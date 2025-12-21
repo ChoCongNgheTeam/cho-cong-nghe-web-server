@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: web_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres} # Lấy từ .env
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-web_db}
+    ports:
+      - "5432:5432" # Chỉ expose nếu dev local; production nên remove
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: . # Dockerfile ở thư mục backend
+    # Hoặc image: node:20, rồi volumes code vào
+    container_name: web_backend
+    restart: always
+    environment:
+      - NODE_ENV=development # Hoặc production
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} # Connect qua network
+    ports:
+      - "3000:3000" # Port BE expose
+    volumes:
+      - .:/app # Bind mount code cho dev hot-reload
+      - /app/node_modules # Tránh override node_modules
+    networks:
+      - app_network
+    depends_on:
+      postgres:
+        condition: service_healthy # Chờ DB healthy
+    command: sh -c "npx prisma generate && npm run dev"
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
