@@ -6,7 +6,7 @@
     "rootDir": ".",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/app/*"]
+      "@/*": ["src/*"]
     },
     "outDir": "dist",
     "strict": true,

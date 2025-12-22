@@ -28,7 +28,7 @@ services:
       - NODE_ENV=development # Hoặc production
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} # Connect qua network
     ports:
-      - "3000:3000" # Port BE expose
+      - "5000:5000" # Port BE expose
     volumes:
       - .:/app # Bind mount code cho dev hot-reload
       - /app/node_modules # Tránh override node_modules

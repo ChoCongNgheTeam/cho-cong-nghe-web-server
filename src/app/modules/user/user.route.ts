@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { validate } from "@/middlewares/validate.middleware";
+import { validate } from "@/app/middlewares/validate.middleware";
 import {
   getUsersHandler,
   getUserByIdHandler,
@@ -10,8 +10,8 @@ import {
   updateMeHandler,
 } from "./user.controller";
 import { createUserSchema, updateUserSchema, updateProfileSchema } from "./user.validation";
-import { authMiddleware } from "@/middlewares/auth.middleware";
-import { requireRole } from "@/middlewares/role.middleware";
+import { authMiddleware } from "@/app/middlewares/auth.middleware";
+import { requireRole } from "@/app/middlewares/role.middleware";
 
 const router = Router();
 

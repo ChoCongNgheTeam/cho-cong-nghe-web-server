@@ -104,3 +104,157 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Email hoặc mật khẩu không đúng
+  /auth/forgot-password:
+    post:
+      summary: Yêu cầu đặt lại mật khẩu
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        "200":
+          description: Yêu cầu thành công (dù email có tồn tại hay không để tránh lộ thông tin)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Nếu email tồn tại, link reset đã được gửi
+        "400":
+          description: Dữ liệu không hợp lệ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Quá nhiều yêu cầu (rate limit)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Quá nhiều yêu cầu đặt lại mật khẩu. Vui lòng thử lại sau 15 phút.
+
+  /auth/reset-password:
+    get:
+      summary: Xác thực token reset password và redirect về frontend
+      tags: [Auth]
+      description: |
+        Endpoint này nhận token qua query params và redirect người dùng về trang reset password trên frontend.
+        Không trả về JSON mà redirect trực tiếp.
+      parameters:
+        - in: query
+          name: token
+          schema:
+            type: string
+          required: true
+          description: Token đặt lại mật khẩu
+      responses:
+        "302":
+          description: Redirect đến trang reset password trên frontend
+        "400":
+          description: Token không hợp lệ hoặc thiếu
+
+    post:
+      summary: Đặt lại mật khẩu mới
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - password
+              properties:
+                token:
+                  type: string
+                  description: Token nhận từ email reset password
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                password:
+                  type: string
+                  format: password
+                  description: Mật khẩu mới
+                  example: newPassword123
+      responses:
+        "200":
+          description: Đặt lại mật khẩu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Đặt lại mật khẩu thành công
+        "400":
+          description: Dữ liệu không hợp lệ hoặc token không hợp lệ/hết hạn
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "410":
+          description: Token đã hết hạn hoặc đã được sử dụng
+  /auth/change-password:
+    post:
+      summary: Đổi mật khẩu (người dùng đã đăng nhập)
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - currentPassword
+                - newPassword
+                - confirmNewPassword
+              properties:
+                currentPassword:
+                  type: string
+                  format: password
+                  example: oldPassword123
+                newPassword:
+                  type: string
+                  format: password
+                  example: NewPassword123
+                confirmNewPassword:
+                  type: string
+                  format: password
+                  example: NewPassword123
+      responses:
+        "200":
+          description: Đổi mật khẩu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Đổi mật khẩu thành công
+        "400":
+          description: Dữ liệu không hợp lệ hoặc mật khẩu hiện tại sai
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Chưa đăng nhập

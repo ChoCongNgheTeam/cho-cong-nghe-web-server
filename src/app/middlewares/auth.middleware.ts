@@ -1,8 +1,6 @@
 import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
-import { jwtConfig } from "@/config/jwt";
-import prisma from "@/config/db";
-import { verifyAccessToken } from "@/services/token.service";
+import prisma from "src/config/db";
+import { verifyAccessToken } from "src/services/token.service";
 
 export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   try {

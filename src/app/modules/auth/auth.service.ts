@@ -1,64 +1,57 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import prisma from "@/config/db";
-import { jwtConfig } from "@/config/jwt";
+import { jwtConfig } from "src/config/jwt";
 import { RegisterInput, LoginInput, ResetPasswordInput } from "./auth.validation";
-import { signAccessToken } from "@/services/token.service";
-
-// Giả lập lưu reset token (thực tế nên dùng Redis)
-const resetTokens = new Map<string, { userId: string; expiresAt: number }>();
+import { signAccessToken } from "src/services/token.service";
+import {
+  findByEmailOrUserName,
+  findByUserName,
+  findByEmail,
+  createUser,
+  updatePassword,
+  createPasswordResetToken,
+  findPasswordResetToken,
+  deletePasswordResetToken,
+} from "./auth.repository";
+import { sendResetPasswordEmail } from "@/services/email.service";
+import { forgotPasswordRateLimit } from "@/utils/rateLimiter";
+import { Request } from "express";
+import prisma from "prisma/client";
 
 export const register = async (input: RegisterInput) => {
   const { email, password, ...rest } = input;
 
-  const existingUser = await prisma.users.findUnique({ where: { email } });
-  if (existingUser) {
-    throw new Error("Email đã được sử dụng");
-  }
+  const existedUser = await findByEmailOrUserName(email, rest.userName);
 
-  const existingUsername = await prisma.users.findUnique({ where: { userName: rest.userName } });
-  if (existingUsername) {
+  if (existedUser) {
+    if (existedUser.email === email) {
+      throw new Error("Email đã được sử dụng");
+    }
     throw new Error("Username đã được sử dụng");
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  return prisma.users.create({
-    data: {
-      email,
-      passwordHash,
-      role: "CUSTOMER",
-      ...rest,
-    },
-    select: {
-      id: true,
-      email: true,
-      userName: true,
-      fullName: true,
-      role: true,
-      createdAt: true,
-    },
+  return createUser({
+    email,
+    passwordHash,
+    role: "CUSTOMER",
+    ...rest,
   });
 };
 
 export const login = async (input: LoginInput) => {
-  const { email, password } = input;
+  const { userName, password } = input;
 
-  const user = await prisma.users.findUnique({
-    where: { email },
-  });
+  const user = await findByUserName(userName);
 
-  if (!user || !user.passwordHash) {
-    throw new Error("Email hoặc mật khẩu không đúng");
+  if (!user || !user.isActive) {
+    throw new Error("Tài khoản hoặc mật khẩu không đúng");
   }
 
   const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
   if (!isPasswordValid) {
-    throw new Error("Email hoặc mật khẩu không đúng");
-  }
-
-  if (!user.isActive) {
-    throw new Error("Tài khoản của bạn đã bị khóa");
+    throw new Error("Tài khoản hoặc mật khẩu không đúng");
   }
 
   const token = signAccessToken({
@@ -78,23 +71,27 @@ export const login = async (input: LoginInput) => {
   };
 };
 
-export const forgotPassword = async (email: string) => {
-  const user = await prisma.users.findUnique({ where: { email } });
+export const forgotPassword = async (email: string, req: Request) => {
+  // Rate limit bắt buộc
+  forgotPasswordRateLimit(req);
+
+  const user = await findByEmail(email);
   if (!user) {
-    // Không báo lỗi để tránh lộ email tồn tại
-    return { message: "Nếu email tồn tại, link reset sẽ được gửi" };
+    return { message: "Nếu email tồn tại, link reset đã được gửi" };
   }
 
   const resetToken = jwt.sign({ userId: user.id }, jwtConfig.secret, {
     expiresIn: "1h",
   });
 
-  const expiresAt = Date.now() + jwtConfig.resetTokenExpiresIn * 1000;
-  resetTokens.set(resetToken, { userId: user.id, expiresAt });
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-  // TODO: Gửi email thực tế (Nodemailer, Resend, etc.)
-  console.log("🔗 Link reset password (dev only):");
-  console.log(`http://localhost:3000/auth/reset-password?token=${resetToken}`);
+  // Lưu vào DB (one-time token)
+  await createPasswordResetToken(user.id, resetToken, expiresAt);
+
+  const resetLink = `${process.env.FRONTEND_URL}/auth/reset-password?token=${resetToken}`;
+
+  await sendResetPasswordEmail(user.email, resetLink);
 
   return { message: "Nếu email tồn tại, link reset đã được gửi" };
 };
@@ -109,19 +106,44 @@ export const resetPassword = async (input: ResetPasswordInput) => {
     throw new Error("Token không hợp lệ hoặc đã hết hạn");
   }
 
-  const stored = resetTokens.get(token);
-  if (!stored || stored.userId !== decoded.userId || Date.now() > stored.expiresAt) {
+  // Tìm token trong DB
+  const resetRecord = await findPasswordResetToken(token);
+
+  if (!resetRecord || resetRecord.userId !== decoded.userId || new Date() > resetRecord.expiresAt) {
     throw new Error("Token không hợp lệ hoặc đã hết hạn");
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  await prisma.users.update({
-    where: { id: decoded.userId },
-    data: { passwordHash },
-  });
+  await updatePassword(decoded.userId, passwordHash);
 
-  resetTokens.delete(token); // xóa token sau khi dùng
+  // Xóa token ngay sau khi dùng (one-time)
+  await deletePasswordResetToken(token);
 
   return { message: "Đặt lại mật khẩu thành công" };
+};
+
+export const changePassword = async (
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+) => {
+  // Lấy user kèm passwordHash
+  const user = await prisma.users.findUnique({
+    where: { id: userId },
+    select: { passwordHash: true },
+  });
+
+  if (!user || !user.passwordHash) {
+    throw new Error("Không thể đổi mật khẩu cho tài khoản này");
+  }
+
+  const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!isValid) {
+    throw new Error("Mật khẩu hiện tại không đúng");
+  }
+
+  const newHash = await bcrypt.hash(newPassword, 10);
+
+  await updatePassword(userId, newHash);
 };

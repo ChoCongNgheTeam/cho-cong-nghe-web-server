@@ -1,5 +1,5 @@
 import jwt, { SignOptions } from "jsonwebtoken";
-import { jwtConfig } from "@/config/jwt";
+import { jwtConfig } from "src/config/jwt";
 
 export interface AccessTokenPayload {
   userId: string;
