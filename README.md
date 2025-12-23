@@ -114,7 +114,7 @@ Hoặc check trực tiếp trong DBeaver/pgAdmin.
 ### 8. Chạy Development Server
 
 ```bash
-npm run dev
+docker compose up -d
 ```
 
 Server sẽ chạy tại: `http://localhost:5000`
