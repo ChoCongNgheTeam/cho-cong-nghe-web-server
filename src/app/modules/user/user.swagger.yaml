@@ -1,0 +1,537 @@
+paths:
+  /users/me:
+    get:
+      summary: Lấy thông tin người dùng hiện tại
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lấy thông tin thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/User"
+              example:
+                data:
+                  id: "545528af-0b9c-4fe4-bbad-45965e067e06"
+                  userName: "khanhduy23"
+                  email: "lukila@gmail.com"
+                  fullName: "Nguyễn Văn A"
+                  phone: "0123456789"
+                  gender: "MALE"
+                  role: "CUSTOMER"
+                  isActive: true
+                  avatarImage: null
+                  createdAt: "2025-12-23T13:04:43.506Z"
+                  updatedAt: "2025-12-23T13:43:10.118Z"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          description: Không tìm thấy thông tin người dùng
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                message: "Không tìm thấy thông tin người dùng"
+
+    patch:
+      summary: Cập nhật hồ sơ cá nhân
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName:
+                  type: string
+                  minLength: 3
+                  maxLength: 100
+                phone:
+                  type: string
+                  pattern: "^0\\d{9}$"
+                gender:
+                  type: string
+                  enum: [MALE, FEMALE, OTHER]
+                avatarImage:
+                  type: string
+                  format: uri
+            example:
+              fullName: "Nguyễn Văn A"
+              phone: "0987654321"
+              gender: "MALE"
+              avatarImage: "https://example.com/avatar.jpg"
+      responses:
+        "200":
+          description: Cập nhật hồ sơ thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/User"
+                  message:
+                    type: string
+              example:
+                data:
+                  id: "545528af-0b9c-4fe4-bbad-45965e067e06"
+                  userName: "khanhduy23"
+                  email: "lukila@gmail.com"
+                  fullName: "Nguyễn Văn A"
+                  phone: "0987654321"
+                  gender: "MALE"
+                  role: "CUSTOMER"
+                  isActive: true
+                  avatarImage: "https://example.com/avatar.jpg"
+                  createdAt: "2025-12-23T13:04:43.506Z"
+                  updatedAt: "2025-12-23T13:43:10.118Z"
+                message: "Cập nhật hồ sơ cá nhân thành công"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "409":
+          description: Dữ liệu bị trùng
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                message: "Email đã được sử dụng"
+
+  /users:
+    get:
+      summary: Lấy danh sách tất cả người dùng (Admin only)
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lấy danh sách thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+                  total:
+                    type: integer
+                  message:
+                    type: string
+              example:
+                data:
+                  - id: "545528af-0b9c-4fe4-bbad-45965e067e06"
+                    userName: "khanhduy23"
+                    email: "lukila@gmail.com"
+                    fullName: "Nguyễn Văn A"
+                    phone: "0123456789"
+                    gender: "MALE"
+                    role: "CUSTOMER"
+                    isActive: true
+                    avatarImage: null
+                    createdAt: "2025-12-23T13:04:43.506Z"
+                    updatedAt: "2025-12-23T13:43:10.118Z"
+                  - id: "645528af-0b9c-4fe4-bbad-45965e067e07"
+                    userName: "admin"
+                    email: "admin@gmail.com"
+                    fullName: "Admin User"
+                    phone: "0987654321"
+                    gender: "MALE"
+                    role: "ADMIN"
+                    isActive: true
+                    avatarImage: null
+                    createdAt: "2025-12-20T10:00:00.000Z"
+                    updatedAt: "2025-12-20T10:00:00.000Z"
+                total: 2
+                message: "Lấy danh sách người dùng thành công"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+    post:
+      summary: Tạo người dùng mới (Admin only)
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userName
+                - email
+                - password
+                - fullName
+              properties:
+                userName:
+                  type: string
+                  minLength: 3
+                  maxLength: 30
+                  pattern: "^[a-zA-Z0-9_]+$"
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 6
+                  pattern: "^(?=.*[A-Z])(?=.*\\d)[A-Za-z\\d@$!%*?&]+$"
+                  description: Phải có chữ hoa, số và không chứa ký tự có dấu
+                fullName:
+                  type: string
+                  minLength: 3
+                  maxLength: 100
+                phone:
+                  type: string
+                  pattern: "^0\\d{9}$"
+                gender:
+                  type: string
+                  enum: [MALE, FEMALE, OTHER]
+                role:
+                  type: string
+                  enum: [CUSTOMER, ADMIN, STAFF]
+                  default: CUSTOMER
+                isActive:
+                  type: boolean
+                  default: true
+                avatarImage:
+                  type: string
+                  format: uri
+            example:
+              userName: "newuser123"
+              email: "newuser@example.com"
+              password: "Password123"
+              fullName: "Nguyễn Văn B"
+              phone: "0912345678"
+              gender: "MALE"
+              role: "CUSTOMER"
+              isActive: true
+      responses:
+        "201":
+          description: Tạo người dùng thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/User"
+                  message:
+                    type: string
+              example:
+                data:
+                  id: "745528af-0b9c-4fe4-bbad-45965e067e08"
+                  userName: "newuser123"
+                  email: "newuser@example.com"
+                  fullName: "Nguyễn Văn B"
+                  phone: "0912345678"
+                  gender: "MALE"
+                  role: "CUSTOMER"
+                  isActive: true
+                  avatarImage: null
+                  createdAt: "2025-12-23T14:00:00.000Z"
+                  updatedAt: "2025-12-23T14:00:00.000Z"
+                message: "Tạo người dùng thành công"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "409":
+          description: Email hoặc username đã tồn tại
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                message: "Email đã được sử dụng"
+
+  /users/{id}:
+    get:
+      summary: Lấy thông tin người dùng theo ID (Admin only)
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID của người dùng
+          example: "545528af-0b9c-4fe4-bbad-45965e067e06"
+      responses:
+        "200":
+          description: Lấy người dùng thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/User"
+                  message:
+                    type: string
+              example:
+                data:
+                  id: "545528af-0b9c-4fe4-bbad-45965e067e06"
+                  userName: "khanhduy23"
+                  email: "lukila@gmail.com"
+                  fullName: "Nguyễn Văn A"
+                  phone: "0123456789"
+                  gender: "MALE"
+                  role: "CUSTOMER"
+                  isActive: true
+                  avatarImage: null
+                  createdAt: "2025-12-23T13:04:43.506Z"
+                  updatedAt: "2025-12-23T13:43:10.118Z"
+                message: "Lấy người dùng thành công"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          description: Không tìm thấy người dùng
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                message: "Không tìm thấy người dùng"
+
+    patch:
+      summary: Cập nhật thông tin người dùng (Admin only)
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID của người dùng
+          example: "545528af-0b9c-4fe4-bbad-45965e067e06"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userName:
+                  type: string
+                  minLength: 3
+                  maxLength: 30
+                  pattern: "^[a-zA-Z0-9_]+$"
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 6
+                  pattern: "^(?=.*[A-Z])(?=.*\\d)[A-Za-z\\d@$!%*?&]+$"
+                  description: Phải có chữ hoa, số và không chứa ký tự có dấu
+                fullName:
+                  type: string
+                  minLength: 3
+                  maxLength: 100
+                phone:
+                  type: string
+                  pattern: "^0\\d{9}$"
+                gender:
+                  type: string
+                  enum: [MALE, FEMALE, OTHER]
+                role:
+                  type: string
+                  enum: [CUSTOMER, ADMIN, STAFF]
+                isActive:
+                  type: boolean
+                avatarImage:
+                  type: string
+                  format: uri
+            example:
+              fullName: "Nguyễn Văn A Updated"
+              phone: "0987654321"
+              isActive: false
+      responses:
+        "200":
+          description: Cập nhật người dùng thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/User"
+                  message:
+                    type: string
+              example:
+                data:
+                  id: "545528af-0b9c-4fe4-bbad-45965e067e06"
+                  userName: "khanhduy23"
+                  email: "lukila@gmail.com"
+                  fullName: "Nguyễn Văn A Updated"
+                  phone: "0987654321"
+                  gender: "MALE"
+                  role: "CUSTOMER"
+                  isActive: false
+                  avatarImage: null
+                  createdAt: "2025-12-23T13:04:43.506Z"
+                  updatedAt: "2025-12-23T14:30:00.000Z"
+                message: "Cập nhật người dùng thành công"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          description: Không tìm thấy người dùng
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                message: "Không tìm thấy người dùng"
+        "409":
+          description: Email hoặc username đã được sử dụng
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                message: "Email đã được sử dụng"
+
+    delete:
+      summary: Xóa người dùng (Admin only)
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID của người dùng
+          example: "545528af-0b9c-4fe4-bbad-45965e067e06"
+      responses:
+        "204":
+          description: Xóa người dùng thành công (không có nội dung trả về)
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          description: Không tìm thấy người dùng để xóa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                message: "Không tìm thấy người dùng để xóa"
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userName:
+          type: string
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        phone:
+          type: string
+        gender:
+          type: string
+          enum: [MALE, FEMALE, OTHER]
+          nullable: true
+        role:
+          type: string
+          enum: [CUSTOMER, ADMIN, STAFF]
+        isActive:
+          type: boolean
+        avatarImage:
+          type: string
+          format: uri
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: string
+
+  responses:
+    UnauthorizedError:
+      description: Chưa xác thực hoặc token không hợp lệ
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            message: "Không có token, truy cập bị từ chối"
+
+    ForbiddenError:
+      description: Không có quyền truy cập (chỉ ADMIN)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            message: "Bạn không có quyền truy cập tài nguyên này"
+
+    ValidationError:
+      description: Dữ liệu không hợp lệ
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            message: "Dữ liệu không hợp lệ"
+            errors:
+              email: "Email không hợp lệ"
+              password: "Mật khẩu phải ít nhất 6 ký tự"
+              phone: "Số điện thoại không hợp lệ"
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Nhập JWT token (không cần thêm 'Bearer ' ở đầu)"

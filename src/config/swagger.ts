@@ -1,4 +1,5 @@
 import swaggerJSDoc from "swagger-jsdoc";
+import "dotenv/config";
 
 const options = {
   definition: {
@@ -10,7 +11,7 @@ const options = {
     },
     servers: [
       {
-        url: "http://localhost:5000/api/v1", // thay port nếu khác
+        url: `${process.env.API_BASE_URL}/api/v1`,
         description: "Development server",
       },
     ],

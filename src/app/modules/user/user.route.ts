@@ -18,10 +18,10 @@ const router = Router();
 // Public
 router.get("/me", authMiddleware, getMeHandler);
 router.patch("/me", authMiddleware, validate(updateProfileSchema), updateMeHandler);
-router.get("/:id", authMiddleware, getUserByIdHandler);
 
 // Admin only
 router.get("/", authMiddleware, requireRole("ADMIN"), getUsersHandler);
+router.get("/:id", authMiddleware, requireRole("ADMIN"), getUserByIdHandler);
 router.post(
   "/",
   authMiddleware,

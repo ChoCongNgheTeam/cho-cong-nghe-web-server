@@ -1,8 +1,8 @@
-// src/user/user.service.ts
 import bcrypt from "bcryptjs";
 import * as userRepository from "./user.repository";
 import { CreateUserInput, UpdateUserInput } from "./user.validation";
 import { Prisma } from "@prisma/client";
+import { DuplicateError } from "@/utils/errors";
 
 export const getUsers = async () => {
   return userRepository.findAll();
@@ -24,13 +24,7 @@ export const createUser = async (input: CreateUserInput) => {
   } catch (error: any) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const field = (error.meta?.target as string[])?.[0];
-      throw new Error(
-        field === "email"
-          ? "Email đã được sử dụng"
-          : field === "userName"
-          ? "Username đã được sử dụng"
-          : "Dữ liệu bị trùng"
-      );
+      throw new DuplicateError(field === "email" ? "Email" : "Username");
     }
     throw error;
   }
@@ -38,11 +32,20 @@ export const createUser = async (input: CreateUserInput) => {
 
 export const updateUser = async (id: string, input: UpdateUserInput) => {
   try {
-    return await userRepository.update(id, input);
+    //  Hash password nếu có trong input (check với FE)
+    const updateData = { ...input };
+
+    if (updateData.password) {
+      const passwordHash = await bcrypt.hash(updateData.password, 10);
+      delete (updateData as any).password;
+      (updateData as any).passwordHash = passwordHash;
+    }
+
+    return await userRepository.update(id, updateData);
   } catch (error: any) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const field = (error.meta?.target as string[])?.[0];
-      throw new Error(field === "email" ? "Email đã được sử dụng" : "Dữ liệu bị trùng");
+      throw new DuplicateError(field === "email" ? "Email" : "Username");
     }
     throw error;
   }

@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import {
   getUsers as getUsersService,
   getUserById as getUserByIdService,
@@ -7,7 +7,6 @@ import {
   deleteUser as deleteUserService,
 } from "./user.service";
 
-// GET /users - Admin only
 export const getUsersHandler = async (req: Request, res: Response) => {
   try {
     const users = await getUsersService();
@@ -21,20 +20,18 @@ export const getUsersHandler = async (req: Request, res: Response) => {
   }
 };
 
-// GET /users/:id
 export const getUserByIdHandler = async (req: Request, res: Response) => {
   try {
     const user = await getUserByIdService(req.params.id);
     if (!user) {
       return res.status(404).json({ message: "Không tìm thấy người dùng" });
     }
-    res.json({ data: user });
+    res.json({ data: user, message: "Lấy người dùng thành công" });
   } catch (error: any) {
     res.status(500).json({ message: error.message || "Lỗi server" });
   }
 };
 
-// POST /users - Admin only
 export const createUserHandler = async (req: Request, res: Response) => {
   try {
     const user = await createUserService(req.body);
@@ -49,7 +46,6 @@ export const createUserHandler = async (req: Request, res: Response) => {
   }
 };
 
-// PATCH /users/:id - Admin only
 export const updateUserHandler = async (req: Request, res: Response) => {
   try {
     const user = await updateUserService(req.params.id, req.body);
@@ -68,7 +64,6 @@ export const updateUserHandler = async (req: Request, res: Response) => {
   }
 };
 
-// DELETE /users/:id - Admin only
 export const deleteUserHandler = async (req: Request, res: Response) => {
   try {
     await deleteUserService(req.params.id);
@@ -81,21 +76,23 @@ export const deleteUserHandler = async (req: Request, res: Response) => {
   }
 };
 
-// GET /users/me
 export const getMeHandler = async (req: Request, res: Response) => {
-  if (!req.user?.id) {
-    return res.status(401).json({ message: "Chưa xác thực" });
-  }
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ message: "Chưa xác thực" });
+    }
 
-  const user = await getUserByIdService(req.user.id);
-  if (!user) {
-    return res.status(404).json({ message: "Không tìm thấy thông tin người dùng" });
-  }
+    const user = await getUserByIdService(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy thông tin người dùng" });
+    }
 
-  res.json({ data: user });
+    res.json({ data: user });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || "Lỗi server" });
+  }
 };
 
-// PATCH /users/me
 export const updateMeHandler = async (req: Request, res: Response) => {
   if (!req.user?.id) {
     return res.status(401).json({ message: "Chưa xác thực" });

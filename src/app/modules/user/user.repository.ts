@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import prisma from "src/config/db";
 
 const selectUserWithoutPassword = {
@@ -13,6 +14,9 @@ const selectUserWithoutPassword = {
   createdAt: true,
   updatedAt: true,
 };
+
+type CreateUserData = Prisma.usersCreateInput;
+type UpdateUserData = Prisma.usersUpdateInput;
 
 export const findAll = async () => {
   return prisma.users.findMany({
@@ -34,14 +38,14 @@ export const findByEmail = async (email: string) => {
   });
 };
 
-export const create = async (data: any) => {
+export const create = async (data: CreateUserData) => {
   return prisma.users.create({
     data,
     select: selectUserWithoutPassword,
   });
 };
 
-export const update = async (id: string, data: any) => {
+export const update = async (id: string, data: UpdateUserData) => {
   return prisma.users.update({
     where: { id },
     data,
