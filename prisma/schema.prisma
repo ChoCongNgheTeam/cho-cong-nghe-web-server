@@ -136,6 +136,7 @@ model categories {
   parent            categories?          @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children          categories[]         @relation("CategoryHierarchy")
   productCategories product_categories[]
+  @@unique([parentId, position])
 }
 
 model product_categories {

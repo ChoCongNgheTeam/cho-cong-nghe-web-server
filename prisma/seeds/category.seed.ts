@@ -1,63 +1,40 @@
 import { PrismaClient } from "@prisma/client";
-import { generateUniqueSlug } from "./utils";
+import { seedCategoryGroup } from "@/utils/seed-category-helper";
+import {
+  phoneCategoryData,
+  laptopCategoryData,
+  dienMayCategoryData,
+  phuKienCategoryData,
+  congNgheThietBiSoData,
+} from "../seed-data/categories";
 
 const prisma = new PrismaClient();
 
-const categoryData = [
-  {
-    name: "Điện thoại",
-    slug: "dien-thoai",
-    description: "Điện thoại cơ bản",
-    categoryImage: "./images/categories/dien-thoai.png",
-  },
-  { name: "Laptop", slug: "laptop" },
-  { name: "Phụ kiện", slug: "phu-kien" },
-  { name: "Tai nghe", slug: "tai-nghe", parentName: "Phụ kiện" },
-  { name: "iPhone", slug: "iphone", parentName: "Điện thoại" },
-  { name: "Galaxy", slug: "galaxy", parentName: "Điện thoại" },
-];
-
 export async function seedCategories() {
-  console.log("Seeding categories...");
+  console.log("🌱 Seeding categories...");
 
-  const created: any[] = [];
+  const allCreated = [];
 
-  // Tạo root categories trước
-  for (const cat of categoryData.filter((c) => !c.parentName)) {
-    const slug = cat.slug || (await generateUniqueSlug(prisma.categories, cat.name));
-    const category = await prisma.categories.upsert({
-      where: { name: cat.name },
-      update: {},
-      create: {
-        name: cat.name,
-        slug,
-        description: cat.description,
-        categoryImage: cat.categoryImage,
-      },
-    });
-    created.push(category);
-  }
+  // Seed từng nhóm
+  const phoneCategories = await seedCategoryGroup(prisma, phoneCategoryData, "Điện thoại");
+  allCreated.push(...phoneCategories);
 
-  // Tạo children (cần parent đã tồn tại)
-  for (const cat of categoryData.filter((c) => c.parentName)) {
-    const parent = await prisma.categories.findUnique({ where: { name: cat.parentName! } });
-    if (!parent) throw new Error(`Parent category ${cat.parentName} không tồn tại`);
+  const laptopCategories = await seedCategoryGroup(prisma, laptopCategoryData, "Laptop");
+  allCreated.push(...laptopCategories);
 
-    const slug = cat.slug || (await generateUniqueSlug(prisma.categories, cat.name));
-    const category = await prisma.categories.upsert({
-      where: { name: cat.name },
-      update: {},
-      create: {
-        name: cat.name,
-        slug,
-        description: cat.description,
-        categoryImage: cat.categoryImage,
-        parentId: parent.id,
-      },
-    });
-    created.push(category);
-  }
+  const dienmayCategories = await seedCategoryGroup(prisma, dienMayCategoryData, "Điện máy");
+  allCreated.push(...dienmayCategories);
 
-  console.log(`🚶‍➡️    Đã tạo ${created.length} categories`);
-  return created;
+  const phuKienCategories = await seedCategoryGroup(prisma, phuKienCategoryData, "Phụ kiện");
+  allCreated.push(...phuKienCategories);
+
+  const congNgheThietBiSoCategories = await seedCategoryGroup(
+    prisma,
+    congNgheThietBiSoData,
+    "Công nghệ & thiết bị số"
+  );
+  allCreated.push(...congNgheThietBiSoCategories);
+
+  console.log(`\n✨ Tổng cộng đã tạo ${allCreated.length} categories\n`);
+  return allCreated;
 }
