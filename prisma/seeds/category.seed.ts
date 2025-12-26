@@ -6,6 +6,10 @@ import {
   dienMayCategoryData,
   phuKienCategoryData,
   congNgheThietBiSoData,
+  chamSocNhaCuaSucKhoeData,
+  thietBiGiaDinhData,
+  thietBiNhaBepData,
+  ketNoiTienIchGiaiTriData,
 } from "../seed-data/categories";
 
 const prisma = new PrismaClient();
@@ -34,6 +38,35 @@ export async function seedCategories() {
     "Công nghệ & thiết bị số"
   );
   allCreated.push(...congNgheThietBiSoCategories);
+
+  const chamSocNhaCuaSucKhoeCategories = await seedCategoryGroup(
+    prisma,
+    chamSocNhaCuaSucKhoeData,
+    "Chăm sóc nhà cửa & sức khỏe"
+  );
+
+  allCreated.push(...chamSocNhaCuaSucKhoeCategories);
+
+  const thietBiGiaDinhCategories = await seedCategoryGroup(
+    prisma,
+    thietBiGiaDinhData,
+    "Thiết bị gia đình"
+  );
+  allCreated.push(...thietBiGiaDinhCategories);
+
+  const thietBiNhaBepCategories = await seedCategoryGroup(
+    prisma,
+    thietBiNhaBepData,
+    "Thiết bị nhà bếp"
+  );
+  allCreated.push(...thietBiNhaBepCategories);
+
+  const ketNoiTienIchGiaiTriCategories = await seedCategoryGroup(
+    prisma,
+    ketNoiTienIchGiaiTriData,
+    "Kết nối, tiện ích & giải trí"
+  );
+  allCreated.push(...ketNoiTienIchGiaiTriCategories);
 
   console.log(`\n✨ Tổng cộng đã tạo ${allCreated.length} categories\n`);
   return allCreated;
