@@ -1,9 +1,13 @@
 import { Request, Response, NextFunction } from "express";
 import { ZodSchema } from "zod";
 
+type RequestPart = "body" | "query" | "params";
+
 export const validate =
-  (schema: ZodSchema) => (req: Request, res: Response, next: NextFunction) => {
-    const result = schema.safeParse(req.body);
+  (schema: ZodSchema, source: RequestPart = "body") =>
+  (req: Request, res: Response, next: NextFunction) => {
+    const dataToValidate = req[source];
+    const result = schema.safeParse(dataToValidate);
 
     if (!result.success) {
       const flattened = result.error.flatten((issue) => issue.message);
@@ -22,6 +26,20 @@ export const validate =
       });
     }
 
-    req.body = result.data;
+    // --- PHẦN SỬA LỖI BẮT ĐẦU TẠI ĐÂY ---
+    // Nếu source là query, dùng defineProperty để tránh lỗi getter-only
+    if (source === "query") {
+      Object.defineProperty(req, "query", {
+        value: result.data,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+    } else {
+      // Body và Params thường gán bình thường được
+      req[source] = result.data;
+    }
+    // --- KẾT THÚC PHẦN SỬA LỖI ---
+
     next();
   };
