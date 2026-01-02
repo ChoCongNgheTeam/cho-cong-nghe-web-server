@@ -50,6 +50,12 @@ enum VoucherActionType {
   BUY_X_GET_Y
 }
 
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 // --------------------- MODELS ---------------------
 
 model users {
@@ -341,7 +347,7 @@ model reviews {
   orderItemId String   @unique @db.Uuid
   rating      Int
   comment     String?
-  isApproved  Boolean  @default(false)
+  isApproved  ReviewStatus @default(PENDING)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
