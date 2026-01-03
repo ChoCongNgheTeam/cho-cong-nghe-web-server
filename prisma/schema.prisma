@@ -39,6 +39,14 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum PaymentTransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+
 enum DiscountType {
   PERCENTAGE
   FIXED
@@ -326,6 +334,7 @@ model orders {
   shippingAddress user_addresses   @relation(fields: [shippingAddressId], references: [id])
   orderItems      order_items[]
   voucherUsages   voucher_usages[]
+  transactions    payment_transactions[]
 }
 
 model order_items {
@@ -364,7 +373,27 @@ model payment_methods {
   updatedAt   DateTime @updatedAt
 
   orders orders[]
+  payment_transactions payment_transactions[]
 }
+
+model payment_transactions {
+  id              String   @id @default(uuid()) @db.Uuid
+
+  orderId         String   @db.Uuid
+  paymentMethodId String   @db.Uuid
+
+  amount          Decimal  @db.Decimal(10, 2)
+  transactionRef  String?
+  status          PaymentTransactionStatus
+  payload         Json?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  order           orders            @relation(fields: [orderId], references: [id])
+  paymentMethod   payment_methods   @relation(fields: [paymentMethodId], references: [id])
+}
+
 
 model vouchers {
   id             String       @id @default(uuid()) @db.Uuid

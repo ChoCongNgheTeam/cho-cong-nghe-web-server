@@ -1,0 +1,160 @@
+paths:
+  # Public - FE lấy danh sách để render select
+  /payments/active:
+    get:
+      summary: Lấy danh sách phương thức thanh toán đang hoạt động
+      tags: [Payments - Public]
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PaymentMethod"
+                  message:
+                    type: string
+
+  # Admin
+  /payments/admin/all:
+    get:
+      summary: Lấy tất cả phương thức thanh toán (Admin)
+      tags: [Payments - Admin]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PaymentMethod"
+                  total:
+                    type: integer
+                  message:
+                    type: string
+
+  /payments/admin:
+    post:
+      summary: Tạo phương thức thanh toán mới (Admin)
+      tags: [Payments - Admin]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                isActive:
+                  type: boolean
+                  default: true
+      responses:
+        "201":
+          description: Tạo thành công
+
+  /payments/admin/{id}:
+    patch:
+      summary: Cập nhật phương thức thanh toán (Admin)
+      tags: [Payments - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                isActive:
+                  type: boolean
+      responses:
+        "200":
+          description: Cập nhật thành công
+
+    delete:
+      summary: Xóa phương thức thanh toán (Admin)
+      tags: [Payments - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Xóa thành công
+
+  /payments/webhook:
+    post:
+      summary: Webhook nhận thông báo thanh toán từ bên thứ 3
+      tags: [Payments - Webhook]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                orderId:
+                  type: string
+                transactionRef:
+                  type: string
+                status:
+                  type: string
+                  enum: [COMPLETED, FAILED, REFUNDED]
+      responses:
+        "200":
+          description: Xử lý thành công
+        "400":
+          description: Lỗi xử lý webhook
+
+components:
+  schemas:
+    PaymentMethod:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time

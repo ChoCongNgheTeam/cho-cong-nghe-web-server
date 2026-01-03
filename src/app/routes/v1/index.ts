@@ -6,6 +6,7 @@ import categoryRoutes from "@/app/modules/category/category.route";
 import productRoutes from "@/app/modules/product/product.route";
 import orderRoutes from "@/app/modules/order/order.route";
 import reviewRoutes from "@/app/modules/review/review.route";
+import paymentRoutes from "@/app/modules/payment/payment.router";
 
 const router = Router();
 
@@ -15,5 +16,6 @@ router.use("/categories", categoryRoutes);
 router.use("/products", productRoutes);
 router.use("/orders", orderRoutes);
 router.use("/reviews", reviewRoutes);
+router.use("/payments", paymentRoutes);
 
 export default router;
