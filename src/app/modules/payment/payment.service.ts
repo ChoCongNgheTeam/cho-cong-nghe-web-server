@@ -47,7 +47,7 @@ export const handlePaymentWebhook = async (rawPayload: any) => {
       amount: order.totalAmount,
       transactionRef: payload.transactionRef,
       status: "PENDING",
-      payload: Prisma.InputJsonValue,
+      payload: rawPayload as Prisma.InputJsonValue,
     });
   }
 

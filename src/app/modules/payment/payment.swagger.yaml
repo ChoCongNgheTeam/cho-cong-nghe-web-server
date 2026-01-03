@@ -113,29 +113,38 @@ paths:
         "200":
           description: Xóa thành công
 
-  /payments/webhook:
-    post:
-      summary: Webhook nhận thông báo thanh toán từ bên thứ 3
-      tags: [Payments - Webhook]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                orderId:
-                  type: string
-                transactionRef:
-                  type: string
-                status:
-                  type: string
-                  enum: [COMPLETED, FAILED, REFUNDED]
-      responses:
-        "200":
-          description: Xử lý thành công
-        "400":
-          description: Lỗi xử lý webhook
+/payments/webhook:
+  post:
+    summary: Webhook nhận thông báo thanh toán từ bên thứ 3
+    tags: [Payments - Webhook]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - orderId
+              - transactionRef
+              - status
+            properties:
+              orderId:
+                type: string
+                format: uuid
+              transactionRef:
+                type: string
+              status:
+                type: string
+                enum: [COMPLETED, FAILED, REFUNDED]
+          example:
+            orderId: "782c39c6-a4e2-46e9-b29a-6f8c4bbafd87"
+            transactionRef: "TXN_TEST_001"
+            status: "COMPLETED"
+    responses:
+      "200":
+        description: Xử lý thành công
+      "400":
+        description: Lỗi xử lý webhook
 
 components:
   schemas:

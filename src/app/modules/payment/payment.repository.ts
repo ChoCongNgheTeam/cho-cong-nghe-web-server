@@ -1,5 +1,5 @@
 import prisma from "@/config/db";
-import { Prisma } from "@prisma/client";
+import { Prisma, PaymentTransactionStatus } from "@prisma/client";
 
 const paymentMethodSelect = {
   id: true,
@@ -10,24 +10,16 @@ const paymentMethodSelect = {
   updatedAt: true,
 } satisfies Prisma.payment_methodsSelect;
 
-const paymentTransactionSelect = {
+export const paymentTransactionSelect = {
   id: true,
   orderId: true,
   paymentMethodId: true,
   amount: true,
-  transactionRef: true,
   status: true,
+  transactionRef: true,
   payload: true,
   createdAt: true,
-  updatedAt: true,
-
-  paymentMethod: {
-    select: { name: true },
-  },
-  order: {
-    select: { orderStatus: true, paymentStatus: true, totalAmount: true },
-  },
-} satisfies Prisma.payment_transactionsSelect;
+};
 
 export const findAllPaymentMethods = async () => {
   return prisma.payment_methods.findMany({
@@ -82,8 +74,8 @@ export const createPaymentTransaction = async (data: {
   paymentMethodId: string;
   amount: Prisma.Decimal;
   transactionRef?: string;
-  status: string;
-  payload?: Prisma.JsonValue;
+  status: PaymentTransactionStatus;
+  payload?: Prisma.InputJsonValue;
 }) => {
   return prisma.payment_transactions.create({
     data,
