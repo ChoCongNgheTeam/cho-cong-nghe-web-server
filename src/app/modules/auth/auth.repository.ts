@@ -77,3 +77,17 @@ export const deletePasswordResetToken = async (token: string) => {
     where: { token },
   });
 };
+
+export const deleteRefreshToken = async (token: string) => {
+  return prisma.refresh_tokens.deleteMany({
+    where: { token },
+  });
+};
+
+export const createRefreshToken = async (data: {
+  userId: string;
+  token: string;
+  expiresAt: Date;
+}) => {
+  return prisma.refresh_tokens.create({ data });
+};

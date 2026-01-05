@@ -526,7 +526,7 @@ components:
             message: "Dữ liệu không hợp lệ"
             errors:
               email: "Email không hợp lệ"
-              password: "Mật khẩu phải ít nhất 6 ký tự"
+              password: "Mật khẩu phải có chữ hoa, số và không chứa ký tự có dấu"
               phone: "Số điện thoại không hợp lệ"
 
   securitySchemes:

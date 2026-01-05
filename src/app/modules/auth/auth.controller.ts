@@ -1,5 +1,14 @@
 import { Request, Response } from "express";
-import { register, login, forgotPassword, resetPassword, changePassword } from "./auth.service";
+import {
+  register,
+  login,
+  forgotPassword,
+  resetPassword,
+  changePassword,
+  logout,
+} from "./auth.service";
+import { signAccessToken, verifyRefreshToken } from "@/services/token.service";
+import prisma from "prisma/client";
 
 export const registerHandler = async (req: Request, res: Response) => {
   try {
@@ -15,14 +24,65 @@ export const registerHandler = async (req: Request, res: Response) => {
 
 export const loginHandler = async (req: Request, res: Response) => {
   try {
-    const result = await login(req.body);
+    const { accessToken, refreshToken, refreshTokenTTL, user } = await login(req.body);
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: refreshTokenTTL,
+    });
+
     res.json({
-      data: result,
+      accessToken,
+      user,
       message: "Đăng nhập thành công",
     });
   } catch (error: any) {
     res.status(401).json({ message: error.message });
   }
+};
+
+export const refreshTokenHandler = async (req: Request, res: Response) => {
+  try {
+    const token = req.cookies.refreshToken;
+    if (!token) {
+      return res.status(401).json({ message: "No refresh token" });
+    }
+
+    const decoded = verifyRefreshToken(token) as {
+      userId: string;
+      role: string;
+    };
+
+    // CHECK DB
+    const tokenInDb = await prisma.refresh_tokens.findUnique({
+      where: { token },
+    });
+
+    if (!tokenInDb || tokenInDb.expiresAt < new Date()) {
+      return res.status(401).json({ message: "Refresh token không hợp lệ" });
+    }
+
+    const newAccessToken = signAccessToken({
+      userId: decoded.userId,
+      role: decoded.role,
+    });
+
+    res.json({ accessToken: newAccessToken });
+  } catch {
+    res.status(401).json({ message: "Refresh token không hợp lệ" });
+  }
+};
+
+export const logoutHandler = async (req: Request, res: Response) => {
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+  });
+
+  return res.json({ message: "Đăng xuất thành công" });
 };
 
 export const forgotPasswordHandler = async (req: Request, res: Response) => {

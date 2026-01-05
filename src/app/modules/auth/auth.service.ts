@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { jwtConfig } from "src/config/jwt";
 import { RegisterInput, LoginInput, ResetPasswordInput } from "./auth.validation";
-import { signAccessToken } from "src/services/token.service";
+import { signAccessToken, signRefreshToken } from "@/services/token.service";
 import {
   findByEmailOrUserName,
   findByUserName,
@@ -12,6 +12,8 @@ import {
   createPasswordResetToken,
   findPasswordResetToken,
   deletePasswordResetToken,
+  deleteRefreshToken,
+  createRefreshToken,
 } from "./auth.repository";
 import { sendResetPasswordEmail } from "@/services/email.service";
 import { forgotPasswordRateLimit } from "@/utils/rateLimiter";
@@ -24,10 +26,9 @@ export const register = async (input: RegisterInput) => {
   const existedUser = await findByEmailOrUserName(email, rest.userName);
 
   if (existedUser) {
-    if (existedUser.email === email) {
-      throw new Error("Email đã được sử dụng");
+    if (existedUser.email === email || existedUser.userName === rest.userName) {
+      throw new Error("Email hoặc tên đăng nhập đã được sử dụng");
     }
-    throw new Error("Username đã được sử dụng");
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
@@ -36,12 +37,13 @@ export const register = async (input: RegisterInput) => {
     email,
     passwordHash,
     role: "CUSTOMER",
+    avatarImage: "./images/avatar.png",
     ...rest,
   });
 };
 
 export const login = async (input: LoginInput) => {
-  const { userName, password } = input;
+  const { userName, password, rememberMe } = input;
 
   const user = await findByUserName(userName);
 
@@ -54,13 +56,26 @@ export const login = async (input: LoginInput) => {
     throw new Error("Tài khoản hoặc mật khẩu không đúng");
   }
 
-  const token = signAccessToken({
+  const accessToken = signAccessToken({
     userId: user.id,
     role: user.role,
   });
 
+  const refreshTokenTTL = rememberMe
+    ? jwtConfig.refreshToken.ttl.long
+    : jwtConfig.refreshToken.ttl.short;
+  const refreshToken = signRefreshToken({ userId: user.id }, refreshTokenTTL);
+
+  await createRefreshToken({
+    userId: user.id,
+    token: refreshToken,
+    expiresAt: new Date(Date.now() + refreshTokenTTL),
+  });
+
   return {
-    token,
+    accessToken,
+    refreshToken,
+    refreshTokenTTL,
     user: {
       id: user.id,
       email: user.email,
@@ -69,6 +84,12 @@ export const login = async (input: LoginInput) => {
       role: user.role,
     },
   };
+};
+
+export const logout = async (refreshToken?: string) => {
+  if (!refreshToken) return;
+
+  await deleteRefreshToken(refreshToken);
 };
 
 export const forgotPassword = async (email: string, req: Request) => {
@@ -80,9 +101,11 @@ export const forgotPassword = async (email: string, req: Request) => {
     return { message: "Nếu email tồn tại, link reset đã được gửi" };
   }
 
-  const resetToken = jwt.sign({ userId: user.id }, jwtConfig.secret, {
-    expiresIn: "1h",
-  });
+  const resetToken = jwt.sign(
+    { userId: user.id },
+    jwtConfig.resetToken.secret,
+    { expiresIn: jwtConfig.resetToken.expiresIn / 1000 } // ms → s
+  );
 
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
@@ -99,9 +122,10 @@ export const forgotPassword = async (email: string, req: Request) => {
 export const resetPassword = async (input: ResetPasswordInput) => {
   const { token, password } = input;
 
-  let decoded: any;
+  let decoded: { userId: string };
+
   try {
-    decoded = jwt.verify(token, jwtConfig.secret);
+    decoded = jwt.verify(token, jwtConfig.resetToken.secret) as { userId: string };
   } catch (error) {
     throw new Error("Token không hợp lệ hoặc đã hết hạn");
   }

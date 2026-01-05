@@ -15,8 +15,8 @@ paths:
                 - password
                 - fullName
                 - phone
-                - gender
-                - role
+                # - gender
+                # - role
               properties:
                 userName:
                   type: string
@@ -40,21 +40,21 @@ paths:
                   type: string
                   pattern: "^0\\d{9}$"
                   description: Số điện thoại Việt Nam (10 số, bắt đầu bằng 0)
-                gender:
-                  type: string
-                  enum: [MALE, FEMALE, OTHER]
-                role:
-                  type: string
-                  enum: [ADMIN, CUSTOMER, STAFF]
-                  default: CUSTOMER
+                # gender:
+                #   type: string
+                #   enum: [MALE, FEMALE, OTHER]
+                # role:
+                #   type: string
+                #   enum: [ADMIN, CUSTOMER, STAFF]
+                #   default: CUSTOMER
             example:
               userName: "user123"
               email: "user@example.com"
               password: "Password123"
               fullName: "Nguyễn Văn A"
               phone: "0123456789"
-              gender: "MALE"
-              role: "CUSTOMER"
+              # gender: "MALE"
+              # role: "CUSTOMER"
       responses:
         "201":
           description: Đăng ký thành công
@@ -81,13 +81,13 @@ paths:
                     email: "user@example.com"
                     fullName: "Nguyễn Văn A"
                     phone: "0123456789"
-                    gender: "MALE"
+                    # gender: "MALE"
                     role: "CUSTOMER"
-                    isActive: true
-                    avatarImage: null
+                    # isActive: true
+                    # avatarImage: null
                     createdAt: "2025-12-23T13:04:43.506Z"
-                    updatedAt: "2025-12-23T13:04:43.506Z"
-                  accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    # updatedAt: "2025-12-23T13:04:43.506Z"
+                  # accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
         "400":
           $ref: "#/components/responses/ValidationError"
         "409":
@@ -97,7 +97,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
-                message: "Email đã được sử dụng"
+                message: "Email hoặc tên đăng nhập đã được sử dụng"
 
   /auth/login:
     post:
@@ -421,7 +421,7 @@ components:
             message: "Dữ liệu không hợp lệ"
             errors:
               email: "Email không hợp lệ"
-              password: "Mật khẩu phải ít nhất 6 ký tự"
+              password: "Mật khẩu phải có chữ hoa, số và không chứa ký tự có dấu"
               phone: "Số điện thoại không hợp lệ"
 
   securitySchemes:

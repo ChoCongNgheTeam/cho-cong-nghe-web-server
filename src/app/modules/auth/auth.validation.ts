@@ -14,8 +14,7 @@ export const registerSchema = z.object({
     .trim()
     .min(3, "Tên đăng nhập phải từ 3 ký tự")
     .max(30, "Tên đăng nhập tối đa 30 ký tự")
-    .regex(/^[a-zA-Z0-9_]+$/, "Tên đăng nhập không hợp lệ")
-    .optional(),
+    .regex(/^[a-zA-Z0-9_]+$/, "Tên đăng nhập không hợp lệ"),
 
   email: z.email("Email không hợp lệ"),
 
@@ -43,6 +42,7 @@ export const loginSchema = z.object({
     .max(30, "Tên đăng nhập tối đa 30 ký tự")
     .regex(/^[a-zA-Z0-9_]+$/, "Tên đăng nhập không hợp lệ"),
   password: passwordRule,
+  rememberMe: z.boolean().optional(),
 });
 
 export const forgotPasswordSchema = z.object({

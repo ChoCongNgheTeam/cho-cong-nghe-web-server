@@ -89,6 +89,7 @@ model users {
   voucherUsages voucher_usages[]
 
   passwordResetTokens password_reset_tokens[]
+  refreshTokens refresh_tokens[]
 }
 
 model password_reset_tokens {
@@ -98,6 +99,18 @@ model password_reset_tokens {
   user      users    @relation(fields: [userId], references: [id])
   expiresAt DateTime
   createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model refresh_tokens {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user users @relation(fields: [userId], references: [id])
 
   @@index([userId])
 }

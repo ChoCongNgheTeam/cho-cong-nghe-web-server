@@ -11,8 +11,10 @@ import {
   registerHandler,
   loginHandler,
   forgotPasswordHandler,
+  logoutHandler,
   resetPasswordHandler,
   changePasswordHandler,
+  refreshTokenHandler,
 } from "./auth.controller";
 import { authMiddleware } from "@/app/middlewares/auth.middleware";
 
@@ -21,6 +23,9 @@ const router = Router();
 router.post("/register", validate(registerSchema), registerHandler);
 router.post("/login", validate(loginSchema), loginHandler);
 router.post("/forgot-password", validate(forgotPasswordSchema), forgotPasswordHandler);
+router.post("/logout", logoutHandler);
+
+router.post("/refresh", refreshTokenHandler);
 
 router.get("/reset-password", (req, res) => {
   const { token } = req.query;
