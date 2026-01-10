@@ -162,22 +162,22 @@ model categories {
 
   parent            categories?          @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children          categories[]         @relation("CategoryHierarchy")
-  productCategories product_categories[]
+  products products[]
   @@unique([parentId, position])
 }
 
-model product_categories {
-  productId  String  @db.Uuid
-  categoryId String  @db.Uuid
-  isPrimary  Boolean @default(false)
-  position   Int     @default(0)
+// model product_categories {
+//   productId  String  @db.Uuid
+//   categoryId String  @db.Uuid
+//   isPrimary  Boolean @default(false)
+//   position   Int     @default(0)
 
-  product  products   @relation(fields: [productId], references: [id])
-  category categories @relation(fields: [categoryId], references: [id])
+//   product  products   @relation(fields: [productId], references: [id])
+//   category categories @relation(fields: [categoryId], references: [id])
 
-  @@id([productId, categoryId])
-  @@unique([productId, categoryId])
-}
+//   @@id([productId, categoryId])
+//   @@unique([productId, categoryId])
+// }
 
 model products {
   id            String   @id @default(uuid()) @db.Uuid
@@ -194,7 +194,7 @@ model products {
   updatedAt     DateTime @updatedAt
 
   brand             brands               @relation(fields: [brandId], references: [id])
-  productCategories product_categories[]
+  categories categories[]
   variants          products_variants[]
   highlights        product_highlights[]
 }

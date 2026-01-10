@@ -50,13 +50,27 @@ export async function seedProducts({ brands, categories, highlights }: SeedProdu
 
   for (const data of productData) {
     const brand = brands.find((b: any) => b.name === data.brandName);
-    if (!brand) throw new Error(`Brand ${data.brandName} không tồn tại`);
+    if (!brand) {
+      throw new Error(`Brand ${data.brandName} không tồn tại`);
+    }
 
     const slug = await generateUniqueSlug(prisma.products, data.name);
 
+    // Lấy danh sách category IDs để connect
+    const categoryConnect = (data.categoryNames || [])
+      .map((catName) => {
+        const category = categories.find((c: any) => c.name === catName);
+        return category ? { id: category.id } : null;
+      })
+      .filter(Boolean);
+
     const product = await prisma.products.upsert({
       where: { slug },
-      update: {},
+      update: {
+        categories: {
+          set: categoryConnect as { id: string }[],
+        },
+      },
       create: {
         name: data.name,
         description: data.description || "",
@@ -64,56 +78,40 @@ export async function seedProducts({ brands, categories, highlights }: SeedProdu
         brandId: brand.id,
         isActive: true,
         isFeatured: data.isFeatured || false,
+        categories: {
+          connect: categoryConnect as { id: string }[],
+        },
       },
     });
 
-    // Gắn categories (n-n)
-    for (const catName of data.categoryNames || []) {
-      const category = categories.find((c: any) => c.name === catName);
-      if (category) {
-        await prisma.product_categories.upsert({
-          where: {
-            productId_categoryId: {
-              productId: product.id,
-              categoryId: category.id,
-            },
-          },
-          update: {},
-          create: {
-            productId: product.id,
-            categoryId: category.id,
-            isPrimary: data.categoryNames![0] === catName,
-          },
-        });
-      }
-    }
-
-    // Gắn highlights
+    // Gắn highlights (giữ nguyên vì là explicit table)
     if (data.highlights) {
       for (const hl of data.highlights) {
         const highlight = highlights.find((h: any) => h.key === hl.key);
-        if (highlight) {
-          await prisma.product_highlights.upsert({
-            where: {
-              productId_highlightId: {
-                productId: product.id,
-                highlightId: highlight.id,
-              },
-            },
-            update: {},
-            create: {
+        if (!highlight) continue;
+
+        await prisma.product_highlights.upsert({
+          where: {
+            productId_highlightId: {
               productId: product.id,
               highlightId: highlight.id,
-              value: hl.value,
             },
-          });
-        }
+          },
+          update: {
+            value: hl.value,
+          },
+          create: {
+            productId: product.id,
+            highlightId: highlight.id,
+            value: hl.value,
+          },
+        });
       }
     }
 
     createdProducts.push(product);
   }
 
-  console.log(`🚶‍➡️    Đã tạo ${createdProducts.length} products`);
+  console.log(`🚀 Đã tạo ${createdProducts.length} products`);
   return createdProducts;
 }
