@@ -1,7 +1,9 @@
 export * from "./brand.seed";
 export * from "./category.seed";
 export * from "./attribute.seed";
-export * from "./highlight.seed";
+export * from "./specifications.seed";
+export * from "./product-specifications.seed";
+// export * from "./review.seed";
 export * from "./payment-method.seed";
 export * from "./user.seed";
 export * from "./product.seed";

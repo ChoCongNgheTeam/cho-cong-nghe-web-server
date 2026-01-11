@@ -3,7 +3,9 @@ import {
   seedBrands,
   seedCategories,
   seedAttributes,
-  seedHighlights,
+  seedSpecifications,
+  seedProductSpecifications,
+  // seedReviews,
   seedPaymentMethods,
   seedUsers,
   seedProducts,
@@ -20,7 +22,7 @@ async function main() {
   const brands = await seedBrands();
   const categories = await seedCategories();
   const attributes = await seedAttributes();
-  const highlights = await seedHighlights();
+  const highlights = await seedSpecifications();
   await seedPaymentMethods();
   const users = await seedUsers();
   await seedVouchers();
@@ -28,6 +30,9 @@ async function main() {
 
   const products = await seedProducts({ brands, categories, highlights });
   await seedVariants({ products, attributes });
+
+  await seedProductSpecifications();
+  // await seedReviews();
 
   console.log("Seeding hoàn tất thành công!");
 }

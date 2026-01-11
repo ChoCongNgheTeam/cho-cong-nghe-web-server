@@ -8,7 +8,7 @@ interface SeedVariantsParams {
 }
 
 const variantData = {
-  "iPhone 15 Pro Max": [
+  "iPhone 15": [
     { storage: "256GB", color: "Black", price: 34990000, isDefault: true },
     { storage: "256GB", color: "White", price: 34990000 },
     { storage: "512GB", color: "Black", price: 39990000 },
