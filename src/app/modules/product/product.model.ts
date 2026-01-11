@@ -11,6 +11,27 @@ export interface ProductVariantImage {
   position: number;
 }
 
+export interface Attribute {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export interface AttributeOption {
+  id: string;
+  attributeId: string;
+  value: string;
+  attribute?: Attribute;
+}
+
+export interface VariantAttribute {
+  id: string;
+  productVariantId: string;
+  attributeOptionId: string;
+  attributeOption: AttributeOption;
+  createdAt: Date;
+}
+
 export interface ProductVariant {
   id: string;
   code?: string;
@@ -23,6 +44,7 @@ export interface ProductVariant {
     quantity: number;
     reservedQuantity: number;
   };
+  variantAttributes?: VariantAttribute[];
 }
 
 export interface Product {

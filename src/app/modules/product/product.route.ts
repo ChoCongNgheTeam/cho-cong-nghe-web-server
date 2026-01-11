@@ -11,19 +11,14 @@ import {
   productBySlugParamsSchema,
 } from "./product.validation";
 import { upload } from "src/app/middlewares/upload.middleware";
-import { uploadProductImage } from "./product.controller";
+
 
 const router = Router();
 
 // =====================
 // === PUBLIC ROUTES ===
 // =====================
-// Upload ảnh sản phẩm
-router.post(
-  "/upload-image",
-  upload.single("image"),
-  uploadProductImage
-);
+
 
 // Lấy danh sách sản phẩm (public)
 router.get(
@@ -66,7 +61,8 @@ router.post(
   "/admin",
   authMiddleware,
   requireRole("ADMIN"),
-  validate(createProductSchema),
+  upload.any(),
+  // validate(createProductSchema),
   c.createProductHandler
 );
 

@@ -7,7 +7,7 @@ const selectProduct = {
   name: true,
   description: true,
   slug: true,
-  brandId: true,
+  
   brand: { select: { id: true, name: true } },
   viewsCount: true,
   ratingAverage: true,
@@ -32,11 +32,25 @@ const selectProduct = {
       isActive: true,
       inventory: { select: { quantity: true, reservedQuantity: true } },
       images: { select: { id: true, imageUrl: true, altText: true, position: true } },
+      variantAttributes: {
+        select: {
+          id: true,
+         
+          attributeOption: {
+            select: {
+              id: true,
+              attribute: { select: { id: true, name: true } },
+              value: true,
+            },
+          },
+          createdAt: true,
+        },
+      },
     },
   },
   // Đã sửa: Highlights -> highlights (viết thường để khớp với schema)
   highlights: {
-    orderBy: { sortOrder: 'asc' }, 
+    orderBy: { sortOrder: 'asc' as const }, 
     select: {
       value: true,
       highlight: {
@@ -60,6 +74,16 @@ const buildWhere = (query: ListProductsQuery, onlyActive: boolean) => {
       { name: { contains: query.search, mode: "insensitive" } },
       { description: { contains: query.search, mode: "insensitive" } },
     ];
+  }
+  // LOGIC MỚI: Lọc theo Category Slug (Tên trên URL)
+  if (query.category) {
+    where.productCategories = {
+      some: {
+        category: {
+          slug: query.category // Lọc theo trường slug trong bảng Category
+        }
+      }
+    };
   }
   if (query.categoryId) {
     where.productCategories = { some: { categoryId: query.categoryId } };
@@ -141,6 +165,20 @@ export const create = async (data: any) => {
           inventory: {
             create: { quantity: v.quantity ?? 0 },
           },
+          images: { 
+            create: v.images?.map((img: any, idx: number) => ({
+              imageUrl: img.imageUrl,
+              // Nếu DB có cột publicId thì lưu, không thì bỏ dòng này
+              // publicId: img.publicId, 
+              altText: img.altText || data.name, // Nếu không có alt text thì lấy tên SP
+              position: idx, // Lưu thứ tự hiển thị
+            })) || [] 
+          },
+          variantAttributes: {
+            create: v.variantAttributes?.map((attr: any) => ({
+              attributeOptionId: attr.attributeOptionId,
+            })) || []
+          }
         })),
       },
     },
@@ -189,9 +227,59 @@ export const update = async (id: string, data: any) => {
 };
 
 export const remove = async (id: string) => {
-  // Xóa dữ liệu liên quan trước khi xóa sản phẩm
+  // Xóa dữ liệu liên quan trước khi xóa sản phẩm (theo thứ tự Foreign Key)
+  // 1. Lấy tất cả variants của product
+  const variants = await prisma.products_variants.findMany({
+    where: { productId: id },
+    select: { id: true },
+  });
+
+  // 2. Xóa images và attributes của các variants
+  for (const variant of variants) {
+    await prisma.product_variant_images.deleteMany({ where: { productVariantId: variant.id } });
+    await prisma.variants_attributes.deleteMany({ where: { productVariantId: variant.id } });
+  }
+
+  // 3. Xóa inventory
+  await prisma.inventory.deleteMany({ 
+    where: { variant: { productId: id } } 
+  });
+
+  // 4. Xóa các variants
+  await prisma.products_variants.deleteMany({ where: { productId: id } });
+  
+  // 5. Xóa categories và highlights
   await prisma.product_categories.deleteMany({ where: { productId: id } });
   await prisma.product_highlights.deleteMany({ where: { productId: id } });
   
+  // 6. Xóa product
   return prisma.products.delete({ where: { id } });
+};
+
+// Lấy ảnh cũ của các variant theo product ID
+export const getVariantImagesByProductId = async (productId: string) => {
+  const product = await prisma.products.findUnique({
+    where: { id: productId },
+    include: {
+      variants: {
+        include: {
+          images: {
+            select: {
+              id: true,
+              imageUrl: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!product) return [];
+
+  return product.variants.flatMap(variant =>
+    variant.images.map(img => ({
+      id: img.id,
+      imageUrl: img.imageUrl,
+    }))
+  );
 };

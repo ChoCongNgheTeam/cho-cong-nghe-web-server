@@ -1,6 +1,11 @@
 import { slugify } from "transliteration";
 import * as repo from "./product.repository";
 import { CreateProductInput, UpdateProductInput, ListProductsQuery } from "./product.validation";
+// Định nghĩa lại phương thức toJSON cho BigInt
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString(); // Chuyển BigInt thành String để tránh lỗi
+  // Hoặc dùng: return Number(this); // Nếu chắc chắn số không quá lớn vượt mức Number an toàn
+};
 
 export const getProductsPublic = (q: ListProductsQuery) => repo.findAllPublic(q);
 export const getProductsAdmin = (q: ListProductsQuery) => repo.findAllAdmin(q);
