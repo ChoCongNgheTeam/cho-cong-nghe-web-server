@@ -6,9 +6,8 @@ import {
   resetPassword,
   changePassword,
   logout,
+  refreshTokenRotation,
 } from "./auth.service";
-import { signAccessToken, verifyRefreshToken } from "@/services/token.service";
-import prisma from "prisma/client";
 
 export const registerHandler = async (req: Request, res: Response) => {
   try {
@@ -23,8 +22,13 @@ export const registerHandler = async (req: Request, res: Response) => {
 };
 
 export const loginHandler = async (req: Request, res: Response) => {
+  const userAgent = req.headers["user-agent"];
+  const ip = req.ip;
   try {
-    const { accessToken, refreshToken, refreshTokenTTL, user } = await login(req.body);
+    const { accessToken, refreshToken, refreshTokenTTL, user } = await login(req.body, {
+      userAgent,
+      ip,
+    });
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
@@ -50,36 +54,32 @@ export const refreshTokenHandler = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "No refresh token" });
     }
 
-    const decoded = verifyRefreshToken(token) as {
-      userId: string;
-      role: string;
-    };
+    const { accessToken, refreshToken, refreshTokenTTL } = await refreshTokenRotation(token);
 
-    // CHECK DB
-    const tokenInDb = await prisma.refresh_tokens.findUnique({
-      where: { token },
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: refreshTokenTTL,
     });
 
-    if (!tokenInDb || tokenInDb.expiresAt < new Date()) {
-      return res.status(401).json({ message: "Refresh token không hợp lệ" });
-    }
-
-    const newAccessToken = signAccessToken({
-      userId: decoded.userId,
-      role: decoded.role,
-    });
-
-    res.json({ accessToken: newAccessToken });
-  } catch {
-    res.status(401).json({ message: "Refresh token không hợp lệ" });
+    return res.json({ accessToken });
+  } catch (err: any) {
+    return res.status(401).json({ message: err.message });
   }
 };
 
 export const logoutHandler = async (req: Request, res: Response) => {
+  const refreshToken = req.cookies.refreshToken;
+
+  if (refreshToken) {
+    await logout(refreshToken);
+  }
+
   res.clearCookie("refreshToken", {
     httpOnly: true,
-    sameSite: "strict",
     secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
   });
 
   return res.json({ message: "Đăng xuất thành công" });

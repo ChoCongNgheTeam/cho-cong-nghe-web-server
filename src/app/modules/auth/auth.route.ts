@@ -16,16 +16,26 @@ import {
   changePasswordHandler,
   refreshTokenHandler,
 } from "./auth.controller";
+
 import { authMiddleware } from "@/app/middlewares/auth.middleware";
+import { forgotPasswordLimiter, loginLimiter, refreshTokenLimiter } from "@/utils/rateLimiter";
 
 const router = Router();
 
 router.post("/register", validate(registerSchema), registerHandler);
-router.post("/login", validate(loginSchema), loginHandler);
-router.post("/forgot-password", validate(forgotPasswordSchema), forgotPasswordHandler);
+
+router.post("/login", loginLimiter, validate(loginSchema), loginHandler);
+
+router.post(
+  "/forgot-password",
+  forgotPasswordLimiter,
+  validate(forgotPasswordSchema),
+  forgotPasswordHandler
+);
+
 router.post("/logout", logoutHandler);
 
-router.post("/refresh", refreshTokenHandler);
+router.post("/refresh", refreshTokenLimiter, refreshTokenHandler);
 
 router.get("/reset-password", (req, res) => {
   const { token } = req.query;

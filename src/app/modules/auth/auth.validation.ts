@@ -8,13 +8,15 @@ const passwordRule = z
     "Mật khẩu phải có chữ hoa, số và không chứa ký tự có dấu"
   );
 
+const userNameRule = z
+  .string()
+  .trim()
+  .min(3, "Tên đăng nhập phải từ 3 ký tự")
+  .max(30, "Tên đăng nhập tối đa 30 ký tự")
+  .regex(/^[a-zA-Z0-9_]+$/, "Tên đăng nhập không hợp lệ");
+
 export const registerSchema = z.object({
-  userName: z
-    .string()
-    .trim()
-    .min(3, "Tên đăng nhập phải từ 3 ký tự")
-    .max(30, "Tên đăng nhập tối đa 30 ký tự")
-    .regex(/^[a-zA-Z0-9_]+$/, "Tên đăng nhập không hợp lệ"),
+  userName: userNameRule,
 
   email: z.email("Email không hợp lệ"),
 
@@ -24,24 +26,19 @@ export const registerSchema = z.object({
     .string()
     .trim()
     .min(3, "Họ và tên phải từ 3 ký tự")
-    .max(30, "Họ và tên tối đa 30 ký tự")
-    .optional(),
+    .max(30, "Họ và tên tối đa 30 ký tự"),
 
   phone: z
     .string()
     .trim()
-    .regex(/^0\d{9}$/, "Số điện thoại không hợp lệ")
-    .optional(),
+    .regex(/^0\d{9}$/, "Số điện thoại không hợp lệ"),
 });
 
 export const loginSchema = z.object({
-  userName: z
-    .string()
-    .trim()
-    .min(3, "Tên đăng nhập phải từ 3 ký tự")
-    .max(30, "Tên đăng nhập tối đa 30 ký tự")
-    .regex(/^[a-zA-Z0-9_]+$/, "Tên đăng nhập không hợp lệ"),
+  userName: userNameRule,
+
   password: passwordRule,
+
   rememberMe: z.boolean().optional(),
 });
 

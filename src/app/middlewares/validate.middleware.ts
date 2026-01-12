@@ -14,6 +14,7 @@ export const validate =
 
       // Chỉ lấy fieldErrors và chuyển array thành string (lấy lỗi đầu tiên)
       const errors: Record<string, string> = {};
+
       Object.entries(flattened.fieldErrors).forEach(([key, messages]) => {
         if (Array.isArray(messages) && messages.length > 0) {
           errors[key] = messages[0];
@@ -25,8 +26,6 @@ export const validate =
         errors,
       });
     }
-
-    // --- PHẦN SỬA LỖI BẮT ĐẦU TẠI ĐÂY ---
     // Nếu source là query, dùng defineProperty để tránh lỗi getter-only
     if (source === "query") {
       Object.defineProperty(req, "query", {
@@ -39,7 +38,6 @@ export const validate =
       // Body và Params thường gán bình thường được
       req[source] = result.data;
     }
-    // --- KẾT THÚC PHẦN SỬA LỖI ---
 
     next();
   };

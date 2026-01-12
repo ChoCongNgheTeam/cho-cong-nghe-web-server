@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { jwtConfig } from "src/config/jwt";
 import { RegisterInput, LoginInput, ResetPasswordInput } from "./auth.validation";
-import { signAccessToken, signRefreshToken } from "@/services/token.service";
+import { signAccessToken, signRefreshToken, verifyRefreshToken } from "@/services/token.service";
 import {
   findByEmailOrUserName,
   findByUserName,
@@ -14,10 +14,19 @@ import {
   deletePasswordResetToken,
   deleteRefreshToken,
   createRefreshToken,
+  findValidRefreshToken,
+  revokeAllRefreshTokensByUser,
+  revokeRefreshTokenById,
+  findValidRefreshTokenWithUser,
+  cleanupRevokedExpiredRefreshTokens,
 } from "./auth.repository";
+
 import { sendResetPasswordEmail } from "@/services/email.service";
+
 import { forgotPasswordRateLimit } from "@/utils/rateLimiter";
+
 import { Request } from "express";
+
 import prisma from "prisma/client";
 
 export const register = async (input: RegisterInput) => {
@@ -42,7 +51,7 @@ export const register = async (input: RegisterInput) => {
   });
 };
 
-export const login = async (input: LoginInput) => {
+export const login = async (input: LoginInput, meta?: { userAgent?: string; ip?: string }) => {
   const { userName, password, rememberMe } = input;
 
   const user = await findByUserName(userName);
@@ -61,15 +70,19 @@ export const login = async (input: LoginInput) => {
     role: user.role,
   });
 
+  // TTL = Time To Live
   const refreshTokenTTL = rememberMe
     ? jwtConfig.refreshToken.ttl.long
     : jwtConfig.refreshToken.ttl.short;
+
   const refreshToken = signRefreshToken({ userId: user.id }, refreshTokenTTL);
 
   await createRefreshToken({
     userId: user.id,
     token: refreshToken,
     expiresAt: new Date(Date.now() + refreshTokenTTL),
+    userAgent: meta?.userAgent,
+    ip: meta?.ip,
   });
 
   return {
@@ -86,9 +99,7 @@ export const login = async (input: LoginInput) => {
   };
 };
 
-export const logout = async (refreshToken?: string) => {
-  if (!refreshToken) return;
-
+export const logout = async (refreshToken: string) => {
   await deleteRefreshToken(refreshToken);
 };
 
@@ -170,4 +181,51 @@ export const changePassword = async (
   const newHash = await bcrypt.hash(newPassword, 10);
 
   await updatePassword(userId, newHash);
+};
+
+export const refreshTokenRotation = async (refreshToken: string) => {
+  //  Verify JWT signature + exp
+  const decoded = verifyRefreshToken(refreshToken) as {
+    userId: string;
+  };
+
+  // Check DB
+  const tokenInDb = await findValidRefreshTokenWithUser(refreshToken);
+
+  if (!tokenInDb) {
+    // reuse / stolen token
+    await revokeAllRefreshTokensByUser(decoded.userId);
+    throw new Error("Refresh token không hợp lệ hoặc đã bị thu hồi");
+  }
+
+  // Revoke old refresh token
+  await revokeRefreshTokenById(tokenInDb.id);
+
+  // Issue new tokens
+  const accessToken = signAccessToken({
+    userId: decoded.userId,
+    role: tokenInDb.user.role,
+  });
+
+  const refreshTokenTTL = jwtConfig.refreshToken.ttl.long;
+
+  const newRefreshToken = signRefreshToken({ userId: decoded.userId }, refreshTokenTTL);
+
+  // Save new refresh token
+  await createRefreshToken({
+    userId: decoded.userId,
+    token: newRefreshToken,
+    expiresAt: new Date(Date.now() + refreshTokenTTL),
+  });
+
+  return {
+    accessToken,
+    refreshToken: newRefreshToken,
+    refreshTokenTTL,
+  };
+};
+
+export const cleanupRefreshTokens = async () => {
+  const result = await cleanupRevokedExpiredRefreshTokens();
+  return result.count;
 };

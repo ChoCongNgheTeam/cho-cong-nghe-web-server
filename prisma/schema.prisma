@@ -108,7 +108,12 @@ model refresh_tokens {
   userId    String   @db.Uuid
   token     String   @unique
   expiresAt DateTime
+  revokedAt DateTime?
   createdAt DateTime @default(now())
+
+  deviceId  String?   // optional
+  userAgent String?
+  ip        String?
 
   user users @relation(fields: [userId], references: [id])
 

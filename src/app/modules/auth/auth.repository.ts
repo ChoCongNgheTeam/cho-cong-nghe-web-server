@@ -79,8 +79,14 @@ export const deletePasswordResetToken = async (token: string) => {
 };
 
 export const deleteRefreshToken = async (token: string) => {
-  return prisma.refresh_tokens.deleteMany({
-    where: { token },
+  return prisma.refresh_tokens.updateMany({
+    where: {
+      token: token,
+      revokedAt: null,
+    },
+    data: {
+      revokedAt: new Date(),
+    },
   });
 };
 
@@ -88,6 +94,68 @@ export const createRefreshToken = async (data: {
   userId: string;
   token: string;
   expiresAt: Date;
+  userAgent?: string;
+  ip?: string;
 }) => {
   return prisma.refresh_tokens.create({ data });
+};
+
+export const findValidRefreshToken = (token: string) => {
+  return prisma.refresh_tokens.findFirst({
+    where: {
+      token,
+      revokedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+  });
+};
+
+export const revokeRefreshTokenById = (id: string) => {
+  return prisma.refresh_tokens.update({
+    where: { id },
+    data: { revokedAt: new Date() },
+  });
+};
+
+export const revokeAllRefreshTokensByUser = (userId: string) => {
+  return prisma.refresh_tokens.updateMany({
+    where: {
+      userId,
+      revokedAt: null,
+    },
+    data: {
+      revokedAt: new Date(),
+    },
+  });
+};
+
+export const findValidRefreshTokenWithUser = (token: string) => {
+  return prisma.refresh_tokens.findFirst({
+    where: {
+      token,
+      revokedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          role: true,
+        },
+      },
+    },
+  });
+};
+
+export const cleanupRevokedExpiredRefreshTokens = async () => {
+  return prisma.refresh_tokens.deleteMany({
+    where: {
+      expiresAt: {
+        lt: new Date(),
+      },
+      revokedAt: {
+        not: null,
+      },
+    },
+  });
 };

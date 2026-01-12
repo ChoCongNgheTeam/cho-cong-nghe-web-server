@@ -10,6 +10,7 @@ export const jwtConfig = {
     secret: env.JWT_REFRESH_SECRET,
 
     ttl: {
+      // ms("1d")  // = 86400000 (milliseconds)
       short: ms(env.JWT_REFRESH_TTL_SHORT as ms.StringValue),
       long: ms(env.JWT_REFRESH_TTL_LONG as ms.StringValue),
     },
