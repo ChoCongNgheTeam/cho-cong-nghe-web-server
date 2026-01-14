@@ -6,7 +6,8 @@ import * as Apple from "./apple";
 export const allProducts = [
   // Apple
   Apple.iphone13,
-  //   Apple.iphone14Plus,
+  Apple.iphone14,
+
   // Samsung
   //   Samsung.galaxyS24Ultra,
   // Xiaomi

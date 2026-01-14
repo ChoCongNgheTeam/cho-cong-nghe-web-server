@@ -7,7 +7,8 @@
     "dev": "ts-node-dev -r tsconfig-paths/register --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "cleanup:refresh-token": "ts-node src/scripts/cleanup-refresh-token.ts"
+    "cleanup:refresh-token": "ts-node src/scripts/cleanup-refresh-token.ts",
+    "upload:assets": "ts-node scripts/upload-assets.ts"
   },
   "prisma": {
     "seed": "ts-node -r tsconfig-paths/register prisma/seed.ts"

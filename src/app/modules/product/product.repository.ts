@@ -172,10 +172,6 @@ export const selectProductSpecifications = {
   },
 };
 
-// =====================
-// === WHERE BUILDERS ===
-// =====================
-
 const buildProductWhere = (
   query: ListProductsQuery,
   onlyActive: boolean
@@ -237,10 +233,6 @@ const buildProductWhere = (
 
   return where;
 };
-
-// =====================
-// === FIND OPERATIONS ===
-// =====================
 
 export const findAllPublic = async (query: ListProductsQuery) => {
   return findAll(query, true);

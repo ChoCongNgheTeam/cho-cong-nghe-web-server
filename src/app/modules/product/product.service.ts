@@ -182,9 +182,8 @@ const calculateOverallStockStatus = (
   return "in_stock";
 };
 
-/**
- * Transform product card data (for listing)
- */
+// Transform product card data (for listing)
+
 const transformProductCard = (product: any): ProductCard => {
   const defaultVariant = product.variants[0];
   const price = defaultVariant ? Number(defaultVariant.price) : 0;
@@ -234,12 +233,6 @@ const transformProductCard = (product: any): ProductCard => {
 /**
  * Transform product detail data (for product page)
  */
-
-interface GroupedSpecification {
-  groupName: string;
-  items: any[]; // Danh sách các spec thuộc group này
-}
-
 const transformProductDetail = (
   product: any,
   reviewStats?: ReviewStats
@@ -331,10 +324,6 @@ export const transformProductHighlights = (product: any) => {
       .sort((a: any, b: any) => (a.highlightOrder ?? 0) - (b.highlightOrder ?? 0)) || []
   );
 };
-
-// =====================
-// === PUBLIC SERVICES ===
-// =====================
 
 export const getProductsPublic = async (query: ListProductsQuery) => {
   const result = await repo.findAllPublic(query);

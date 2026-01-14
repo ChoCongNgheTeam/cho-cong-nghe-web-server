@@ -20,8 +20,6 @@ const variantData = {
     { storage: "256GB", color: "Trắng", price: 15990000 },
     { storage: "256GB", color: "Đỏ", price: 15990000 },
     { storage: "256GB", color: "Hồng", price: 15990000 },
-    { storage: "256GB", color: "Xanh", price: 15990000 }, // Xanh dương (Blue)
-    { storage: "256GB", color: "Xanh lá", price: 16490000 }, // Màu mới thường giá cao hơn chút hoặc bằng
     { storage: "256GB", color: "Xanh rêu", price: 16490000 },
 
     // --- Phiên bản 512 GB ---
@@ -37,39 +35,34 @@ const variantData = {
 const variantImages: Record<string, Record<string, string[]>> = {
   "iPhone 13": {
     Đen: [
-      "https://example.com/iphone13-black-front.jpg",
-      "https://example.com/iphone13-black-side.jpg",
-      "https://example.com/iphone13-black-back.jpg",
+      "products/iphone-13/black/front.webp",
+      "products/iphone-13/black/side.webp",
+      "products/iphone-13/black/back.webp",
     ],
     Trắng: [
-      "https://example.com/iphone13-white-front.jpg",
-      "https://example.com/iphone13-white-side.jpg",
-      "https://example.com/iphone13-white-back.jpg",
+      "products/iphone-13/white/front.webp",
+      "products/iphone-13/white/side.webp",
+      "products/iphone-13/white/back.webp",
     ],
     Đỏ: [
-      "https://example.com/iphone13-red-front.jpg",
-      "https://example.com/iphone13-red-side.jpg",
-      "https://example.com/iphone13-red-back.jpg",
+      "products/iphone-13/red/front.webp",
+      "products/iphone-13/red/side.webp",
+      "products/iphone-13/red/back.webp",
     ],
     Hồng: [
-      "https://example.com/iphone13-pink-front.jpg",
-      "https://example.com/iphone13-pink-side.jpg",
-      "https://example.com/iphone13-pink-back.jpg",
+      "products/iphone-13/pink/front.webp",
+      "products/iphone-13/pink/side.webp",
+      "products/iphone-13/pink/back.webp",
     ],
-    Xanh: [
-      "https://example.com/iphone13-blue-front.jpg",
-      "https://example.com/iphone13-blue-side.jpg",
-      "https://example.com/iphone13-blue-back.jpg",
-    ],
-    "Xanh lá": [
-      "https://example.com/iphone13-alpine-green-front.jpg",
-      "https://example.com/iphone13-alpine-green-side.jpg",
-      "https://example.com/iphone13-alpine-green-back.jpg",
+    "Xanh dương": [
+      "products/iphone-13/blue/front.webp",
+      "products/iphone-13/blue/side.webp",
+      "products/iphone-13/blue/back.webp",
     ],
     "Xanh rêu": [
-      "https://example.com/iphone13-midnight-blue-front.jpg",
-      "https://example.com/iphone13-midnight-blue-side.jpg",
-      "https://example.com/iphone13-midnight-blue-back.jpg",
+      "products/iphone-13/alpine-green/front.webp",
+      "products/iphone-13/alpine-green/side.webp",
+      "products/iphone-13/alpine-green/back.webp",
     ],
   },
 };
@@ -132,11 +125,12 @@ export async function seedVariants({ products, attributes }: SeedVariantsParams)
       const imagesForThisVariant = variantImages[product.name]?.[variant.color];
 
       if (imagesForThisVariant && imagesForThisVariant.length > 0) {
-        for (const [imgIndex, url] of imagesForThisVariant.entries()) {
+        for (const [imgIndex, imagePath] of imagesForThisVariant.entries()) {
           await prisma.product_variant_images.create({
             data: {
               productVariantId: createdVariant.id,
-              imageUrl: url,
+              imagePath,
+              imageUrl: null,
               altText: `${product.name} ${variant.color} - View ${imgIndex + 1}`,
               position: imgIndex + 1, // position bắt đầu từ 1 thường đẹp hơn
             },
@@ -148,9 +142,8 @@ export async function seedVariants({ products, attributes }: SeedVariantsParams)
         await prisma.product_variant_images.create({
           data: {
             productVariantId: createdVariant.id,
-            imageUrl: `https://placehold.co/800x800?text=${encodeURIComponent(
-              product.name + " " + variant.color
-            )}`,
+            imagePath: "products/placeholder.png",
+            imageUrl: null,
             altText: `${product.name} ${variant.color} (placeholder)`,
             position: 1,
           },
