@@ -7,9 +7,14 @@ import {
   updateProductSchema,
   reviewsQuerySchema,
   bulkUpdateSchema,
+  ListProductsQuery,
 } from "./product.validation";
 import { uploadImage, deleteImage } from "@/services/cloudinary.service";
 import fs from "fs";
+
+type ValidatedQuery<T> = Request & {
+  query: T;
+};
 
 // =====================
 // === HELPERS ===
@@ -112,14 +117,12 @@ const deleteOldImages = async (imageUrls: string[]): Promise<void> => {
   await Promise.all(deletePromises);
 };
 
-// =====================
-// === PUBLIC HANDLERS ===
-// =====================
-
-export const getProductsPublicHandler = async (req: Request, res: Response) => {
+export const getProductsPublicHandler = async (
+  req: ValidatedQuery<ListProductsQuery>,
+  res: Response
+) => {
   try {
-    const query = listProductsSchema.parse(req.query);
-    const result = await productService.getProductsPublic(query);
+    const result = await productService.getProductsPublic(req.query);
 
     res.json({
       success: true,
@@ -159,10 +162,35 @@ export const getProductBySlugHandler = async (req: Request, res: Response) => {
   }
 };
 
+export const getProductBySpecificationsHandler = async (req: Request, res: Response) => {
+  try {
+    const { slug } = req.params;
+    const specs = await productService.getProductSpecificationsBySlug(slug);
+
+    res.json({
+      success: true,
+      data: specs,
+      message: "Lấy thông số kỹ thuật thành công",
+    });
+  } catch (error: any) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
+  }
+};
+
 export const getRelatedProductsHandler = async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
-    const limit = Number(req.query.limit) || 8;
+
+    const DEFAULT_LIMIT = 8;
+    const MAX_LIMIT = 12;
+
+    const rawLimit = Number(req.query.limit);
+    const limit =
+      Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, MAX_LIMIT) : DEFAULT_LIMIT;
+
     const products = await productService.getRelatedProducts(slug, limit);
 
     res.json({
@@ -171,8 +199,7 @@ export const getRelatedProductsHandler = async (req: Request, res: Response) => 
       message: "Lấy sản phẩm tương tự thành công",
     });
   } catch (error: any) {
-    const status = error.statusCode || 500;
-    res.status(status).json({
+    res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || "Lỗi server",
     });

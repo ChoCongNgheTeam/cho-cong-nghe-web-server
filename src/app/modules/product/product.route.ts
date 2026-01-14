@@ -17,6 +17,7 @@ import {
   updateProductHandler,
   deleteProductHandler,
   bulkUpdateProductsHandler,
+  getProductBySpecificationsHandler,
 } from "./product.controller";
 import {
   listProductsSchema,
@@ -37,6 +38,13 @@ router.get("/", validate(listProductsSchema, "query"), getProductsPublicHandler)
 
 // Lấy chi tiết sản phẩm theo slug
 router.get("/slug/:slug", validate(productBySlugParamsSchema, "params"), getProductBySlugHandler);
+
+// Lấy thông số kỹ thuật
+router.get(
+  "/slug/:slug/specifications",
+  validate(productBySlugParamsSchema, "params"),
+  getProductBySpecificationsHandler
+);
 
 // Lấy sản phẩm tương tự
 router.get(

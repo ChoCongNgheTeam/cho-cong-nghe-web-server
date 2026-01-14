@@ -17,7 +17,9 @@ import {
   AvailableStorage,
   PriceRange,
   ProductGallery,
+  AvailableOption,
 } from "./product.model";
+import { group } from "node:console";
 
 // Fix BigInt serialization
 (BigInt.prototype as any).toJSON = function () {
@@ -47,18 +49,6 @@ const getStockStatus = (
  */
 const transformVariant = (variant: any): ProductVariant => {
   // Build attributes object: { "Color": "Black", "Storage": "256GB" }
-  const attributes: Record<string, string> = {};
-  const attributeIds: Record<string, string> = {};
-
-  variant.variantAttributes?.forEach((va: any) => {
-    const attrName = va.attributeOption.attribute.name;
-    const attrValue = va.attributeOption.value;
-    const attrId = va.attributeOption.id;
-
-    attributes[attrName] = attrValue;
-    attributeIds[attrName] = attrId;
-  });
-
   const quantity = variant.inventory?.quantity ?? 0;
   const reservedQuantity = variant.inventory?.reservedQuantity ?? 0;
   const available = Math.max(0, quantity - reservedQuantity);
@@ -74,59 +64,15 @@ const transformVariant = (variant: any): ProductVariant => {
     soldCount: variant.soldCount,
     isDefault: variant.isDefault,
     isActive: variant.isActive,
-    available: available > 0, // ✅ Nhóm 1
-    stockStatus: getStockStatus(quantity, reservedQuantity), // ✅ Nhóm 2
+    available: available > 0,
+    stockStatus: getStockStatus(quantity, reservedQuantity),
     inventory: {
       quantity,
       reservedQuantity,
       available,
     },
     images: variant.images || [],
-    attributes,
-    attributeIds,
   };
-};
-
-/**
- * Group attributes theo tên để render selector
- * Output: [{ name: "Color", values: ["Black", "White"] }, ...]
- */
-const groupAttributes = (variants: any[]): AttributeGroup[] => {
-  const attributeMap = new Map<string, AttributeGroup>();
-
-  variants.forEach((variant) => {
-    variant.variantAttributes?.forEach((va: any) => {
-      const attrId = va.attributeOption.attribute.id;
-      const attrName = va.attributeOption.attribute.name;
-      const valueId = va.attributeOption.id;
-      const value = va.attributeOption.value;
-
-      if (!attributeMap.has(attrName)) {
-        attributeMap.set(attrName, {
-          id: attrId,
-          name: attrName,
-          values: [],
-        });
-      }
-
-      const group = attributeMap.get(attrName)!;
-      const existingValue = group.values.find((v) => v.id === valueId);
-
-      if (!existingValue) {
-        group.values.push({
-          id: valueId,
-          value,
-          variantIds: [variant.id],
-        });
-      } else {
-        if (!existingValue.variantIds.includes(variant.id)) {
-          existingValue.variantIds.push(variant.id);
-        }
-      }
-    });
-  });
-
-  return Array.from(attributeMap.values());
 };
 
 /**
@@ -148,87 +94,6 @@ const COLOR_HEX_MAP: Record<string, string> = {
   // Thêm các màu khác nếu cần
 };
 
-const extractAvailableColors = (variants: any[]): AvailableColor[] => {
-  const colorMap = new Map<string, AvailableColor>();
-
-  variants.forEach((variant) => {
-    const colorAttr = variant.variantAttributes?.find(
-      (va: any) => va.attributeOption.attribute.name === "Color"
-    );
-
-    if (colorAttr) {
-      const colorName = colorAttr.attributeOption.value;
-      const available = variant.inventory
-        ? variant.inventory.quantity - variant.inventory.reservedQuantity > 0
-        : false;
-
-      if (!colorMap.has(colorName)) {
-        colorMap.set(colorName, {
-          name: colorName,
-          hex: COLOR_HEX_MAP[colorName] || "#CCCCCC", // Default gray nếu không có mapping
-          slug: colorName.toLowerCase().replace(/\s+/g, "-"),
-          available: false,
-          variantIds: [],
-        });
-      }
-
-      const color = colorMap.get(colorName)!;
-      color.variantIds.push(variant.id);
-
-      // Nếu có ít nhất 1 variant available thì color.available = true
-      if (available) {
-        color.available = true;
-      }
-    }
-  });
-
-  // Sort: available trước, sau đó theo alphabet
-  return Array.from(colorMap.values()).sort((a, b) => {
-    if (a.available !== b.available) return a.available ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
-};
-
-/**
- * ✅ NHÓM 1: Extract available storages
- */
-const extractAvailableStorages = (variants: any[]): AvailableStorage[] => {
-  const storageMap = new Map<string, AvailableStorage>();
-
-  variants.forEach((variant) => {
-    const storageAttr = variant.variantAttributes?.find(
-      (va: any) => va.attributeOption.attribute.name === "Storage"
-    );
-
-    if (storageAttr) {
-      const storageName = storageAttr.attributeOption.value;
-      const storageValue = parseInt(storageName) || 0; // Extract số: "256GB" -> 256
-      const available = variant.inventory
-        ? variant.inventory.quantity - variant.inventory.reservedQuantity > 0
-        : false;
-
-      if (!storageMap.has(storageName)) {
-        storageMap.set(storageName, {
-          name: storageName,
-          value: storageValue,
-          available: false,
-          variantIds: [],
-        });
-      }
-
-      const storage = storageMap.get(storageName)!;
-      storage.variantIds.push(variant.id);
-
-      if (available) {
-        storage.available = true;
-      }
-    }
-  });
-
-  // Sort theo value tăng dần
-  return Array.from(storageMap.values()).sort((a, b) => a.value - b.value);
-};
-
 /**
  * ✅ NHÓM 1: Calculate price range
  */
@@ -241,11 +106,11 @@ const calculatePriceRange = (variants: any[]): PriceRange => {
   };
 };
 
-/**
- * ✅ NHÓM 2: Build gallery from all variants
- */
+// Build gallery from all variants
+
 const buildGallery = (variants: any[]): ProductGallery[] => {
   const galleryMap = new Map<string, ProductGallery>();
+  let position = 0;
 
   variants.forEach((variant) => {
     variant.images?.forEach((img: any) => {
@@ -254,7 +119,7 @@ const buildGallery = (variants: any[]): ProductGallery[] => {
           id: img.id,
           imageUrl: img.imageUrl,
           altText: img.altText,
-          position: img.position,
+          position: position++,
           type: "product", // Có thể phân loại thêm sau
         });
       }
@@ -263,6 +128,39 @@ const buildGallery = (variants: any[]): ProductGallery[] => {
 
   // Sort theo position
   return Array.from(galleryMap.values()).sort((a, b) => a.position - b.position);
+};
+
+const buildAvailableOptions = (variants: any[]): AvailableOption[] => {
+  const map = new Map();
+
+  for (const variant of variants) {
+    for (const va of variant.variantAttributes) {
+      const attributeName = va.attributeOption.attribute.name;
+      const optionValue = va.attributeOption.value;
+      const optionId = va.attributeOption.id;
+
+      if (!map.has(attributeName)) {
+        map.set(attributeName, new Map());
+      }
+
+      const valueMap = map.get(attributeName);
+
+      if (!valueMap.has(optionId)) {
+        valueMap.set(optionId, {
+          id: optionId,
+          value: optionValue,
+          variantIds: [],
+        });
+      }
+
+      valueMap.get(optionId).variantIds.push(variant.id);
+    }
+  }
+
+  return Array.from(map.entries()).map(([attribute, values]) => ({
+    attribute,
+    values: Array.from(values.values()),
+  }));
 };
 
 /**
@@ -300,7 +198,13 @@ const transformProductCard = (product: any): ProductCard => {
     product.productHighlights
       ?.map((h: any) => {
         const spec = h.specification;
-        return spec.unit ? `${spec.name} ${spec.unit}` : spec.name;
+
+        return {
+          key: spec.key,
+          name: spec.name,
+          icon: spec.icon,
+          value: spec.unit ? spec.unit : undefined,
+        };
       })
       .slice(0, 3) || [];
 
@@ -330,7 +234,16 @@ const transformProductCard = (product: any): ProductCard => {
 /**
  * Transform product detail data (for product page)
  */
-const transformProductDetail = (product: any, reviewStats?: ReviewStats): ProductDetail => {
+
+interface GroupedSpecification {
+  groupName: string;
+  items: any[]; // Danh sách các spec thuộc group này
+}
+
+const transformProductDetail = (
+  product: any,
+  reviewStats?: ReviewStats
+): Omit<ProductDetail, "highlights" | "specifications"> => {
   const transformedVariants = product.variants.map(transformVariant);
   const defaultVariant =
     transformedVariants.find((v: { isDefault: any }) => v.isDefault) || transformedVariants[0];
@@ -342,49 +255,81 @@ const transformProductDetail = (product: any, reviewStats?: ReviewStats): Produc
     description: product.description,
     brand: product.brand,
     category: product.category || [],
-
-    // ✅ NHÓM 1: Bắt buộc
-    availableColors: extractAvailableColors(product.variants),
-    availableStorages: extractAvailableStorages(product.variants),
+    availableOptions: buildAvailableOptions(product.variants),
     priceRange: calculatePriceRange(product.variants),
-
-    // ✅ NHÓM 2: Nên có
     gallery: buildGallery(product.variants),
-    warranty: "12 tháng chính hãng", // Có thể lấy từ DB nếu có
+    warranty: "12 tháng chính hãng",
     stockStatus: calculateOverallStockStatus(product.variants),
-
     currentVariant: defaultVariant,
     variants: transformedVariants,
-    attributes: groupAttributes(product.variants),
-    highlights:
-      product.productHighlights?.map((h: any) => ({
-        id: h.specification.id,
-        key: h.specification.key,
-        name: h.specification.name,
-        icon: h.specification.icon,
-        unit: h.specification.unit,
-      })) || [],
-    specifications:
-      product.productSpecifications?.map((s: any) => ({
-        id: s.specification.id,
-        key: s.specification.key,
-        name: s.specification.name,
-        icon: s.specification.icon,
-        unit: s.specification.unit,
-        value: s.value,
-      })) || [],
-    rating: reviewStats || {
-      average: Number(product.ratingAverage) || 0,
-      total: product.ratingCount || 0,
-      distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
-    },
-    reviews: [], // Sẽ load riêng qua endpoint /reviews
+
+    rating: reviewStats!,
     viewsCount: Number(product.viewsCount) || 0,
     isFeatured: product.isFeatured,
     isActive: product.isActive,
     createdAt: product.createdAt,
     updatedAt: product.updatedAt,
   };
+};
+
+export const transformProductSpecifications = (product: any) => {
+  const valueMap = new Map(
+    product.productSpecifications.map((ps: any) => [ps.specificationId, ps.value])
+  );
+
+  const groups: any[] = [];
+
+  for (const cs of product.category.categorySpecifications) {
+    const existingGroup = groups.find((g) => g.groupName === cs.groupName);
+
+    const item = {
+      id: cs.specification.id,
+      key: cs.specification.key,
+      name: cs.specification.name,
+      icon: cs.specification.icon,
+      unit: cs.specification.unit,
+      value: valueMap.get(cs.specification.id) ?? null,
+    };
+
+    if (existingGroup) {
+      existingGroup.items.push(item);
+    } else {
+      groups.push({
+        groupName: cs.groupName,
+        items: [item],
+      });
+    }
+  }
+
+  return { specifications: groups };
+};
+
+export const transformProductHighlights = (product: any) => {
+  const highlightMap = new Map(
+    product.productHighlights?.map((h: any) => [h.specificationId, h.sortOrder])
+  );
+
+  return (
+    product.productSpecifications
+      ?.map((s: any) => {
+        const highlightOrder = highlightMap.get(s.specificationId);
+        if (highlightOrder === undefined) return null;
+
+        return {
+          id: s.specification.id,
+          key: s.specification.key,
+          group: s.specification.group || "Khác",
+          name: s.specification.name,
+          icon: s.specification.icon,
+          unit: s.specification.unit,
+          value: s.value,
+          isHighlight: true,
+          highlightOrder,
+        };
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => (a.highlightOrder ?? 0) - (b.highlightOrder ?? 0)) || []
+  );
 };
 
 // =====================
@@ -402,6 +347,36 @@ export const getProductsPublic = async (query: ListProductsQuery) => {
 
 export const getProductBySlug = async (slug: string) => {
   const product = await repo.findBySlug(slug);
+  if (!product || !product.isActive) {
+    const error: any = new Error("Không tìm thấy sản phẩm");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const reviewStats = await repo.getReviewStats(product.id);
+
+  repo
+    .update(product.id, {
+      viewsCount: BigInt(product.viewsCount) + BigInt(1),
+    })
+    .catch(console.error);
+
+  const productDetail = transformProductDetail(product, {
+    average: Number(product.ratingAverage) || 0,
+    total: reviewStats.total,
+    distribution: reviewStats.distribution as any,
+  });
+
+  const highlights = transformProductHighlights(product);
+
+  return {
+    ...productDetail,
+    highlights,
+  };
+};
+
+export const getProductSpecificationsBySlug = async (slug: string) => {
+  const product = await repo.findSpecificationsBySlug(slug);
 
   if (!product || !product.isActive) {
     const error: any = new Error("Không tìm thấy sản phẩm");
@@ -409,22 +384,9 @@ export const getProductBySlug = async (slug: string) => {
     throw error;
   }
 
-  // Lấy review stats
-  const reviewStats = await repo.getReviewStats(product.id);
-  const stats: ReviewStats = {
-    average: Number(product.ratingAverage) || 0,
-    total: reviewStats.total,
-    distribution: reviewStats.distribution as any,
-  };
+  const { specifications } = transformProductSpecifications(product);
 
-  // Increment view count (async, không cần await)
-  repo
-    .update(product.id, {
-      viewsCount: BigInt(product.viewsCount) + BigInt(1),
-    })
-    .catch(console.error);
-
-  return transformProductDetail(product, stats);
+  return { specifications };
 };
 
 export const getRelatedProducts = async (slug: string, limit: number = 8) => {

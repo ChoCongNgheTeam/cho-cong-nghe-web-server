@@ -102,8 +102,10 @@ const selectProductDetail = {
   name: true,
   slug: true,
   description: true,
+
   brand: { select: selectBrand },
   category: { select: selectCategory },
+
   viewsCount: true,
   ratingAverage: true,
   ratingCount: true,
@@ -111,36 +113,60 @@ const selectProductDetail = {
   isActive: true,
   createdAt: true,
   updatedAt: true,
+
   variants: {
     select: selectVariant,
     orderBy: { isDefault: "desc" as const },
   },
+
   productHighlights: {
     orderBy: { sortOrder: "asc" as const },
     select: {
+      specificationId: true,
+      sortOrder: true,
+    },
+  },
+
+  productSpecifications: {
+    orderBy: { sortOrder: "asc" as const },
+    select: {
+      specificationId: true,
+      sortOrder: true,
+      value: true,
       specification: {
+        select: { id: true, key: true, group: true, name: true, icon: true, unit: true },
+      },
+    },
+  },
+};
+
+export const selectProductSpecifications = {
+  isActive: true,
+  category: {
+    select: {
+      categorySpecifications: {
+        orderBy: {
+          sortOrder: "asc" as const,
+        },
         select: {
-          id: true,
-          key: true,
-          name: true,
-          icon: true,
-          unit: true,
+          groupName: true,
+          sortOrder: true,
+          specification: {
+            select: {
+              id: true,
+              key: true,
+              name: true,
+              icon: true,
+              unit: true,
+            },
+          },
         },
       },
     },
   },
   productSpecifications: {
-    orderBy: { sortOrder: "asc" as const },
     select: {
-      specification: {
-        select: {
-          id: true,
-          key: true,
-          name: true,
-          icon: true,
-          unit: true,
-        },
-      },
+      specificationId: true,
       value: true,
     },
   },
@@ -272,6 +298,12 @@ export const findBySlug = (slug: string) =>
   prisma.products.findUnique({
     where: { slug },
     select: selectProductDetail,
+  });
+
+export const findSpecificationsBySlug = (slug: string) =>
+  prisma.products.findUnique({
+    where: { slug },
+    select: selectProductSpecifications,
   });
 
 // =====================

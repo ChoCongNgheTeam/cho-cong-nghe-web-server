@@ -22,13 +22,19 @@ async function main() {
   const brands = await seedBrands();
   const categories = await seedCategories();
   const attributes = await seedAttributes();
-  const highlights = await seedSpecifications();
+  await seedSpecifications();
+
+  const specifications = await prisma.specifications.findMany();
   await seedPaymentMethods();
   const users = await seedUsers();
   await seedVouchers();
   await seedUserAddresses({ users });
 
-  const products = await seedProducts({ brands, categories, highlights });
+  const products = await seedProducts({
+    brands,
+    categories,
+    highlights: specifications, // ← CHUẨN
+  });
   await seedVariants({ products, attributes });
 
   await seedProductSpecifications();

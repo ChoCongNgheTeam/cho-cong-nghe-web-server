@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 const attributeData = [
   {
     name: "Color",
-    options: ["Black", "White", "Silver", "Blue", "Red", "Gold", "Green"],
+    options: ["Đen", "Trắng", "Đỏ", "Hồng", "Xanh", "Xanh lá", "Xanh rêu"],
   },
   {
     name: "Size",

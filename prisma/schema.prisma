@@ -46,7 +46,6 @@ enum PaymentTransactionStatus {
   REFUNDED
 }
 
-
 enum DiscountType {
   PERCENTAGE
   FIXED
@@ -89,13 +88,13 @@ model users {
   voucherUsages voucher_usages[]
 
   passwordResetTokens password_reset_tokens[]
-  refreshTokens refresh_tokens[]
+  refreshTokens       refresh_tokens[]
 }
 
 model password_reset_tokens {
   id        String   @id @default(uuid()) @db.Uuid
   token     String   @unique
-  userId    String   @db.Uuid 
+  userId    String   @db.Uuid
   user      users    @relation(fields: [userId], references: [id])
   expiresAt DateTime
   createdAt DateTime @default(now())
@@ -104,14 +103,14 @@ model password_reset_tokens {
 }
 
 model refresh_tokens {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  token     String   @unique
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  token     String    @unique
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
-  deviceId  String?   // optional
+  deviceId  String? // optional
   userAgent String?
   ip        String?
 
@@ -137,6 +136,7 @@ model user_addresses {
   user users @relation(fields: [userId], references: [id])
 
   orders orders[]
+
   @@unique([userId, detailAddress, phone])
 }
 
@@ -155,7 +155,7 @@ model brands {
 
 model categories {
   id            String   @id @default(uuid()) @db.Uuid
-  name  String @unique
+  name          String   @unique
   parentId      String?  @db.Uuid
   description   String?
   categoryImage String?
@@ -165,9 +165,12 @@ model categories {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  parent            categories?          @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children          categories[]         @relation("CategoryHierarchy")
-  products products[]
+  parent                 categories?               @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children               categories[]              @relation("CategoryHierarchy")
+  products               products[]
+  attributes             category_attributes[]
+  categorySpecifications category_specifications[]
+
   @@unique([parentId, position])
 }
 
@@ -199,13 +202,26 @@ model products {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  brand             brands               @relation(fields: [brandId], references: [id])
-  category          categories           @relation(fields: [categoryId], references: [id])
+  brand                 brands                   @relation(fields: [brandId], references: [id])
+  category              categories               @relation(fields: [categoryId], references: [id])
   // categories categories[]
-  variants          products_variants[]
+  variants              products_variants[]
   productSpecifications product_specifications[]
   productHighlights     product_highlights[]
+}
 
+model category_attributes {
+  categoryId  String @db.Uuid
+  attributeId String @db.Uuid
+
+  category  categories @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  attribute attributes @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+
+  // Optional: tùy chỉnh thêm
+  isRequired Boolean @default(false) // bắt buộc cho category này?
+  sortOrder  Int     @default(0)
+
+  @@id([categoryId, attributeId])
 }
 
 model attributes {
@@ -215,7 +231,8 @@ model attributes {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  options attributes_options[]
+  options             attributes_options[]
+  allowedInCategories category_attributes[]
 }
 
 model attributes_options {
@@ -227,6 +244,7 @@ model attributes_options {
 
   attribute    attributes            @relation(fields: [attributeId], references: [id])
   variantAttrs variants_attributes[]
+
   @@unique([attributeId, value])
 }
 
@@ -285,37 +303,57 @@ model inventory {
   variant products_variants @relation(fields: [variantId], references: [id])
 }
 
+model category_specifications {
+  categoryId      String @db.Uuid
+  specificationId String @db.Uuid
+
+  category      categories     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  specification specifications @relation(fields: [specificationId], references: [id], onDelete: Cascade)
+  groupName     String
+  isRequired    Boolean        @default(false) // có thể override required theo category
+  sortOrder     Int            @default(0)
+
+  @@id([categoryId, specificationId])
+}
+
 model specifications {
   id        String   @id @default(uuid()) @db.Uuid
-  key       String   @unique   // chip, ram, battery
-  name      String             // Chip, RAM, Pin
-  unit      String?            // GB, mAh, inch
+  key       String   @unique // chip, ram, battery
+  name      String // Chip, RAM, Pin
+  group     String   @default("Thông số khác")
+  unit      String? // GB, mAh, inch
   icon      String?
   createdAt DateTime @default(now())
 
+  // Thêm các trường hỗ trợ
+  isFilterable Boolean @default(false) // có dùng làm bộ lọc (facet) không?
+  isRequired   Boolean @default(false) // bắt buộc cho category này?
+  sortOrder    Int     @default(0)
+
   productSpecifications product_specifications[]
-  productHighlights product_highlights[]
+  productHighlights     product_highlights[]
+  allowedInCategories   category_specifications[]
 }
 
 model product_specifications {
-  productId        String @db.Uuid
-  specificationId  String @db.Uuid
-  value            String
-  sortOrder        Int     @default(0)
+  productId       String @db.Uuid
+  specificationId String @db.Uuid
+  value           String
+  sortOrder       Int    @default(0)
 
-  product        products        @relation(fields: [productId], references: [id])
-  specification  specifications  @relation(fields: [specificationId], references: [id])
+  product       products       @relation(fields: [productId], references: [id])
+  specification specifications @relation(fields: [specificationId], references: [id])
 
   @@id([productId, specificationId])
 }
 
 model product_highlights {
-  productId        String @db.Uuid
-  specificationId  String @db.Uuid
-  sortOrder        Int    @default(0)
+  productId       String @db.Uuid
+  specificationId String @db.Uuid
+  sortOrder       Int    @default(0)
 
-  product       products        @relation(fields: [productId], references: [id])
-  specification specifications  @relation(fields: [specificationId], references: [id])
+  product       products       @relation(fields: [productId], references: [id])
+  specification specifications @relation(fields: [specificationId], references: [id])
 
   @@id([productId, specificationId])
 }
@@ -360,10 +398,10 @@ model orders {
   orderDate         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
-  user            users            @relation(fields: [userId], references: [id])
-  paymentMethod   payment_methods  @relation(fields: [paymentMethodId], references: [id])
-  voucher         vouchers?        @relation(fields: [voucherId], references: [id])
-  shippingAddress user_addresses   @relation(fields: [shippingAddressId], references: [id])
+  user            users                  @relation(fields: [userId], references: [id])
+  paymentMethod   payment_methods        @relation(fields: [paymentMethodId], references: [id])
+  voucher         vouchers?              @relation(fields: [voucherId], references: [id])
+  shippingAddress user_addresses         @relation(fields: [shippingAddressId], references: [id])
   orderItems      order_items[]
   voucherUsages   voucher_usages[]
   transactions    payment_transactions[]
@@ -383,14 +421,14 @@ model order_items {
 }
 
 model reviews {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @db.Uuid
-  orderItemId String   @unique @db.Uuid
+  id          String       @id @default(uuid()) @db.Uuid
+  userId      String       @db.Uuid
+  orderItemId String       @unique @db.Uuid
   rating      Int
   comment     String?
   isApproved  ReviewStatus @default(PENDING)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   user      users       @relation(fields: [userId], references: [id])
   orderItem order_items @relation(fields: [orderItemId], references: [id])
@@ -398,34 +436,33 @@ model reviews {
 
 model payment_methods {
   id          String   @id @default(uuid()) @db.Uuid
-  name        String @unique
+  name        String   @unique
   description String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  orders orders[]
+  orders               orders[]
   payment_transactions payment_transactions[]
 }
 
 model payment_transactions {
-  id              String   @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  orderId         String   @db.Uuid
-  paymentMethodId String   @db.Uuid
+  orderId         String @db.Uuid
+  paymentMethodId String @db.Uuid
 
-  amount          Decimal  @db.Decimal(10, 2)
-  transactionRef  String?
-  status          PaymentTransactionStatus
-  payload         Json?
+  amount         Decimal                  @db.Decimal(10, 2)
+  transactionRef String?
+  status         PaymentTransactionStatus
+  payload        Json?
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  order           orders            @relation(fields: [orderId], references: [id])
-  paymentMethod   payment_methods   @relation(fields: [paymentMethodId], references: [id])
+  order         orders          @relation(fields: [orderId], references: [id])
+  paymentMethod payment_methods @relation(fields: [paymentMethodId], references: [id])
 }
-
 
 model vouchers {
   id             String       @id @default(uuid()) @db.Uuid

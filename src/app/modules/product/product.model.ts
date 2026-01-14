@@ -27,7 +27,7 @@ export interface Inventory {
   available: number; // quantity - reservedQuantity
 }
 
-// ✅ NHÓM 1: Bắt buộc
+// NHÓM 1: Bắt buộc, sẽ bỏ
 export interface AvailableColor {
   name: string;
   hex?: string; // Mã màu để render swatch
@@ -40,6 +40,17 @@ export interface AvailableStorage {
   name: string; // "128GB", "256GB", "512GB"
   value: number; // 128, 256, 512 (để sort)
   available: boolean;
+  variantIds: string[];
+}
+
+export interface AvailableOption {
+  attribute: string; // ví dụ: "Color", "Storage"
+  values: AvailableOptionValue[];
+}
+
+export interface AvailableOptionValue {
+  id: string;
+  value: string; // ví dụ: "Black", "256GB"
   variantIds: string[];
 }
 
@@ -92,8 +103,6 @@ export interface ProductVariant {
   stockStatus: "in_stock" | "low_stock" | "out_of_stock"; // ✅ Nhóm 2
   inventory: Inventory;
   images: VariantImage[];
-  attributes: Record<string, string>; // { "Color": "Black", "Storage": "256GB" }
-  attributeIds: Record<string, string>; // { "Color": "attr-id-1", "Storage": "attr-id-2" }
 }
 
 // =====================
@@ -106,7 +115,9 @@ export interface Specification {
   name: string;
   icon?: string;
   unit?: string;
-  value?: string;
+  value: string;
+  isHighlight?: boolean;
+  highlightOrder?: number;
 }
 
 export interface Highlight {
@@ -150,6 +161,13 @@ export interface ReviewStats {
 // === PRODUCT LIST (For Card Display) ===
 // =====================
 
+export interface ProductCardHighlight {
+  key: string;
+  name: string;
+  icon?: string | null;
+  value?: string;
+}
+
 export interface ProductCard {
   id: string;
   name: string;
@@ -175,7 +193,7 @@ export interface ProductCard {
   isNew?: boolean; // Sản phẩm mới trong 30 ngày
 
   // Quick info
-  highlights: string[]; // ["6.1 inch", "48MP", "A16 Bionic"]
+  highlights: ProductCardHighlight[];
 
   // Availability
   inStock: boolean;
@@ -192,37 +210,16 @@ export interface ProductDetail {
   description?: string;
   brand: Brand;
   category: Category[];
-
-  // ✅ NHÓM 1: Bắt buộc - FE dùng trực tiếp
-  availableColors: AvailableColor[]; // Danh sách màu có sẵn
-  availableStorages: AvailableStorage[]; // Danh sách bộ nhớ có sẵn
-  priceRange: PriceRange; // Khoảng giá
-
-  // ✅ NHÓM 2: Nên có
-  gallery: ProductGallery[]; // Ảnh tổng hợp (tất cả variants + lifestyle)
-  warranty?: string; // "12 tháng chính hãng Apple Việt Nam"
-  stockStatus: "in_stock" | "low_stock" | "out_of_stock" | "pre_order";
-
-  // Current selected variant (default hoặc user chọn)
-  currentVariant: ProductVariant;
-
-  // Tất cả variants
-  variants: ProductVariant[];
-
-  // Grouped attributes để render selector
-  attributes: AttributeGroup[];
-
-  // Highlights (thông số nổi bật)
+  availableOptions: AvailableOption[];
   highlights: Highlight[];
-
-  // Full specifications
-  specifications: Specification[];
-
-  // Rating & Reviews
+  priceRange: PriceRange;
+  gallery: ProductGallery[];
+  warranty?: string;
+  stockStatus: "in_stock" | "low_stock" | "out_of_stock" | "pre_order";
+  currentVariant: ProductVariant;
+  variants: ProductVariant[];
   rating: ReviewStats;
-  reviews: Review[];
 
-  // Meta
   viewsCount: number;
   isFeatured: boolean;
   isActive: boolean;
