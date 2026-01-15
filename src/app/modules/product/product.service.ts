@@ -48,7 +48,6 @@ const getStockStatus = (
  * Transform raw variant data sang FE-friendly format
  */
 const transformVariant = (variant: any): ProductVariant => {
-  // Build attributes object: { "Color": "Black", "Storage": "256GB" }
   const quantity = variant.inventory?.quantity ?? 0;
   const reservedQuantity = variant.inventory?.reservedQuantity ?? 0;
   const available = Math.max(0, quantity - reservedQuantity);
@@ -75,28 +74,7 @@ const transformVariant = (variant: any): ProductVariant => {
   };
 };
 
-/**
- * ✅ NHÓM 1: Extract available colors
- * Mapping màu phổ biến sang hex code
- */
-const COLOR_HEX_MAP: Record<string, string> = {
-  Black: "#000000",
-  White: "#FFFFFF",
-  Red: "#FF0000",
-  Blue: "#0000FF",
-  Green: "#00FF00",
-  Yellow: "#FFFF00",
-  Pink: "#FFC0CB",
-  Purple: "#800080",
-  Gray: "#808080",
-  Silver: "#C0C0C0",
-  Gold: "#FFD700",
-  // Thêm các màu khác nếu cần
-};
-
-/**
- * ✅ NHÓM 1: Calculate price range
- */
+// NHÓM 1: Calculate price range
 const calculatePriceRange = (variants: any[]): PriceRange => {
   const prices = variants.filter((v) => v.isActive).map((v) => Number(v.price));
 
@@ -137,6 +115,7 @@ const buildAvailableOptions = (variants: any[]): AvailableOption[] => {
     for (const va of variant.variantAttributes) {
       const attributeName = va.attributeOption.attribute.name;
       const optionValue = va.attributeOption.value;
+      const optionLabel = va.attributeOption.label;
       const optionId = va.attributeOption.id;
 
       if (!map.has(attributeName)) {
@@ -149,6 +128,7 @@ const buildAvailableOptions = (variants: any[]): AvailableOption[] => {
         valueMap.set(optionId, {
           id: optionId,
           value: optionValue,
+          label: optionLabel,
           variantIds: [],
         });
       }
@@ -250,12 +230,9 @@ const transformProductDetail = (
     category: product.category || [],
     availableOptions: buildAvailableOptions(product.variants),
     priceRange: calculatePriceRange(product.variants),
-    gallery: buildGallery(product.variants),
     warranty: "12 tháng chính hãng",
     stockStatus: calculateOverallStockStatus(product.variants),
     currentVariant: defaultVariant,
-    variants: transformedVariants,
-
     rating: reviewStats!,
     viewsCount: Number(product.viewsCount) || 0,
     isFeatured: product.isFeatured,
@@ -364,6 +341,40 @@ export const getProductBySlug = async (slug: string) => {
   };
 };
 
+export const getProductVariant = async (
+  slug: string,
+  code?: string,
+  options?: Record<string, string>
+) => {
+  // Lấy product để verify
+  const product = await repo.findBySlug(slug);
+  if (!product || !product.isActive) {
+    const error: any = new Error("Không tìm thấy sản phẩm");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  let variant;
+
+  // Tìm variant theo code ?
+  if (code) {
+    variant = await repo.findVariantByCode(product.id, code);
+  }
+  // Hoặc tìm theo options (Color, Storage, ...)
+  else if (options && Object.keys(options).length > 0) {
+    variant = await repo.findVariantByOptions(product.id, options);
+  }
+
+  if (!variant || !variant.isActive) {
+    const error: any = new Error("Không tìm thấy variant");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // Transform và trả về
+  return transformVariant(variant);
+};
+
 export const getProductSpecificationsBySlug = async (slug: string) => {
   const product = await repo.findSpecificationsBySlug(slug);
 
@@ -376,6 +387,31 @@ export const getProductSpecificationsBySlug = async (slug: string) => {
   const { specifications } = transformProductSpecifications(product);
 
   return { specifications };
+};
+
+export const getProductGallery = async (slug: string) => {
+  const product = await repo.findBySlug(slug);
+  if (!product || !product.isActive) {
+    const error: any = new Error("Không tìm thấy sản phẩm");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const variants = await repo.findAllVariantsWithImages(product.id);
+
+  // Gom tất cả images của các variant
+  const allImages = variants.flatMap((variant) => variant.images);
+
+  // Deduplicate theo imageUrl
+  const uniqueImages = Array.from(new Map(allImages.map((img) => [img.imageUrl, img])).values());
+
+  // Chuẩn hoá response cho FE
+  return uniqueImages.map((img) => ({
+    id: img.id,
+    imageUrl: img.imageUrl,
+    altText: img.altText,
+    position: img.position,
+  }));
 };
 
 export const getRelatedProducts = async (slug: string, limit: number = 8) => {

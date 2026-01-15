@@ -7,6 +7,8 @@ import {
   // Public handlers
   getProductsPublicHandler,
   getProductBySlugHandler,
+  getProductVariantHandler,
+  getProductGalleryHandler,
   getRelatedProductsHandler,
   getProductReviewsHandler,
 
@@ -27,6 +29,7 @@ import {
   updateProductSchema,
   bulkUpdateSchema,
   reviewsQuerySchema,
+  variantQuerySchema,
 } from "./product.validation";
 
 const router = Router();
@@ -38,6 +41,21 @@ router.get("/", validate(listProductsSchema, "query"), getProductsPublicHandler)
 
 // Lấy chi tiết sản phẩm theo slug
 router.get("/slug/:slug", validate(productBySlugParamsSchema, "params"), getProductBySlugHandler);
+
+// Lấy chi tiết variant cụ thể
+router.get(
+  "/slug/:slug/variant",
+  validate(productBySlugParamsSchema, "params"),
+  validate(variantQuerySchema, "query"),
+  getProductVariantHandler
+);
+
+// Lấy gallery của variant
+router.get(
+  "/slug/:slug/gallery",
+  validate(productBySlugParamsSchema, "params"),
+  getProductGalleryHandler
+);
 
 // Lấy thông số kỹ thuật
 router.get(

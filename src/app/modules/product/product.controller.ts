@@ -162,6 +162,58 @@ export const getProductBySlugHandler = async (req: Request, res: Response) => {
   }
 };
 
+export const getProductVariantHandler = async (req: Request, res: Response) => {
+  try {
+    const { slug } = req.params;
+    const { code, ...queryOptions } = req.query;
+
+    // Filter để chỉ lấy các attribute options (bỏ code)
+    const options: Record<string, string> = {};
+    for (const [key, value] of Object.entries(queryOptions)) {
+      if (typeof value === "string" && value) {
+        options[key] = value;
+      }
+    }
+
+    const variant = await productService.getProductVariant(
+      slug,
+      code as string | undefined,
+      Object.keys(options).length > 0 ? options : undefined
+    );
+
+    res.json({
+      success: true,
+      data: variant,
+      message: "Lấy chi tiết variant thành công",
+    });
+  } catch (error: any) {
+    const status = error.statusCode || 500;
+    res.status(status).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
+  }
+};
+
+export const getProductGalleryHandler = async (req: Request, res: Response) => {
+  try {
+    const { slug } = req.params;
+    const gallery = await productService.getProductGallery(slug);
+
+    res.json({
+      success: true,
+      data: gallery,
+      message: "Lấy gallery thành công",
+    });
+  } catch (error: any) {
+    const status = error.statusCode || 500;
+    res.status(status).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
+  }
+};
+
 export const getProductBySpecificationsHandler = async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;

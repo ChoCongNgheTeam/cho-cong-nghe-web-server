@@ -36,6 +36,7 @@ const selectVariantAttribute = {
     select: {
       id: true,
       value: true,
+      label: true,
       attribute: {
         select: {
           id: true,
@@ -242,6 +243,49 @@ export const findAllAdmin = async (query: ListProductsQuery) => {
   return findAll(query, false);
 };
 
+export const findAllVariantsWithImages = async (productId: string) => {
+  return prisma.products_variants.findMany({
+    where: {
+      productId,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      code: true,
+      variantAttributes: {
+        select: {
+          attributeOption: {
+            select: {
+              id: true,
+              value: true,
+              attribute: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      images: {
+        orderBy: {
+          position: "asc",
+        },
+        select: {
+          id: true,
+          imageUrl: true,
+          altText: true,
+          position: true,
+        },
+      },
+    },
+    orderBy: {
+      isDefault: "desc", // Default variant lên đầu
+    },
+  });
+};
+
 const findAll = async (query: ListProductsQuery, onlyActive: boolean) => {
   const { page, limit, sortBy, sortOrder } = query;
   const skip = (page - 1) * limit;
@@ -278,6 +322,44 @@ const findAll = async (query: ListProductsQuery, onlyActive: boolean) => {
     total,
     totalPages: Math.ceil(total / limit),
   };
+};
+
+export const findVariantByCode = async (productId: string, code: string) => {
+  return prisma.products_variants.findFirst({
+    where: {
+      productId,
+      code,
+      isActive: true,
+    },
+    select: selectVariant,
+  });
+};
+
+export const findVariantByOptions = async (productId: string, options: Record<string, string>) => {
+  // Lấy tất cả variants của product
+  const variants = await prisma.products_variants.findMany({
+    where: {
+      productId,
+      isActive: true,
+    },
+    select: selectVariant,
+  });
+
+  // Tìm variant match với tất cả options
+  const matchedVariant = variants.find((variant) => {
+    const variantOptions: Record<string, string> = {};
+
+    variant.variantAttributes.forEach((attr) => {
+      const attributeName = attr.attributeOption.attribute.name;
+      const optionValue = attr.attributeOption.value;
+      variantOptions[attributeName] = optionValue;
+    });
+
+    // Kiểm tra tất cả options có match không
+    return Object.entries(options).every(([key, value]) => variantOptions[key] === value);
+  });
+
+  return matchedVariant || null;
 };
 
 export const findById = (id: string) =>

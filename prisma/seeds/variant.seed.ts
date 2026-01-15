@@ -9,60 +9,74 @@ interface SeedVariantsParams {
 
 const variantData = {
   "iPhone 13": [
-    // --- Phiên bản 128 GB ---
-    { storage: "128GB", color: "Trắng", price: 13490000, isDefault: true },
-    { storage: "128GB", color: "Đen", price: 13490000 },
-    { storage: "128GB", color: "Đỏ", price: 13490000 },
-    { storage: "128GB", color: "Hồng", price: 13490000 },
+    // --- 128 GB ---
+    { storage: "128gb", color: "white", price: 13490000, isDefault: true },
+    { storage: "128gb", color: "black", price: 13490000 },
+    { storage: "128gb", color: "red", price: 13490000 },
+    { storage: "128gb", color: "pink", price: 13490000 },
 
-    // --- Phiên bản 256 GB ---
-    { storage: "256GB", color: "Đen", price: 15990000 },
-    { storage: "256GB", color: "Trắng", price: 15990000 },
-    { storage: "256GB", color: "Đỏ", price: 15990000 },
-    { storage: "256GB", color: "Hồng", price: 15990000 },
-    { storage: "256GB", color: "Xanh rêu", price: 16490000 },
+    // --- 256 GB ---
+    { storage: "256gb", color: "black", price: 15990000 },
+    { storage: "256gb", color: "white", price: 15990000 },
+    { storage: "256gb", color: "red", price: 15990000 },
+    { storage: "256gb", color: "pink", price: 15990000 },
+    { storage: "256gb", color: "alpine-green", price: 16490000 },
 
-    // --- Phiên bản 512 GB ---
-    { storage: "512GB", color: "Đen", price: 18990000 },
+    // --- 512 GB ---
+    { storage: "512gb", color: "black", price: 18990000 },
   ],
+
   "Samsung Galaxy S24+": [
-    { storage: "256GB", color: "Black", price: 33990000, isDefault: true },
-    { storage: "512GB", color: "Gray", price: 38990000 },
+    { storage: "256gb", color: "black", price: 33990000, isDefault: true },
+    { storage: "512gb", color: "gray", price: 38990000 }, // ⚠️ gray cần có trong attribute color
   ],
-  "Xiaomi 14 Ultra": [{ storage: "256GB", color: "Black", price: 21990000, isDefault: true }],
+
+  "Xiaomi 14 Ultra": [{ storage: "256gb", color: "black", price: 21990000, isDefault: true }],
 };
 
 const variantImages: Record<string, Record<string, string[]>> = {
   "iPhone 13": {
-    Đen: [
-      "products/iphone-13/black/front.webp",
-      "products/iphone-13/black/side.webp",
-      "products/iphone-13/black/back.webp",
+    black: [
+      "products/iphone-13/black/image-01.webp",
+      "products/iphone-13/black/image-02.webp",
+      "products/iphone-13/black/image-03.webp",
+      "products/iphone-13/black/image-04.webp",
+      "products/iphone-13/black/image-05.webp",
     ],
-    Trắng: [
-      "products/iphone-13/white/front.webp",
-      "products/iphone-13/white/side.webp",
-      "products/iphone-13/white/back.webp",
+    white: [
+      "products/iphone-13/white/image-01.webp",
+      "products/iphone-13/white/image-02.webp",
+      "products/iphone-13/white/image-03.webp",
+      "products/iphone-13/white/image-04.webp",
+      "products/iphone-13/white/image-05.webp",
     ],
-    Đỏ: [
-      "products/iphone-13/red/front.webp",
-      "products/iphone-13/red/side.webp",
-      "products/iphone-13/red/back.webp",
+    red: [
+      "products/iphone-13/red/image-01.webp",
+      "products/iphone-13/red/image-02.webp",
+      "products/iphone-13/red/image-03.webp",
+      "products/iphone-13/red/image-04.webp",
+      "products/iphone-13/red/image-05.webp",
     ],
-    Hồng: [
-      "products/iphone-13/pink/front.webp",
-      "products/iphone-13/pink/side.webp",
-      "products/iphone-13/pink/back.webp",
+    pink: [
+      "products/iphone-13/pink/image-01.webp",
+      "products/iphone-13/pink/image-02.webp",
+      "products/iphone-13/pink/image-03.webp",
+      "products/iphone-13/pink/image-04.webp",
+      "products/iphone-13/pink/image-05.webp",
     ],
-    "Xanh dương": [
-      "products/iphone-13/blue/front.webp",
-      "products/iphone-13/blue/side.webp",
-      "products/iphone-13/blue/back.webp",
+    blue: [
+      "products/iphone-13/blue/image-01.webp",
+      "products/iphone-13/blue/image-02.webp",
+      "products/iphone-13/blue/image-03.webp",
+      "products/iphone-13/blue/image-04.webp",
+      "products/iphone-13/blue/image-05.webp",
     ],
-    "Xanh rêu": [
-      "products/iphone-13/alpine-green/front.webp",
-      "products/iphone-13/alpine-green/side.webp",
-      "products/iphone-13/alpine-green/back.webp",
+    "alpine-green": [
+      "products/iphone-13/alpine-green/image-01.webp",
+      "products/iphone-13/alpine-green/image-02.webp",
+      "products/iphone-13/alpine-green/image-03.webp",
+      "products/iphone-13/alpine-green/image-04.webp",
+      "products/iphone-13/alpine-green/image-05.webp",
     ],
   },
 };
@@ -70,8 +84,8 @@ const variantImages: Record<string, Record<string, string[]>> = {
 export async function seedVariants({ products, attributes }: SeedVariantsParams) {
   console.log("Seeding product variants...");
 
-  const colorAttr = attributes.find((a: any) => a.name === "Color");
-  const storageAttr = attributes.find((a: any) => a.name === "Storage");
+  const colorAttr = attributes.find((a: any) => a.name === "color");
+  const storageAttr = attributes.find((a: any) => a.name === "storage");
 
   const createdVariants: any[] = [];
 

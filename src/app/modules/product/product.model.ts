@@ -51,6 +51,7 @@ export interface AvailableOption {
 export interface AvailableOptionValue {
   id: string;
   value: string; // ví dụ: "Black", "256GB"
+  code: string;
   variantIds: string[];
 }
 
@@ -213,11 +214,11 @@ export interface ProductDetail {
   availableOptions: AvailableOption[];
   highlights: Highlight[];
   priceRange: PriceRange;
-  gallery: ProductGallery[];
+  // gallery: ProductGallery[];
   warranty?: string;
   stockStatus: "in_stock" | "low_stock" | "out_of_stock" | "pre_order";
   currentVariant: ProductVariant;
-  variants: ProductVariant[];
+  // variants: ProductVariant[];
   rating: ReviewStats;
 
   viewsCount: number;
