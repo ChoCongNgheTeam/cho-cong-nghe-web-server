@@ -1,6 +1,7 @@
 import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
 import { ListProductsQuery, ReviewsQuery } from "./product.validation";
+import { OrderStatus } from "@prisma/client";
 
 // =====================
 // === SELECT FRAGMENTS ===
@@ -81,18 +82,15 @@ const selectProductCard = {
     take: 1, // Chỉ lấy variant mặc định cho card
     orderBy: { isDefault: "desc" as const },
   },
-  productHighlights: {
+  productSpecifications: {
     orderBy: { sortOrder: "asc" as const },
-    take: 3, // Chỉ lấy 3 highlights nổi bật nhất
     select: {
+      specificationId: true,
+      sortOrder: true,
+      value: true,
+      isHighlight: true,
       specification: {
-        select: {
-          id: true,
-          key: true,
-          name: true,
-          icon: true,
-          unit: true,
-        },
+        select: { id: true, key: true, group: true, name: true, icon: true, unit: true },
       },
     },
   },
@@ -120,20 +118,13 @@ const selectProductDetail = {
     orderBy: { isDefault: "desc" as const },
   },
 
-  productHighlights: {
-    orderBy: { sortOrder: "asc" as const },
-    select: {
-      specificationId: true,
-      sortOrder: true,
-    },
-  },
-
   productSpecifications: {
     orderBy: { sortOrder: "asc" as const },
     select: {
       specificationId: true,
       sortOrder: true,
       value: true,
+      isHighlight: true,
       specification: {
         select: { id: true, key: true, group: true, name: true, icon: true, unit: true },
       },
@@ -282,6 +273,26 @@ export const findAllVariantsWithImages = async (productId: string) => {
     },
     orderBy: {
       isDefault: "desc", // Default variant lên đầu
+    },
+  });
+};
+
+export const findOrderItemForReview = (userId: string, productId: string) => {
+  return prisma.order_items.findFirst({
+    where: {
+      order: {
+        userId,
+        orderStatus: OrderStatus.DELIVERED,
+      },
+      productVariant: {
+        productId,
+      },
+    },
+    select: {
+      id: true,
+      review: {
+        select: { id: true },
+      },
     },
   });
 };
@@ -556,20 +567,6 @@ export const update = async (id: string, data: any) => {
     };
   }
 
-  // Xử lý highlights
-  if (highlights !== undefined) {
-    await prisma.product_highlights.deleteMany({ where: { productId: id } });
-    if (highlights.length > 0) {
-      await prisma.product_highlights.createMany({
-        data: highlights.map((h: any, index: number) => ({
-          productId: id,
-          specificationId: h.specificationId,
-          sortOrder: index,
-        })),
-      });
-    }
-  }
-
   // Xử lý specifications
   if (specifications !== undefined) {
     await prisma.product_specifications.deleteMany({ where: { productId: id } });
@@ -616,7 +613,7 @@ export const remove = async (id: string) => {
   });
 
   await prisma.products_variants.deleteMany({ where: { productId: id } });
-  await prisma.product_highlights.deleteMany({ where: { productId: id } });
+  // await prisma.product_highlights.deleteMany({ where: { productId: id } });
   await prisma.product_specifications.deleteMany({ where: { productId: id } });
 
   return prisma.products.delete({ where: { id } });

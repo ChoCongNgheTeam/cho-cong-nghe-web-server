@@ -5,6 +5,7 @@ import {
   seedAttributes,
   seedSpecifications,
   seedProductSpecifications,
+  seedProductHighlights,
   // seedReviews,
   seedPaymentMethods,
   seedUsers,
@@ -23,8 +24,6 @@ async function main() {
   const categories = await seedCategories();
   const attributes = await seedAttributes();
   await seedSpecifications();
-
-  const specifications = await prisma.specifications.findMany();
   await seedPaymentMethods();
   const users = await seedUsers();
   await seedVouchers();
@@ -33,12 +32,10 @@ async function main() {
   const products = await seedProducts({
     brands,
     categories,
-    highlights: specifications, // ← CHUẨN
   });
-  await seedVariants({ products, attributes });
-
   await seedProductSpecifications();
-  // await seedReviews();
+  await seedProductHighlights();
+  await seedVariants({ products, attributes });
 
   console.log("Seeding hoàn tất thành công!");
 }

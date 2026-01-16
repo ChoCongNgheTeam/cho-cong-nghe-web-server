@@ -146,7 +146,12 @@ export const getProductsPublicHandler = async (
 export const getProductBySlugHandler = async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
-    const product = await productService.getProductBySlug(slug);
+
+    const userId = (req as any).user?.id || null;
+
+    console.log(userId);
+
+    const product = await productService.getProductBySlug(slug, userId);
 
     res.json({
       success: true,

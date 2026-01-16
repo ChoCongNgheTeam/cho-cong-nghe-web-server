@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { validate } from "@/app/middlewares/validate.middleware";
-import { authMiddleware } from "@/app/middlewares/auth.middleware";
+import { authMiddleware, optionalAuthMiddleware } from "@/app/middlewares/auth.middleware";
 import { requireRole } from "@/app/middlewares/role.middleware";
 import { upload } from "@/app/middlewares/upload.middleware";
 import {
@@ -40,7 +40,12 @@ const router = Router();
 router.get("/", validate(listProductsSchema, "query"), getProductsPublicHandler);
 
 // Lấy chi tiết sản phẩm theo slug
-router.get("/slug/:slug", validate(productBySlugParamsSchema, "params"), getProductBySlugHandler);
+router.get(
+  "/slug/:slug",
+  validate(productBySlugParamsSchema, "params"),
+  optionalAuthMiddleware,
+  getProductBySlugHandler
+);
 
 // Lấy chi tiết variant cụ thể
 router.get(

@@ -207,7 +207,6 @@ model products {
   // categories categories[]
   variants              products_variants[]
   productSpecifications product_specifications[]
-  productHighlights     product_highlights[]
 }
 
 model category_attributes {
@@ -333,7 +332,6 @@ model specifications {
   sortOrder    Int     @default(0)
 
   productSpecifications product_specifications[]
-  productHighlights     product_highlights[]
   allowedInCategories   category_specifications[]
 }
 
@@ -342,17 +340,7 @@ model product_specifications {
   specificationId String @db.Uuid
   value           String
   sortOrder       Int    @default(0)
-
-  product       products       @relation(fields: [productId], references: [id])
-  specification specifications @relation(fields: [specificationId], references: [id])
-
-  @@id([productId, specificationId])
-}
-
-model product_highlights {
-  productId       String @db.Uuid
-  specificationId String @db.Uuid
-  sortOrder       Int    @default(0)
+  isHighlight     Boolean
 
   product       products       @relation(fields: [productId], references: [id])
   specification specifications @relation(fields: [specificationId], references: [id])

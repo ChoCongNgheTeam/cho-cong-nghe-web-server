@@ -73,5 +73,5 @@ export const iphone14: SeedProductInput = {
   brandName: "Apple",
   categoryNames: ["Điện thoại"],
   isFeatured: true,
-  highlights: [{ key: "cpu_type" }, { key: "gpu_chip" }, { key: "rom_capacity" }],
+  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
 };

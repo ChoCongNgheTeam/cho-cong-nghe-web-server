@@ -174,18 +174,15 @@ const transformProductCard = (product: any): ProductCard => {
 
   // Lấy highlights
   const highlights =
-    product.productHighlights
-      ?.map((h: any) => {
-        const spec = h.specification;
-
-        return {
-          key: spec.key,
-          name: spec.name,
-          icon: spec.icon,
-          value: spec.unit ? spec.unit : undefined,
-        };
-      })
-      .slice(0, 3) || [];
+    product.productSpecifications
+      ?.filter((spec: any) => spec.isHighlight)
+      .slice(0, 3)
+      .map((spec: any) => ({
+        key: spec.specification.key,
+        name: spec.specification.name,
+        icon: spec.specification.icon,
+        value: spec.value,
+      })) || [];
 
   // Check sản phẩm mới (trong 30 ngày)
   const isNew = product.createdAt
@@ -275,30 +272,21 @@ export const transformProductSpecifications = (product: any) => {
 };
 
 export const transformProductHighlights = (product: any) => {
-  const highlightMap = new Map(
-    product.productHighlights?.map((h: any) => [h.specificationId, h.sortOrder])
-  );
-
   return (
     product.productSpecifications
-      ?.map((s: any) => {
-        const highlightOrder = highlightMap.get(s.specificationId);
-        if (highlightOrder === undefined) return null;
-
-        return {
-          id: s.specification.id,
-          key: s.specification.key,
-          group: s.specification.group || "Khác",
-          name: s.specification.name,
-          icon: s.specification.icon,
-          unit: s.specification.unit,
-          value: s.value,
-          isHighlight: true,
-          highlightOrder,
-        };
-      })
-      .filter(Boolean)
-      .sort((a: any, b: any) => (a.highlightOrder ?? 0) - (b.highlightOrder ?? 0)) || []
+      ?.filter((s: any) => s.isHighlight)
+      .map((s: any) => ({
+        id: s.specification.id,
+        key: s.specification.key,
+        group: s.specification.group || "Khác",
+        name: s.specification.name,
+        icon: s.specification.icon,
+        unit: s.specification.unit,
+        value: s.value,
+        isHighlight: true,
+        highlightOrder: s.sortOrder ?? 0,
+      }))
+      .sort((a: any, b: any) => a.highlightOrder - b.highlightOrder) || []
   );
 };
 
@@ -311,7 +299,7 @@ export const getProductsPublic = async (query: ListProductsQuery) => {
   };
 };
 
-export const getProductBySlug = async (slug: string) => {
+export const getProductBySlug = async (slug: string, userId?: string) => {
   const product = await repo.findBySlug(slug);
   if (!product || !product.isActive) {
     const error: any = new Error("Không tìm thấy sản phẩm");
@@ -321,6 +309,7 @@ export const getProductBySlug = async (slug: string) => {
 
   const reviewStats = await repo.getReviewStats(product.id);
 
+  // tăng view async
   repo
     .update(product.id, {
       viewsCount: BigInt(product.viewsCount) + BigInt(1),
@@ -335,9 +324,22 @@ export const getProductBySlug = async (slug: string) => {
 
   const highlights = transformProductHighlights(product);
 
+  // 👇 CHECK CAN REVIEW
+  let canReview = false;
+  let orderItemId: string | null = null;
+
+  if (userId) {
+    const orderItem = await repo.findOrderItemForReview(userId, product.id);
+
+    canReview = !!orderItem && !orderItem.review;
+    orderItemId = orderItem?.id ?? null;
+  }
+
   return {
     ...productDetail,
     highlights,
+    canReview,
+    orderItemId,
   };
 };
 

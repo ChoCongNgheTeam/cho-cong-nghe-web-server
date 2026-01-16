@@ -7,10 +7,9 @@ const prisma = new PrismaClient();
 interface SeedProductsParams {
   brands: any[];
   categories: any[];
-  highlights: any[];
 }
 
-export async function seedProducts({ brands, categories, highlights }: SeedProductsParams) {
+export async function seedProducts({ brands, categories }: SeedProductsParams) {
   console.log("🌱 Seeding products...");
 
   const createdProducts = [];
@@ -52,29 +51,6 @@ export async function seedProducts({ brands, categories, highlights }: SeedProdu
         isFeatured: data.isFeatured ?? false,
       },
     });
-
-    // Xử lý highlights
-    if (data.highlights?.length) {
-      for (const [index, hl] of data.highlights.entries()) {
-        const spec = highlights.find((s) => s.key === hl.key);
-        if (!spec) continue;
-
-        await prisma.product_highlights.upsert({
-          where: {
-            productId_specificationId: {
-              productId: product.id,
-              specificationId: spec.id,
-            },
-          },
-          update: { sortOrder: index },
-          create: {
-            productId: product.id,
-            specificationId: spec.id,
-            sortOrder: index,
-          },
-        });
-      }
-    }
 
     createdProducts.push(product);
     console.log(`  → Created/Upserted: ${product.name}`);
