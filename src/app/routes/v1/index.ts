@@ -9,6 +9,7 @@ import wishlistRoutes from "@/app/modules/wishlist/wishlist.route";
 import orderRoutes from "@/app/modules/order/order.route";
 import reviewRoutes from "@/app/modules/review/review.route";
 import paymentRoutes from "@/app/modules/payment/payment.router";
+import cartRoutes from "@/app/modules/cart/cart.route";
 
 const router = Router();
 
@@ -21,5 +22,5 @@ router.use("/wishlist", wishlistRoutes);
 router.use("/orders", orderRoutes);
 router.use("/reviews", reviewRoutes);
 router.use("/payments", paymentRoutes);
-
+router.use("/cart", cartRoutes);
 export default router;
