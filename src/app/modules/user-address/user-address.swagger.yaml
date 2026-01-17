@@ -1,0 +1,330 @@
+openapi: 3.0.0
+info:
+  title: Addresses API
+  version: 1.0.0
+  description: API quản lý địa chỉ giao hàng của user
+
+tags:
+  - name: Addresses
+    description: Quản lý địa chỉ giao hàng
+
+paths:
+  /addresses:
+    get:
+      summary: Lấy tất cả địa chỉ
+      tags:
+        - Addresses
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Danh sách địa chỉ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Address'
+                  total:
+                    type: number
+                  message:
+                    type: string
+        '401':
+          description: Chưa đăng nhập
+
+    post:
+      summary: Tạo mới địa chỉ
+      tags:
+        - Addresses
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAddressInput'
+      responses:
+        '201':
+          description: Tạo địa chỉ thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Address'
+                  message:
+                    type: string
+        '400':
+          description: Dữ liệu không hợp lệ
+        '401':
+          description: Chưa đăng nhập
+
+  /addresses/default:
+    get:
+      summary: Lấy địa chỉ mặc định
+      tags:
+        - Addresses
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Địa chỉ mặc định
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Address'
+                  message:
+                    type: string
+        '401':
+          description: Chưa đăng nhập
+        '404':
+          description: Chưa có địa chỉ mặc định
+
+  /addresses/{addressId}:
+    get:
+      summary: Lấy thông tin một địa chỉ
+      tags:
+        - Addresses
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: addressId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Thông tin địa chỉ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Address'
+                  message:
+                    type: string
+        '401':
+          description: Chưa đăng nhập
+        '403':
+          description: Không có quyền
+        '404':
+          description: Địa chỉ không tồn tại
+
+    patch:
+      summary: Cập nhật địa chỉ
+      tags:
+        - Addresses
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: addressId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAddressInput'
+      responses:
+        '200':
+          description: Cập nhật địa chỉ thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Address'
+                  message:
+                    type: string
+        '400':
+          description: Dữ liệu không hợp lệ
+        '401':
+          description: Chưa đăng nhập
+        '403':
+          description: Không có quyền
+        '404':
+          description: Địa chỉ không tồn tại
+
+    delete:
+      summary: Xóa địa chỉ
+      tags:
+        - Addresses
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: addressId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Xóa địa chỉ thành công
+        '401':
+          description: Chưa đăng nhập
+        '403':
+          description: Không có quyền
+        '404':
+          description: Địa chỉ không tồn tại
+
+  /addresses/{addressId}/set-default:
+    put:
+      summary: Đặt địa chỉ mặc định
+      tags:
+        - Addresses
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: addressId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Đặt địa chỉ mặc định thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Address'
+                  message:
+                    type: string
+        '401':
+          description: Chưa đăng nhập
+        '403':
+          description: Không có quyền
+        '404':
+          description: Địa chỉ không tồn tại
+
+components:
+  schemas:
+    Address:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        contactName:
+          type: string
+          example: "Nguyễn Văn A"
+        phone:
+          type: string
+          example: "0987654321"
+        provinceId:
+          type: number
+          example: 1
+        districtId:
+          type: number
+          example: 1
+        wardId:
+          type: number
+          nullable: true
+          example: 1
+        detailAddress:
+          type: string
+          example: "123 Đường ABC, Phường XYZ"
+        type:
+          type: string
+          enum: [HOME, OFFICE]
+          nullable: true
+        isDefault:
+          type: boolean
+          default: false
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateAddressInput:
+      type: object
+      required:
+        - contactName
+        - phone
+        - provinceId
+        - districtId
+        - detailAddress
+      properties:
+        contactName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        phone:
+          type: string
+          pattern: '^(\+84|0)[0-9]{9,10}$'
+        provinceId:
+          type: number
+        districtId:
+          type: number
+        wardId:
+          type: number
+          nullable: true
+        detailAddress:
+          type: string
+          minLength: 1
+          maxLength: 255
+        type:
+          type: string
+          enum: [HOME, OFFICE]
+        isDefault:
+          type: boolean
+          default: false
+
+    UpdateAddressInput:
+      type: object
+      properties:
+        contactName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        phone:
+          type: string
+          pattern: '^(\+84|0)[0-9]{9,10}$'
+        provinceId:
+          type: number
+        districtId:
+          type: number
+        wardId:
+          type: number
+          nullable: true
+        detailAddress:
+          type: string
+          minLength: 1
+          maxLength: 255
+        type:
+          type: string
+          enum: [HOME, OFFICE]
+          nullable: true
+        isDefault:
+          type: boolean
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
