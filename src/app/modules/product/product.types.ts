@@ -24,34 +24,18 @@ export interface VariantImage {
 export interface Inventory {
   quantity: number;
   reservedQuantity: number;
-  available: number; // quantity - reservedQuantity
-}
-
-// NHÓM 1: Bắt buộc, sẽ bỏ
-export interface AvailableColor {
-  name: string;
-  hex?: string; // Mã màu để render swatch
-  slug?: string; // Để filter URL
-  available: boolean; // Ít nhất 1 variant của màu này còn hàng
-  variantIds: string[]; // Danh sách variant IDs có màu này
-}
-
-export interface AvailableStorage {
-  name: string; // "128GB", "256GB", "512GB"
-  value: number; // 128, 256, 512 (để sort)
-  available: boolean;
-  variantIds: string[];
+  available: number;
 }
 
 export interface AvailableOption {
-  attribute: string; // ví dụ: "Color", "Storage"
+  attribute: string;
   values: AvailableOptionValue[];
 }
 
 export interface AvailableOptionValue {
   id: string;
-  value: string; // ví dụ: "Black", "256GB"
-  code: string;
+  value: string;
+  label?: string;
   variantIds: string[];
 }
 
@@ -60,29 +44,11 @@ export interface PriceRange {
   max: number;
 }
 
-// ✅ NHÓM 2: Nên có
 export interface ProductGallery {
   id: string;
   imageUrl: string;
   altText?: string;
   position: number;
-  type?: "product" | "lifestyle" | "detail"; // Phân loại ảnh
-}
-
-// =====================
-// === ATTRIBUTE TYPES ===
-// =====================
-
-export interface AttributeGroup {
-  id: string;
-  name: string; // "Color", "Storage", "RAM"
-  values: AttributeValue[];
-}
-
-export interface AttributeValue {
-  id: string;
-  value: string; // "Black", "256GB", "8GB"
-  variantIds: string[]; // Danh sách variant IDs có attribute này
 }
 
 // =====================
@@ -93,15 +59,15 @@ export interface ProductVariant {
   id: string;
   code: string;
   price: number;
-  originalPrice?: number; // Giá gốc trước khuyến mãi
-  discountPrice?: number; // Giá sau khuyến mãi
-  discountPercentage?: number; // % giảm giá
+  originalPrice?: number;
+  discountPrice?: number;
+  discountPercentage?: number;
   weight?: number;
   soldCount: number;
   isDefault: boolean;
   isActive: boolean;
-  available: boolean; // ✅ Nhóm 1: Còn hàng hay không
-  stockStatus: "in_stock" | "low_stock" | "out_of_stock"; // ✅ Nhóm 2
+  available: boolean;
+  stockStatus: "in_stock" | "low_stock" | "out_of_stock";
   inventory: Inventory;
   images: VariantImage[];
 }
@@ -127,6 +93,7 @@ export interface Highlight {
   name: string;
   icon?: string;
   unit?: string;
+  value?: string;
 }
 
 // =====================
@@ -159,7 +126,7 @@ export interface ReviewStats {
 }
 
 // =====================
-// === PRODUCT LIST (For Card Display) ===
+// === PRODUCT LIST ===
 // =====================
 
 export interface ProductCardHighlight {
@@ -174,34 +141,22 @@ export interface ProductCard {
   name: string;
   slug: string;
   brand: Brand;
-
-  // Giá từ variant mặc định hoặc variant rẻ nhất
   price: number;
-  originalPrice?: number; // Nếu có discount
-  discount?: number; // Phần trăm giảm giá
-
-  // Thumbnail từ variant default
+  originalPrice?: number;
+  discount?: number;
   thumbnail: string;
-
-  // Rating
   rating: {
     average: number;
     count: number;
   };
-
-  // Tags
   isFeatured: boolean;
-  isNew?: boolean; // Sản phẩm mới trong 30 ngày
-
-  // Quick info
+  isNew?: boolean;
   highlights: ProductCardHighlight[];
-
-  // Availability
   inStock: boolean;
 }
 
 // =====================
-// === PRODUCT DETAIL (Full Info) ===
+// === PRODUCT DETAIL ===
 // =====================
 
 export interface ProductDetail {
@@ -214,43 +169,29 @@ export interface ProductDetail {
   availableOptions: AvailableOption[];
   highlights: Highlight[];
   priceRange: PriceRange;
-  // gallery: ProductGallery[];
   warranty?: string;
   stockStatus: "in_stock" | "low_stock" | "out_of_stock" | "pre_order";
   currentVariant: ProductVariant;
-  // variants: ProductVariant[];
   rating: ReviewStats;
-
   viewsCount: number;
   isFeatured: boolean;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  canReview?: boolean;
+  orderItemId?: string | null;
 }
 
-// =====================
-// === ADMIN TYPES ===
-// =====================
-
-export interface ProductAdmin {
-  id: string;
-  name: string;
-  slug: string;
-  brand: Brand;
-  categories: Category[];
-  variantCount: number;
-  totalStock: number;
-  minPrice: number;
-  maxPrice: number;
-  viewsCount: number;
-  rating: {
-    average: number;
-    count: number;
-  };
-  isFeatured: boolean;
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+export interface ProductSpecificationGroup {
+  groupName: string;
+  items: {
+    id: string;
+    key: string;
+    name: string;
+    icon?: string;
+    unit?: string;
+    value: string | null;
+  }[];
 }
 
 // =====================
@@ -271,4 +212,35 @@ export interface ProductListResponse extends PaginatedResponse<ProductCard> {
     categories: { id: string; name: string; count: number }[];
     priceRange: { min: number; max: number };
   };
+}
+
+// =====================
+// === RAW DB TYPES ===
+// =====================
+
+export interface RawVariantAttribute {
+  attributeOption: {
+    id: string;
+    value: string;
+    label: string;
+    attribute: {
+      id: string;
+      name: string;
+    };
+  };
+}
+
+export interface RawVariant {
+  id: string;
+  code: string;
+  price: any;
+  soldCount: number;
+  isDefault: boolean;
+  isActive: boolean;
+  inventory?: {
+    quantity: number;
+    reservedQuantity: number;
+  };
+  images: VariantImage[];
+  variantAttributes: RawVariantAttribute[];
 }

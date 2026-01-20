@@ -2,646 +2,128 @@ openapi: 3.0.0
 info:
   title: Product API
   version: 1.0.0
-  description: API quản lý sản phẩm (Public & Admin)
+  description: API quản lý sản phẩm cho hệ thống thương mại điện tử
 
 servers:
-  - url: http://localhost:5000/api/v1
-    description: Local server
-
-tags:
-  - name: Products - Public
-    description: API xem sản phẩm dành cho khách hàng
-  - name: Products - Admin
-    description: API quản lý sản phẩm dành cho quản trị viên
-
-paths:
-  # ==================== PUBLIC ENDPOINTS ====================
-  /products:
-    get:
-      summary: Lấy danh sách sản phẩm (Public)
-      tags: [Products - Public]
-      parameters:
-        - $ref: "#/components/parameters/PageParam"
-        - $ref: "#/components/parameters/LimitParam"
-        - $ref: "#/components/parameters/SearchParam"
-        - name: category
-          in: query
-          schema:
-            type: string
-            example: "dien-thoai"
-          description: "Lọc theo Slug danh mục (VD: dien-thoai)"
-        - name: categoryId
-          in: query
-          schema:
-            type: string
-            format: uuid
-          description: "Lọc theo ID danh mục"
-        - name: brandId
-          in: query
-          schema:
-            type: string
-            format: uuid
-          description: "Lọc theo ID thương hiệu"
-        - name: isFeatured
-          in: query
-          schema:
-            type: boolean
-          description: "Lọc sản phẩm nổi bật"
-        - name: sortBy
-          in: query
-          schema:
-            type: string
-            enum: [createdAt, name, viewsCount, ratingAverage]
-            default: createdAt
-        - name: sortOrder
-          in: query
-          schema:
-            type: string
-            enum: [asc, desc]
-            default: desc
-      responses:
-        "200":
-          description: Thành công
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProductListResponse"
-
-  /products/{slug}:
-    get:
-      summary: Xem chi tiết sản phẩm theo Slug
-      tags: [Products - Public]
-      parameters:
-        - in: path
-          name: slug
-          required: true
-          schema:
-            type: string
-            example: "iphone-15-pro-max-titanium"
-      responses:
-        "200":
-          description: Thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    $ref: "#/components/schemas/ProductDetail"
-                  message:
-                    type: string
-              example:
-                data:
-                  id: "12345678-1234-1234-1234-123456789abc"
-                  name: "Samsung Galaxy S24 Ultra"
-                  slug: "samsung-galaxy-s24-ultra"
-                  description: "Smartphone cao cấp với màn hình 6.8 inch Dynamic AMOLED"
-                  brand:
-                    id: "87654321-8765-8765-8765-876543210def"
-                    name: "Samsung"
-                  viewsCount: "5240"
-                  ratingAverage: 4.7
-                  ratingCount: 320
-                  isFeatured: true
-                  isActive: true
-                  createdAt: "2026-01-01T10:00:00.000Z"
-                  updatedAt: "2026-01-03T15:30:00.000Z"
-                  productCategories:
-                    - isPrimary: true
-                      category:
-                        id: "22222222-2222-2222-2222-222222222222"
-                        name: "Điện thoại thông minh"
-                        slug: "dien-thoai-thong-minh"
-                  variants:
-                    - id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-                      code: "SGS24U-256-BLK"
-                      price: 25990000
-                      weight: 232
-                      isDefault: true
-                      isActive: true
-                      inventory:
-                        quantity: 50
-                        reservedQuantity: 8
-                      images:
-                        - id: "img-001"
-                          imageUrl: "https://res.cloudinary.com/demo/image/upload/v1700000001/products/samsung-s24-01.jpg"
-                          altText: "Samsung Galaxy S24 Ultra - Màu Đen"
-                          position: 0
-                        - id: "img-002"
-                          imageUrl: "https://res.cloudinary.com/demo/image/upload/v1700000002/products/samsung-s24-02.jpg"
-                          altText: "Samsung Galaxy S24 Ultra - Góc cạnh"
-                          position: 1
-                      variantAttributes:
-                        - id: "vattr-001"
-                          productVariantId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-                          attributeOptionId: "33333333-3333-3333-3333-333333333333"
-                          attributeOption:
-                            id: "33333333-3333-3333-3333-333333333333"
-                            attributeId: "11111111-1111-1111-1111-111111111111"
-                            value: "Đen"
-                            attribute:
-                              id: "11111111-1111-1111-1111-111111111111"
-                              name: "Màu sắc"
-                          createdAt: "2026-01-01T10:00:00.000Z"
-                        - id: "vattr-002"
-                          productVariantId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-                          attributeOptionId: "44444444-4444-4444-4444-444444444444"
-                          attributeOption:
-                            id: "44444444-4444-4444-4444-444444444444"
-                            attributeId: "99999999-9999-9999-9999-999999999999"
-                            value: "256GB"
-                            attribute:
-                              id: "99999999-9999-9999-9999-999999999999"
-                              name: "Dung lượng lưu trữ"
-                          createdAt: "2026-01-01T10:00:00.000Z"
-                  highlights:
-                    - value: "256GB"
-                      highlight:
-                        id: "66666666-6666-6666-6666-666666666666"
-                        key: "storage"
-                        title: "Bộ nhớ"
-                        icon: null
-                    - value: "Snapdragon 8 Gen 3"
-                      highlight:
-                        id: "77777777-7777-7777-7777-777777777777"
-                        key: "processor"
-                        title: "Bộ xử lý"
-                        icon: null
-                message: "Lấy chi tiết sản phẩm thành công"
-        "404":
-          $ref: "#/components/responses/NotFoundError"
-
-  # ==================== ADMIN ENDPOINTS ====================
-  /products/admin:
-    post:
-      summary: Tạo sản phẩm mới
-      description: |
-        Hỗ trợ 2 định dạng:
-        1. **application/json**: Dùng để tạo sản phẩm nhanh (không upload ảnh).
-        2. **multipart/form-data**: Dùng để tạo sản phẩm CÓ upload ảnh. Field `data` chứa JSON string.
-        
-        **Lưu ý**: Route có middleware `upload.any()` để xử lý file upload. Validation được thực hiện ở controller.
-      tags: [Products - Admin]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          # --- CÁCH 1: GỬI JSON THUẦN (DỄ TEST) ---
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateProductInput"
-            example:
-              brandId: "11111111-1111-1111-1111-111111111111"
-              name: "Samsung Galaxy S24 Ultra"
-              description: "Smartphone cao cấp với màn hình 6.8 inch Dynamic AMOLED"
-              categories:
-                - "22222222-2222-2222-2222-222222222222"
-              variants:
-                - code: "SGS24U-256-BLK"
-                  price: 25990000
-                  weight: 232
-                  isDefault: true
-                  quantity: 50
-                  variantAttributes:
-                    - attributeOptionId: "33333333-3333-3333-3333-333333333333"
-                    - attributeOptionId: "44444444-4444-4444-4444-444444444444"
-                - code: "SGS24U-512-BLK"
-                  price: 28990000
-                  weight: 232
-                  isDefault: false
-                  quantity: 30
-                  variantAttributes:
-                    - attributeOptionId: "55555555-5555-5555-5555-555555555555"
-                    - attributeOptionId: "44444444-4444-4444-4444-444444444444"
-              highlights:
-                - highlightId: "66666666-6666-6666-6666-666666666666"
-                  value: "256GB"
-                - highlightId: "77777777-7777-7777-7777-777777777777"
-                  value: "Snapdragon 8 Gen 3"
-
-          # --- CÁCH 2: GỬI MULTIPART (UPLOAD ẢNH) ---
-          multipart/form-data:
-            schema:
-              type: object
-              required: [data]
-              properties:
-                data:
-                  type: string
-                  description: 'JSON string chứa thông tin sản phẩm. LƯU Ý: Phải là chuỗi JSON hợp lệ.'
-                  example: '{"brandId":"11111111-1111-1111-1111-111111111111","name":"Samsung Galaxy S24 Ultra","description":"Smartphone cao cấp","categories":["22222222-2222-2222-2222-222222222222"],"variants":[{"code":"SGS24U-256","price":25990000,"quantity":50,"isDefault":true,"variantAttributes":[{"attributeOptionId":"33333333-3333-3333-3333-333333333333"}]}],"highlights":[{"highlightId":"66666666-6666-6666-6666-666666666666","value":"256GB"}]}'
-                variant_0:
-                  type: array
-                  items:
-                    type: string
-                    format: binary
-                  description: "Ảnh cho variant đầu tiên (index 0)"
-                variant_1:
-                  type: array
-                  items:
-                    type: string
-                    format: binary
-                  description: "Ảnh cho variant thứ hai (index 1)"
-                variant_2:
-                  type: array
-                  items:
-                    type: string
-                    format: binary
-                  description: "Ảnh cho variant thứ ba (index 2)"
-      responses:
-        "201":
-          description: Tạo thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    $ref: "#/components/schemas/ProductDetail"
-                  message:
-                    type: string
-              example:
-                data:
-                  id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-                  name: "Samsung Galaxy S24 Ultra"
-                  slug: "samsung-galaxy-s24-ultra"
-                  description: "Smartphone cao cấp với màn hình 6.8 inch Dynamic AMOLED"
-                  brand:
-                    id: "87654321-8765-8765-8765-876543210def"
-                    name: "Samsung"
-                  viewsCount: "0"
-                  ratingAverage: 0
-                  ratingCount: 0
-                  isFeatured: true
-                  isActive: true
-                  createdAt: "2026-01-03T16:00:00.000Z"
-                  updatedAt: "2026-01-03T16:00:00.000Z"
-                  productCategories:
-                    - isPrimary: true
-                      category:
-                        id: "22222222-2222-2222-2222-222222222222"
-                        name: "Điện thoại thông minh"
-                        slug: "dien-thoai-thong-minh"
-                  variants:
-                    - id: "cccccccc-cccc-cccc-cccc-cccccccccccc"
-                      code: "SGS24U-256-BLK"
-                      price: 25990000
-                      weight: 232
-                      isDefault: true
-                      isActive: true
-                      inventory:
-                        quantity: 50
-                        reservedQuantity: 0
-                      images:
-                        - id: "img-new-001"
-                          imageUrl: "https://res.cloudinary.com/demo/image/upload/v1700000001/products/samsung-s24-new.jpg"
-                          altText: "Samsung Galaxy S24 Ultra mới"
-                          position: 0
-                      variantAttributes:
-                        - id: "vattr-new-001"
-                          productVariantId: "cccccccc-cccc-cccc-cccc-cccccccccccc"
-                          attributeOptionId: "33333333-3333-3333-3333-333333333333"
-                          attributeOption:
-                            id: "33333333-3333-3333-3333-333333333333"
-                            attributeId: "11111111-1111-1111-1111-111111111111"
-                            value: "Đen"
-                            attribute:
-                              id: "11111111-1111-1111-1111-111111111111"
-                              name: "Màu sắc"
-                          createdAt: "2026-01-03T16:00:00.000Z"
-                  highlights:
-                    - value: "256GB"
-                      highlight:
-                        id: "66666666-6666-6666-6666-666666666666"
-                        key: "storage"
-                        title: "Bộ nhớ"
-                        icon: null
-                message: "Tạo sản phẩm thành công"
-        "400":
-          $ref: "#/components/responses/ValidationError"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-
-  /products/admin/{id}:
-    patch:
-      summary: Cập nhật sản phẩm
-      tags: [Products - Admin]
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateProductInput"
-            example:
-              name: "Samsung Galaxy S24 Ultra - Updated"
-              isFeatured: true
-              isActive: true
-              description: "Smartphone cao cấp với màn hình 6.8 inch Dynamic AMOLED - Bản cập nhật"
-              highlights:
-                - highlightId: "66666666-6666-6666-6666-666666666666"
-                  value: "512GB"
-                - highlightId: "77777777-7777-7777-7777-777777777777"
-                  value: "Snapdragon 8 Gen 3 Leading Version"
-      responses:
-        "200":
-          description: Cập nhật thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    $ref: "#/components/schemas/ProductDetail"
-                  message:
-                    type: string
-              example:
-                data:
-                  id: "12345678-1234-1234-1234-123456789abc"
-                  name: "Samsung Galaxy S24 Ultra - Updated Edition"
-                  slug: "samsung-galaxy-s24-ultra-updated-edition"
-                  description: "Smartphone cao cấp - Bản cập nhật với nhiều tính năng mới"
-                  brand:
-                    id: "87654321-8765-8765-8765-876543210def"
-                    name: "Samsung"
-                  viewsCount: "8750"
-                  ratingAverage: 4.9
-                  ratingCount: 415
-                  isFeatured: true
-                  isActive: true
-                  createdAt: "2026-01-01T10:00:00.000Z"
-                  updatedAt: "2026-01-03T17:30:00.000Z"
-                  productCategories:
-                    - isPrimary: true
-                      category:
-                        id: "22222222-2222-2222-2222-222222222222"
-                        name: "Điện thoại thông minh"
-                        slug: "dien-thoai-thong-minh"
-                  variants:
-                    - id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-                      code: "SGS24U-256-BLK"
-                      price: 25990000
-                      weight: 232
-                      isDefault: true
-                      isActive: true
-                      inventory:
-                        quantity: 50
-                        reservedQuantity: 8
-                      images:
-                        - id: "img-001"
-                          imageUrl: "https://res.cloudinary.com/demo/image/upload/v1700000001/products/samsung-s24-01.jpg"
-                          altText: "Samsung Galaxy S24 Ultra - Màu Đen"
-                          position: 0
-                      variantAttributes:
-                        - id: "vattr-001"
-                          productVariantId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-                          attributeOptionId: "33333333-3333-3333-3333-333333333333"
-                          attributeOption:
-                            id: "33333333-3333-3333-3333-333333333333"
-                            attributeId: "11111111-1111-1111-1111-111111111111"
-                            value: "Đen"
-                            attribute:
-                              id: "11111111-1111-1111-1111-111111111111"
-                              name: "Màu sắc"
-                          createdAt: "2026-01-01T10:00:00.000Z"
-                  highlights:
-                    - value: "512GB"
-                      highlight:
-                        id: "66666666-6666-6666-6666-666666666666"
-                        key: "storage"
-                        title: "Bộ nhớ"
-                        icon: null
-                    - value: "Snapdragon 8 Gen 3 Leading Version"
-                      highlight:
-                        id: "77777777-7777-7777-7777-777777777777"
-                        key: "processor"
-                        title: "Bộ xử lý"
-                        icon: null
-                message: "Cập nhật sản phẩm thành công"
-
-    delete:
-      summary: Xóa sản phẩm
-      tags: [Products - Admin]
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "200":
-          description: Xóa thành công
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                message: "Xóa sản phẩm thành công"
-
-  /products/admin/all:
-    get:
-      summary: Lấy danh sách cho Admin (kèm filter & active status)
-      tags: [Products - Admin]
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/PageParam"
-        - $ref: "#/components/parameters/LimitParam"
-        - $ref: "#/components/parameters/SearchParam"
-        - name: categoryId
-          in: query
-          schema:
-            type: string
-            format: uuid
-        - name: brandId
-          in: query
-          schema:
-            type: string
-            format: uuid
-        - name: isFeatured
-          in: query
-          schema:
-            type: boolean
-        - name: sortBy
-          in: query
-          schema:
-            type: string
-            enum: [createdAt, name, viewsCount, ratingAverage]
-            default: createdAt
-        - name: sortOrder
-          in: query
-          schema:
-            type: string
-            enum: [asc, desc]
-            default: desc
-      responses:
-        "200":
-          description: Thành công
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProductListResponse"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
+  - url: http://localhost:3000/api
+    description: Development server
 
 components:
-  parameters:
-    PageParam:
-      name: page
-      in: query
-      schema:
-        type: integer
-        default: 1
-    LimitParam:
-      name: limit
-      in: query
-      schema:
-        type: integer
-        default: 10
-    SearchParam:
-      name: search
-      in: query
-      schema:
-        type: string
-      description: Tìm kiếm tên hoặc mô tả
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
 
   schemas:
-    # --- INPUT SCHEMAS ---
-    CreateProductInput:
-      type: object
-      required: [brandId, name]
-      properties:
-        brandId:
-          type: string
-          format: uuid
-          description: ID của Brand
-        name:
-          type: string
-          minLength: 3
-        description:
-          type: string
-        categories:
-          type: array
-          items:
-            type: string
-            format: uuid
-          description: Danh sách ID danh mục
-        variants:
-          type: array
-          items:
-            $ref: "#/components/schemas/VariantInput"
-        highlights:
-          type: array
-          items:
-            $ref: "#/components/schemas/HighlightInput"
-    
-    UpdateProductInput:
+    Brand:
       type: object
       properties:
-        brandId:
+        id:
           type: string
           format: uuid
         name:
           type: string
-        description:
+        slug:
           type: string
-        categories:
-          type: array
-          items:
-            type: string
-            format: uuid
-        isFeatured:
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+
+    VariantImage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        imageUrl:
+          type: string
+          format: uri
+        altText:
+          type: string
+        position:
+          type: integer
+
+    Inventory:
+      type: object
+      properties:
+        quantity:
+          type: integer
+        reservedQuantity:
+          type: integer
+        available:
+          type: integer
+
+    ProductVariant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        price:
+          type: number
+        soldCount:
+          type: integer
+        isDefault:
           type: boolean
         isActive:
           type: boolean
-        highlights:
-          type: array
-          items:
-            $ref: "#/components/schemas/HighlightInput"
-
-    VariantInput:
-      type: object
-      required: [price]
-      properties:
-        code:
-          type: string
-          description: "SKU (mã SKU duy nhất)"
-        price:
-          type: number
-          format: decimal
-          description: "Giá sản phẩm (Decimal)"
-        weight:
-          type: number
-          format: decimal
-          nullable: true
-          description: "Trọng lượng (gram/kg) (Decimal)"
-        isDefault:
+        available:
           type: boolean
-          description: "Đây có phải biến thể mặc định không"
-        quantity:
-          type: integer
-          description: "Số lượng tồn kho ban đầu"
+        stockStatus:
+          type: string
+          enum: [in_stock, low_stock, out_of_stock]
+        inventory:
+          $ref: "#/components/schemas/Inventory"
         images:
           type: array
           items:
-            type: object
-            properties:
-              imageUrl:
-                type: string
-                format: url
-              altText:
-                type: string
-          description: "Mảng ảnh (chỉ cần khi gửi JSON với URL ảnh sẵn)"
-        variantAttributes:
-          type: array
-          description: "Mảng thuộc tính (attributeOptionId)"
-          items:
-            type: object
-            properties:
-              attributeOptionId:
-                type: string
-                format: uuid
-    
-    HighlightInput:
+            $ref: "#/components/schemas/VariantImage"
+
+    ProductCard:
       type: object
-      required: [highlightId]
       properties:
-        highlightId:
+        id:
           type: string
           format: uuid
-        value:
+        name:
           type: string
-          example: "8GB"
-
-    # --- OUTPUT SCHEMAS ---
-    ProductListResponse:
-      type: object
-      properties:
-        data:
+        slug:
+          type: string
+        brand:
+          $ref: "#/components/schemas/Brand"
+        price:
+          type: number
+        thumbnail:
+          type: string
+          format: uri
+        rating:
+          type: object
+          properties:
+            average:
+              type: number
+            count:
+              type: integer
+        isFeatured:
+          type: boolean
+        isNew:
+          type: boolean
+        highlights:
           type: array
           items:
-            $ref: "#/components/schemas/ProductDetail"
-        page:
-          type: integer
-        limit:
-          type: integer
-        total:
-          type: integer
-        totalPages:
-          type: integer
-        message:
-          type: string
+            type: object
+        inStock:
+          type: boolean
 
     ProductDetail:
       type: object
@@ -656,19 +138,16 @@ components:
         description:
           type: string
         brand:
+          $ref: "#/components/schemas/Brand"
+        category:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+        currentVariant:
+          $ref: "#/components/schemas/ProductVariant"
+        rating:
           type: object
-          properties:
-            id: 
-              type: string
-              format: uuid
-            name:
-              type: string
         viewsCount:
-          type: string # Chuyển thành string vì BigInt JSON trả về string
-          example: "1540"
-        ratingAverage:
-          type: number
-        ratingCount:
           type: integer
         isFeatured:
           type: boolean
@@ -680,198 +159,775 @@ components:
         updatedAt:
           type: string
           format: date-time
-        productCategories:
-          type: array
-          items:
-            type: object
-            properties:
-              isPrimary:
-                type: boolean
-              category:
-                type: object
-                properties:
-                  id:
-                    type: string
-                    format: uuid
-                  name:
-                    type: string
-                  slug:
-                    type: string
-        variants:
-          type: array
-          items:
-            $ref: "#/components/schemas/ProductVariant"
-        highlights:
-          type: array
-          items:
-            type: object
-            properties:
-              value:
-                type: string
-              highlight:
-                type: object
-                properties:
-                  id:
-                    type: string
-                    format: uuid
-                  key:
-                    type: string
-                  title:
-                    type: string
-                  icon:
-                    type: string
-                    nullable: true
 
-    ProductVariant:
+    Review:
       type: object
       properties:
         id:
           type: string
           format: uuid
-        code:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
           type: string
-          nullable: true
-          description: "SKU (unique identifier)"
-        price:
-          type: number
-          format: decimal
-          description: "Giá sản phẩm"
-        weight:
-          type: number
-          format: decimal
-          nullable: true
-          description: "Trọng lượng (gram/kg)"
-        isDefault:
-          type: boolean
-          description: "Biến thể mặc định"
-        isActive:
-          type: boolean
-          description: "Có hoạt động hay không"
-        inventory:
-          type: object
-          properties:
-            quantity:
-              type: integer
-              description: "Số lượng tồn kho"
-            reservedQuantity:
-              type: integer
-              description: "Số lượng đã đặt trước"
-        images:
-          type: array
-          items:
-            type: object
-            properties:
-              id:
-                type: string
-              imageUrl:
-                type: string
-                description: "URL ảnh trên Cloudinary"
-              altText:
-                type: string
-                description: "Mô tả ảnh"
-              position:
-                type: integer
-                description: "Thứ tự ảnh"
-        variantAttributes:
-          type: array
-          items:
-            $ref: "#/components/schemas/VariantAttribute"
-
-    # --- NEW ATTRIBUTE SCHEMAS ---
-    Attribute:
-      type: object
-      properties:
-        id:
+        createdAt:
           type: string
-          format: uuid
-        name:
-          type: string
-          description: 'Tên thuộc tính (ví dụ như Màu sắc, Dung lượng)'
-        description:
-          type: string
-
-    AttributeOption:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        attributeId:
-          type: string
-          format: uuid
-        value:
-          type: string
-          description: 'Giá trị của thuộc tính (ví dụ như Đen, 256GB)'
-        attribute:
-          $ref: "#/components/schemas/Attribute"
-
-    VariantAttribute:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        productVariantId:
-          type: string
-          format: uuid
-        attributeOptionId:
-          type: string
-          format: uuid
-        attributeOption:
+          format: date-time
+        user:
           type: object
           properties:
             id:
               type: string
-              format: uuid
-            attribute:
-              $ref: "#/components/schemas/Attribute"
-            value:
+            fullName:
               type: string
-        createdAt:
-          type: string
-          format: date-time
+            avatarImage:
+              type: string
 
-    # --- ERROR RESPONSES ---
-    ErrorResponse:
+    Error:
       type: object
       properties:
+        success:
+          type: boolean
+          example: false
         message:
           type: string
-        errors:
+
+    PaginatedResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items: {}
+        pagination:
           type: object
+          properties:
+            page:
+              type: integer
+            limit:
+              type: integer
+            total:
+              type: integer
+            totalPages:
+              type: integer
+        message:
+          type: string
 
-  responses:
-    UnauthorizedError:
-      description: Chưa đăng nhập
-      content:
-        application/json:
+paths:
+  /products:
+    get:
+      summary: Lấy danh sách sản phẩm (Public)
+      tags:
+        - Public - Products
+      parameters:
+        - in: query
+          name: page
           schema:
-            $ref: "#/components/schemas/ErrorResponse"
-          example:
-            message: "Bạn chưa đăng nhập hoặc token hết hạn"
-    
-    ValidationError:
-      description: Dữ liệu sai
-      content:
-        application/json:
+            type: integer
+            default: 1
+          description: Trang hiện tại
+        - in: query
+          name: limit
           schema:
-            $ref: "#/components/schemas/ErrorResponse"
-          example:
-            message: "Dữ liệu không hợp lệ"
-            errors:
-               name: "Tên sản phẩm phải từ 3 ký tự trở lên"
+            type: integer
+            default: 12
+            maximum: 50
+          description: Số lượng items mỗi trang
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Tìm kiếm theo tên hoặc mô tả
+        - in: query
+          name: category
+          schema:
+            type: string
+          description: Filter theo category slug
+        - in: query
+          name: categoryId
+          schema:
+            type: string
+            format: uuid
+          description: Filter theo category ID
+        - in: query
+          name: brandId
+          schema:
+            type: string
+            format: uuid
+          description: Filter theo brand ID
+        - in: query
+          name: isFeatured
+          schema:
+            type: boolean
+          description: Filter sản phẩm nổi bật
+        - in: query
+          name: minPrice
+          schema:
+            type: number
+          description: Giá tối thiểu
+        - in: query
+          name: maxPrice
+          schema:
+            type: number
+          description: Giá tối đa
+        - in: query
+          name: minRating
+          schema:
+            type: number
+            minimum: 0
+            maximum: 5
+          description: Rating tối thiểu
+        - in: query
+          name: inStock
+          schema:
+            type: boolean
+          description: Chỉ lấy sản phẩm còn hàng
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, name, price, viewsCount, ratingAverage, soldCount]
+            default: createdAt
+          description: Sắp xếp theo field
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Thứ tự sắp xếp
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ProductCard"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
-    NotFoundError:
-      description: Không tìm thấy
-      content:
-        application/json:
+  /products/slug/{slug}:
+    get:
+      summary: Lấy chi tiết sản phẩm theo slug
+      tags:
+        - Public - Products
+      parameters:
+        - in: path
+          name: slug
+          required: true
           schema:
-            $ref: "#/components/schemas/ErrorResponse"
-          example:
-            message: "Không tìm thấy sản phẩm"
+            type: string
+          description: Product slug
+      security:
+        - bearerAuth: []
+        - {}
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/ProductDetail"
+                  message:
+                    type: string
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
+  /products/slug/{slug}/variant:
+    get:
+      summary: Lấy chi tiết variant cụ thể
+      tags:
+        - Public - Products
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: code
+          schema:
+            type: string
+          description: Variant code (SKU)
+        - in: query
+          name: color
+          schema:
+            type: string
+          description: Dynamic attribute - color
+        - in: query
+          name: storage
+          schema:
+            type: string
+          description: Dynamic attribute - storage
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/ProductVariant"
+                  message:
+                    type: string
+        "404":
+          description: Variant not found
+
+  /products/slug/{slug}/gallery:
+    get:
+      summary: Lấy gallery ảnh của sản phẩm
+      tags:
+        - Public - Products
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VariantImage"
+                  message:
+                    type: string
+
+  /products/slug/{slug}/specifications:
+    get:
+      summary: Lấy thông số kỹ thuật
+      tags:
+        - Public - Products
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      specifications:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            groupName:
+                              type: string
+                            items:
+                              type: array
+                              items:
+                                type: object
+                  message:
+                    type: string
+
+  /products/slug/{slug}/related:
+    get:
+      summary: Lấy sản phẩm tương tự
+      tags:
+        - Public - Products
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 8
+            maximum: 12
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProductCard"
+                  message:
+                    type: string
+
+  /products/slug/{slug}/reviews:
+    get:
+      summary: Lấy đánh giá của sản phẩm
+      tags:
+        - Public - Products
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+            maximum: 20
+        - in: query
+          name: rating
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, rating]
+            default: createdAt
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Review"
+
+  /products/admin/all:
+    get:
+      summary: Lấy tất cả sản phẩm (Admin)
+      tags:
+        - Admin - Products
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 12
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: categoryId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: brandId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: isFeatured
+          schema:
+            type: boolean
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, name, price, viewsCount, ratingAverage]
+            default: createdAt
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedResponse"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden - Admin role required
+
+  /products/admin/{id}:
+    get:
+      summary: Lấy chi tiết sản phẩm theo ID (Admin)
+      tags:
+        - Admin - Products
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/ProductDetail"
+                  message:
+                    type: string
+        "404":
+          description: Product not found
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+
+    patch:
+      summary: Cập nhật sản phẩm
+      tags:
+        - Admin - Products
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                brandId:
+                  type: string
+                  format: uuid
+                  description: Brand ID
+                categoryId:
+                  type: string
+                  format: uuid
+                  description: Category ID
+                name:
+                  type: string
+                  minLength: 3
+                  description: Tên sản phẩm
+                description:
+                  type: string
+                  description: Mô tả sản phẩm
+                isFeatured:
+                  type: boolean
+                  description: Sản phẩm nổi bật
+                isActive:
+                  type: boolean
+                  description: Kích hoạt sản phẩm
+                variants:
+                  type: string
+                  description: JSON string của variants array
+                  example: '[{"id":"uuid","price":28990000,"quantity":120}]'
+                specifications:
+                  type: string
+                  description: JSON string của specifications array
+                  example: '[{"specificationId":"uuid","value":"A17 Pro","isHighlight":true}]'
+                variant_0:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Ảnh cho variant 0 (có thể upload nhiều ảnh)
+                variant_1:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Ảnh cho variant 1
+            encoding:
+              variants:
+                contentType: application/json
+              specifications:
+                contentType: application/json
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/ProductDetail"
+                  message:
+                    type: string
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Product not found
+
+    delete:
+      summary: Xóa sản phẩm
+      tags:
+        - Admin - Products
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                    example: Xóa sản phẩm thành công
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Product not found
+
+  /products/admin:
+    post:
+      summary: Tạo sản phẩm mới
+      tags:
+        - Admin - Products
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - brandId
+                - categoryId
+                - name
+                - variants
+              properties:
+                brandId:
+                  type: string
+                  format: uuid
+                  description: Brand ID
+                  example: df656f59-85c6-4a1e-81c0-c318d9c05fc7
+                categoryId:
+                  type: string
+                  format: uuid
+                  description: Category ID (single category)
+                  example: 90dfb31f-fd25-49db-88c6-0acd531c5eee
+                name:
+                  type: string
+                  minLength: 3
+                  description: Tên sản phẩm
+                  example: iPhone 15 Pro Max
+                description:
+                  type: string
+                  description: Mô tả sản phẩm
+                  example: iPhone 15 Pro Max chính hãng VN/A, chip A17 Pro
+                isFeatured:
+                  type: boolean
+                  description: Sản phẩm nổi bật
+                  default: false
+                  example: true
+                isActive:
+                  type: boolean
+                  description: Kích hoạt sản phẩm
+                  default: true
+                  example: true
+                variants:
+                  type: string
+                  description: JSON string của variants array (bắt buộc có ít nhất 1 variant với isDefault=true)
+                  example: '[{"code":"IP15PM-256-BLACK","price":29990000,"quantity":100,"isDefault":true,"isActive":true,"variantAttributes":[{"attributeOptionId":"c4bed20c-494c-4f90-a54b-c60629fe829e"},{"attributeOptionId":"d08118ab-4aca-4a6e-bdf2-ce4a3fc13792"}]}]'
+                specifications:
+                  type: string
+                  description: JSON string của specifications array
+                  example: '[{"specificationId":"1fa98b73-8238-482f-b5c2-899f02de2cda","value":"A17 Pro","isHighlight":true},{"specificationId":"5243c8ca-464e-4ff6-9c36-497d0ccf54d2","value":"8GB","isHighlight":false}]'
+                variant_0:
+                  type: string
+                  format: binary
+                  description: Ảnh cho variant đầu tiên (có thể upload nhiều ảnh với cùng field name)
+                variant_1:
+                  type: string
+                  format: binary
+                  description: Ảnh cho variant thứ 2
+            encoding:
+              variants:
+                contentType: application/json
+              specifications:
+                contentType: application/json
+      responses:
+        "201":
+          description: Created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/ProductDetail"
+                  message:
+                    type: string
+                    example: Tạo sản phẩm thành công
+              examples:
+                success:
+                  summary: Tạo sản phẩm thành công
+                  value:
+                    success: true
+                    data:
+                      id: uuid-product-id
+                      name: iPhone 15 Pro Max
+                      slug: iphone-15-pro-max
+                      brand:
+                        id: df656f59-85c6-4a1e-81c0-c318d9c05fc7
+                        name: Apple
+                        slug: apple
+                      category:
+                        - id: 90dfb31f-fd25-49db-88c6-0acd531c5eee
+                          name: Điện thoại
+                          slug: dien-thoai
+                    message: Tạo sản phẩm thành công
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                  errors:
+                    type: array
+                    items:
+                      type: object
+              examples:
+                validation_error:
+                  summary: Lỗi validation
+                  value:
+                    success: false
+                    message: Dữ liệu không hợp lệ
+                    errors:
+                      - path: [variants]
+                        message: Phải có đúng 1 biến thể mặc định
+                missing_field:
+                  summary: Thiếu field bắt buộc
+                  value:
+                    success: false
+                    message: Dữ liệu không hợp lệ
+                    errors:
+                      - path: [brandId]
+                        message: Required
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+tags:
+  - name: Public - Products
+    description: Public endpoints cho sản phẩm
+  - name: Admin - Products
+    description: Admin endpoints quản lý sản phẩm (yêu cầu authentication & ADMIN role)

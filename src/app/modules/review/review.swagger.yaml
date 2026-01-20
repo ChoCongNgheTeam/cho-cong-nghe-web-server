@@ -254,3 +254,9 @@ components:
           type: string
           enum: [PENDING, APPROVED, REJECTED]
           description: Trạng thái mới của đánh giá
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Nhập JWT token (không cần thêm 'Bearer ' ở đầu)"

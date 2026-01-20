@@ -1,125 +1,25 @@
 import { Request, Response } from "express";
 import * as productService from "./product.service";
 import * as productRepo from "./product.repository";
+import { ListProductsQuery, reviewsQuerySchema } from "./product.validation";
 import {
-  listProductsSchema,
-  createProductSchema,
-  updateProductSchema,
-  reviewsQuerySchema,
-  bulkUpdateSchema,
-  ListProductsQuery,
-} from "./product.validation";
-import { uploadImage, deleteImage } from "@/services/cloudinary.service";
-import fs from "fs";
+  cleanupTempFiles,
+  parseMultipartData,
+  uploadVariantImages,
+  deleteOldImages,
+} from "./product.helpers";
 
 type ValidatedQuery<T> = Request & {
   query: T;
 };
 
 // =====================
-// === HELPERS ===
+// === PUBLIC HANDLERS ===
 // =====================
-
-/**
- * Cleanup temporary uploaded files
- */
-const cleanupTempFiles = (files: Express.Multer.File[]) => {
-  files.forEach((file) => {
-    if (fs.existsSync(file.path)) {
-      fs.unlinkSync(file.path);
-    }
-  });
-};
-
-/**
- * Parse multipart form data
- */
-const parseMultipartData = (body: any): any => {
-  let data = { ...body };
-
-  // Parse JSON string nếu có field 'data'
-  if (body.data && typeof body.data === "string") {
-    try {
-      const parsedData = JSON.parse(body.data);
-      data = { ...data, ...parsedData };
-      delete data.data; // Remove redundant field
-    } catch (e) {
-      throw new Error("Format dữ liệu JSON không hợp lệ");
-    }
-  }
-
-  // Parse các field array/object nếu chúng là string
-  const fieldsToParse = ["variants", "highlights", "specifications", "categories"];
-
-  fieldsToParse.forEach((field) => {
-    if (data[field] && typeof data[field] === "string") {
-      try {
-        data[field] = JSON.parse(data[field]);
-      } catch (e) {
-        throw new Error(`Format JSON của field '${field}' không hợp lệ`);
-      }
-    }
-  });
-
-  return data;
-};
-
-/**
- * Upload images for variants
- */
-const uploadVariantImages = async (
-  variants: any[],
-  files: Express.Multer.File[]
-): Promise<void> => {
-  if (!files || files.length === 0) return;
-
-  await Promise.all(
-    variants.map(async (variant, index) => {
-      // Files cho variant này có fieldname = `variant_${index}`
-      const variantFiles = files.filter((f) => f.fieldname === `variant_${index}`);
-
-      if (variantFiles.length > 0) {
-        // Upload lên Cloudinary
-        const uploadPromises = variantFiles.map((file) => uploadImage(file.path, "products"));
-        const uploadedImages = await Promise.all(uploadPromises);
-
-        // Gán vào variant.images
-        variant.images = uploadedImages.map((img, idx) => ({
-          imageUrl: img.url,
-          publicId: img.publicId,
-          altText: variant.altText || variant.code,
-        }));
-      } else {
-        // Giữ nguyên images nếu không upload mới
-        variant.images = variant.images || [];
-      }
-    })
-  );
-};
-
-/**
- * Delete old images from Cloudinary
- */
-const deleteOldImages = async (imageUrls: string[]): Promise<void> => {
-  const deletePromises = imageUrls.map(async (url) => {
-    try {
-      // Extract publicId from Cloudinary URL
-      // Format: https://res.cloudinary.com/[cloud]/image/upload/v[version]/[publicId].[ext]
-      const matches = url.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
-      if (matches && matches[1]) {
-        await deleteImage(matches[1]);
-      }
-    } catch (err) {
-      console.error(`Failed to delete image: ${url}`, err);
-    }
-  });
-
-  await Promise.allSettled(deletePromises);
-};
 
 export const getProductsPublicHandler = async (
   req: ValidatedQuery<ListProductsQuery>,
-  res: Response
+  res: Response,
 ) => {
   try {
     const result = await productService.getProductsPublic(req.query);
@@ -146,10 +46,7 @@ export const getProductsPublicHandler = async (
 export const getProductBySlugHandler = async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
-
     const userId = (req as any).user?.id || null;
-
-    console.log(userId);
 
     const product = await productService.getProductBySlug(slug, userId);
 
@@ -181,7 +78,7 @@ export const getProductVariantHandler = async (req: Request, res: Response) => {
 
     const variant = await productService.getProductVariant(
       slug,
-      Object.keys(options).length > 0 ? options : undefined
+      Object.keys(options).length > 0 ? options : undefined,
     );
 
     res.json({
@@ -293,7 +190,7 @@ export const getProductReviewsHandler = async (req: Request, res: Response) => {
 
 export const getProductsAdminHandler = async (
   req: ValidatedQuery<ListProductsQuery>,
-  res: Response
+  res: Response,
 ) => {
   try {
     const result = await productService.getProductsAdmin(req.query);
@@ -340,21 +237,18 @@ export const createProductHandler = async (req: Request, res: Response) => {
   const files = (req.files as Express.Multer.File[]) || [];
 
   try {
-    // 1. Parse multipart data
-    const rawData = parseMultipartData(req.body);
+    // Parse data từ form-data
+    const parsedBody = parseMultipartData(req.body);
 
-    // 2. Upload images nếu có
-    if (files.length > 0 && rawData.variants) {
-      await uploadVariantImages(rawData.variants, files);
+    // Upload images cho variants
+    if (files.length > 0 && parsedBody.variants?.length > 0) {
+      await uploadVariantImages(parsedBody.variants, files);
     }
 
-    // 3. Validate data
-    const validatedData = createProductSchema.parse(rawData);
+    // Create product (validation đã được thực hiện trong route middleware)
+    const product = await productService.createProduct(parsedBody);
 
-    // 4. Create product
-    const product = await productService.createProduct(validatedData);
-
-    // 5. Cleanup temp files
+    // Cleanup temp files
     cleanupTempFiles(files);
 
     res.status(201).json({
@@ -363,7 +257,6 @@ export const createProductHandler = async (req: Request, res: Response) => {
       message: "Tạo sản phẩm thành công",
     });
   } catch (error: any) {
-    // Cleanup on error
     cleanupTempFiles(files);
 
     if (error.name === "ZodError") {
@@ -374,8 +267,7 @@ export const createProductHandler = async (req: Request, res: Response) => {
       });
     }
 
-    const status = error.statusCode || 500;
-    res.status(status).json({
+    res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || "Lỗi server",
     });
@@ -387,29 +279,28 @@ export const updateProductHandler = async (req: Request, res: Response) => {
   const { id } = req.params;
 
   try {
-    // 1. Get old images for cleanup
+    // Get old images for cleanup
     const oldImages = files.length > 0 ? await productRepo.getVariantImagesByProductId(id) : [];
 
-    // 2. Parse multipart data
-    const rawData = parseMultipartData(req.body);
+    // Parse multipart data
+    const parsedData = parseMultipartData(req.body);
 
-    // 3. Upload new images nếu có
-    if (files.length > 0 && rawData.variants) {
-      await uploadVariantImages(rawData.variants, files);
+    // Upload new images if any
+    if (files.length > 0 && parsedData.variants) {
+      await uploadVariantImages(parsedData.variants, files);
     }
 
-    // 4. Validate data
-    const validatedData = updateProductSchema.parse(rawData);
+    // Update product
+    const product = await productService.updateProduct(id, parsedData);
 
-    // 5. Update product
-    const product = await productService.updateProduct(id, validatedData);
-
-    // 6. Delete old images from Cloudinary
+    // Delete old images from Cloudinary
     if (oldImages.length > 0) {
-      await deleteOldImages(oldImages.map((img) => img.imageUrl));
+      await deleteOldImages(
+        oldImages.map((img) => img.imageUrl).filter((url): url is string => Boolean(url)),
+      );
     }
 
-    // 7. Cleanup temp files
+    // Cleanup temp files
     cleanupTempFiles(files);
 
     res.json({
@@ -418,7 +309,6 @@ export const updateProductHandler = async (req: Request, res: Response) => {
       message: "Cập nhật sản phẩm thành công",
     });
   } catch (error: any) {
-    // Cleanup on error
     cleanupTempFiles(files);
 
     if (error.name === "ZodError") {
@@ -466,30 +356,3 @@ export const deleteProductHandler = async (req: Request, res: Response) => {
     });
   }
 };
-
-// export const bulkUpdateProductsHandler = async (req: Request, res: Response) => {
-//   try {
-//     const input = bulkUpdateSchema.parse(req.body);
-//     const result = await productService.bulkUpdateProducts(input);
-
-//     res.json({
-//       success: true,
-//       data: result,
-//       message: `Cập nhật ${result.updated} sản phẩm thành công`,
-//     });
-//   } catch (error: any) {
-//     if (error.name === "ZodError") {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Dữ liệu không hợp lệ",
-//         errors: error.errors,
-//       });
-//     }
-
-//     const status = error.statusCode || 500;
-//     res.status(status).json({
-//       success: false,
-//       message: error.message || "Lỗi server",
-//     });
-//   }
-// };

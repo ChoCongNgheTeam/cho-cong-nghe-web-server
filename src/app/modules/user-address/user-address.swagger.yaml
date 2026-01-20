@@ -17,7 +17,7 @@ paths:
       security:
         - BearerAuth: []
       responses:
-        '200':
+        "200":
           description: Danh sách địa chỉ
           content:
             application/json:
@@ -27,12 +27,12 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Address'
+                      $ref: "#/components/schemas/Address"
                   total:
                     type: number
                   message:
                     type: string
-        '401':
+        "401":
           description: Chưa đăng nhập
 
     post:
@@ -46,9 +46,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateAddressInput'
+              $ref: "#/components/schemas/CreateAddressInput"
       responses:
-        '201':
+        "201":
           description: Tạo địa chỉ thành công
           content:
             application/json:
@@ -56,12 +56,12 @@ paths:
                 type: object
                 properties:
                   data:
-                    $ref: '#/components/schemas/Address'
+                    $ref: "#/components/schemas/Address"
                   message:
                     type: string
-        '400':
+        "400":
           description: Dữ liệu không hợp lệ
-        '401':
+        "401":
           description: Chưa đăng nhập
 
   /addresses/default:
@@ -72,7 +72,7 @@ paths:
       security:
         - BearerAuth: []
       responses:
-        '200':
+        "200":
           description: Địa chỉ mặc định
           content:
             application/json:
@@ -80,12 +80,12 @@ paths:
                 type: object
                 properties:
                   data:
-                    $ref: '#/components/schemas/Address'
+                    $ref: "#/components/schemas/Address"
                   message:
                     type: string
-        '401':
+        "401":
           description: Chưa đăng nhập
-        '404':
+        "404":
           description: Chưa có địa chỉ mặc định
 
   /addresses/{addressId}:
@@ -103,7 +103,7 @@ paths:
             type: string
             format: uuid
       responses:
-        '200':
+        "200":
           description: Thông tin địa chỉ
           content:
             application/json:
@@ -111,14 +111,14 @@ paths:
                 type: object
                 properties:
                   data:
-                    $ref: '#/components/schemas/Address'
+                    $ref: "#/components/schemas/Address"
                   message:
                     type: string
-        '401':
+        "401":
           description: Chưa đăng nhập
-        '403':
+        "403":
           description: Không có quyền
-        '404':
+        "404":
           description: Địa chỉ không tồn tại
 
     patch:
@@ -139,9 +139,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateAddressInput'
+              $ref: "#/components/schemas/UpdateAddressInput"
       responses:
-        '200':
+        "200":
           description: Cập nhật địa chỉ thành công
           content:
             application/json:
@@ -149,16 +149,16 @@ paths:
                 type: object
                 properties:
                   data:
-                    $ref: '#/components/schemas/Address'
+                    $ref: "#/components/schemas/Address"
                   message:
                     type: string
-        '400':
+        "400":
           description: Dữ liệu không hợp lệ
-        '401':
+        "401":
           description: Chưa đăng nhập
-        '403':
+        "403":
           description: Không có quyền
-        '404':
+        "404":
           description: Địa chỉ không tồn tại
 
     delete:
@@ -175,13 +175,13 @@ paths:
             type: string
             format: uuid
       responses:
-        '200':
+        "200":
           description: Xóa địa chỉ thành công
-        '401':
+        "401":
           description: Chưa đăng nhập
-        '403':
+        "403":
           description: Không có quyền
-        '404':
+        "404":
           description: Địa chỉ không tồn tại
 
   /addresses/{addressId}/set-default:
@@ -199,7 +199,7 @@ paths:
             type: string
             format: uuid
       responses:
-        '200':
+        "200":
           description: Đặt địa chỉ mặc định thành công
           content:
             application/json:
@@ -207,14 +207,14 @@ paths:
                 type: object
                 properties:
                   data:
-                    $ref: '#/components/schemas/Address'
+                    $ref: "#/components/schemas/Address"
                   message:
                     type: string
-        '401':
+        "401":
           description: Chưa đăng nhập
-        '403':
+        "403":
           description: Không có quyền
-        '404':
+        "404":
           description: Địa chỉ không tồn tại
 
 components:
@@ -324,7 +324,8 @@ components:
           type: boolean
 
   securitySchemes:
-    BearerAuth:
+    bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: "Nhập JWT token (không cần thêm 'Bearer ' ở đầu)"

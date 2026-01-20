@@ -5,258 +5,19 @@ import {
   UpdateProductInput,
   ListProductsQuery,
   ReviewsQuery,
-  BulkUpdateInput,
 } from "./product.validation";
 import {
-  ProductCard,
-  ProductDetail,
-  AttributeGroup,
-  ProductVariant,
-  ReviewStats,
-  AvailableColor,
-  AvailableStorage,
-  PriceRange,
-  ProductGallery,
-  AvailableOption,
-} from "./product.model";
+  transformProductCard,
+  transformProductDetail,
+  transformProductSpecifications,
+  transformProductHighlights,
+  transformVariant,
+} from "./product.transformers";
+import { ReviewStats } from "./product.types";
 
-// Fix BigInt serialization
-(BigInt.prototype as any).toJSON = function () {
-  return this.toString();
-};
-
-const getStockStatus = (
-  quantity: number,
-  reservedQuantity: number
-): "in_stock" | "low_stock" | "out_of_stock" => {
-  const available = quantity - reservedQuantity;
-
-  if (available <= 0) return "out_of_stock";
-  if (available <= 5) return "low_stock"; // Còn <= 5 sản phẩm
-  return "in_stock";
-};
-
-/**
- * Transform raw variant data sang FE-friendly format
- */
-const transformVariant = (variant: any): ProductVariant => {
-  const quantity = variant.inventory?.quantity ?? 0;
-  const reservedQuantity = variant.inventory?.reservedQuantity ?? 0;
-  const available = Math.max(0, quantity - reservedQuantity);
-
-  return {
-    id: variant.id,
-    code: variant.code,
-    price: Number(variant.price),
-    originalPrice: variant.originalPrice ? Number(variant.originalPrice) : undefined,
-    discountPrice: variant.discountPrice ? Number(variant.discountPrice) : undefined,
-    discountPercentage: variant.discountPercentage ?? undefined,
-    weight: variant.weight ? Number(variant.weight) : undefined,
-    soldCount: variant.soldCount,
-    isDefault: variant.isDefault,
-    isActive: variant.isActive,
-    available: available > 0,
-    stockStatus: getStockStatus(quantity, reservedQuantity),
-    inventory: {
-      quantity,
-      reservedQuantity,
-      available,
-    },
-    images: variant.images || [],
-  };
-};
-
-// NHÓM 1: Calculate price range
-const calculatePriceRange = (variants: any[]): PriceRange => {
-  const prices = variants.filter((v) => v.isActive).map((v) => Number(v.price));
-
-  return {
-    min: Math.min(...prices),
-    max: Math.max(...prices),
-  };
-};
-
-const buildAvailableOptions = (variants: any[]): AvailableOption[] => {
-  const map = new Map();
-
-  for (const variant of variants) {
-    for (const va of variant.variantAttributes) {
-      const attributeName = va.attributeOption.attribute.name;
-      const optionValue = va.attributeOption.value;
-      const optionLabel = va.attributeOption.label;
-      const optionId = va.attributeOption.id;
-
-      if (!map.has(attributeName)) {
-        map.set(attributeName, new Map());
-      }
-
-      const valueMap = map.get(attributeName);
-
-      if (!valueMap.has(optionId)) {
-        valueMap.set(optionId, {
-          id: optionId,
-          value: optionValue,
-          label: optionLabel,
-          variantIds: [],
-        });
-      }
-
-      valueMap.get(optionId).variantIds.push(variant.id);
-    }
-  }
-
-  return Array.from(map.entries()).map(([attribute, values]) => ({
-    attribute,
-    values: Array.from(values.values()),
-  }));
-};
-
-/**
- * ✅ NHÓM 2: Calculate overall stock status
- */
-const calculateOverallStockStatus = (
-  variants: any[]
-): "in_stock" | "low_stock" | "out_of_stock" | "pre_order" => {
-  const activeVariants = variants.filter((v) => v.isActive);
-
-  let totalAvailable = 0;
-  activeVariants.forEach((v) => {
-    const available = (v.inventory?.quantity ?? 0) - (v.inventory?.reservedQuantity ?? 0);
-    totalAvailable += Math.max(0, available);
-  });
-
-  if (totalAvailable === 0) return "out_of_stock";
-  if (totalAvailable <= 10) return "low_stock"; // Tổng <= 10 sản phẩm
-  return "in_stock";
-};
-
-// Transform product card data (for listing)
-
-const transformProductCard = (product: any): ProductCard => {
-  const defaultVariant = product.variants[0];
-  const price = defaultVariant ? Number(defaultVariant.price) : 0;
-  const thumbnail = defaultVariant?.images[0]?.imageUrl || "";
-  const inStock = defaultVariant?.inventory
-    ? defaultVariant.inventory.quantity > defaultVariant.inventory.reservedQuantity
-    : false;
-
-  // Lấy highlights
-  const highlights =
-    product.productSpecifications
-      ?.filter((spec: any) => spec.isHighlight)
-      .slice(0, 3)
-      .map((spec: any) => ({
-        key: spec.specification.key,
-        name: spec.specification.name,
-        icon: spec.specification.icon,
-        value: spec.value,
-      })) || [];
-
-  // Check sản phẩm mới (trong 10 ngày)
-  const isNew = product.createdAt
-    ? Date.now() - new Date(product.createdAt).getTime() < 10 * 24 * 60 * 60 * 1000
-    : false;
-
-  return {
-    id: product.id,
-    name: product.name,
-    slug: product.slug,
-    brand: product.brand,
-    price,
-    thumbnail,
-    rating: {
-      average: Number(product.ratingAverage) || 0,
-      count: product.ratingCount || 0,
-    },
-    isFeatured: product.isFeatured,
-    isNew,
-    highlights,
-    inStock,
-  };
-};
-
-/**
- * Transform product detail data (for product page)
- */
-const transformProductDetail = (
-  product: any,
-  reviewStats?: ReviewStats
-): Omit<ProductDetail, "highlights" | "specifications"> => {
-  const transformedVariants = product.variants.map(transformVariant);
-  const defaultVariant =
-    transformedVariants.find((v: { isDefault: any }) => v.isDefault) || transformedVariants[0];
-
-  return {
-    id: product.id,
-    name: product.name,
-    slug: product.slug,
-    description: product.description,
-    brand: product.brand,
-    category: product.category || [],
-    availableOptions: buildAvailableOptions(product.variants),
-    priceRange: calculatePriceRange(product.variants),
-    warranty: "12 tháng chính hãng",
-    stockStatus: calculateOverallStockStatus(product.variants),
-    currentVariant: defaultVariant,
-    rating: reviewStats!,
-    viewsCount: Number(product.viewsCount) || 0,
-    isFeatured: product.isFeatured,
-    isActive: product.isActive,
-    createdAt: product.createdAt,
-    updatedAt: product.updatedAt,
-  };
-};
-
-export const transformProductSpecifications = (product: any) => {
-  const valueMap = new Map(
-    product.productSpecifications.map((ps: any) => [ps.specificationId, ps.value])
-  );
-
-  const groups: any[] = [];
-
-  for (const cs of product.category.categorySpecifications) {
-    const existingGroup = groups.find((g) => g.groupName === cs.groupName);
-
-    const item = {
-      id: cs.specification.id,
-      key: cs.specification.key,
-      name: cs.specification.name,
-      icon: cs.specification.icon,
-      unit: cs.specification.unit,
-      value: valueMap.get(cs.specification.id) ?? null,
-    };
-
-    if (existingGroup) {
-      existingGroup.items.push(item);
-    } else {
-      groups.push({
-        groupName: cs.groupName,
-        items: [item],
-      });
-    }
-  }
-
-  return { specifications: groups };
-};
-
-export const transformProductHighlights = (product: any) => {
-  return (
-    product.productSpecifications
-      ?.filter((s: any) => s.isHighlight)
-      .map((s: any) => ({
-        id: s.specification.id,
-        key: s.specification.key,
-        group: s.specification.group || "Khác",
-        name: s.specification.name,
-        icon: s.specification.icon,
-        unit: s.specification.unit,
-        value: s.value,
-        isHighlight: true,
-        highlightOrder: s.sortOrder ?? 0,
-      }))
-      .sort((a: any, b: any) => a.highlightOrder - b.highlightOrder) || []
-  );
-};
+// =====================
+// === PUBLIC SERVICES ===
+// =====================
 
 export const getProductsPublic = async (query: ListProductsQuery) => {
   const result = await repo.findAllPublic(query);
@@ -277,7 +38,7 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
 
   const reviewStats = await repo.getReviewStats(product.id);
 
-  // tăng view async
+  // Tăng view count async
   repo
     .update(product.id, {
       viewsCount: BigInt(product.viewsCount) + BigInt(1),
@@ -292,13 +53,12 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
 
   const highlights = transformProductHighlights(product);
 
-  // CHECK CAN REVIEW
+  // Check if user can review
   let canReview = false;
   let orderItemId: string | null = null;
 
   if (userId) {
     const orderItem = await repo.findOrderItemForReview(userId, product.id);
-
     canReview = !!orderItem && !orderItem.review;
     orderItemId = orderItem?.id ?? null;
   }
@@ -312,7 +72,6 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
 };
 
 export const getProductVariant = async (slug: string, options?: Record<string, string>) => {
-  // Lấy product để verify
   const product = await repo.findBySlug(slug);
   if (!product || !product.isActive) {
     const error: any = new Error("Không tìm thấy sản phẩm");
@@ -332,8 +91,16 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
     throw error;
   }
 
-  // Transform và trả về
-  return transformVariant(variant);
+  return transformVariant({
+    ...variant,
+    code: variant.code ?? "",
+    inventory: variant.inventory ?? undefined,
+    images: variant.images.map((img) => ({
+      ...img,
+      imageUrl: img.imageUrl ?? "",
+      altText: img.altText ?? "",
+    })),
+  });
 };
 
 export const getProductSpecificationsBySlug = async (slug: string) => {
@@ -360,13 +127,12 @@ export const getProductGallery = async (slug: string) => {
 
   const variants = await repo.findAllVariantsWithImages(product.id);
 
-  // Gom tất cả images của các variant
+  // Collect all images from variants
   const allImages = variants.flatMap((variant) => variant.images);
 
-  // Deduplicate theo imageUrl
+  // Deduplicate by imageUrl
   const uniqueImages = Array.from(new Map(allImages.map((img) => [img.imageUrl, img])).values());
 
-  // Chuẩn hoá response cho FE
   return uniqueImages.map((img) => ({
     id: img.id,
     imageUrl: img.imageUrl,
@@ -431,27 +197,42 @@ export const getProductById = async (id: string) => {
 };
 
 export const createProduct = async (input: CreateProductInput) => {
+  const defaultCount = input.variants.filter((v) => v.isDefault).length;
+  if (defaultCount !== 1) {
+    const error: any = new Error("Phải có đúng 1 biến thể mặc định");
+    error.statusCode = 400;
+    throw error;
+  }
+
   const slug = slugify(input.name).toLowerCase();
 
   const product = await repo.create({
     ...input,
     slug,
-    categories: input.categories,
-    variants: input.variants,
-    highlights: input.highlights,
-    specifications: input.specifications,
   });
 
   return transformProductDetail(product);
 };
 
 export const updateProduct = async (id: string, input: UpdateProductInput) => {
-  await getProductById(id); // Check existence
+  // Check product exists
+  await getProductById(id);
 
   const updateData: any = { ...input };
 
+  // Update slug if name changed
   if (input.name) {
     updateData.slug = slugify(input.name).toLowerCase();
+  }
+
+  // Validate default variant if variants are updated
+  if (input.variants) {
+    const defaultCount = input.variants.filter((v) => v.isDefault).length;
+    if (defaultCount > 1) {
+      const error: any = new Error("Chỉ được có tối đa 1 biến thể mặc định");
+      error.statusCode = 400;
+      throw error;
+    }
   }
 
   const product = await repo.update(id, updateData);
@@ -462,26 +243,3 @@ export const deleteProduct = async (id: string) => {
   await getProductById(id);
   return repo.remove(id);
 };
-
-// export const bulkUpdateProducts = async (input: BulkUpdateInput) => {
-//   const { productIds, updates } = input;
-
-//   // Nếu có thêm categories, cần xử lý riêng từng product
-//   if (updates.categoryIds) {
-//     await Promise.all(
-//       productIds.map((id) =>
-//         repo.update(id, {
-//           categories: updates.categoryIds,
-//         })
-//       )
-//     );
-//     delete updates.categoryIds;
-//   }
-
-//   // Bulk update các field còn lại
-//   if (Object.keys(updates).length > 0) {
-//     await repo.bulkUpdate(productIds, updates);
-//   }
-
-//   return { success: true, updated: productIds.length };
-// };

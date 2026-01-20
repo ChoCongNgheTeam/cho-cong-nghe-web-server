@@ -1,4 +1,3 @@
-// src/middlewares/upload.middleware.ts
 import multer, { FileFilterCallback } from "multer";
 import path from "path";
 import fs from "fs";
@@ -14,64 +13,67 @@ if (!fs.existsSync(tmpDir)) {
 
 // Cấu hình lưu file tạm
 const storage = multer.diskStorage({
-  destination: (
-    req: Request,
-    file: Express.Multer.File,
-    cb
-  ) => {
+  destination: (req: Request, file: Express.Multer.File, cb) => {
     cb(null, tmpDir);
   },
 
-  filename: (
-    req: Request,
-    file: Express.Multer.File,
-    cb
-  ) => {
-    const uniqueSuffix =
-      Date.now() + "-" + Math.round(Math.random() * 1e9);
+  filename: (req: Request, file: Express.Multer.File, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
 
-    cb(
-      null,
-      file.fieldname +
-        "-" +
-        uniqueSuffix +
-        path.extname(file.originalname)
-    );
+    cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname));
   },
 });
 
 // Lọc file
-const fileFilter = (
-  req: Request,
-  file: Express.Multer.File,
-  cb: FileFilterCallback
-) => {
-  const allowedMimes = [
-    "image/jpeg",
-    "image/png",
-    "image/gif",
-    "image/webp",
-  ];
+// const fileFilter = (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
+//   const allowedMimes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
-  const allowedExts = [
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".gif",
-    ".webp",
-  ];
+//   const allowedExts = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
 
-  const ext = path.extname(file.originalname).toLowerCase();
-  const mime = file.mimetype;
+//   const ext = path.extname(file.originalname).toLowerCase();
+//   const mime = file.mimetype;
 
-  if (allowedExts.includes(ext) && allowedMimes.includes(mime)) {
+//   if (allowedExts.includes(ext) && allowedMimes.includes(mime)) {
+//     cb(null, true);
+//   } else {
+//     cb(new Error("Chỉ chấp nhận ảnh jpg, jpeg, png, gif, webp"));
+//   }
+// };
+
+const fileFilter = (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
+  // console.log("📎 File received:", {
+  //   fieldname: file.fieldname,
+  //   originalname: file.originalname,
+  //   mimetype: file.mimetype,
+  // });
+
+  // ✅ Cho phép JSON fields cụ thể
+  const jsonFields = ["variants", "specifications"];
+  if (jsonFields.includes(file.fieldname) && file.mimetype === "application/json") {
+    return cb(null, true);
+  }
+
+  // ✅ Skip file rỗng hoặc không phải ảnh
+  if (!file.originalname || file.originalname.trim() === "") {
+    return cb(null, false);
+  }
+
+  const allowedExts = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+  const allowedMimes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
+  const cleanName = file.originalname.split(";")[0].trim();
+
+  if (!cleanName) {
+    return cb(null, false);
+  }
+
+  const ext = path.extname(cleanName).toLowerCase();
+  const mime = file.mimetype.toLowerCase();
+
+  if (allowedExts.includes(ext) || allowedMimes.includes(mime)) {
     cb(null, true);
   } else {
-    cb(
-      new Error(
-        "Chỉ chấp nhận ảnh jpg, jpeg, png, gif, webp"
-      )
-    );
+    cb(new Error(`Chỉ chấp nhận ảnh jpg, jpeg, png, gif, webp. Nhận được: ${cleanName} (${mime})`));
   }
 };
 

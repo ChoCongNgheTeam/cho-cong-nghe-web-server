@@ -499,3 +499,9 @@ components:
         paymentStatus:
           type: string
           enum: [UNPAID, PAID, REFUNDED]
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Nhập JWT token (không cần thêm 'Bearer ' ở đầu)"

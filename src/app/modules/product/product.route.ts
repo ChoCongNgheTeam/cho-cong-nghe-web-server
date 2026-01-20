@@ -11,6 +11,7 @@ import {
   getProductGalleryHandler,
   getRelatedProductsHandler,
   getProductReviewsHandler,
+  getProductBySpecificationsHandler,
 
   // Admin handlers
   getProductsAdminHandler,
@@ -18,121 +19,115 @@ import {
   createProductHandler,
   updateProductHandler,
   deleteProductHandler,
-  // bulkUpdateProductsHandler,
-  getProductBySpecificationsHandler,
 } from "./product.controller";
 import {
   listProductsSchema,
   productBySlugParamsSchema,
   productParamsSchema,
-  createProductSchema,
-  updateProductSchema,
-  bulkUpdateSchema,
   reviewsQuerySchema,
   variantQuerySchema,
 } from "./product.validation";
+import { parseJsonFields } from "@/app/middlewares/parse-json-fields.middleware";
 
 const router = Router();
 
 // Public
 
-// Lấy danh sách sản phẩm (có filter, sort, pagination)
+// List products with filters
 router.get("/", validate(listProductsSchema, "query"), getProductsPublicHandler);
 
-// Lấy chi tiết sản phẩm theo slug
+// Get product detail by slug
 router.get(
   "/slug/:slug",
   validate(productBySlugParamsSchema, "params"),
   optionalAuthMiddleware,
-  getProductBySlugHandler
+  getProductBySlugHandler,
 );
 
-// Lấy chi tiết variant cụ thể
+// Get specific variant
 router.get(
   "/slug/:slug/variant",
   validate(productBySlugParamsSchema, "params"),
   validate(variantQuerySchema, "query"),
-  getProductVariantHandler
+  getProductVariantHandler,
 );
 
-// Lấy gallery của variant
+// Get product gallery
 router.get(
   "/slug/:slug/gallery",
   validate(productBySlugParamsSchema, "params"),
-  getProductGalleryHandler
+  getProductGalleryHandler,
 );
 
-// Lấy thông số kỹ thuật
+// Get product specifications
 router.get(
   "/slug/:slug/specifications",
   validate(productBySlugParamsSchema, "params"),
-  getProductBySpecificationsHandler
+  getProductBySpecificationsHandler,
 );
 
-// Lấy sản phẩm tương tự
+// Get related products
 router.get(
   "/slug/:slug/related",
   validate(productBySlugParamsSchema, "params"),
-  getRelatedProductsHandler
+  getRelatedProductsHandler,
 );
 
-// Lấy reviews của sản phẩm
+// Get product reviews
 router.get(
   "/slug/:slug/reviews",
   validate(productBySlugParamsSchema, "params"),
   validate(reviewsQuerySchema, "query"),
-  getProductReviewsHandler
+  getProductReviewsHandler,
 );
 
 // Admin
 
-// Lấy tất cả sản phẩm (admin - bao gồm inactive)
+// Get all products (admin - includes inactive)
 router.get(
   "/admin/all",
   authMiddleware,
   requireRole("ADMIN"),
   validate(listProductsSchema, "query"),
-  getProductsAdminHandler
+  getProductsAdminHandler,
 );
 
-// Lấy chi tiết sản phẩm theo ID (admin)
+// Get product detail by ID (admin)
 router.get(
   "/admin/:id",
   authMiddleware,
   requireRole("ADMIN"),
   validate(productParamsSchema, "params"),
-  getProductDetailHandler
+  getProductDetailHandler,
 );
 
-// Tạo sản phẩm mới
-// router.post("/admin", authMiddleware, requireRole("ADMIN"), upload.any(), createProductHandler);
+// Create product
+router.post(
+  "/admin",
+  authMiddleware,
+  requireRole("ADMIN"),
+  upload.any(),
+  parseJsonFields,
+  createProductHandler,
+);
 
-// Cập nhật sản phẩm
-// router.patch(
-//   "/admin/:id",
-//   authMiddleware,
-//   requireRole("ADMIN"),
-//   upload.any(),
-//   validate(productParamsSchema, "params"),
-//   updateProductHandler
-// );
+// Update product
+router.patch(
+  "/admin/:id",
+  authMiddleware,
+  requireRole("ADMIN"),
+  validate(productParamsSchema, "params"),
+  upload.any(),
+  updateProductHandler,
+);
 
-// Xóa sản phẩm
+// Delete product
 router.delete(
   "/admin/:id",
   authMiddleware,
   requireRole("ADMIN"),
   validate(productParamsSchema, "params"),
-  deleteProductHandler
+  deleteProductHandler,
 );
-
-// Bulk update (featured, active status)
-// router.patch(
-//   "/admin/bulk-update",
-//   authMiddleware,
-//   requireRole("ADMIN"),
-//   validate(bulkUpdateSchema),
-//   bulkUpdateProductsHandler
-// );
 
 export default router;

@@ -157,7 +157,7 @@ export const selectProductSpecifications = {
 
 const buildProductWhere = (
   query: ListProductsQuery,
-  onlyActive: boolean
+  onlyActive: boolean,
 ): Prisma.productsWhereInput => {
   const where: Prisma.productsWhereInput = {};
 
@@ -481,26 +481,18 @@ export const getReviewStats = async (productId: string) => {
 };
 
 export const create = async (data: any) => {
-  const { categories, variants, highlights, specifications, ...product } = data;
+  const { variants, highlights, specifications, ...product } = data;
 
   return prisma.products.create({
     data: {
       ...product,
-      categories: {
-        connect: categories?.map((id: string) => ({ id })) ?? [],
-      },
-      productHighlights: {
-        create:
-          highlights?.map((h: any, index: number) => ({
-            specificationId: h.specificationId,
-            sortOrder: index,
-          })) ?? [],
-      },
       productSpecifications: {
         create:
           specifications?.map((s: any, index: number) => ({
             specificationId: s.specificationId,
             value: s.value,
+            isHighlight:
+              highlights?.some((h: any) => h.specificationId === s.specificationId) || false,
             sortOrder: index,
           })) ?? [],
       },
@@ -509,7 +501,6 @@ export const create = async (data: any) => {
           variants?.map((v: any) => ({
             code: v.code,
             price: v.price,
-            weight: v.weight,
             isDefault: v.isDefault || false,
             isActive: v.isActive ?? true,
             inventory: {
@@ -518,6 +509,7 @@ export const create = async (data: any) => {
             images: {
               create:
                 v.images?.map((img: any, idx: number) => ({
+                  imagePath: img.imageUrl,
                   imageUrl: img.imageUrl,
                   altText: img.altText || product.name,
                   position: idx,
@@ -621,7 +613,7 @@ export const getVariantImagesByProductId = async (productId: string) => {
     variant.images.map((img) => ({
       id: img.id,
       imageUrl: img.imageUrl,
-    }))
+    })),
   );
 };
 
