@@ -3,10 +3,6 @@ import { Prisma } from "@prisma/client";
 import { ListProductsQuery, ReviewsQuery } from "./product.validation";
 import { OrderStatus } from "@prisma/client";
 
-// =====================
-// === SELECT FRAGMENTS ===
-// =====================
-
 const selectBrand = {
   id: true,
   name: true,
@@ -52,7 +48,6 @@ const selectVariant = {
   id: true,
   code: true,
   price: true,
-  weight: true,
   soldCount: true,
   isDefault: true,
   isActive: true,
@@ -101,10 +96,8 @@ const selectProductDetail = {
   name: true,
   slug: true,
   description: true,
-
   brand: { select: selectBrand },
   category: { select: selectCategory },
-
   viewsCount: true,
   ratingAverage: true,
   ratingCount: true,
@@ -112,12 +105,10 @@ const selectProductDetail = {
   isActive: true,
   createdAt: true,
   updatedAt: true,
-
   variants: {
     select: selectVariant,
     orderBy: { isDefault: "desc" as const },
   },
-
   productSpecifications: {
     orderBy: { sortOrder: "asc" as const },
     select: {
@@ -391,10 +382,6 @@ export const findSpecificationsBySlug = (slug: string) =>
     select: selectProductSpecifications,
   });
 
-// =====================
-// === RELATED PRODUCTS ===
-// =====================
-
 export const findRelatedProducts = async (productId: string, limit: number = 8) => {
   // Lấy thông tin sản phẩm hiện tại
   const product = await prisma.products.findUnique({
@@ -418,10 +405,6 @@ export const findRelatedProducts = async (productId: string, limit: number = 8) 
     orderBy: { viewsCount: "desc" },
   });
 };
-
-// =====================
-// === REVIEWS ===
-// =====================
 
 export const findProductReviews = async (productId: string, query: ReviewsQuery) => {
   const { page, limit, rating, sortBy, sortOrder } = query;
@@ -496,10 +479,6 @@ export const getReviewStats = async (productId: string) => {
     distribution,
   };
 };
-
-// =====================
-// === CREATE & UPDATE ===
-// =====================
 
 export const create = async (data: any) => {
   const { categories, variants, highlights, specifications, ...product } = data;
@@ -618,10 +597,6 @@ export const remove = async (id: string) => {
 
   return prisma.products.delete({ where: { id } });
 };
-
-// =====================
-// === UTILITY ===
-// =====================
 
 export const getVariantImagesByProductId = async (productId: string) => {
   const product = await prisma.products.findUnique({

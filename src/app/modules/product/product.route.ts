@@ -18,7 +18,7 @@ import {
   createProductHandler,
   updateProductHandler,
   deleteProductHandler,
-  bulkUpdateProductsHandler,
+  // bulkUpdateProductsHandler,
   getProductBySpecificationsHandler,
 } from "./product.controller";
 import {
@@ -105,17 +105,17 @@ router.get(
 );
 
 // Tạo sản phẩm mới
-router.post("/admin", authMiddleware, requireRole("ADMIN"), upload.any(), createProductHandler);
+// router.post("/admin", authMiddleware, requireRole("ADMIN"), upload.any(), createProductHandler);
 
 // Cập nhật sản phẩm
-router.patch(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  upload.any(),
-  validate(productParamsSchema, "params"),
-  updateProductHandler
-);
+// router.patch(
+//   "/admin/:id",
+//   authMiddleware,
+//   requireRole("ADMIN"),
+//   upload.any(),
+//   validate(productParamsSchema, "params"),
+//   updateProductHandler
+// );
 
 // Xóa sản phẩm
 router.delete(
@@ -127,12 +127,12 @@ router.delete(
 );
 
 // Bulk update (featured, active status)
-router.patch(
-  "/admin/bulk-update",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(bulkUpdateSchema),
-  bulkUpdateProductsHandler
-);
+// router.patch(
+//   "/admin/bulk-update",
+//   authMiddleware,
+//   requireRole("ADMIN"),
+//   validate(bulkUpdateSchema),
+//   bulkUpdateProductsHandler
+// );
 
 export default router;

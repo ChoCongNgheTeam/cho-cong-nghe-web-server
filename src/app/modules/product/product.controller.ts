@@ -114,7 +114,7 @@ const deleteOldImages = async (imageUrls: string[]): Promise<void> => {
     }
   });
 
-  await Promise.all(deletePromises);
+  await Promise.allSettled(deletePromises);
 };
 
 export const getProductsPublicHandler = async (
@@ -170,9 +170,8 @@ export const getProductBySlugHandler = async (req: Request, res: Response) => {
 export const getProductVariantHandler = async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
-    const { code, ...queryOptions } = req.query;
+    const { ...queryOptions } = req.query;
 
-    // Filter để chỉ lấy các attribute options (bỏ code)
     const options: Record<string, string> = {};
     for (const [key, value] of Object.entries(queryOptions)) {
       if (typeof value === "string" && value) {
@@ -182,7 +181,6 @@ export const getProductVariantHandler = async (req: Request, res: Response) => {
 
     const variant = await productService.getProductVariant(
       slug,
-      code as string | undefined,
       Object.keys(options).length > 0 ? options : undefined
     );
 
@@ -293,10 +291,12 @@ export const getProductReviewsHandler = async (req: Request, res: Response) => {
 // === ADMIN HANDLERS ===
 // =====================
 
-export const getProductsAdminHandler = async (req: Request, res: Response) => {
+export const getProductsAdminHandler = async (
+  req: ValidatedQuery<ListProductsQuery>,
+  res: Response
+) => {
   try {
-    const query = listProductsSchema.parse(req.query);
-    const result = await productService.getProductsAdmin(query);
+    const result = await productService.getProductsAdmin(req.query);
 
     res.json({
       success: true,
@@ -448,9 +448,11 @@ export const deleteProductHandler = async (req: Request, res: Response) => {
     await productService.deleteProduct(id);
 
     // Delete images from Cloudinary
-    if (images.length > 0) {
-      await deleteOldImages(images.map((img) => img.imageUrl));
-    }
+    const imageUrls = images
+      .map((img) => img.imageUrl)
+      .filter((url): url is string => Boolean(url));
+
+    await deleteOldImages(imageUrls);
 
     res.json({
       success: true,
@@ -465,29 +467,29 @@ export const deleteProductHandler = async (req: Request, res: Response) => {
   }
 };
 
-export const bulkUpdateProductsHandler = async (req: Request, res: Response) => {
-  try {
-    const input = bulkUpdateSchema.parse(req.body);
-    const result = await productService.bulkUpdateProducts(input);
+// export const bulkUpdateProductsHandler = async (req: Request, res: Response) => {
+//   try {
+//     const input = bulkUpdateSchema.parse(req.body);
+//     const result = await productService.bulkUpdateProducts(input);
 
-    res.json({
-      success: true,
-      data: result,
-      message: `Cập nhật ${result.updated} sản phẩm thành công`,
-    });
-  } catch (error: any) {
-    if (error.name === "ZodError") {
-      return res.status(400).json({
-        success: false,
-        message: "Dữ liệu không hợp lệ",
-        errors: error.errors,
-      });
-    }
+//     res.json({
+//       success: true,
+//       data: result,
+//       message: `Cập nhật ${result.updated} sản phẩm thành công`,
+//     });
+//   } catch (error: any) {
+//     if (error.name === "ZodError") {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Dữ liệu không hợp lệ",
+//         errors: error.errors,
+//       });
+//     }
 
-    const status = error.statusCode || 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
-};
+//     const status = error.statusCode || 500;
+//     res.status(status).json({
+//       success: false,
+//       message: error.message || "Lỗi server",
+//     });
+//   }
+// };

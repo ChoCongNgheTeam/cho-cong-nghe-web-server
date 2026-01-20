@@ -19,20 +19,12 @@ import {
   ProductGallery,
   AvailableOption,
 } from "./product.model";
-import { group } from "node:console";
 
 // Fix BigInt serialization
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
 };
 
-// =====================
-// === TRANSFORM HELPERS ===
-// =====================
-
-/**
- * Tính stock status dựa trên inventory
- */
 const getStockStatus = (
   quantity: number,
   reservedQuantity: number
@@ -82,30 +74,6 @@ const calculatePriceRange = (variants: any[]): PriceRange => {
     min: Math.min(...prices),
     max: Math.max(...prices),
   };
-};
-
-// Build gallery from all variants
-
-const buildGallery = (variants: any[]): ProductGallery[] => {
-  const galleryMap = new Map<string, ProductGallery>();
-  let position = 0;
-
-  variants.forEach((variant) => {
-    variant.images?.forEach((img: any) => {
-      if (!galleryMap.has(img.imageUrl)) {
-        galleryMap.set(img.imageUrl, {
-          id: img.id,
-          imageUrl: img.imageUrl,
-          altText: img.altText,
-          position: position++,
-          type: "product", // Có thể phân loại thêm sau
-        });
-      }
-    });
-  });
-
-  // Sort theo position
-  return Array.from(galleryMap.values()).sort((a, b) => a.position - b.position);
 };
 
 const buildAvailableOptions = (variants: any[]): AvailableOption[] => {
@@ -184,9 +152,9 @@ const transformProductCard = (product: any): ProductCard => {
         value: spec.value,
       })) || [];
 
-  // Check sản phẩm mới (trong 30 ngày)
+  // Check sản phẩm mới (trong 10 ngày)
   const isNew = product.createdAt
-    ? new Date().getTime() - new Date(product.createdAt).getTime() < 30 * 24 * 60 * 60 * 1000
+    ? Date.now() - new Date(product.createdAt).getTime() < 10 * 24 * 60 * 60 * 1000
     : false;
 
   return {
@@ -324,7 +292,7 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
 
   const highlights = transformProductHighlights(product);
 
-  // 👇 CHECK CAN REVIEW
+  // CHECK CAN REVIEW
   let canReview = false;
   let orderItemId: string | null = null;
 
@@ -343,11 +311,7 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
   };
 };
 
-export const getProductVariant = async (
-  slug: string,
-  code?: string,
-  options?: Record<string, string>
-) => {
+export const getProductVariant = async (slug: string, options?: Record<string, string>) => {
   // Lấy product để verify
   const product = await repo.findBySlug(slug);
   if (!product || !product.isActive) {
@@ -358,12 +322,7 @@ export const getProductVariant = async (
 
   let variant;
 
-  // Tìm variant theo code ?
-  if (code) {
-    variant = await repo.findVariantByCode(product.id, code);
-  }
-  // Hoặc tìm theo options (Color, Storage, ...)
-  else if (options && Object.keys(options).length > 0) {
+  if (options && Object.keys(options).length > 0) {
     variant = await repo.findVariantByOptions(product.id, options);
   }
 
@@ -381,7 +340,7 @@ export const getProductSpecificationsBySlug = async (slug: string) => {
   const product = await repo.findSpecificationsBySlug(slug);
 
   if (!product || !product.isActive) {
-    const error: any = new Error("Không tìm thấy sản phẩm");
+    const error: any = new Error("Không tìm thấy thông số sản phẩm");
     error.statusCode = 404;
     throw error;
   }
@@ -504,25 +463,25 @@ export const deleteProduct = async (id: string) => {
   return repo.remove(id);
 };
 
-export const bulkUpdateProducts = async (input: BulkUpdateInput) => {
-  const { productIds, updates } = input;
+// export const bulkUpdateProducts = async (input: BulkUpdateInput) => {
+//   const { productIds, updates } = input;
 
-  // Nếu có thêm categories, cần xử lý riêng từng product
-  if (updates.categoryIds) {
-    await Promise.all(
-      productIds.map((id) =>
-        repo.update(id, {
-          categories: updates.categoryIds,
-        })
-      )
-    );
-    delete updates.categoryIds;
-  }
+//   // Nếu có thêm categories, cần xử lý riêng từng product
+//   if (updates.categoryIds) {
+//     await Promise.all(
+//       productIds.map((id) =>
+//         repo.update(id, {
+//           categories: updates.categoryIds,
+//         })
+//       )
+//     );
+//     delete updates.categoryIds;
+//   }
 
-  // Bulk update các field còn lại
-  if (Object.keys(updates).length > 0) {
-    await repo.bulkUpdate(productIds, updates);
-  }
+//   // Bulk update các field còn lại
+//   if (Object.keys(updates).length > 0) {
+//     await repo.bulkUpdate(productIds, updates);
+//   }
 
-  return { success: true, updated: productIds.length };
-};
+//   return { success: true, updated: productIds.length };
+// };
