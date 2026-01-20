@@ -11,7 +11,7 @@ paths:
       tags:
         - Cart
       security:
-        - Bearer: []
+        - bearerAuth: []
       responses:
         "200":
           description: Lấy giỏ hàng thành công
@@ -55,7 +55,7 @@ paths:
       tags:
         - Cart
       security:
-        - Bearer: []
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -107,7 +107,7 @@ paths:
       tags:
         - Cart
       security:
-        - Bearer: []
+        - bearerAuth: []
       responses:
         "200":
           description: Giỏ hàng đã được làm trống
@@ -132,7 +132,7 @@ paths:
       tags:
         - Cart
       security:
-        - Bearer: []
+        - bearerAuth: []
       parameters:
         - in: path
           name: cartItemId
@@ -181,7 +181,7 @@ paths:
       tags:
         - Cart
       security:
-        - Bearer: []
+        - bearerAuth: []
       parameters:
         - in: path
           name: cartItemId
@@ -218,7 +218,7 @@ paths:
       tags:
         - Cart
       security:
-        - Bearer: []
+        - bearerAuth: []
       description: Kiểm tra xem tất cả sản phẩm trong giỏ hàng còn tồn kho không
       responses:
         "200":
