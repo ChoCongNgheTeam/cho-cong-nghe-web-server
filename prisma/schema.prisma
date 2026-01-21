@@ -47,14 +47,22 @@ enum PaymentTransactionStatus {
 }
 
 enum DiscountType {
-  PERCENTAGE
-  FIXED
+  DISCOUNT_PERCENT
+  DISCOUNT_FIXED
 }
 
-enum VoucherActionType {
-  DISCOUNT
-  FREE_SHIPPING
+enum TargetType {
+  PRODUCT
+  CATEGORY
+  BRAND
+  ALL
+}
+
+enum PromotionActionType {
+  DISCOUNT_PERCENT
+  DISCOUNT_FIXED
   BUY_X_GET_Y
+  GIFT_PRODUCT
 }
 
 enum ReviewStatus {
@@ -267,7 +275,6 @@ model products_variants {
   cartItems         cart_items[]
   orderItems        order_items[]
   wishlist          wishlist[]
-  voucherActions    voucher_actions[]
 }
 
 model variants_attributes {
@@ -472,30 +479,15 @@ model vouchers {
   updatedAt      DateTime     @updatedAt
 
   orders        orders[]
-  actions       voucher_actions[]
   targets       voucher_targets[]
   voucherUsers  voucher_user[]
   voucherUsages voucher_usages[]
 }
 
-model voucher_actions {
-  id                   String            @id @default(uuid()) @db.Uuid
-  voucherId            String            @db.Uuid
-  actionType           VoucherActionType
-  value                String?
-  buyQuantity          Int?
-  getQuantity          Int?
-  giftProductVariantId String?           @db.Uuid
-  createdAt            DateTime          @default(now())
-
-  voucher     vouchers           @relation(fields: [voucherId], references: [id])
-  giftVariant products_variants? @relation(fields: [giftProductVariantId], references: [id])
-}
-
 model voucher_targets {
   id         String   @id @default(uuid()) @db.Uuid
   voucherId  String   @db.Uuid
-  targetType String // "product" | "category" | "brand" | "all" (có thể tách enum nếu cần)
+  targetType TargetType
   targetId   String?
   createdAt  DateTime @default(now())
 
@@ -526,4 +518,36 @@ model voucher_usages {
   voucher vouchers @relation(fields: [voucherId], references: [id])
   user    users    @relation(fields: [userId], references: [id])
   order   orders   @relation(fields: [orderId], references: [id])
+}
+
+model promotions {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  description String?
+  priority    Int      @default(0)
+  isActive    Boolean  @default(true)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+
+  targets promotion_targets[]
+}
+
+model promotion_targets {
+  id                   String   @id @default(uuid()) @db.Uuid
+  promotionId           String   @db.Uuid
+
+  targetType            TargetType
+  targetId              String?
+  buyQuantity           Int?
+
+  actionType             PromotionActionType
+  discountValue         Decimal? @db.Decimal(10,2)
+  giftProductVariantId  String?  @db.Uuid
+  getQuantity           Int?
+
+  createdAt             DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  promotion promotions @relation(fields: [promotionId], references: [id])
 }

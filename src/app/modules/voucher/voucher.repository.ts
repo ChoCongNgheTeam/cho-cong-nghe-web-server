@@ -37,16 +37,6 @@ const selectVoucherDetail = {
   isActive: true,
   createdAt: true,
   updatedAt: true,
-  actions: {
-    select: {
-      id: true,
-      actionType: true,
-      value: true,
-      buyQuantity: true,
-      getQuantity: true,
-      giftProductVariantId: true,
-    },
-  },
   targets: {
     select: {
       id: true,
@@ -102,7 +92,9 @@ export const findAll = async (query: ListVouchersQuery) => {
 
   const [data, total] = await Promise.all([
     prisma.vouchers.findMany({
-      where,
+      where: {
+        voucherUsers: { none: {} },
+      },
       select: selectVoucherCard,
       orderBy: { [sortBy]: sortOrder },
       skip,
@@ -174,14 +166,11 @@ export const checkVoucherCode = async (code: string) => {
 // =====================
 
 export const create = async (data: any) => {
-  const { actions, targets, userIds, ...voucherData } = data;
+  const { targets, userIds, ...voucherData } = data;
 
   return prisma.vouchers.create({
     data: {
       ...voucherData,
-      actions: {
-        create: actions || [],
-      },
       targets: {
         create: targets || [],
       },
@@ -200,13 +189,9 @@ export const create = async (data: any) => {
 };
 
 export const update = async (id: string, data: any) => {
-  const { actions, targets, ...updateData } = data;
+  const { targets, ...updateData } = data;
 
-  // Delete old actions and targets if new ones are provided
-  if (actions !== undefined) {
-    await prisma.voucher_actions.deleteMany({ where: { voucherId: id } });
-  }
-
+  // Delete old targets if new ones are provided
   if (targets !== undefined) {
     await prisma.voucher_targets.deleteMany({ where: { voucherId: id } });
   }
@@ -215,11 +200,6 @@ export const update = async (id: string, data: any) => {
     where: { id },
     data: {
       ...updateData,
-      ...(actions !== undefined && {
-        actions: {
-          create: actions,
-        },
-      }),
       ...(targets !== undefined && {
         targets: {
           create: targets,
@@ -232,7 +212,6 @@ export const update = async (id: string, data: any) => {
 
 export const remove = async (id: string) => {
   // Delete related records first
-  await prisma.voucher_actions.deleteMany({ where: { voucherId: id } });
   await prisma.voucher_targets.deleteMany({ where: { voucherId: id } });
   await prisma.voucher_user.deleteMany({ where: { voucherId: id } });
   // Note: Don't delete voucher_usages to maintain history
@@ -257,7 +236,7 @@ export const assignToUsers = async (
       maxUses: maxUsesPerUser,
       usedCount: 0,
     })),
-    skipDuplicates: true, // Skip if already exists
+    skipDuplicates: true,
   });
 
   return { success: true, assigned: userIds.length };

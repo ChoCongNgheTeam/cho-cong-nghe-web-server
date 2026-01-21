@@ -2,19 +2,11 @@ openapi: 3.0.0
 info:
   title: Voucher API
   version: 1.0.0
-  description: |
-    API quản lý voucher cho hệ thống thương mại điện tử.
-
-    Bao gồm:
-    - Các endpoint công khai (public)
-    - Các endpoint dành cho người dùng đã đăng nhập
-    - Các endpoint quản trị (admin)
+  description: API quản lý voucher/mã giảm giá
 
 servers:
-  - url: http://localhost:3000/api
+  - url: http://localhost:5000/api
     description: Development server
-  - url: https://api.yourdomain.com/api
-    description: Production server
 
 components:
   securitySchemes:
@@ -24,265 +16,154 @@ components:
       bearerFormat: JWT
 
   schemas:
-    # ──────────────────────────────────────────────
-    # Common Enums
-    # ──────────────────────────────────────────────
     DiscountType:
       type: string
-      enum: [PERCENTAGE, FIXED]
-      example: PERCENTAGE
+      enum:
+        - DISCOUNT_PERCENT
+        - DISCOUNT_FIXED
+      description: Loại giảm giá
 
-    VoucherActionType:
+    TargetType:
       type: string
-      enum: [DISCOUNT, FREE_SHIPPING, BUY_X_GET_Y]
-      example: DISCOUNT
-
-    VoucherTargetType:
-      type: string
-      enum: [all, product, category, brand]
-      example: product
-
-    # ──────────────────────────────────────────────
-    # Voucher Action & Target
-    # ──────────────────────────────────────────────
-    VoucherAction:
-      type: object
-      properties:
-        actionType:
-          $ref: "#/components/schemas/VoucherActionType"
-        value:
-          type: string
-          example: "50000"
-          nullable: true
-        buyQuantity:
-          type: integer
-          example: 2
-          nullable: true
-        getQuantity:
-          type: integer
-          example: 1
-          nullable: true
-        giftProductVariantId:
-          type: string
-          format: uuid
-          example: "550e8400-e29b-41d4-a716-446655440000"
-          nullable: true
-      required:
-        - actionType
+      enum:
+        - ALL
+        - PRODUCT
+        - CATEGORY
+        - BRAND
+      description: Đối tượng áp dụng voucher
 
     VoucherTarget:
       type: object
       properties:
+        id:
+          type: string
+          format: uuid
         targetType:
-          $ref: "#/components/schemas/VoucherTargetType"
+          $ref: "#/components/schemas/TargetType"
         targetId:
           type: string
           format: uuid
-          example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-          nullable: true
-      required:
-        - targetType
+          description: ID của product/category/brand (null nếu targetType = ALL)
 
-    # ──────────────────────────────────────────────
-    # Create / Update Voucher
-    # ──────────────────────────────────────────────
-    CreateVoucherRequest:
+    VoucherCard:
       type: object
-      required:
-        - code
-        - discountType
-        - discountValue
       properties:
+        id:
+          type: string
+          format: uuid
         code:
           type: string
-          minLength: 3
-          example: "SUMMER2025"
         description:
           type: string
-          example: "Giảm 20% cho đơn từ 500k"
-          nullable: true
         discountType:
           $ref: "#/components/schemas/DiscountType"
         discountValue:
           type: number
-          minimum: 1
-          example: 20
         minOrderValue:
           type: number
-          minimum: 0
-          default: 0
-          example: 300000
         maxUses:
           type: integer
-          minimum: 1
-          example: 1000
-          nullable: true
-        maxUsesPerUser:
+        usesCount:
           type: integer
-          minimum: 1
-          example: 3
-          nullable: true
         startDate:
           type: string
           format: date-time
-          example: "2025-06-01T00:00:00.000Z"
-          nullable: true
         endDate:
           type: string
           format: date-time
-          example: "2025-08-31T23:59:59.999Z"
-          nullable: true
-        priority:
-          type: integer
-          default: 0
-          example: 10
         isActive:
           type: boolean
-          default: true
-        actions:
-          type: array
-          items:
-            $ref: "#/components/schemas/VoucherAction"
-          default: []
-        targets:
-          type: array
-          items:
-            $ref: "#/components/schemas/VoucherTarget"
-          default: []
-        userIds:
-          type: array
-          items:
-            type: string
-            format: uuid
-          description: Chỉ dùng khi tạo voucher dành riêng cho một số user
-          example: ["uuid1", "uuid2"]
-          nullable: true
+        isExpired:
+          type: boolean
+        isAvailable:
+          type: boolean
 
-    UpdateVoucherRequest:
+    VoucherDetail:
+      allOf:
+        - $ref: "#/components/schemas/VoucherCard"
+        - type: object
+          properties:
+            maxUsesPerUser:
+              type: integer
+            priority:
+              type: integer
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+            targets:
+              type: array
+              items:
+                $ref: "#/components/schemas/VoucherTarget"
+
+    UserVoucher:
       type: object
       properties:
+        id:
+          type: string
+          format: uuid
         code:
           type: string
-          minLength: 3
-          example: "SUMMER2025"
-          nullable: true
         description:
           type: string
-          nullable: true
         discountType:
           $ref: "#/components/schemas/DiscountType"
-          nullable: true
         discountValue:
           type: number
-          minimum: 1
-          example: 25
-          nullable: true
         minOrderValue:
           type: number
-          minimum: 0
-          example: 500000
-          nullable: true
-        maxUses:
-          type: integer
-          minimum: 1
-          nullable: true
         maxUsesPerUser:
           type: integer
-          minimum: 1
-          nullable: true
+        usedCount:
+          type: integer
+        remainingUses:
+          type: integer
+          description: -1 nghĩa là không giới hạn
         startDate:
           type: string
           format: date-time
-          nullable: true
         endDate:
           type: string
           format: date-time
-          nullable: true
-        priority:
-          type: integer
-          nullable: true
-        isActive:
+        isExpired:
           type: boolean
-          nullable: true
-        actions:
-          type: array
-          items:
-            $ref: "#/components/schemas/VoucherAction"
-          nullable: true
-        targets:
-          type: array
-          items:
-            $ref: "#/components/schemas/VoucherTarget"
-          nullable: true
+        canUse:
+          type: boolean
 
-    # ──────────────────────────────────────────────
-    # Assign Voucher
-    # ──────────────────────────────────────────────
-    AssignVoucherRequest:
+    Error:
       type: object
-      required:
-        - voucherId
-        - userIds
       properties:
-        voucherId:
+        success:
+          type: boolean
+          example: false
+        message:
           type: string
-          format: uuid
-        userIds:
-          type: array
-          items:
-            type: string
-            format: uuid
-          minItems: 1
-        maxUsesPerUser:
-          type: integer
-          minimum: 1
-          default: 1
-
-    # ──────────────────────────────────────────────
-    # Validate Voucher
-    # ──────────────────────────────────────────────
-    ValidateVoucherRequest:
-      type: object
-      required:
-        - code
-        - orderTotal
-      properties:
-        code:
-          type: string
-          example: "SUMMER2025"
-        orderTotal:
-          type: number
-          minimum: 1
-          example: 850000
-        userId:
-          type: string
-          format: uuid
-          nullable: true
 
 paths:
   /vouchers:
     get:
       summary: Lấy danh sách voucher công khai
-      tags: [Voucher - Public]
-      security: [] # public
+      tags:
+        - Public - Vouchers
       parameters:
         - in: query
           name: page
           schema:
             type: integer
-            minimum: 1
             default: 1
         - in: query
           name: limit
           schema:
             type: integer
-            minimum: 1
-            maximum: 50
             default: 12
+            maximum: 50
         - in: query
           name: search
           schema:
             type: string
+          description: Tìm kiếm theo code hoặc description
         - in: query
           name: discountType
           schema:
@@ -309,45 +190,66 @@ paths:
             default: desc
       responses:
         "200":
-          description: Danh sách voucher
+          description: Success
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  success:
+                    type: boolean
                   data:
                     type: array
                     items:
-                      type: object # Bạn có thể định nghĩa chi tiết Voucher response schema nếu cần
+                      $ref: "#/components/schemas/VoucherCard"
                   pagination:
                     type: object
                     properties:
-                      page: { type: integer }
-                      limit: { type: integer }
-                      total: { type: integer }
-                      totalPages: { type: integer }
+                      page:
+                        type: integer
+                      limit:
+                        type: integer
+                      total:
+                        type: integer
+                      totalPages:
+                        type: integer
+                  message:
+                    type: string
 
   /vouchers/code/{code}:
     get:
-      summary: Lấy thông tin voucher theo mã
-      tags: [Voucher - Public]
-      security: []
+      summary: Lấy voucher theo mã code
+      tags:
+        - Public - Vouchers
       parameters:
         - in: path
           name: code
           required: true
           schema:
             type: string
+          description: Mã voucher
       responses:
         "200":
-          description: Thông tin voucher
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/VoucherDetail"
+                  message:
+                    type: string
         "404":
-          description: Không tìm thấy voucher
+          description: Voucher not found
 
   /vouchers/validate:
     post:
-      summary: Kiểm tra tính hợp lệ của voucher
-      tags: [Voucher - Public]
+      summary: Validate voucher cho đơn hàng
+      tags:
+        - Public - Vouchers
       security:
         - bearerAuth: []
       requestBody:
@@ -355,62 +257,133 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ValidateVoucherRequest"
+              type: object
+              required:
+                - code
+                - orderTotal
+              properties:
+                code:
+                  type: string
+                  example: SUMMER2024
+                orderTotal:
+                  type: number
+                  example: 1000000
       responses:
         "200":
-          description: Voucher hợp lệ + thông tin giảm giá
-        "400":
-          description: Voucher không hợp lệ / hết hạn / đã dùng hết...
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      discount:
+                        type: number
+                      voucher:
+                        $ref: "#/components/schemas/VoucherDetail"
+                  message:
+                    type: string
+              examples:
+                valid:
+                  summary: Valid voucher
+                  value:
+                    success: true
+                    data:
+                      discount: 200000
+                      voucher:
+                        id: uuid
+                        code: SUMMER2024
+                        discountType: DISCOUNT_PERCENT
+                        discountValue: 20
+                    message: Áp dụng voucher thành công
+                invalid:
+                  summary: Invalid voucher
+                  value:
+                    success: false
+                    data: null
+                    message: Đơn hàng tối thiểu 500,000đ
 
   /vouchers/my-vouchers:
     get:
-      summary: Lấy danh sách voucher của người dùng hiện tại
-      tags: [Voucher - User]
+      summary: Lấy voucher của user
+      tags:
+        - Public - Vouchers
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: Danh sách voucher của user
-
-  # ──────────────── ADMIN ────────────────
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserVoucher"
+                  message:
+                    type: string
 
   /vouchers/admin/all:
     get:
-      summary: (Admin) Lấy tất cả voucher
-      tags: [Voucher - Admin]
+      summary: Lấy tất cả voucher (Admin)
+      tags:
+        - Admin - Vouchers
       security:
         - bearerAuth: []
       parameters:
-        # Tương tự /vouchers nhưng có thêm quyền ADMIN
-        - $ref: "#/paths/~1vouchers/get/parameters/0"
-        - $ref: "#/paths/~1vouchers/get/parameters/1"
-        # ... (copy các query param còn lại)
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 12
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: discountType
+          schema:
+            $ref: "#/components/schemas/DiscountType"
+        - in: query
+          name: isActive
+          schema:
+            type: boolean
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, code, discountValue, usesCount, priority]
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [asc, desc]
       responses:
         "200":
-          description: Danh sách voucher (admin view)
-
-  /vouchers/admin/assign:
-    post:
-      summary: (Admin) Gán voucher cho nhiều user
-      tags: [Voucher - Admin]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AssignVoucherRequest"
-      responses:
-        "200":
-          description: Gán voucher thành công
-        "400":
-          description: Voucher không tồn tại / user không hợp lệ...
+          description: Success
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
 
   /vouchers/admin/{id}:
     get:
-      summary: (Admin) Lấy chi tiết voucher theo ID
-      tags: [Voucher - Admin]
+      summary: Lấy chi tiết voucher (Admin)
+      tags:
+        - Admin - Vouchers
       security:
         - bearerAuth: []
       parameters:
@@ -422,13 +395,25 @@ paths:
             format: uuid
       responses:
         "200":
-          description: Chi tiết voucher
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/VoucherDetail"
+                  message:
+                    type: string
         "404":
-          description: Không tìm thấy
+          description: Voucher not found
 
     patch:
-      summary: (Admin) Cập nhật voucher
-      tags: [Voucher - Admin]
+      summary: Cập nhật voucher
+      tags:
+        - Admin - Vouchers
       security:
         - bearerAuth: []
       parameters:
@@ -443,16 +428,54 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateVoucherRequest"
+              type: object
+              properties:
+                code:
+                  type: string
+                description:
+                  type: string
+                discountType:
+                  $ref: "#/components/schemas/DiscountType"
+                discountValue:
+                  type: number
+                minOrderValue:
+                  type: number
+                maxUses:
+                  type: integer
+                maxUsesPerUser:
+                  type: integer
+                startDate:
+                  type: string
+                  format: date-time
+                endDate:
+                  type: string
+                  format: date-time
+                priority:
+                  type: integer
+                isActive:
+                  type: boolean
+                targets:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      targetType:
+                        $ref: "#/components/schemas/TargetType"
+                      targetId:
+                        type: string
+                        format: uuid
       responses:
         "200":
-          description: Voucher đã được cập nhật
+          description: Success
         "400":
-          description: Dữ liệu không hợp lệ
+          description: Validation error
+        "404":
+          description: Voucher not found
 
     delete:
-      summary: (Admin) Xóa voucher
-      tags: [Voucher - Admin]
+      summary: Xóa voucher
+      tags:
+        - Admin - Vouchers
       security:
         - bearerAuth: []
       parameters:
@@ -464,14 +487,15 @@ paths:
             format: uuid
       responses:
         "200":
-          description: Voucher đã được xóa
+          description: Success
         "404":
-          description: Không tìm thấy voucher
+          description: Voucher not found
 
   /vouchers/admin:
     post:
-      summary: (Admin) Tạo voucher mới
-      tags: [Voucher - Admin]
+      summary: Tạo voucher mới
+      tags:
+        - Admin - Vouchers
       security:
         - bearerAuth: []
       requestBody:
@@ -479,9 +503,184 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateVoucherRequest"
+              type: object
+              required:
+                - code
+                - discountType
+                - discountValue
+              properties:
+                code:
+                  type: string
+                  minLength: 3
+                  description: Mã voucher (tự động uppercase)
+                  example: SUMMER2024
+                description:
+                  type: string
+                  example: Giảm giá mùa hè
+                discountType:
+                  $ref: "#/components/schemas/DiscountType"
+                discountValue:
+                  type: number
+                  description: Giá trị giảm (% hoặc số tiền cố định)
+                  example: 20
+                minOrderValue:
+                  type: number
+                  default: 0
+                  example: 500000
+                maxUses:
+                  type: integer
+                  description: Số lượt sử dụng tối đa (null = không giới hạn)
+                  example: 100
+                maxUsesPerUser:
+                  type: integer
+                  description: Số lượt mỗi user được dùng
+                  example: 1
+                startDate:
+                  type: string
+                  format: date-time
+                  example: 2024-06-01T00:00:00Z
+                endDate:
+                  type: string
+                  format: date-time
+                  example: 2024-08-31T23:59:59Z
+                priority:
+                  type: integer
+                  default: 0
+                  description: Độ ưu tiên (cao hơn = áp dụng trước)
+                isActive:
+                  type: boolean
+                  default: true
+                targets:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - targetType
+                    properties:
+                      targetType:
+                        $ref: "#/components/schemas/TargetType"
+                      targetId:
+                        type: string
+                        format: uuid
+                        description: Bắt buộc nếu targetType không phải ALL
+                  example:
+                    - targetType: CATEGORY
+                      targetId: category-uuid
+                    - targetType: BRAND
+                      targetId: brand-uuid
+                userIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: Danh sách user ID được gán voucher (optional)
+                  example: [user-uuid-1, user-uuid-2]
+            examples:
+              percent_discount:
+                summary: Giảm 20%
+                value:
+                  code: SUMMER20
+                  description: Giảm 20% mùa hè
+                  discountType: DISCOUNT_PERCENT
+                  discountValue: 20
+                  minOrderValue: 500000
+                  maxUses: 100
+                  maxUsesPerUser: 1
+                  startDate: 2024-06-01T00:00:00Z
+                  endDate: 2024-08-31T23:59:59Z
+                  isActive: true
+                  targets:
+                    - targetType: ALL
+              fixed_discount:
+                summary: Giảm 50,000đ
+                value:
+                  code: FLASH50K
+                  description: Flash sale giảm 50K
+                  discountType: DISCOUNT_FIXED
+                  discountValue: 50000
+                  minOrderValue: 200000
+                  maxUses: 50
+                  targets:
+                    - targetType: PRODUCT
+                      targetId: product-uuid
       responses:
         "201":
-          description: Voucher được tạo thành công
+          description: Created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/VoucherDetail"
+                  message:
+                    type: string
         "400":
-          description: Dữ liệu không hợp lệ (ví dụ % > 100, ngày kết thúc trước ngày bắt đầu...)
+          description: Validation error
+
+  /vouchers/admin/assign:
+    post:
+      summary: Gán voucher cho users
+      tags:
+        - Admin - Vouchers
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - voucherId
+                - userIds
+              properties:
+                voucherId:
+                  type: string
+                  format: uuid
+                userIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  minItems: 1
+                maxUsesPerUser:
+                  type: integer
+                  default: 1
+            example:
+              voucherId: voucher-uuid
+              userIds: [user-1, user-2, user-3]
+              maxUsesPerUser: 2
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      success:
+                        type: boolean
+                      assigned:
+                        type: integer
+                  message:
+                    type: string
+              example:
+                success: true
+                data:
+                  success: true
+                  assigned: 3
+                message: Gán voucher cho 3 người dùng thành công
+
+tags:
+  - name: Public - Vouchers
+    description: Public endpoints cho voucher
+  - name: Admin - Vouchers
+    description: Admin endpoints quản lý voucher (yêu cầu authentication & ADMIN role)

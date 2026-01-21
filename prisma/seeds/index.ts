@@ -11,3 +11,4 @@ export * from "./product.seed";
 export * from "./variant.seed";
 export * from "./user-address.seed";
 export * from "./voucher.seed";
+export * from "./promotion.seed";

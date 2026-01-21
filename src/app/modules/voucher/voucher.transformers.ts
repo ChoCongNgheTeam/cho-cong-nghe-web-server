@@ -1,11 +1,12 @@
+import { DiscountType } from "@prisma/client";
 import {
   VoucherCard,
   VoucherDetail,
   UserVoucher,
   RawVoucher,
-  DiscountType,
-  VoucherActionType,
-  VoucherTargetType,
+  TargetType,
+  VoucherListItem,
+  VoucherAvailabilityInput,
 } from "./voucher.types";
 
 // Fix BigInt serialization
@@ -16,7 +17,7 @@ import {
 /**
  * Check if voucher is expired
  */
-export const isVoucherExpired = (endDate?: Date): boolean => {
+export const isVoucherExpired = (endDate: Date | null | undefined): boolean => {
   if (!endDate) return false;
   return new Date() > new Date(endDate);
 };
@@ -24,7 +25,7 @@ export const isVoucherExpired = (endDate?: Date): boolean => {
 /**
  * Check if voucher has started
  */
-export const hasVoucherStarted = (startDate?: Date): boolean => {
+export const hasVoucherStarted = (startDate: Date | null | undefined): boolean => {
   if (!startDate) return true;
   return new Date() >= new Date(startDate);
 };
@@ -32,7 +33,7 @@ export const hasVoucherStarted = (startDate?: Date): boolean => {
 /**
  * Check if voucher is available (not expired, started, has uses left)
  */
-export const isVoucherAvailable = (voucher: RawVoucher): boolean => {
+export const isVoucherAvailable = (voucher: VoucherAvailabilityInput): boolean => {
   const expired = isVoucherExpired(voucher.endDate);
   const started = hasVoucherStarted(voucher.startDate);
   const hasUsesLeft = !voucher.maxUses || voucher.usesCount < voucher.maxUses;
@@ -43,11 +44,11 @@ export const isVoucherAvailable = (voucher: RawVoucher): boolean => {
 /**
  * Transform voucher card data (for listing)
  */
-export const transformVoucherCard = (voucher: RawVoucher): VoucherCard => {
+export const transformVoucherCard = (voucher: VoucherListItem): VoucherCard => {
   return {
     id: voucher.id,
     code: voucher.code,
-    description: voucher.description,
+    description: voucher.description ?? undefined,
     discountType: voucher.discountType as DiscountType,
     discountValue: Number(voucher.discountValue),
     minOrderValue: Number(voucher.minOrderValue),
@@ -68,7 +69,7 @@ export const transformVoucherDetail = (voucher: RawVoucher): VoucherDetail => {
   return {
     id: voucher.id,
     code: voucher.code,
-    description: voucher.description,
+    description: voucher.description ?? undefined,
     discountType: voucher.discountType as DiscountType,
     discountValue: Number(voucher.discountValue),
     minOrderValue: Number(voucher.minOrderValue),
@@ -83,19 +84,10 @@ export const transformVoucherDetail = (voucher: RawVoucher): VoucherDetail => {
     isAvailable: isVoucherAvailable(voucher),
     createdAt: voucher.createdAt,
     updatedAt: voucher.updatedAt,
-    actions:
-      voucher.actions?.map((action) => ({
-        id: action.id,
-        actionType: action.actionType as VoucherActionType,
-        value: action.value ?? undefined,
-        buyQuantity: action.buyQuantity ?? undefined,
-        getQuantity: action.getQuantity ?? undefined,
-        giftProductVariantId: action.giftProductVariantId ?? undefined,
-      })) || [],
     targets:
       voucher.targets?.map((target) => ({
         id: target.id,
-        targetType: target.targetType as VoucherTargetType,
+        targetType: target.targetType as TargetType,
         targetId: target.targetId ?? undefined,
       })) || [],
   };
@@ -112,13 +104,13 @@ export const transformUserVoucher = (voucher: RawVoucher, userVoucherData?: any)
   return {
     id: voucher.id,
     code: voucher.code,
-    description: voucher.description,
+    description: voucher.description ?? undefined,
     discountType: voucher.discountType as DiscountType,
     discountValue: Number(voucher.discountValue),
     minOrderValue: Number(voucher.minOrderValue),
     maxUsesPerUser: voucher.maxUsesPerUser ?? undefined,
     usedCount,
-    remainingUses: remainingUses === Infinity ? -1 : remainingUses, // -1 means unlimited
+    remainingUses: remainingUses === Infinity ? -1 : remainingUses,
     startDate: voucher.startDate ?? undefined,
     endDate: voucher.endDate ?? undefined,
     isExpired: isVoucherExpired(voucher.endDate),
@@ -134,9 +126,9 @@ export const calculateDiscount = (
   discountValue: number,
   orderTotal: number,
 ): number => {
-  if (discountType === "PERCENTAGE") {
+  if (discountType === DiscountType.DISCOUNT_PERCENT) {
     return Math.round((orderTotal * discountValue) / 100);
   }
-  // FIXED
+  // DISCOUNT_FIXED
   return Math.min(discountValue, orderTotal);
 };

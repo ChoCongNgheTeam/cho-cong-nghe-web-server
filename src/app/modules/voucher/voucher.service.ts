@@ -11,11 +11,11 @@ import {
   transformVoucherDetail,
   transformUserVoucher,
   calculateDiscount,
-  isVoucherAvailable,
   hasVoucherStarted,
   isVoucherExpired,
 } from "./voucher.transformers";
 import { VoucherValidationResult } from "./voucher.types";
+import { DiscountType } from "@prisma/client";
 
 // =====================
 // === PUBLIC SERVICES ===
@@ -125,7 +125,7 @@ export const validateVoucher = async (
 
   // Calculate discount
   const discount = calculateDiscount(
-    voucher.discountType as any,
+    voucher.discountType as DiscountType,
     Number(voucher.discountValue),
     orderTotal,
   );

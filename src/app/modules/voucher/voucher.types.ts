@@ -2,40 +2,23 @@
 // === ENUMS ===
 // =====================
 
-export enum DiscountType {
-  PERCENTAGE = "PERCENTAGE",
-  FIXED = "FIXED",
-}
+import { Decimal } from "@prisma/client/runtime/library";
+import { DiscountType } from "@prisma/client";
 
-export enum VoucherActionType {
-  DISCOUNT = "DISCOUNT",
-  FREE_SHIPPING = "FREE_SHIPPING",
-  BUY_X_GET_Y = "BUY_X_GET_Y",
-}
-
-export enum VoucherTargetType {
-  ALL = "all",
-  PRODUCT = "product",
-  CATEGORY = "category",
-  BRAND = "brand",
+export enum TargetType {
+  PRODUCT = "PRODUCT",
+  CATEGORY = "CATEGORY",
+  BRAND = "BRAND",
+  ALL = "ALL",
 }
 
 // =====================
 // === BASIC TYPES ===
 // =====================
 
-export interface VoucherAction {
-  id: string;
-  actionType: VoucherActionType;
-  value?: string;
-  buyQuantity?: number;
-  getQuantity?: number;
-  giftProductVariantId?: string;
-}
-
 export interface VoucherTarget {
   id: string;
-  targetType: VoucherTargetType;
+  targetType: TargetType;
   targetId?: string;
 }
 
@@ -71,7 +54,7 @@ export interface VoucherCard {
   endDate?: Date;
   isActive: boolean;
   isExpired: boolean;
-  isAvailable: boolean; // Còn lượt sử dụng và chưa hết hạn
+  isAvailable: boolean;
 }
 
 // =====================
@@ -96,12 +79,11 @@ export interface VoucherDetail {
   isAvailable: boolean;
   createdAt: Date;
   updatedAt: Date;
-  actions: VoucherAction[];
   targets: VoucherTarget[];
 }
 
 // =====================
-// === USER VOUCHER (For User) ===
+// === USER VOUCHER ===
 // =====================
 
 export interface UserVoucher {
@@ -113,11 +95,11 @@ export interface UserVoucher {
   minOrderValue: number;
   maxUsesPerUser?: number;
   usedCount: number;
-  remainingUses: number; // maxUsesPerUser - usedCount
+  remainingUses: number;
   startDate?: Date;
   endDate?: Date;
   isExpired: boolean;
-  canUse: boolean; // Còn lượt sử dụng và chưa hết hạn
+  canUse: boolean;
 }
 
 // =====================
@@ -153,20 +135,42 @@ export interface UserVoucherListResponse extends PaginatedResponse<UserVoucher> 
 export interface RawVoucher {
   id: string;
   code: string;
-  description?: string;
+  description: string | null;
   discountType: any;
   discountValue: any;
   minOrderValue: any;
-  maxUses?: number;
-  maxUsesPerUser?: number;
+  maxUses: number | null;
+  maxUsesPerUser: number | null;
   usesCount: number;
-  startDate?: Date;
-  endDate?: Date;
+  startDate: Date | null;
+  endDate: Date | null;
   priority: number;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
-  actions?: any[];
   targets?: any[];
   voucherUsers?: any[];
+}
+
+export interface VoucherListItem {
+  id: string;
+  code: string;
+  description: string | null;
+  discountType: DiscountType;
+  discountValue: Decimal;
+  minOrderValue: Decimal;
+  maxUses: number | null;
+  usesCount: number;
+  startDate: Date | null;
+  endDate: Date | null;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export interface VoucherAvailabilityInput {
+  startDate: Date | null;
+  endDate: Date | null;
+  maxUses: number | null;
+  usesCount: number;
+  isActive: boolean;
 }

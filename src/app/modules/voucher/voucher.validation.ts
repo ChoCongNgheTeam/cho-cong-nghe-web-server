@@ -4,9 +4,8 @@ import { z } from "zod";
 // === ENUMS ===
 // =====================
 
-export const DiscountTypeEnum = z.enum(["PERCENTAGE", "FIXED"]);
-export const VoucherActionTypeEnum = z.enum(["DISCOUNT", "FREE_SHIPPING", "BUY_X_GET_Y"]);
-export const VoucherTargetTypeEnum = z.enum(["all", "product", "category", "brand"]);
+export const DiscountTypeEnum = z.enum(["DISCOUNT_PERCENT", "DISCOUNT_FIXED"]);
+export const TargetTypeEnum = z.enum(["ALL", "PRODUCT", "CATEGORY", "BRAND"]);
 
 // =====================
 // === QUERY SCHEMAS ===
@@ -47,16 +46,8 @@ export const voucherCodeParamsSchema = z.object({
 // === CREATE/UPDATE SCHEMAS ===
 // =====================
 
-const voucherActionSchema = z.object({
-  actionType: VoucherActionTypeEnum,
-  value: z.string().optional(),
-  buyQuantity: z.coerce.number().int().positive().optional(),
-  getQuantity: z.coerce.number().int().positive().optional(),
-  giftProductVariantId: z.string().uuid().optional(),
-});
-
 const voucherTargetSchema = z.object({
-  targetType: VoucherTargetTypeEnum,
+  targetType: TargetTypeEnum,
   targetId: z.string().uuid().optional(),
 });
 
@@ -73,13 +64,12 @@ export const createVoucherSchema = z
     endDate: z.coerce.date().optional(),
     priority: z.coerce.number().int().default(0),
     isActive: z.boolean().default(true),
-    actions: z.array(voucherActionSchema).optional().default([]),
     targets: z.array(voucherTargetSchema).optional().default([]),
-    userIds: z.array(z.string().uuid()).optional(), // For assigning to specific users
+    userIds: z.array(z.string().uuid()).optional(),
   })
   .refine(
     (data) => {
-      if (data.discountType === "PERCENTAGE" && data.discountValue > 100) {
+      if (data.discountType === "DISCOUNT_PERCENT" && data.discountValue > 100) {
         return false;
       }
       return true;
@@ -115,12 +105,15 @@ export const updateVoucherSchema = z
     endDate: z.coerce.date().optional(),
     priority: z.coerce.number().int().optional(),
     isActive: z.boolean().optional(),
-    actions: z.array(voucherActionSchema).optional(),
     targets: z.array(voucherTargetSchema).optional(),
   })
   .refine(
     (data) => {
-      if (data.discountType === "PERCENTAGE" && data.discountValue && data.discountValue > 100) {
+      if (
+        data.discountType === "DISCOUNT_PERCENT" &&
+        data.discountValue &&
+        data.discountValue > 100
+      ) {
         return false;
       }
       return true;

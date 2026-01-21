@@ -13,6 +13,7 @@ import {
   seedVariants,
   seedUserAddresses,
   seedVouchers,
+  seedPromotions,
 } from "./seeds";
 
 const prisma = new PrismaClient();
@@ -27,6 +28,9 @@ async function main() {
   await seedPaymentMethods();
   const users = await seedUsers();
   await seedVouchers();
+
+  await seedPromotions();
+
   await seedUserAddresses({ users });
 
   const products = await seedProducts({

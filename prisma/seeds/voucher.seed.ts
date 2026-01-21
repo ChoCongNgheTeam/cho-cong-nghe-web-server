@@ -1,4 +1,4 @@
-import { PrismaClient, DiscountType, VoucherActionType } from "@prisma/client";
+import { PrismaClient, DiscountType, TargetType } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -9,15 +9,6 @@ type VoucherTarget =
   | { targetType: "BRAND"; targetIdFromBrandName: string }
   | { targetType: "CATEGORY"; targetId: string }
   | { targetType: "PRODUCT"; targetId: string };
-
-type VoucherAction =
-  | { actionType: "FREE_SHIPPING" }
-  | { actionType: "DISCOUNT"; value: string }
-  | {
-      actionType: "BUY_X_GET_Y";
-      buyQuantity: number;
-      getQuantity: number;
-    };
 
 const voucherData: {
   code: string;
@@ -32,12 +23,11 @@ const voucherData: {
   priority: number;
   isActive: boolean;
   targets?: VoucherTarget[];
-  actions?: VoucherAction[];
 }[] = [
   {
     code: "WELCOME100",
     description: "Giảm 100k cho đơn đầu tiên",
-    discountType: "FIXED",
+    discountType: DiscountType.DISCOUNT_FIXED,
     discountValue: "100000.00",
     minOrderValue: "500000.00",
     maxUses: 100,
@@ -51,25 +41,23 @@ const voucherData: {
   {
     code: "FREESHIP",
     description: "Miễn phí vận chuyển toàn quốc",
-    discountType: "FIXED",
+    discountType: DiscountType.DISCOUNT_FIXED,
     discountValue: "0.00",
     minOrderValue: "300000.00",
     priority: 5,
     isActive: true,
-    actions: [{ actionType: "FREE_SHIPPING" }],
     targets: [{ targetType: "ALL" }],
   },
   {
     code: "APPLE20",
     description: "Giảm 20% cho sản phẩm Apple",
-    discountType: "PERCENTAGE",
+    discountType: DiscountType.DISCOUNT_PERCENT,
     discountValue: "20.00",
     minOrderValue: "10000000.00",
     maxUses: 50,
     maxUsesPerUser: 1,
     priority: 15,
     isActive: true,
-    actions: [{ actionType: "BUY_X_GET_Y", buyQuantity: 2, getQuantity: 1 }],
     targets: [{ targetType: "BRAND", targetIdFromBrandName: "Apple" }],
   },
 ];
@@ -86,7 +74,7 @@ export async function seedVouchers() {
       create: {
         code: data.code,
         description: data.description,
-        discountType: data.discountType as "PERCENTAGE" | "FIXED",
+        discountType: data.discountType,
         discountValue: data.discountValue,
         minOrderValue: data.minOrderValue,
         maxUses: data.maxUses,
@@ -107,33 +95,25 @@ export async function seedVouchers() {
           const brand = await prisma.brands.findUnique({
             where: { name: target.targetIdFromBrandName },
           });
+          if (!brand) {
+            console.warn(
+              `Brand "${target.targetIdFromBrandName}" not found for voucher ${data.code}`,
+            );
+          }
           targetId = brand?.id ?? null;
         }
+        // Nếu là CATEGORY hoặc PRODUCT → giả sử targetId đã được truyền sẵn
+        // (nếu bạn truyền targetId thì dùng luôn, còn không thì để null)
 
         if (target.targetType === "CATEGORY" || target.targetType === "PRODUCT") {
-          targetId = target.targetId;
+          targetId = (target as any).targetId ?? null; // type guard đơn giản
         }
 
         await prisma.voucher_targets.create({
           data: {
             voucherId: voucher.id,
-            targetType: target.targetType,
+            targetType: target.targetType as TargetType,
             targetId,
-          },
-        });
-      }
-    }
-
-    // Tạo actions
-    if (data.actions) {
-      for (const action of data.actions) {
-        await prisma.voucher_actions.create({
-          data: {
-            voucherId: voucher.id,
-            actionType: action.actionType as VoucherActionType,
-            value: action.actionType === "DISCOUNT" ? action.value : null,
-            buyQuantity: action.actionType === "BUY_X_GET_Y" ? action.buyQuantity : null,
-            getQuantity: action.actionType === "BUY_X_GET_Y" ? action.getQuantity : null,
           },
         });
       }
@@ -142,6 +122,6 @@ export async function seedVouchers() {
     createdVouchers.push(voucher);
   }
 
-  console.log(`🚶‍➡️    Đã tạo ${createdVouchers.length} vouchers`);
+  console.log(`🚀 Đã tạo/upsert ${createdVouchers.length} vouchers`);
   return createdVouchers;
 }
