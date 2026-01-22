@@ -291,3 +291,116 @@ export const createUsageRecord = async (voucherId: string, userId: string, order
     },
   });
 };
+
+// ==========================================
+// 📜 voucher/voucher.repository.ts
+// (THÊM HELPER CHO PRICING)
+// ==========================================
+
+/**
+ * Lấy voucher theo code (cho pricing)
+ */
+export const getVoucherByCode = async (code: string, userId?: string) => {
+  const now = new Date();
+
+  const voucher = await prisma.vouchers.findFirst({
+    where: {
+      code,
+      isActive: true,
+      OR: [
+        {
+          AND: [{ startDate: { lte: now } }, { endDate: { gte: now } }],
+        },
+        {
+          AND: [{ startDate: null }, { endDate: null }],
+        },
+        {
+          AND: [{ startDate: { lte: now } }, { endDate: null }],
+        },
+        {
+          AND: [{ startDate: null }, { endDate: { gte: now } }],
+        },
+      ],
+    },
+    select: {
+      id: true,
+      code: true,
+      description: true,
+      discountType: true,
+      discountValue: true,
+      minOrderValue: true,
+      maxUses: true,
+      maxUsesPerUser: true,
+      usesCount: true,
+      startDate: true,
+      endDate: true,
+      priority: true,
+      isActive: true,
+      targets: {
+        select: {
+          id: true,
+          targetType: true,
+          targetId: true,
+        },
+      },
+    },
+  });
+
+  if (!voucher) return null;
+
+  // Kiểm tra user usage nếu có userId
+  let userUsedCount = 0;
+  let userMaxUses: number | undefined = undefined;
+
+  if (userId) {
+    // Check voucher_user (user-specific voucher config)
+    const voucherUser = await prisma.voucher_user.findUnique({
+      where: {
+        voucherId_userId: {
+          voucherId: voucher.id,
+          userId,
+        },
+      },
+      select: {
+        maxUses: true,
+        usedCount: true,
+      },
+    });
+
+    if (voucherUser) {
+      userMaxUses = voucherUser.maxUses;
+      userUsedCount = voucherUser.usedCount;
+    } else {
+      // Nếu không có voucher_user, check voucher_usages
+      userUsedCount = await prisma.voucher_usages.count({
+        where: {
+          voucherId: voucher.id,
+          userId,
+        },
+      });
+    }
+  }
+
+  return {
+    id: voucher.id,
+    code: voucher.code,
+    description: voucher.description,
+    discountType: voucher.discountType,
+    discountValue: Number(voucher.discountValue),
+    minOrderValue: Number(voucher.minOrderValue),
+    maxUses: voucher.maxUses,
+    maxUsesPerUser: voucher.maxUsesPerUser,
+    usesCount: voucher.usesCount,
+    startDate: voucher.startDate,
+    endDate: voucher.endDate,
+    priority: voucher.priority,
+    isActive: voucher.isActive,
+    targets: voucher.targets.map((t) => ({
+      id: t.id,
+      targetType: t.targetType,
+      targetId: t.targetId,
+    })),
+    userUsedCount,
+    userMaxUses,
+  };
+};

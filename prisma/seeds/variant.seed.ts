@@ -26,6 +26,12 @@ const variantData = {
     { storage: "512gb", color: "black", price: 18990000 },
   ],
 
+  "iPhone 14": [
+    { storage: "128gb", color: "black", price: 16990000, isDefault: true },
+    { storage: "256gb", color: "black", price: 19990000 },
+    { storage: "512gb", color: "black", price: 22990000 },
+  ],
+
   "Samsung Galaxy S24+": [
     { storage: "256gb", color: "black", price: 33990000, isDefault: true },
     { storage: "512gb", color: "gray", price: 38990000 }, // ⚠️ gray cần có trong attribute color
@@ -96,7 +102,7 @@ export async function seedVariants({ products, attributes }: SeedVariantsParams)
     for (const [index, variant] of variantsForProduct.entries()) {
       const code = `${product.slug.toUpperCase()}-${variant.storage}-${variant.color}`.replace(
         / /g,
-        ""
+        "",
       );
 
       const createdVariant = await prisma.products_variants.create({

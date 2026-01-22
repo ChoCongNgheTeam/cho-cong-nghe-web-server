@@ -8,6 +8,9 @@ import {
   uploadVariantImages,
   deleteOldImages,
 } from "./product.helpers";
+import { getProductsWithPricing } from "../pricing/usecases/getProductsWithPricing.service";
+import { getProductDetailWithPricing } from "../pricing/usecases/getProductDetailWithPricing.service";
+import { getProductVariantWithPricing } from "../pricing/usecases/getProductVariantPricing.service";
 
 type ValidatedQuery<T> = Request & {
   query: T;
@@ -22,11 +25,12 @@ export const getProductsPublicHandler = async (
   res: Response,
 ) => {
   try {
-    const result = await productService.getProductsPublic(req.query);
+    const result = await getProductsWithPricing(req.query);
 
     res.json({
       success: true,
-      data: result.data,
+      // data: result.data,
+      ...result,
       pagination: {
         page: result.page,
         limit: result.limit,
@@ -48,7 +52,8 @@ export const getProductBySlugHandler = async (req: Request, res: Response) => {
     const { slug } = req.params;
     const userId = (req as any).user?.id || null;
 
-    const product = await productService.getProductBySlug(slug, userId);
+    // const product = await productService.getProductBySlug(slug, userId);
+    const product = await getProductDetailWithPricing(slug, userId);
 
     res.json({
       success: true,
@@ -67,23 +72,25 @@ export const getProductBySlugHandler = async (req: Request, res: Response) => {
 export const getProductVariantHandler = async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
-    const { ...queryOptions } = req.query;
+    const userId = (req as any).user?.id;
 
     const options: Record<string, string> = {};
-    for (const [key, value] of Object.entries(queryOptions)) {
+
+    for (const [key, value] of Object.entries(req.query)) {
       if (typeof value === "string" && value) {
         options[key] = value;
       }
     }
 
-    const variant = await productService.getProductVariant(
+    const result = await getProductVariantWithPricing(
       slug,
-      Object.keys(options).length > 0 ? options : undefined,
+      Object.keys(options).length ? options : undefined,
+      userId,
     );
 
     res.json({
       success: true,
-      data: variant,
+      data: result,
       message: "Lấy chi tiết variant thành công",
     });
   } catch (error: any) {

@@ -541,7 +541,7 @@ model promotion_targets {
   targetId              String?
   buyQuantity           Int?
 
-  actionType             PromotionActionType
+  actionType            PromotionActionType
   discountValue         Decimal? @db.Decimal(10,2)
   giftProductVariantId  String?  @db.Uuid
   getQuantity           Int?

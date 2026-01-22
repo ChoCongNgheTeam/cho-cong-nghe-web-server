@@ -12,6 +12,7 @@ import paymentRoutes from "@/app/modules/payment/payment.router";
 import cartRoutes from "@/app/modules/cart/cart.route";
 import userAddressRoutes from "@/app/modules/user-address/user-address.route";
 import voucherRoutes from "@/app/modules/voucher/voucher.route";
+import promotionRoutes from "@/app/modules/promotion/promotion.route";
 
 const router = Router();
 
@@ -27,4 +28,5 @@ router.use("/payments", paymentRoutes);
 router.use("/cart", cartRoutes);
 router.use("/addresses", userAddressRoutes);
 router.use("/vouchers", voucherRoutes);
+router.use("/promotions", promotionRoutes);
 export default router;

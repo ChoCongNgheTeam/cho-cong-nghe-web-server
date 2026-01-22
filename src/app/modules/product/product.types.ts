@@ -165,7 +165,7 @@ export interface ProductDetail {
   slug: string;
   description?: string;
   brand: Brand;
-  category: Category[];
+  category: Category;
   availableOptions: AvailableOption[];
   highlights: Highlight[];
   priceRange: PriceRange;

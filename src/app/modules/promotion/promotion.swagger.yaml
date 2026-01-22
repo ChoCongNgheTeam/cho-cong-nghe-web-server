@@ -1,0 +1,436 @@
+openapi: 3.0.0
+info:
+  title: Promotion API
+  version: 1.0.0
+  description: API quản lý khuyến mãi (promotions)
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    TargetType:
+      type: string
+      enum:
+        - ALL
+        - PRODUCT
+        - CATEGORY
+        - BRAND
+
+    PromotionActionType:
+      type: string
+      enum:
+        - DISCOUNT_PERCENT
+        - DISCOUNT_FIXED
+        - BUY_X_GET_Y
+        - FREE_GIFT
+
+    PromotionTarget:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        targetType:
+          $ref: "#/components/schemas/TargetType"
+        targetId:
+          type: string
+          format: uuid
+        buyQuantity:
+          type: integer
+        actionType:
+          $ref: "#/components/schemas/PromotionActionType"
+        discountValue:
+          type: number
+        giftProductVariantId:
+          type: string
+          format: uuid
+        getQuantity:
+          type: integer
+
+    PromotionCard:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        priority:
+          type: integer
+        isActive:
+          type: boolean
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        isExpired:
+          type: boolean
+        isAvailable:
+          type: boolean
+        targetCount:
+          type: integer
+
+    PromotionDetail:
+      allOf:
+        - $ref: "#/components/schemas/PromotionCard"
+        - type: object
+          properties:
+            createdAt:
+              type: string
+              format: date-time
+            targets:
+              type: array
+              items:
+                $ref: "#/components/schemas/PromotionTarget"
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+
+paths:
+  /promotions:
+    get:
+      summary: Lấy danh sách promotion công khai
+      tags:
+        - Public - Promotions
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 12
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: isActive
+          schema:
+            type: boolean
+        - in: query
+          name: isExpired
+          schema:
+            type: boolean
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, name, priority, startDate, endDate]
+            default: priority
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        "200":
+          description: Success
+
+  /promotions/active:
+    get:
+      summary: Lấy promotion đang hoạt động
+      tags:
+        - Public - Promotions
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PromotionDetail"
+                  message:
+                    type: string
+
+  /promotions/product/{productId}:
+    get:
+      summary: Lấy promotion áp dụng cho sản phẩm
+      tags:
+        - Public - Promotions
+      parameters:
+        - in: path
+          name: productId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+
+  /promotions/category/{categoryId}:
+    get:
+      summary: Lấy promotion áp dụng cho danh mục
+      tags:
+        - Public - Promotions
+      parameters:
+        - in: path
+          name: categoryId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+
+  /promotions/brand/{brandId}:
+    get:
+      summary: Lấy promotion áp dụng cho thương hiệu
+      tags:
+        - Public - Promotions
+      parameters:
+        - in: path
+          name: brandId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+
+  /promotions/admin/all:
+    get:
+      summary: Lấy tất cả promotion (Admin)
+      tags:
+        - Admin - Promotions
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: isActive
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Success
+
+  /promotions/admin/{id}:
+    get:
+      summary: Lấy chi tiết promotion (Admin)
+      tags:
+        - Admin - Promotions
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+        "404":
+          description: Not found
+
+    patch:
+      summary: Cập nhật promotion
+      tags:
+        - Admin - Promotions
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                priority:
+                  type: integer
+                isActive:
+                  type: boolean
+                startDate:
+                  type: string
+                  format: date-time
+                endDate:
+                  type: string
+                  format: date-time
+                targets:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/PromotionTarget"
+      responses:
+        "200":
+          description: Success
+
+    delete:
+      summary: Xóa promotion
+      tags:
+        - Admin - Promotions
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+
+  /promotions/admin:
+    post:
+      summary: Tạo promotion mới
+      tags:
+        - Admin - Promotions
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - targets
+              properties:
+                name:
+                  type: string
+                  example: Mua 2 tặng 1
+                description:
+                  type: string
+                  example: Mua 2 sản phẩm tặng 1
+                priority:
+                  type: integer
+                  default: 0
+                isActive:
+                  type: boolean
+                  default: true
+                startDate:
+                  type: string
+                  format: date-time
+                endDate:
+                  type: string
+                  format: date-time
+                targets:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - targetType
+                      - actionType
+                    properties:
+                      targetType:
+                        $ref: "#/components/schemas/TargetType"
+                      targetId:
+                        type: string
+                        format: uuid
+                      buyQuantity:
+                        type: integer
+                      actionType:
+                        $ref: "#/components/schemas/PromotionActionType"
+                      discountValue:
+                        type: number
+                      giftProductVariantId:
+                        type: string
+                        format: uuid
+                      getQuantity:
+                        type: integer
+            examples:
+              discount_percent:
+                summary: Giảm 20% cho category
+                value:
+                  name: Giảm 20% điện thoại
+                  description: Giảm giá 20% cho tất cả điện thoại
+                  priority: 10
+                  isActive: true
+                  targets:
+                    - targetType: CATEGORY
+                      targetId: category-uuid
+                      actionType: DISCOUNT_PERCENT
+                      discountValue: 20
+              buy_x_get_y:
+                summary: Mua 2 tặng 1
+                value:
+                  name: Mua 2 tặng 1
+                  description: Mua 2 sản phẩm tặng 1 sản phẩm
+                  priority: 5
+                  isActive: true
+                  targets:
+                    - targetType: PRODUCT
+                      targetId: product-uuid
+                      buyQuantity: 2
+                      getQuantity: 1
+                      actionType: BUY_X_GET_Y
+              free_gift:
+                summary: Tặng quà khi mua
+                value:
+                  name: Tặng tai nghe
+                  description: Tặng tai nghe khi mua iPhone
+                  priority: 3
+                  isActive: true
+                  targets:
+                    - targetType: PRODUCT
+                      targetId: iphone-uuid
+                      actionType: FREE_GIFT
+                      giftProductVariantId: airpods-variant-uuid
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Validation error
+
+tags:
+  - name: Public - Promotions
+    description: Public endpoints
+  - name: Admin - Promotions
+    description: Admin endpoints (yêu cầu authentication & ADMIN role)

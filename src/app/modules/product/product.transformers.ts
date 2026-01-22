@@ -26,30 +26,6 @@ const getStockStatus = (
   return "in_stock";
 };
 
-export const transformVariant = (variant: RawVariant): ProductVariant => {
-  const quantity = variant.inventory?.quantity ?? 0;
-  const reservedQuantity = variant.inventory?.reservedQuantity ?? 0;
-  const available = Math.max(0, quantity - reservedQuantity);
-
-  return {
-    id: variant.id,
-    code: variant.code,
-    price: Number(variant.price),
-    weight: undefined,
-    soldCount: variant.soldCount,
-    isDefault: variant.isDefault,
-    isActive: variant.isActive,
-    available: available > 0,
-    stockStatus: getStockStatus(quantity, reservedQuantity),
-    inventory: {
-      quantity,
-      reservedQuantity,
-      available,
-    },
-    images: variant.images || [],
-  };
-};
-
 /**
  * Calculate price range from variants
  */
@@ -62,39 +38,78 @@ export const calculatePriceRange = (variants: RawVariant[]): PriceRange => {
   };
 };
 
+const isOptionEnabled = (variants: RawVariant[], testOptions: Record<string, string>) => {
+  return variants.some((variant) =>
+    variant.variantAttributes.every((va) => {
+      const attr = va.attributeOption.attribute.name;
+      // console.log(attr);
+
+      return testOptions[attr] === va.attributeOption.value;
+    }),
+  );
+};
+
 /**
  * Build available options from variants
  */
-export const buildAvailableOptions = (variants: RawVariant[]): AvailableOption[] => {
-  const map = new Map();
+const buildAvailableOptionsWithStatus = (
+  variants: RawVariant[],
+  selectedOptions: Record<string, string>,
+): AvailableOption[] => {
+  const attributesMap = new Map<string, Map<string, any>>();
 
-  for (const variant of variants) {
-    for (const va of variant.variantAttributes) {
-      const attributeName = va.attributeOption.attribute.name;
-      const optionValue = va.attributeOption.value;
-      const optionLabel = va.attributeOption.label;
-      const optionId = va.attributeOption.id;
+  // collect all options
+  for (const v of variants) {
+    for (const va of v.variantAttributes) {
+      const attr = va.attributeOption.attribute.name;
+      const opt = va.attributeOption;
 
-      if (!map.has(attributeName)) {
-        map.set(attributeName, new Map());
+      // console.log(attr);
+      // console.log(opt);
+
+      if (!attributesMap.has(attr)) {
+        attributesMap.set(attr, new Map());
       }
 
-      const valueMap = map.get(attributeName);
-
-      if (!valueMap.has(optionId)) {
-        valueMap.set(optionId, {
-          id: optionId,
-          value: optionValue,
-          label: optionLabel,
-          variantIds: [],
+      const optMap = attributesMap.get(attr)!;
+      if (!optMap.has(opt.value)) {
+        optMap.set(opt.value, {
+          id: opt.id,
+          value: opt.value,
+          label: opt.label,
+          enabled: false,
+          image: null,
         });
       }
-
-      valueMap.get(optionId).variantIds.push(variant.id);
     }
   }
 
-  return Array.from(map.entries()).map(([attribute, values]) => ({
+  // evaluate enabled
+  for (const [attr, optMap] of attributesMap.entries()) {
+    for (const option of optMap.values()) {
+      const testOptions = {
+        ...selectedOptions,
+        [attr]: option.value,
+      };
+
+      option.enabled = isOptionEnabled(variants, testOptions);
+
+      // chỉ color mới có image
+      if (attr === "color" && !option.image) {
+        const matchedVariant = variants.find((v) =>
+          v.variantAttributes.some(
+            (va) =>
+              va.attributeOption.attribute.name === "color" &&
+              va.attributeOption.value === option.value,
+          ),
+        );
+
+        option.image = matchedVariant?.images?.[0] ?? null;
+      }
+    }
+  }
+
+  return Array.from(attributesMap.entries()).map(([attribute, values]) => ({
     attribute,
     values: Array.from(values.values()),
   }));
@@ -166,9 +181,18 @@ export const transformProductDetail = (
   product: any,
   reviewStats?: ReviewStats,
 ): Omit<ProductDetail, "highlights" | "canReview" | "orderItemId"> => {
-  const transformedVariants = product.variants.map(transformVariant);
-  const defaultVariant =
-    transformedVariants.find((v: { isDefault: any }) => v.isDefault) || transformedVariants[0];
+  const validVariants = product.variants.filter((v: { isActive: boolean }) => v.isActive);
+
+  const currentVariant =
+    validVariants.find((v: { isDefault: boolean }) => v.isDefault) ?? validVariants[0];
+
+  // lấy option của currentVariant
+  const selectedOptions: Record<string, string> = {};
+  for (const va of currentVariant.variantAttributes) {
+    selectedOptions[va.attributeOption.attribute.name] = va.attributeOption.value;
+  }
+
+  // console.log(selectedOptions);
 
   return {
     id: product.id,
@@ -177,17 +201,54 @@ export const transformProductDetail = (
     description: product.description,
     brand: product.brand,
     category: product.category || [],
-    availableOptions: buildAvailableOptions(product.variants),
     priceRange: calculatePriceRange(product.variants),
+    currentVariant: transformVariant(currentVariant),
+    availableOptions: buildAvailableOptionsWithStatus(validVariants, selectedOptions),
     warranty: "12 tháng chính hãng",
     stockStatus: calculateOverallStockStatus(product.variants),
-    currentVariant: defaultVariant,
     rating: reviewStats!,
     viewsCount: Number(product.viewsCount) || 0,
     isFeatured: product.isFeatured,
     isActive: product.isActive,
     createdAt: product.createdAt,
     updatedAt: product.updatedAt,
+  };
+};
+
+export const transformVariant = (variant: RawVariant): ProductVariant => {
+  const quantity = variant.inventory?.quantity ?? 0;
+  const reservedQuantity = variant.inventory?.reservedQuantity ?? 0;
+  const available = Math.max(0, quantity - reservedQuantity);
+
+  return {
+    id: variant.id,
+    code: variant.code,
+    price: Number(variant.price),
+    soldCount: variant.soldCount,
+    isDefault: variant.isDefault,
+    isActive: variant.isActive,
+    available: available > 0,
+    stockStatus: getStockStatus(quantity, reservedQuantity),
+    inventory: {
+      quantity,
+      reservedQuantity,
+      available,
+    },
+    images: variant.images || [],
+  };
+};
+
+export const transformProductVariantResponse = (product: any, variant: RawVariant) => {
+  const validVariants = product.variants.filter((v: { isActive: boolean }) => v.isActive);
+
+  const selectedOptions: Record<string, string> = {};
+  for (const va of variant.variantAttributes) {
+    selectedOptions[va.attributeOption.attribute.name] = va.attributeOption.value;
+  }
+
+  return {
+    variant: transformVariant(variant),
+    availableOptions: buildAvailableOptionsWithStatus(validVariants, selectedOptions),
   };
 };
 

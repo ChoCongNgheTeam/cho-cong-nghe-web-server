@@ -66,6 +66,26 @@ const selectProductCard = {
   name: true,
   slug: true,
   brand: { select: selectBrand },
+  // category: { select: selectCategory },
+  category: {
+    select: {
+      id: true,
+      slug: true,
+      parent: {
+        select: {
+          id: true,
+          slug: true,
+          parent: {
+            select: {
+              id: true,
+              slug: true,
+            },
+          },
+        },
+      },
+    },
+  },
+
   viewsCount: true,
   ratingAverage: true,
   ratingCount: true,

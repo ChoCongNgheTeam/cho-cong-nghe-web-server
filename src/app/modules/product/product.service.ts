@@ -12,8 +12,10 @@ import {
   transformProductSpecifications,
   transformProductHighlights,
   transformVariant,
+  transformProductVariantResponse,
 } from "./product.transformers";
-import { ReviewStats } from "./product.types";
+import { RawVariant, ReviewStats } from "./product.types";
+import { buildCategoryPath } from "../category/category.helper";
 
 // =====================
 // === PUBLIC SERVICES ===
@@ -24,7 +26,25 @@ export const getProductsPublic = async (query: ListProductsQuery) => {
 
   return {
     ...result,
-    data: result.data.map(transformProductCard),
+    data: result.data.map((product) => {
+      const defaultVariant = product.variants?.[0];
+
+      return {
+        card: transformProductCard(product),
+
+        // chỉ dùng nội bộ
+        pricingContext: defaultVariant
+          ? {
+              productId: product.id,
+              variantId: defaultVariant.id,
+              price: Number(defaultVariant.price),
+              brandId: product.brand?.id,
+              categoryId: product.category?.id,
+              categoryPath: buildCategoryPath(product.category),
+            }
+          : null,
+      };
+    }),
   };
 };
 
@@ -65,6 +85,12 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
 
   return {
     ...productDetail,
+    pricingContext: {
+      productId: product.id,
+      brandId: product.brand?.id,
+      categoryId: product.category?.id,
+      categoryPath: buildCategoryPath(product.category),
+    },
     highlights,
     canReview,
     orderItemId,
@@ -79,19 +105,14 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
     throw error;
   }
 
-  let variant;
-
-  if (options && Object.keys(options).length > 0) {
-    variant = await repo.findVariantByOptions(product.id, options);
-  }
-
+  const variant = await repo.findVariantByOptions(product.id, options || {});
   if (!variant || !variant.isActive) {
     const error: any = new Error("Không tìm thấy variant");
     error.statusCode = 404;
     throw error;
   }
 
-  return transformVariant({
+  const normalizedVariant: RawVariant = {
     ...variant,
     code: variant.code ?? "",
     inventory: variant.inventory ?? undefined,
@@ -100,7 +121,19 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
       imageUrl: img.imageUrl ?? "",
       altText: img.altText ?? "",
     })),
-  });
+  };
+
+  const variantResponse = transformProductVariantResponse(product, normalizedVariant);
+
+  return {
+    ...variantResponse,
+    pricingContext: {
+      productId: product.id,
+      brandId: product.brand?.id,
+      categoryId: product.category?.id,
+      categoryPath: buildCategoryPath(product.category),
+    },
+  };
 };
 
 export const getProductSpecificationsBySlug = async (slug: string) => {
