@@ -29,7 +29,6 @@ export const getProductsPublicHandler = async (
 
     res.json({
       success: true,
-      // data: result.data,
       ...result,
       pagination: {
         page: result.page,
@@ -51,8 +50,6 @@ export const getProductBySlugHandler = async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
     const userId = (req as any).user?.id || null;
-
-    // const product = await productService.getProductBySlug(slug, userId);
     const product = await getProductDetailWithPricing(slug, userId);
 
     res.json({

@@ -11,7 +11,6 @@ import {
   transformProductDetail,
   transformProductSpecifications,
   transformProductHighlights,
-  transformVariant,
   transformProductVariantResponse,
 } from "./product.transformers";
 import { RawVariant, ReviewStats } from "./product.types";
@@ -24,13 +23,20 @@ import { buildCategoryPath } from "../category/category.helper";
 export const getProductsPublic = async (query: ListProductsQuery) => {
   const result = await repo.findAllPublic(query);
 
+  const productIds = result.data.map((p) => p.id);
+  const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
+
   return {
     ...result,
     data: result.data.map((product) => {
       const defaultVariant = product.variants?.[0];
+      const variantOptions = variantOptionsMap.get(product.id) ?? [];
 
       return {
-        card: transformProductCard(product),
+        card: {
+          ...transformProductCard(product),
+          variantOptions,
+        },
 
         // chỉ dùng nội bộ
         pricingContext: defaultVariant

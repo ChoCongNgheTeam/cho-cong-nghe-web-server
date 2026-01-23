@@ -136,7 +136,6 @@ export const calculateOverallStockStatus = (
 
 export const transformProductCard = (product: any): ProductCard => {
   const defaultVariant = product.variants[0];
-  const price = defaultVariant ? Number(defaultVariant.price) : 0;
   const thumbnail = defaultVariant?.images[0]?.imageUrl || "";
   const inStock = defaultVariant?.inventory
     ? defaultVariant.inventory.quantity > defaultVariant.inventory.reservedQuantity
@@ -154,17 +153,15 @@ export const transformProductCard = (product: any): ProductCard => {
         value: spec.value,
       })) || [];
 
-  // Check if product is new (within 10 days)
+  // Check if product is new (within 6 days)
   const isNew = product.createdAt
-    ? Date.now() - new Date(product.createdAt).getTime() < 10 * 24 * 60 * 60 * 1000
+    ? Date.now() - new Date(product.createdAt).getTime() < 6 * 24 * 60 * 60 * 1000
     : false;
 
   return {
     id: product.id,
     name: product.name,
     slug: product.slug,
-    brand: product.brand,
-    price,
     thumbnail,
     rating: {
       average: Number(product.ratingAverage) || 0,

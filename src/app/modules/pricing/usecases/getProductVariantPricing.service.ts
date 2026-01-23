@@ -8,7 +8,7 @@ export const getProductVariantWithPricing = async (
 ) => {
   const { variant, pricingContext, availableOptions } = await getProductVariant(slug, options);
 
-  const pricing = await getVariantPricing(
+  const price = await getVariantPricing(
     pricingContext.productId,
     variant.id,
     Number(variant.price),
@@ -16,11 +16,9 @@ export const getProductVariantWithPricing = async (
     userId,
   );
 
-  console.log("pricing", pricing);
-
   return {
     currentVariant: variant,
     availableOptions,
-    pricing,
+    price,
   };
 };

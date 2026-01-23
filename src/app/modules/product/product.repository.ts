@@ -9,10 +9,21 @@ const selectBrand = {
   slug: true,
 };
 
-const selectCategory = {
+const selectCategoryTree = {
   id: true,
-  name: true,
   slug: true,
+  parent: {
+    select: {
+      id: true,
+      slug: true,
+      parent: {
+        select: {
+          id: true,
+          slug: true,
+        },
+      },
+    },
+  },
 };
 
 const selectVariantImage = {
@@ -66,31 +77,13 @@ const selectProductCard = {
   name: true,
   slug: true,
   brand: { select: selectBrand },
-  // category: { select: selectCategory },
   category: {
-    select: {
-      id: true,
-      slug: true,
-      parent: {
-        select: {
-          id: true,
-          slug: true,
-          parent: {
-            select: {
-              id: true,
-              slug: true,
-            },
-          },
-        },
-      },
-    },
+    select: selectCategoryTree,
   },
-
   viewsCount: true,
   ratingAverage: true,
   ratingCount: true,
   isFeatured: true,
-  createdAt: true,
   variants: {
     where: { isActive: true },
     select: selectVariant,
@@ -98,6 +91,7 @@ const selectProductCard = {
     orderBy: { isDefault: "desc" as const },
   },
   productSpecifications: {
+    where: { isHighlight: true },
     orderBy: { sortOrder: "asc" as const },
     select: {
       specificationId: true,
@@ -109,6 +103,7 @@ const selectProductCard = {
       },
     },
   },
+  createdAt: true,
 };
 
 const selectProductDetail = {
@@ -117,7 +112,9 @@ const selectProductDetail = {
   slug: true,
   description: true,
   brand: { select: selectBrand },
-  category: { select: selectCategory },
+  category: {
+    select: selectCategoryTree,
+  },
   viewsCount: true,
   ratingAverage: true,
   ratingCount: true,
@@ -130,6 +127,7 @@ const selectProductDetail = {
     orderBy: { isDefault: "desc" as const },
   },
   productSpecifications: {
+    where: { isHighlight: true },
     orderBy: { sortOrder: "asc" as const },
     select: {
       specificationId: true,
@@ -642,4 +640,66 @@ export const bulkUpdate = async (productIds: string[], updates: any) => {
     where: { id: { in: productIds } },
     data: updates,
   });
+};
+
+export const getProductVariantOptionsMap = async (productIds: string[]) => {
+  const rows = await prisma.variants_attributes.findMany({
+    where: {
+      productVariant: {
+        productId: { in: productIds },
+        isActive: true,
+      },
+    },
+    select: {
+      productVariant: {
+        select: { productId: true },
+      },
+      attributeOption: {
+        select: {
+          value: true,
+          label: true,
+          attribute: {
+            select: {
+              name: true, // color, size, storage
+            },
+          },
+        },
+      },
+    },
+    distinct: ["attributeOptionId"],
+  });
+
+  const map = new Map<
+    string,
+    {
+      attribute: { name: string };
+      options: { value: string; label: string }[];
+    }[]
+  >();
+
+  for (const row of rows) {
+    const productId = row.productVariant.productId;
+    const list = map.get(productId) ?? [];
+
+    let group = list.find((g) => g.attribute.name === row.attributeOption.attribute.name);
+
+    if (!group) {
+      group = {
+        attribute: { name: row.attributeOption.attribute.name },
+        options: [],
+      };
+      list.push(group);
+    }
+
+    if (!group.options.some((o) => o.value === row.attributeOption.value)) {
+      group.options.push({
+        value: row.attributeOption.value,
+        label: row.attributeOption.label,
+      });
+    }
+
+    map.set(productId, list);
+  }
+
+  return map;
 };

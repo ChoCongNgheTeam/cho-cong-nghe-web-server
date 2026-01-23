@@ -140,8 +140,6 @@ export interface ProductCard {
   id: string;
   name: string;
   slug: string;
-  brand: Brand;
-  price: number;
   originalPrice?: number;
   discount?: number;
   thumbnail: string;

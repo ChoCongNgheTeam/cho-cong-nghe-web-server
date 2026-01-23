@@ -44,3 +44,14 @@ export const createPricingSummary = (pricedProduct: PricedProduct) => {
     })),
   };
 };
+
+export const mapPricingToSummary = (pricing: any) => {
+  if (!pricing) return null;
+
+  return {
+    base: pricing.base,
+    final: pricing.final,
+    discountPercentage: pricing.discountPercentage,
+    hasPromotion: pricing.hasPromotion,
+  };
+};

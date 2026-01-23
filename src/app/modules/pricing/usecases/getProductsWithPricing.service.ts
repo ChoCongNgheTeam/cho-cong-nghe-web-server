@@ -1,5 +1,6 @@
 import { getProductsPublic } from "../../product/product.service";
 import { ListProductsQuery } from "../../product/product.validation";
+import { mapPricingToSummary } from "../pricing.helpers";
 import { getVariantPricing } from "../pricing.service";
 
 export const getProductsWithPricing = async (query: ListProductsQuery, userId?: string) => {
@@ -11,9 +12,12 @@ export const getProductsWithPricing = async (query: ListProductsQuery, userId?: 
         return { ...card, pricing: null };
       }
 
-      // console.log("pricingContext", pricingContext);
+      console.log(pricingContext.productId);
+      console.log(pricingContext.variantId);
+      console.log(pricingContext.price);
+      console.log(pricingContext);
 
-      const pricing = await getVariantPricing(
+      const fullPricing = await getVariantPricing(
         pricingContext.productId,
         pricingContext.variantId,
         pricingContext.price,
@@ -23,7 +27,7 @@ export const getProductsWithPricing = async (query: ListProductsQuery, userId?: 
 
       return {
         ...card,
-        pricing,
+        price: mapPricingToSummary(fullPricing),
       };
     }),
   );

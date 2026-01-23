@@ -234,9 +234,11 @@ export const getVariantPricing = async (
     userId,
   );
 
+  // console.log(pricedProduct);
+
   return {
-    basePrice: pricedProduct.basePrice,
-    finalPrice: pricedProduct.finalPrice,
+    base: pricedProduct.basePrice,
+    final: pricedProduct.finalPrice,
     discountAmount: pricedProduct.totalDiscount,
     discountPercentage: pricedProduct.discountPercentage,
     hasPromotion: pricedProduct.hasPromotion,

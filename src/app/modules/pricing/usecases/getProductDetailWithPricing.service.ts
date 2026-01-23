@@ -11,8 +11,12 @@ export const getProductDetailWithPricing = async (slug: string, userId?: string)
       pricing: null,
     };
   }
+  console.log(productDetail.id);
+  console.log(currentVariant.id);
+  console.log(currentVariant.price);
+  console.log(productDetail.pricingContext);
 
-  const pricing = await getVariantPricing(
+  const price = await getVariantPricing(
     productDetail.id,
     currentVariant.id,
     Number(currentVariant.price),
@@ -20,8 +24,10 @@ export const getProductDetailWithPricing = async (slug: string, userId?: string)
     userId,
   );
 
+  const { pricingContext, ...publicProduct } = productDetail;
+
   return {
-    ...productDetail,
-    pricing,
+    ...publicProduct,
+    price,
   };
 };
