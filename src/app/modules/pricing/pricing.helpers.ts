@@ -51,6 +51,7 @@ export const mapPricingToSummary = (pricing: any) => {
   return {
     base: pricing.base,
     final: pricing.final,
+    discountAmount: pricing.discountAmount,
     discountPercentage: pricing.discountPercentage,
     hasPromotion: pricing.hasPromotion,
   };

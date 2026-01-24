@@ -83,6 +83,23 @@ export interface AppliedDiscount {
   actionType?: PromotionActionType | DiscountType;
 }
 
+export interface DisplayPromotion {
+  id: string;
+  name: string;
+  description: string | null;
+  actionType: PromotionActionType | DiscountType;
+
+  // chỉ để hiển thị điều kiện
+  buyQuantity?: number | null;
+  getQuantity?: number | null;
+
+  // chỉ có với discount
+  discountValue?: number;
+
+  // UI dùng để show "đã áp dụng / chưa"
+  isApplicable?: boolean;
+}
+
 export interface PricedProduct {
   productId: string;
   variantId: string;
@@ -97,6 +114,7 @@ export interface PricedProduct {
 
   // Applied promotions
   appliedPromotions: AppliedDiscount[];
+  availablePromotions: DisplayPromotion[];
 
   // Gifts (if any)
   giftProducts?: {

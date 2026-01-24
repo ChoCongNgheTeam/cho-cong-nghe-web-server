@@ -8,9 +8,12 @@ import {
   uploadVariantImages,
   deleteOldImages,
 } from "./product.helpers";
-import { getProductsWithPricing } from "../pricing/usecases/getProductsWithPricing.service";
-import { getProductDetailWithPricing } from "../pricing/usecases/getProductDetailWithPricing.service";
-import { getProductVariantWithPricing } from "../pricing/usecases/getProductVariantPricing.service";
+import {
+  getProductsWithPricing,
+  getProductDetailWithPricing,
+  getProductVariantWithPricing,
+  getRelatedProductsWithPricing,
+} from "../pricing";
 
 type ValidatedQuery<T> = Request & {
   query: T;
@@ -25,11 +28,12 @@ export const getProductsPublicHandler = async (
   res: Response,
 ) => {
   try {
-    const result = await getProductsWithPricing(req.query);
+    const userId = (req as any).user?.id;
+    const result = await getProductsWithPricing(req.query, userId);
 
     res.json({
       success: true,
-      ...result,
+      data: result.data,
       pagination: {
         page: result.page,
         limit: result.limit,
@@ -139,6 +143,7 @@ export const getProductBySpecificationsHandler = async (req: Request, res: Respo
 export const getRelatedProductsHandler = async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
+    const userId = (req as any).user?.id;
 
     const DEFAULT_LIMIT = 8;
     const MAX_LIMIT = 12;
@@ -147,7 +152,7 @@ export const getRelatedProductsHandler = async (req: Request, res: Response) => 
     const limit =
       Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, MAX_LIMIT) : DEFAULT_LIMIT;
 
-    const products = await productService.getRelatedProducts(slug, limit);
+    const products = await getRelatedProductsWithPricing(slug, limit, userId);
 
     res.json({
       success: true,
@@ -192,6 +197,10 @@ export const getProductReviewsHandler = async (req: Request, res: Response) => {
 // === ADMIN HANDLERS ===
 // =====================
 
+/**
+ * Admin handlers - NO pricing needed
+ * Admin sees base prices only
+ */
 export const getProductsAdminHandler = async (
   req: ValidatedQuery<ListProductsQuery>,
   res: Response,

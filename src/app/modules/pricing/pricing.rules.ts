@@ -4,6 +4,7 @@ import {
   PricingContext,
   PromotionTargetData,
   VoucherTargetData,
+  DisplayPromotion,
 } from "./pricing.types";
 import { TargetType, PromotionActionType, DiscountType } from "@prisma/client";
 import { DISCOUNT_CALCULATION } from "./pricing.constants";
@@ -21,8 +22,6 @@ export const isPromotionTargetApplicable = (
     case TargetType.PRODUCT:
       return target.targetId === productId;
 
-    // case TargetType.CATEGORY:
-    //   return categoryId ? target.targetId === categoryId : false;
     case TargetType.CATEGORY:
       return !!target.targetId && context?.categoryPath?.includes(target.targetId) === true;
 
@@ -53,7 +52,7 @@ export const isPromotionValid = (promotion: PromotionData, context?: PricingCont
 };
 
 /**
- * Lấy promotion targets áp dụng cho sản phẩm
+ * Lấy promotion targets áp dụng cho sản phẩm (WITH quantity check)
  */
 export const getApplicablePromotionTargets = (
   promotion: PromotionData,
@@ -83,6 +82,61 @@ export const getApplicablePromotionTargets = (
   });
 
   return applicable;
+};
+
+/**
+ * NEW: Lấy TẤT CẢ promotions có thể áp dụng (KHÔNG check quantity)
+ * Dùng cho product detail để hiển thị tất cả chương trình
+ */
+export const getAllAvailablePromotions = (
+  productId: string,
+  brandId?: string,
+  context?: PricingContext,
+): DisplayPromotion[] => {
+  if (!context?.availablePromotions) return [];
+
+  const promotions: DisplayPromotion[] = [];
+  const addedPromotionIds = new Set<string>();
+
+  for (const promotion of context.availablePromotions) {
+    // Check time validity only
+    if (!isPromotionValid(promotion, context)) {
+      continue;
+    }
+
+    // Check if any target applies to this product (NO quantity check)
+    const applicableTargets = promotion.targets.filter((target) =>
+      isPromotionTargetApplicable(target, productId, brandId, context),
+    );
+
+    if (applicableTargets.length === 0) continue;
+
+    // Group by promotion ID and collect all action types
+    if (!addedPromotionIds.has(promotion.id)) {
+      // Get all unique action types for this promotion
+      const actionTypes = [...new Set(applicableTargets.map((t) => t.actionType))];
+
+      for (const actionType of actionTypes) {
+        const targetsWithAction = applicableTargets.filter((t) => t.actionType === actionType);
+        const representativeTarget = targetsWithAction[0];
+
+        promotions.push({
+          id: promotion.id,
+          name: promotion.name,
+          // description: formatPromotionDescriptionForDisplay(representativeTarget, promotion),
+          description: promotion.description,
+          actionType: representativeTarget.actionType,
+          buyQuantity: representativeTarget.buyQuantity ?? null,
+          getQuantity: representativeTarget.getQuantity ?? null,
+          discountValue: representativeTarget.discountValue ?? undefined,
+        });
+      }
+
+      addedPromotionIds.add(promotion.id);
+    }
+  }
+
+  return promotions;
 };
 
 /**
@@ -169,6 +223,9 @@ export const getBestPromotionTarget = (
 
     // Find best target in this promotion
     for (const target of applicableTargets) {
+      if (target.actionType === PromotionActionType.GIFT_PRODUCT) {
+        continue;
+      }
       const { discountAmount } = calculatePromotionTargetDiscount(target, basePrice, quantity);
 
       if (!bestResult || discountAmount > bestResult.discountAmount) {
@@ -276,7 +333,7 @@ export const calculateVoucherDiscount = (
   voucher: VoucherData,
   items: Array<{
     productId: string;
-    categoryId?: string;
+    categoryPath?: string[];
     brandId?: string;
     totalPrice: number;
   }>,
@@ -284,7 +341,7 @@ export const calculateVoucherDiscount = (
   // Filter items that voucher applies to
   const applicableItems = items.filter((item) =>
     voucher.targets.some((target) =>
-      isVoucherTargetApplicable(target, item.productId, item.categoryId, item.brandId),
+      isVoucherTargetApplicable(target, item.productId, item.categoryPath?.[0], item.brandId),
     ),
   );
 
@@ -303,4 +360,29 @@ export const calculateVoucherDiscount = (
   }
 
   return Math.round(discount);
+};
+
+/**
+ * HELPER: Format promotion description for display
+ */
+const formatPromotionDescriptionForDisplay = (
+  target: PromotionTargetData,
+  promotion: PromotionData,
+): string => {
+  switch (target.actionType) {
+    case PromotionActionType.DISCOUNT_PERCENT:
+      return `Giảm ${target.discountValue}%`;
+
+    case PromotionActionType.DISCOUNT_FIXED:
+      return `Giảm ${Number(target.discountValue).toLocaleString()}đ`;
+
+    case PromotionActionType.BUY_X_GET_Y:
+      return `Mua ${target.buyQuantity} tặng ${target.getQuantity}`;
+
+    case PromotionActionType.GIFT_PRODUCT:
+      return `Tặng quà khi mua ${target.buyQuantity || 1} sản phẩm`;
+
+    default:
+      return promotion.description || "Khuyến mãi đặc biệt";
+  }
 };

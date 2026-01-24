@@ -12,11 +12,6 @@ export const getProductsWithPricing = async (query: ListProductsQuery, userId?: 
         return { ...card, pricing: null };
       }
 
-      console.log(pricingContext.productId);
-      console.log(pricingContext.variantId);
-      console.log(pricingContext.price);
-      console.log(pricingContext);
-
       const fullPricing = await getVariantPricing(
         pricingContext.productId,
         pricingContext.variantId,

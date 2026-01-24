@@ -161,6 +161,7 @@ export const transformProductCard = (product: any): ProductCard => {
   return {
     id: product.id,
     name: product.name,
+    priceOrigin: Number(defaultVariant.price),
     slug: product.slug,
     thumbnail,
     rating: {

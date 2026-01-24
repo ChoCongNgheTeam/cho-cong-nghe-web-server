@@ -6,12 +6,15 @@ import {
   PricingContext,
   AppliedDiscount,
   PricingContextInput,
+  DisplayPromotion,
 } from "./pricing.types";
 import {
   getBestPromotionTarget,
   calculatePromotionTargetDiscount,
   isVoucherValid,
   calculateVoucherDiscount,
+  getApplicablePromotionTargets,
+  getAllAvailablePromotions,
 } from "./pricing.rules";
 import { calculateDiscountPercentage, validatePricingInput } from "./pricing.helpers";
 import { PromotionActionType } from "@prisma/client";
@@ -21,10 +24,14 @@ import * as voucherRepo from "../voucher/voucher.repository";
 /**
  * ===== CORE FUNCTION =====
  * Tính giá cho 1 sản phẩm (dùng trong product detail, cart item)
+ * @param input - Product pricing input
+ * @param userId - User ID (optional)
+ * @param mode - "detail" = show all promotions, "cart" = apply with quantity check
  */
 export const calculateProductPrice = async (
   input: PricingProductInput,
   userId?: string,
+  mode: "detail" | "cart" = "cart",
 ): Promise<PricedProduct> => {
   // Validate
   const validation = validatePricingInput(input.basePrice, input.quantity);
@@ -41,53 +48,149 @@ export const calculateProductPrice = async (
     brandId: input.brandId,
   };
 
-  // Find best promotion target for this product
-  const bestPromotionResult = getBestPromotionTarget(
-    input.productId,
-    input.basePrice,
-    input.quantity,
-    input.categoryPath,
-    input.brandId,
-    context,
-  );
-
   let finalPrice = input.basePrice;
   let totalDiscount = 0;
   const appliedPromotions: AppliedDiscount[] = [];
+  const availablePromotions: DisplayPromotion[] = [];
   const giftProducts: { variantId: string; quantity: number }[] = [];
 
-  // Apply promotion
-  if (bestPromotionResult) {
-    const { promotion, target } = bestPromotionResult;
-    const { discountAmount, applicableQuantity } = calculatePromotionTargetDiscount(
-      target,
+  if (mode === "detail") {
+    // DETAIL MODE: Show ALL available promotions (no quantity check for display)
+    const allPromotions = getAllAvailablePromotions(input.productId, input.brandId, context);
+
+    availablePromotions.push(...allPromotions);
+
+    // Still apply best discount for price display
+    const bestPromotionResult = getBestPromotionTarget(
+      input.productId,
       input.basePrice,
       input.quantity,
+      input.categoryPath,
+      input.brandId,
+      context,
     );
 
-    finalPrice = input.basePrice - discountAmount / input.quantity;
-    totalDiscount = discountAmount;
+    if (bestPromotionResult) {
+      const { promotion, target } = bestPromotionResult;
+      const { discountAmount } = calculatePromotionTargetDiscount(
+        target,
+        input.basePrice,
+        input.quantity,
+      );
 
-    appliedPromotions.push({
-      type: "PROMOTION",
-      id: promotion.id,
-      name: promotion.name,
-      discountAmount,
-      description: formatPromotionDescription(target),
-      actionType: target.actionType,
-    });
+      finalPrice = input.basePrice - discountAmount / input.quantity;
+      totalDiscount = discountAmount;
 
-    // Handle gift product
-    if (
-      target.actionType === PromotionActionType.GIFT_PRODUCT &&
-      target.giftProductVariantId &&
-      target.getQuantity
-    ) {
-      const sets = target.buyQuantity ? Math.floor(input.quantity / target.buyQuantity) : 1;
-      giftProducts.push({
-        variantId: target.giftProductVariantId,
-        quantity: sets * target.getQuantity,
+      appliedPromotions.push({
+        type: "PROMOTION",
+        id: promotion.id,
+        name: promotion.name,
+        discountAmount,
+        description: formatPromotionDescription(target),
+        actionType: target.actionType,
       });
+    }
+  } else {
+    // CART MODE: Apply promotions with quantity validation
+    const bestPromotionResult = getBestPromotionTarget(
+      input.productId,
+      input.basePrice,
+      input.quantity,
+      input.categoryPath,
+      input.brandId,
+      context,
+    );
+
+    const addedPromotionIds = new Set<string>();
+
+    for (const promotion of context.availablePromotions) {
+      const applicableTargets = getApplicablePromotionTargets(
+        promotion,
+        input.productId,
+        input.quantity,
+        input.brandId,
+        context,
+      );
+
+      if (applicableTargets.length > 0) {
+        // Add to available promotions (unique by promotion ID)
+        if (!addedPromotionIds.has(promotion.id)) {
+          const representativeTarget = applicableTargets[0];
+          availablePromotions.push({
+            id: promotion.id,
+            name: promotion.name,
+            description: formatPromotionDescription(representativeTarget),
+            actionType: representativeTarget.actionType,
+            buyQuantity: representativeTarget.buyQuantity ?? null,
+            getQuantity: representativeTarget.getQuantity ?? null,
+          });
+          addedPromotionIds.add(promotion.id);
+        }
+
+        // Apply promotion if it's the best one
+        if (bestPromotionResult && bestPromotionResult.promotion.id === promotion.id) {
+          const { target } = bestPromotionResult;
+          const { discountAmount } = calculatePromotionTargetDiscount(
+            target,
+            input.basePrice,
+            input.quantity,
+          );
+
+          finalPrice = input.basePrice - discountAmount / input.quantity;
+          totalDiscount = discountAmount;
+
+          if (!appliedPromotions.some((ap) => ap.id === promotion.id)) {
+            appliedPromotions.push({
+              type: "PROMOTION",
+              id: promotion.id,
+              name: promotion.name,
+              discountAmount,
+              description: formatPromotionDescription(target),
+              actionType: target.actionType,
+            });
+          }
+
+          // Handle gifts for this promotion
+          const giftTargets = applicableTargets.filter(
+            (t) =>
+              t.actionType === PromotionActionType.GIFT_PRODUCT &&
+              t.giftProductVariantId &&
+              t.getQuantity,
+          );
+
+          for (const giftTarget of giftTargets) {
+            const sets = giftTarget.buyQuantity
+              ? Math.floor(input.quantity / giftTarget.buyQuantity)
+              : 1;
+
+            const giftQuantity = sets * giftTarget.getQuantity!;
+
+            if (giftQuantity > 0) {
+              giftProducts.push({
+                variantId: giftTarget.giftProductVariantId!,
+                quantity: giftQuantity,
+              });
+
+              const giftDescription = formatPromotionDescription(giftTarget);
+              if (
+                !appliedPromotions.some(
+                  (ap) =>
+                    ap.id === promotion.id && ap.actionType === PromotionActionType.GIFT_PRODUCT,
+                )
+              ) {
+                appliedPromotions.push({
+                  type: "PROMOTION",
+                  id: promotion.id,
+                  name: promotion.name,
+                  discountAmount: 0,
+                  description: giftDescription,
+                  actionType: PromotionActionType.GIFT_PRODUCT,
+                });
+              }
+            }
+          }
+        }
+      }
     }
   }
 
@@ -103,6 +206,7 @@ export const calculateProductPrice = async (
     totalDiscount: totalDiscount,
 
     appliedPromotions,
+    availablePromotions,
     giftProducts: giftProducts.length > 0 ? giftProducts : undefined,
     hasPromotion: appliedPromotions.length > 0,
     discountPercentage: calculateDiscountPercentage(input.basePrice, finalPrice),
@@ -118,9 +222,9 @@ export const calculateProductPrice = async (
 export const calculateCartPrice = async (input: PricingCartInput): Promise<PricingResult> => {
   const errors: string[] = [];
 
-  // Calculate price for each item
+  // Calculate price for each item (CART MODE)
   const pricedItems = await Promise.all(
-    input.items.map((item) => calculateProductPrice(item, input.userId)),
+    input.items.map((item) => calculateProductPrice(item, input.userId, "cart")),
   );
 
   // Calculate subtotal (after promotion)
@@ -222,6 +326,7 @@ export const getVariantPricing = async (
   context?: PricingContextInput,
   userId?: string,
 ) => {
+  // Use DETAIL MODE to show all promotions
   const pricedProduct = await calculateProductPrice(
     {
       productId,
@@ -232,9 +337,8 @@ export const getVariantPricing = async (
       brandId: context?.brandId,
     },
     userId,
+    "detail", // Show all available promotions
   );
-
-  // console.log(pricedProduct);
 
   return {
     base: pricedProduct.basePrice,
@@ -249,6 +353,7 @@ export const getVariantPricing = async (
       discountAmount: p.discountAmount,
       actionType: p.actionType,
     })),
+    availablePromotions: pricedProduct.availablePromotions,
     gifts: pricedProduct.giftProducts,
   };
 };
@@ -268,7 +373,7 @@ const formatPromotionDescription = (target: any): string => {
       return `Mua ${target.buyQuantity} tặng ${target.getQuantity}`;
 
     case PromotionActionType.GIFT_PRODUCT:
-      return `Tặng quà khi mua ${target.buyQuantity || 1} sản phẩm`;
+      return `Tặng quà khi mua ${target.description || 1} sản phẩm`;
 
     default:
       return "Khuyến mãi đặc biệt";

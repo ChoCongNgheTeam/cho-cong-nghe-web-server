@@ -139,6 +139,7 @@ export interface ProductCardHighlight {
 export interface ProductCard {
   id: string;
   name: string;
+  priceOrigin: number;
   slug: string;
   originalPrice?: number;
   discount?: number;

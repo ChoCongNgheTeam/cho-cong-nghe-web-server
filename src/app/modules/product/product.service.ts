@@ -38,7 +38,7 @@ export const getProductsPublic = async (query: ListProductsQuery) => {
           variantOptions,
         },
 
-        // chỉ dùng nội bộ
+        // chỉ dùng nội bộ - KHÔNG trả về client
         pricingContext: defaultVariant
           ? {
               productId: product.id,
@@ -180,6 +180,9 @@ export const getProductGallery = async (slug: string) => {
   }));
 };
 
+/**
+ * IMPROVED: Return related products with pricing context
+ */
 export const getRelatedProducts = async (slug: string, limit: number = 8) => {
   const product = await repo.findBySlug(slug);
   if (!product) {
@@ -189,7 +192,27 @@ export const getRelatedProducts = async (slug: string, limit: number = 8) => {
   }
 
   const related = await repo.findRelatedProducts(product.id, limit);
-  return related.map(transformProductCard);
+
+  // Transform and include pricing context for each product
+  return related.map((p) => {
+    const defaultVariant = p.variants?.[0];
+    const transformed = transformProductCard(p);
+
+    return {
+      ...transformed,
+      // Internal use only - needed for pricing
+      _pricingContext: defaultVariant
+        ? {
+            productId: p.id,
+            variantId: defaultVariant.id,
+            price: Number(defaultVariant.price),
+            brandId: p.brand?.id,
+            categoryId: p.category?.id,
+            categoryPath: buildCategoryPath(p.category),
+          }
+        : null,
+    };
+  });
 };
 
 export const getProductReviews = async (slug: string, query: ReviewsQuery) => {
@@ -207,6 +230,9 @@ export const getProductReviews = async (slug: string, query: ReviewsQuery) => {
 // === ADMIN SERVICES ===
 // =====================
 
+/**
+ * Admin list - NO pricing needed (admin sees base prices only)
+ */
 export const getProductsAdmin = async (query: ListProductsQuery) => {
   const result = await repo.findAllAdmin(query);
 
@@ -216,6 +242,9 @@ export const getProductsAdmin = async (query: ListProductsQuery) => {
   };
 };
 
+/**
+ * Admin detail - NO pricing needed (admin sees base prices only)
+ */
 export const getProductById = async (id: string) => {
   const product = await repo.findById(id);
 
