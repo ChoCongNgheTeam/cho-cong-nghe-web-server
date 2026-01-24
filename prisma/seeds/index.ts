@@ -9,6 +9,7 @@ export * from "./payment-method.seed";
 export * from "./user.seed";
 export * from "./product.seed";
 export * from "./variant.seed";
+export * from "./product-color-images.seed";
 export * from "./user-address.seed";
 export * from "./voucher.seed";
 export * from "./promotion.seed";

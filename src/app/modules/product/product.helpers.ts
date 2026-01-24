@@ -25,7 +25,7 @@ export const parseMultipartData = (body: any): any => {
   }
 
   // Parse array/object fields if they are strings
-  const fieldsToParse = ["variants", "highlights", "specifications"];
+  const fieldsToParse = ["variants", "highlights", "specifications", "colorImages"];
 
   fieldsToParse.forEach((field) => {
     if (data[field] && typeof data[field] === "string") {
@@ -45,7 +45,6 @@ export const parseMultipartData = (body: any): any => {
       if (typeof data[field] === "string") {
         data[field] = data[field].toLowerCase() === "true";
       } else if (typeof data[field] === "boolean") {
-        // Already boolean, keep it
         data[field] = data[field];
       }
     }
@@ -54,43 +53,68 @@ export const parseMultipartData = (body: any): any => {
   return data;
 };
 
-export const uploadVariantImages = async (
-  variants: any[],
+/**
+ * Upload color-based images
+ * Expected format: colorImages = [{ color, altText }]
+ * Files fieldname: `color_${color}_${index}`
+ */
+export const uploadColorImages = async (
+  colorImages: any[],
   files: Express.Multer.File[],
-): Promise<void> => {
-  if (!files || files.length === 0) return;
+): Promise<any[]> => {
+  if (!files || files.length === 0) return [];
 
-  await Promise.all(
-    variants.map(async (variant, index) => {
-      // Files for this variant have fieldname = `variant_${index}`
-      const variantFiles = files.filter((f) => f.fieldname === `variant_${index}`);
+  const uploadedImages: any[] = [];
 
-      if (variantFiles.length > 0) {
-        // Upload to Cloudinary
-        const uploadPromises = variantFiles.map((file) => uploadImage(file.path, "products"));
-        const uploadedImages = await Promise.all(uploadPromises);
+  // Group files by color
+  const filesByColor = new Map<string, Express.Multer.File[]>();
 
-        // Assign to variant.images
-        variant.images = uploadedImages.map((img) => ({
-          imageUrl: img.url,
-          publicId: img.publicId,
-          altText: variant.altText || variant.code,
-        }));
-      } else {
-        // Keep existing images if no new upload
-        variant.images = variant.images || [];
+  files.forEach((file) => {
+    // Expected fieldname: color_red_0, color_blue_1, etc.
+    const match = file.fieldname.match(/^color_([^_]+)_(\d+)$/);
+    if (match) {
+      const color = match[1];
+      if (!filesByColor.has(color)) {
+        filesByColor.set(color, []);
       }
-    }),
-  );
+      filesByColor.get(color)!.push(file);
+    }
+  });
+
+  // Upload images for each color
+  for (const [color, colorFiles] of filesByColor.entries()) {
+    const uploadPromises = colorFiles.map((file, index) =>
+      uploadImage(file.path, "products").then((result) => ({
+        ...result,
+        position: index,
+      })),
+    );
+
+    const uploaded = await Promise.all(uploadPromises);
+
+    // Find matching color config from colorImages
+    const colorConfig = colorImages.find((ci) => ci.color === color) || { altText: color };
+
+    uploaded.forEach((img) => {
+      uploadedImages.push({
+        color,
+        imagePath: img.publicId,
+        imageUrl: img.url,
+        altText: colorConfig.altText || color,
+        position: img.position,
+      });
+    });
+  }
+
+  return uploadedImages;
 };
 
 export const deleteOldImages = async (imageUrls: string[]): Promise<void> => {
   const deletePromises = imageUrls.map(async (url) => {
     try {
-      // Extract publicId from Cloudinary URL
-      const matches = url.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
-      if (matches && matches[1]) {
-        await deleteImage(matches[1]);
+      const publicId = extractPublicId(url);
+      if (publicId) {
+        await deleteImage(publicId);
       }
     } catch (err) {
       console.error(`Failed to delete image: ${url}`, err);

@@ -23,7 +23,7 @@ const ASSETS_DIR = path.join(process.cwd(), "assets");
 async function uploadAssets() {
   console.log("🚀 Start uploading assets...");
 
-  const images = await prisma.product_variant_images.findMany({
+  const images = await prisma.product_color_images.findMany({
     where: {
       imageUrl: null,
     },
@@ -62,7 +62,7 @@ async function uploadAssets() {
         resource_type: "image",
       });
 
-      await prisma.product_variant_images.update({
+      await prisma.product_color_images.update({
         where: { id: img.id },
         data: {
           imageUrl: result.secure_url,

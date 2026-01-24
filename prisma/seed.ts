@@ -11,6 +11,7 @@ import {
   seedUsers,
   seedProducts,
   seedVariants,
+  seedProductColorImages,
   seedUserAddresses,
   seedVouchers,
   seedPromotions,
@@ -40,7 +41,7 @@ async function main() {
   await seedProductSpecifications();
   await seedProductHighlights();
   await seedVariants({ products, attributes });
-
+  await seedProductColorImages({ products });
   console.log("Seeding hoàn tất thành công!");
 }
 

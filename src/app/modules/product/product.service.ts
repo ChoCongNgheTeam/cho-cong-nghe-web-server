@@ -122,11 +122,6 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
     ...variant,
     code: variant.code ?? "",
     inventory: variant.inventory ?? undefined,
-    images: variant.images.map((img) => ({
-      ...img,
-      imageUrl: img.imageUrl ?? "",
-      altText: img.altText ?? "",
-    })),
   };
 
   const variantResponse = transformProductVariantResponse(product, normalizedVariant);
@@ -155,7 +150,6 @@ export const getProductSpecificationsBySlug = async (slug: string) => {
 
   return { specifications };
 };
-
 export const getProductGallery = async (slug: string) => {
   const product = await repo.findBySlug(slug);
   if (!product || !product.isActive) {
@@ -164,22 +158,18 @@ export const getProductGallery = async (slug: string) => {
     throw error;
   }
 
-  const variants = await repo.findAllVariantsWithImages(product.id);
+  // Get all color images for this product
+  const colorImages = await repo.findColorImagesByProductId(product.id);
 
-  // Collect all images from variants
-  const allImages = variants.flatMap((variant) => variant.images);
-
-  // Deduplicate by imageUrl
-  const uniqueImages = Array.from(new Map(allImages.map((img) => [img.imageUrl, img])).values());
-
-  return uniqueImages.map((img) => ({
+  // Group by color and return
+  return colorImages.map((img) => ({
     id: img.id,
+    color: img.color,
     imageUrl: img.imageUrl,
     altText: img.altText,
     position: img.position,
   }));
 };
-
 /**
  * IMPROVED: Return related products with pricing context
  */

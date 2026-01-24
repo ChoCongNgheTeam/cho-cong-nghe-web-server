@@ -14,8 +14,9 @@ export interface Category {
   slug: string;
 }
 
-export interface VariantImage {
+export interface ColorImage {
   id: string;
+  color: string;
   imageUrl: string;
   altText?: string;
   position: number;
@@ -36,7 +37,7 @@ export interface AvailableOptionValue {
   id: string;
   value: string;
   label?: string;
-  variantIds: string[];
+  image?: ColorImage | null; // Ảnh cho option color
 }
 
 export interface PriceRange {
@@ -46,6 +47,7 @@ export interface PriceRange {
 
 export interface ProductGallery {
   id: string;
+  color: string;
   imageUrl: string;
   altText?: string;
   position: number;
@@ -62,14 +64,14 @@ export interface ProductVariant {
   originalPrice?: number;
   discountPrice?: number;
   discountPercentage?: number;
-  weight?: number;
   soldCount: number;
   isDefault: boolean;
   isActive: boolean;
   available: boolean;
   stockStatus: "in_stock" | "low_stock" | "out_of_stock";
   inventory: Inventory;
-  images: VariantImage[];
+  color?: string; // Màu của variant này
+  images: ColorImage[]; // Ảnh theo màu
 }
 
 // =====================
@@ -233,6 +235,7 @@ export interface RawVariant {
   id: string;
   code: string;
   price: any;
+  images?: string[];
   soldCount: number;
   isDefault: boolean;
   isActive: boolean;
@@ -240,6 +243,5 @@ export interface RawVariant {
     quantity: number;
     reservedQuantity: number;
   };
-  images: VariantImage[];
   variantAttributes: RawVariantAttribute[];
 }

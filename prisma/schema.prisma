@@ -213,6 +213,7 @@ model products {
   brand                 brands                   @relation(fields: [brandId], references: [id])
   category              categories               @relation(fields: [categoryId], references: [id])
   // categories categories[]
+  img                   product_color_images[]
   variants              products_variants[]
   productSpecifications product_specifications[]
 }
@@ -262,7 +263,7 @@ model products_variants {
   code      String?  @unique // SKU
   price     Decimal  @db.Decimal(10, 2)
   soldCount Int      @default(0)
-  weight    Decimal? @db.Decimal(10, 2) // gram/kg
+  // weight    Decimal? @db.Decimal(10, 2) // gram/kg
   isDefault Boolean  @default(false)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -270,12 +271,29 @@ model products_variants {
 
   product           products                 @relation(fields: [productId], references: [id])
   variantAttributes variants_attributes[]
-  images            product_variant_images[]
   inventory         inventory?
   cartItems         cart_items[]
   orderItems        order_items[]
   wishlist          wishlist[]
 }
+
+model product_color_images {
+  id        String   @id @default(uuid()) @db.Uuid
+  productId String   @db.Uuid
+  color     String  
+  imagePath String
+  imageUrl  String?
+  altText   String?
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product products @relation(fields: [productId], references: [id])
+
+  @@unique([productId, color, imagePath])
+  @@index([productId, color])
+}
+
 
 model variants_attributes {
   id                String   @id @default(uuid()) @db.Uuid
@@ -289,18 +307,18 @@ model variants_attributes {
   @@unique([productVariantId, attributeOptionId])
 }
 
-model product_variant_images {
-  id               String   @id @default(uuid()) @db.Uuid
-  productVariantId String   @db.Uuid
-  imagePath        String
-  imageUrl         String?
-  altText          String?
-  position         Int      @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+// model product_variant_images {
+//   id               String   @id @default(uuid()) @db.Uuid
+//   productVariantId String   @db.Uuid
+//   imagePath        String
+//   imageUrl         String?
+//   altText          String?
+//   position         Int      @default(0)
+//   createdAt        DateTime @default(now())
+//   updatedAt        DateTime @updatedAt
 
-  productVariant products_variants @relation(fields: [productVariantId], references: [id])
-}
+//   productVariant products_variants @relation(fields: [productVariantId], references: [id])
+// }
 
 model inventory {
   variantId        String   @id @db.Uuid

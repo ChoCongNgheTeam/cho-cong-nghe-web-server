@@ -5,7 +5,7 @@ import { ListProductsQuery, reviewsQuerySchema } from "./product.validation";
 import {
   cleanupTempFiles,
   parseMultipartData,
-  uploadVariantImages,
+  uploadColorImages,
   deleteOldImages,
 } from "./product.helpers";
 import {
@@ -197,10 +197,6 @@ export const getProductReviewsHandler = async (req: Request, res: Response) => {
 // === ADMIN HANDLERS ===
 // =====================
 
-/**
- * Admin handlers - NO pricing needed
- * Admin sees base prices only
- */
 export const getProductsAdminHandler = async (
   req: ValidatedQuery<ListProductsQuery>,
   res: Response,
@@ -253,13 +249,17 @@ export const createProductHandler = async (req: Request, res: Response) => {
     // Parse data từ form-data
     const parsedBody = parseMultipartData(req.body);
 
-    // Upload images cho variants
-    if (files.length > 0 && parsedBody.variants?.length > 0) {
-      await uploadVariantImages(parsedBody.variants, files);
+    // Upload color images
+    let uploadedColorImages: any[] = [];
+    if (files.length > 0 && parsedBody.colorImages?.length > 0) {
+      uploadedColorImages = await uploadColorImages(parsedBody.colorImages, files);
     }
 
-    // Create product (validation đã được thực hiện trong route middleware)
-    const product = await productService.createProduct(parsedBody);
+    // Create product with color images
+    const product = await productService.createProduct({
+      ...parsedBody,
+      colorImages: uploadedColorImages,
+    });
 
     // Cleanup temp files
     cleanupTempFiles(files);
@@ -292,19 +292,23 @@ export const updateProductHandler = async (req: Request, res: Response) => {
   const { id } = req.params;
 
   try {
-    // Get old images for cleanup
-    const oldImages = files.length > 0 ? await productRepo.getVariantImagesByProductId(id) : [];
+    // Get old color images for cleanup
+    const oldImages = files.length > 0 ? await productRepo.getColorImagesByProductId(id) : [];
 
     // Parse multipart data
     const parsedData = parseMultipartData(req.body);
 
-    // Upload new images if any
-    if (files.length > 0 && parsedData.variants) {
-      await uploadVariantImages(parsedData.variants, files);
+    // Upload new color images if any
+    let uploadedColorImages: any[] = [];
+    if (files.length > 0 && parsedData.colorImages) {
+      uploadedColorImages = await uploadColorImages(parsedData.colorImages, files);
     }
 
     // Update product
-    const product = await productService.updateProduct(id, parsedData);
+    const product = await productService.updateProduct(id, {
+      ...parsedData,
+      colorImages: uploadedColorImages.length > 0 ? uploadedColorImages : undefined,
+    });
 
     // Delete old images from Cloudinary
     if (oldImages.length > 0) {
@@ -344,8 +348,8 @@ export const deleteProductHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    // Get images before delete
-    const images = await productRepo.getVariantImagesByProductId(id);
+    // Get color images before delete
+    const images = await productRepo.getColorImagesByProductId(id);
 
     // Delete product
     await productService.deleteProduct(id);

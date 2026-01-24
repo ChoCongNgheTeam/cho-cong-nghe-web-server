@@ -1,4 +1,3 @@
-// seed-data/product-specifications.ts
 export interface ProductSpecificationSeed {
   productSlug: string;
   specifications: Array<{

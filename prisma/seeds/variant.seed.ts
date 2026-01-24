@@ -46,13 +46,11 @@ export async function seedVariants({ products, attributes }: SeedVariantsParams)
             price: v.price,
             isDefault: v.isDefault ?? false,
             isActive: true,
-            weight: 220, // có thể lấy từ data nếu sau này thêm field
           },
           create: {
             productId: product.id,
             code,
             price: v.price,
-            weight: 220,
             isDefault: v.isDefault ?? false,
             isActive: true,
           },
@@ -106,33 +104,33 @@ export async function seedVariants({ products, attributes }: SeedVariantsParams)
         }
 
         // Images
-        const images = variantImages[product.name]?.[v.color] ?? [];
+        // const images = variantImages[product.name]?.[v.color] ?? [];
 
-        if (images.length > 0) {
-          for (const [imgIndex, imagePath] of images.entries()) {
-            // Tạo mới, không cần upsert → nếu chạy seed nhiều lần sẽ tạo duplicate
-            // (nếu bạn có unique constraint trên (productVariantId, imagePath) thì sẽ lỗi → xử lý ở Cách 2)
-            await prisma.product_variant_images.create({
-              data: {
-                productVariantId: variant.id,
-                imagePath,
-                imageUrl: null,
-                altText: `${product.name} ${v.color} - View ${imgIndex + 1}`,
-                position: imgIndex + 1,
-              },
-            });
-          }
-        } else {
-          // placeholder
-          await prisma.product_variant_images.create({
-            data: {
-              productVariantId: variant.id,
-              imagePath: "products/placeholder.png",
-              altText: `${product.name} ${v.color} (placeholder)`,
-              position: 1,
-            },
-          });
-        }
+        // if (images.length > 0) {
+        //   for (const [imgIndex, imagePath] of images.entries()) {
+        //     // Tạo mới, không cần upsert → nếu chạy seed nhiều lần sẽ tạo duplicate
+        //     // (nếu bạn có unique constraint trên (productVariantId, imagePath) thì sẽ lỗi → xử lý ở Cách 2)
+        //     await prisma.product_variant_images.create({
+        //       data: {
+        //         productVariantId: variant.id,
+        //         imagePath,
+        //         imageUrl: null,
+        //         altText: `${product.name} ${v.color} - View ${imgIndex + 1}`,
+        //         position: imgIndex + 1,
+        //       },
+        //     });
+        //   }
+        // } else {
+        //   // placeholder
+        //   await prisma.product_variant_images.create({
+        //     data: {
+        //       productVariantId: variant.id,
+        //       imagePath: "products/placeholder.png",
+        //       altText: `${product.name} ${v.color} (placeholder)`,
+        //       position: 1,
+        //     },
+        //   });
+        // }
 
         // Inventory
         await prisma.inventory.upsert({

@@ -26,8 +26,10 @@ const selectCategoryTree = {
   },
 };
 
-const selectVariantImage = {
+// XÓA selectVariantImage (không còn dùng)
+const selectColorImage = {
   id: true,
+  color: true,
   imageUrl: true,
   altText: true,
   position: true,
@@ -55,6 +57,7 @@ const selectVariantAttribute = {
   },
 };
 
+// UPDATE: Variant không còn include images
 const selectVariant = {
   id: true,
   code: true,
@@ -63,15 +66,12 @@ const selectVariant = {
   isDefault: true,
   isActive: true,
   inventory: { select: selectInventory },
-  images: {
-    select: selectVariantImage,
-    orderBy: { position: "asc" as const },
-  },
   variantAttributes: {
     select: selectVariantAttribute,
   },
 };
 
+// UPDATE: ProductCard include img (color images)
 const selectProductCard = {
   id: true,
   name: true,
@@ -79,6 +79,11 @@ const selectProductCard = {
   brand: { select: selectBrand },
   category: {
     select: selectCategoryTree,
+  },
+  img: {
+    select: selectColorImage,
+    orderBy: [{ color: "asc" as const }, { position: "asc" as const }],
+    take: 1, // Chỉ lấy 1 ảnh đầu tiên cho thumbnail
   },
   viewsCount: true,
   ratingAverage: true,
@@ -106,6 +111,7 @@ const selectProductCard = {
   createdAt: true,
 };
 
+// UPDATE: ProductDetail include img
 const selectProductDetail = {
   id: true,
   name: true,
@@ -114,6 +120,10 @@ const selectProductDetail = {
   brand: { select: selectBrand },
   category: {
     select: selectCategoryTree,
+  },
+  img: {
+    select: selectColorImage,
+    orderBy: [{ color: "asc" as const }, { position: "asc" as const }],
   },
   viewsCount: true,
   ratingAverage: true,
@@ -243,46 +253,56 @@ export const findAllAdmin = async (query: ListProductsQuery) => {
   return findAll(query, false);
 };
 
-export const findAllVariantsWithImages = async (productId: string) => {
-  return prisma.products_variants.findMany({
-    where: {
-      productId,
-      isActive: true,
-    },
+// XÓA findAllVariantsWithImages (không còn cần thiết)
+
+/**
+ * Find all color images for a product
+ */
+export const findColorImagesByProductId = async (productId: string) => {
+  return prisma.product_color_images.findMany({
+    where: { productId },
+    orderBy: [{ color: "asc" }, { position: "asc" }],
+  });
+};
+
+/**
+ * Get color images by product ID (for deletion)
+ */
+export const getColorImagesByProductId = async (productId: string) => {
+  return prisma.product_color_images.findMany({
+    where: { productId },
     select: {
       id: true,
-      code: true,
-      variantAttributes: {
-        select: {
-          attributeOption: {
-            select: {
-              id: true,
-              value: true,
-              attribute: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-        },
-      },
-      images: {
-        orderBy: {
-          position: "asc",
-        },
-        select: {
-          id: true,
-          imageUrl: true,
-          altText: true,
-          position: true,
-        },
-      },
+      imageUrl: true,
+      imagePath: true,
     },
-    orderBy: {
-      isDefault: "desc", // Default variant lên đầu
+  });
+};
+
+/**
+ * Delete color images
+ */
+export const deleteColorImages = async (imageIds: string[]) => {
+  return prisma.product_color_images.deleteMany({
+    where: {
+      id: { in: imageIds },
     },
+  });
+};
+
+/**
+ * Create color images
+ */
+export const createColorImages = async (productId: string, images: any[]) => {
+  return prisma.product_color_images.createMany({
+    data: images.map((img) => ({
+      productId,
+      color: img.color,
+      imagePath: img.imagePath,
+      imageUrl: img.imageUrl,
+      altText: img.altText,
+      position: img.position || 0,
+    })),
   });
 };
 
@@ -382,17 +402,89 @@ export const findVariantByOptions = async (productId: string, options: Record<st
   return matchedVariant || null;
 };
 
-export const findById = (id: string) =>
-  prisma.products.findUnique({
+// UPDATE: findById include img
+export const findById = async (id: string) => {
+  return prisma.products.findUnique({
     where: { id },
-    select: selectProductDetail,
+    include: {
+      brand: true,
+      category: {
+        include: {
+          categorySpecifications: {
+            include: {
+              specification: true,
+            },
+          },
+        },
+      },
+      img: {
+        orderBy: [{ color: "asc" }, { position: "asc" }],
+      },
+      variants: {
+        include: {
+          inventory: true,
+          variantAttributes: {
+            include: {
+              attributeOption: {
+                include: {
+                  attribute: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+      },
+      productSpecifications: {
+        include: {
+          specification: true,
+        },
+      },
+    },
   });
+};
 
-export const findBySlug = (slug: string) =>
-  prisma.products.findUnique({
+// UPDATE: findBySlug include img
+export const findBySlug = async (slug: string) => {
+  return prisma.products.findUnique({
     where: { slug },
-    select: selectProductDetail,
+    include: {
+      brand: true,
+      category: {
+        include: {
+          categorySpecifications: {
+            include: {
+              specification: true,
+            },
+          },
+        },
+      },
+      img: {
+        orderBy: [{ color: "asc" }, { position: "asc" }],
+      },
+      variants: {
+        include: {
+          inventory: true,
+          variantAttributes: {
+            include: {
+              attributeOption: {
+                include: {
+                  attribute: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+      },
+      productSpecifications: {
+        include: {
+          specification: true,
+        },
+      },
+    },
   });
+};
 
 export const findSpecificationsBySlug = (slug: string) =>
   prisma.products.findUnique({
@@ -498,22 +590,36 @@ export const getReviewStats = async (productId: string) => {
   };
 };
 
+// UPDATE: create với color images
 export const create = async (data: any) => {
-  const { variants, highlights, specifications, ...product } = data;
+  const { variants, specifications, colorImages, ...product } = data;
 
   return prisma.products.create({
     data: {
       ...product,
+      // Tạo color images
+      img: colorImages
+        ? {
+            create: colorImages.map((img: any) => ({
+              color: img.color,
+              imagePath: img.imagePath,
+              imageUrl: img.imageUrl,
+              altText: img.altText,
+              position: img.position || 0,
+            })),
+          }
+        : undefined,
+      // Tạo specifications
       productSpecifications: {
         create:
           specifications?.map((s: any, index: number) => ({
             specificationId: s.specificationId,
             value: s.value,
-            isHighlight:
-              highlights?.some((h: any) => h.specificationId === s.specificationId) || false,
+            isHighlight: s.isHighlight || false,
             sortOrder: index,
           })) ?? [],
       },
+      // Tạo variants (KHÔNG còn images)
       variants: {
         create:
           variants?.map((v: any) => ({
@@ -523,15 +629,6 @@ export const create = async (data: any) => {
             isActive: v.isActive ?? true,
             inventory: {
               create: { quantity: v.quantity ?? 0 },
-            },
-            images: {
-              create:
-                v.images?.map((img: any, idx: number) => ({
-                  imagePath: img.imageUrl,
-                  imageUrl: img.imageUrl,
-                  altText: img.altText || product.name,
-                  position: idx,
-                })) || [],
             },
             variantAttributes: {
               create:
@@ -546,14 +643,19 @@ export const create = async (data: any) => {
   });
 };
 
+// UPDATE: update với color images
 export const update = async (id: string, data: any) => {
-  const { categories, highlights, specifications, variants, ...updateData } = data;
+  const { specifications, variants, colorImages, ...updateData } = data;
 
-  // Xử lý categories
-  if (categories) {
-    updateData.categories = {
-      set: categories.map((id: string) => ({ id })),
-    };
+  // Xử lý color images
+  if (colorImages !== undefined) {
+    // Xóa ảnh cũ
+    await prisma.product_color_images.deleteMany({ where: { productId: id } });
+
+    // Tạo ảnh mới nếu có
+    if (colorImages.length > 0) {
+      await createColorImages(id, colorImages);
+    }
   }
 
   // Xử lý specifications
@@ -565,15 +667,101 @@ export const update = async (id: string, data: any) => {
           productId: id,
           specificationId: s.specificationId,
           value: s.value,
+          isHighlight: s.isHighlight || false,
           sortOrder: index,
         })),
       });
     }
   }
 
-  // Xử lý variants (nếu có)
-  // Logic phức tạp hơn, để trong service layer
+  // Xử lý variants nếu có
+  if (variants !== undefined) {
+    // Lấy variants hiện tại
+    const existingVariants = await prisma.products_variants.findMany({
+      where: { productId: id },
+      select: { id: true },
+    });
 
+    const existingIds = existingVariants.map((v) => v.id);
+    const updateIds = variants.filter((v: any) => v.id).map((v: any) => v.id);
+
+    // Xóa variants không còn trong danh sách
+    const toDelete = existingIds.filter((id) => !updateIds.includes(id));
+    if (toDelete.length > 0) {
+      // Xóa các relation trước
+      await prisma.variants_attributes.deleteMany({
+        where: { productVariantId: { in: toDelete } },
+      });
+      await prisma.inventory.deleteMany({
+        where: { productVariantId: { in: toDelete } },
+      });
+      // Xóa variants
+      await prisma.products_variants.deleteMany({
+        where: { id: { in: toDelete } },
+      });
+    }
+
+    // Update hoặc create variants
+    for (const variant of variants) {
+      if (variant._delete) {
+        // Skip deleted variants
+        continue;
+      }
+
+      if (variant.id) {
+        // Update existing variant
+        await prisma.products_variants.update({
+          where: { id: variant.id },
+          data: {
+            code: variant.code,
+            price: variant.price,
+            isDefault: variant.isDefault,
+            isActive: variant.isActive,
+            inventory:
+              variant.quantity !== undefined
+                ? {
+                    upsert: {
+                      create: { quantity: variant.quantity },
+                      update: { quantity: variant.quantity },
+                    },
+                  }
+                : undefined,
+            // Update variant attributes nếu có
+            ...(variant.variantAttributes && {
+              variantAttributes: {
+                deleteMany: {},
+                create: variant.variantAttributes.map((attr: any) => ({
+                  attributeOptionId: attr.attributeOptionId,
+                })),
+              },
+            }),
+          },
+        });
+      } else {
+        // Create new variant
+        await prisma.products_variants.create({
+          data: {
+            productId: id,
+            code: variant.code,
+            price: variant.price,
+            isDefault: variant.isDefault || false,
+            isActive: variant.isActive ?? true,
+            inventory: {
+              create: { quantity: variant.quantity ?? 0 },
+            },
+            variantAttributes: {
+              create:
+                variant.variantAttributes?.map((attr: any) => ({
+                  attributeOptionId: attr.attributeOptionId,
+                })) || [],
+            },
+          },
+        });
+      }
+    }
+  }
+
+  // Update product data
   return prisma.products.update({
     where: { id },
     data: updateData,
@@ -581,6 +769,7 @@ export const update = async (id: string, data: any) => {
   });
 };
 
+// UPDATE: remove - xóa color images thay vì variant images
 export const remove = async (id: string) => {
   // Xóa cascade theo thứ tự
   const variants = await prisma.products_variants.findMany({
@@ -589,9 +778,7 @@ export const remove = async (id: string) => {
   });
 
   for (const variant of variants) {
-    await prisma.product_variant_images.deleteMany({
-      where: { productVariantId: variant.id },
-    });
+    // XÓA logic xóa variant images
     await prisma.variants_attributes.deleteMany({
       where: { productVariantId: variant.id },
     });
@@ -602,38 +789,16 @@ export const remove = async (id: string) => {
   });
 
   await prisma.products_variants.deleteMany({ where: { productId: id } });
-  // await prisma.product_highlights.deleteMany({ where: { productId: id } });
+
+  // XÓA color images
+  await prisma.product_color_images.deleteMany({ where: { productId: id } });
+
   await prisma.product_specifications.deleteMany({ where: { productId: id } });
 
   return prisma.products.delete({ where: { id } });
 };
 
-export const getVariantImagesByProductId = async (productId: string) => {
-  const product = await prisma.products.findUnique({
-    where: { id: productId },
-    include: {
-      variants: {
-        include: {
-          images: {
-            select: {
-              id: true,
-              imageUrl: true,
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (!product) return [];
-
-  return product.variants.flatMap((variant) =>
-    variant.images.map((img) => ({
-      id: img.id,
-      imageUrl: img.imageUrl,
-    })),
-  );
-};
+// XÓA getVariantImagesByProductId (thay bằng getColorImagesByProductId)
 
 export const bulkUpdate = async (productIds: string[], updates: any) => {
   return prisma.products.updateMany({

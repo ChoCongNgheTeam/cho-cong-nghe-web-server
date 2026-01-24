@@ -74,9 +74,9 @@ export const productBySlugParamsSchema = z.object({
 // === CREATE/UPDATE SCHEMAS ===
 // =====================
 
-const variantImageSchema = z.object({
-  imageUrl: z.string().url(),
-  publicId: z.string().optional(),
+// Color image schema - không còn liên kết với variant
+const colorImageSchema = z.object({
+  color: z.string().min(1, "Màu sắc không được để trống"),
   altText: z.string().optional(),
 });
 
@@ -90,7 +90,6 @@ const createVariantSchema = z.object({
   isDefault: z.coerce.boolean().default(false),
   isActive: z.coerce.boolean().default(true),
   quantity: z.coerce.number().int().nonnegative().default(0),
-  images: z.array(variantImageSchema).min(1, "Variant phải có ít nhất 1 ảnh"),
   variantAttributes: z.array(variantAttributeSchema).min(1, "Variant phải có ít nhất 1 thuộc tính"),
 });
 
@@ -101,6 +100,7 @@ export const createProductSchema = z
     name: z.string().min(3, "Tên sản phẩm phải có ít nhất 3 ký tự"),
     description: z.string().optional(),
     variants: z.array(createVariantSchema).min(1, "Sản phẩm phải có ít nhất 1 biến thể"),
+    colorImages: z.array(colorImageSchema).min(1, "Sản phẩm phải có ít nhất 1 màu với ảnh"),
     specifications: z
       .array(
         z.object({
@@ -129,11 +129,9 @@ const updateVariantSchema = z.object({
   id: z.string().uuid().optional(),
   code: z.string().optional(),
   price: z.coerce.number().positive().optional(),
-  weight: z.coerce.number().positive().optional(),
   isDefault: z.coerce.boolean().optional(),
   isActive: z.coerce.boolean().optional(),
   quantity: z.coerce.number().int().nonnegative().optional(),
-  images: z.array(variantImageSchema).optional(),
   variantAttributes: z.array(variantAttributeSchema).optional(),
   _delete: z.boolean().optional(),
 });
@@ -144,6 +142,7 @@ export const updateProductSchema = z.object({
   name: z.string().min(3).optional(),
   description: z.string().optional(),
   variants: z.array(updateVariantSchema).optional(),
+  colorImages: z.array(colorImageSchema).optional(),
   specifications: z
     .array(
       z.object({

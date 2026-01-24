@@ -8,6 +8,7 @@ import {
   Highlight,
   ProductSpecificationGroup,
   RawVariant,
+  ColorImage,
 } from "./product.types";
 
 // Fix BigInt serialization
@@ -27,6 +28,34 @@ const getStockStatus = (
 };
 
 /**
+ * Get color from variant's attributes
+ */
+const getVariantColor = (variant: RawVariant): string | undefined => {
+  const colorAttr = variant.variantAttributes.find(
+    (va) => va.attributeOption.attribute.name === "color",
+  );
+  return colorAttr?.attributeOption.value;
+};
+
+/**
+ * Get images for a specific color from product's color images
+ */
+const getImagesForColor = (colorImages: any[], color?: string): ColorImage[] => {
+  if (!color) return [];
+
+  return colorImages
+    .filter((img) => img.color === color)
+    .sort((a, b) => a.position - b.position)
+    .map((img) => ({
+      id: img.id,
+      color: img.color,
+      imageUrl: img.imageUrl || "",
+      altText: img.altText || "",
+      position: img.position,
+    }));
+};
+
+/**
  * Calculate price range from variants
  */
 export const calculatePriceRange = (variants: RawVariant[]): PriceRange => {
@@ -42,8 +71,6 @@ const isOptionEnabled = (variants: RawVariant[], testOptions: Record<string, str
   return variants.some((variant) =>
     variant.variantAttributes.every((va) => {
       const attr = va.attributeOption.attribute.name;
-      // console.log(attr);
-
       return testOptions[attr] === va.attributeOption.value;
     }),
   );
@@ -51,21 +78,20 @@ const isOptionEnabled = (variants: RawVariant[], testOptions: Record<string, str
 
 /**
  * Build available options from variants
+ * For color options, attach the first image of that color
  */
 const buildAvailableOptionsWithStatus = (
   variants: RawVariant[],
+  colorImages: any[],
   selectedOptions: Record<string, string>,
 ): AvailableOption[] => {
   const attributesMap = new Map<string, Map<string, any>>();
 
-  // collect all options
+  // Collect all options
   for (const v of variants) {
     for (const va of v.variantAttributes) {
       const attr = va.attributeOption.attribute.name;
       const opt = va.attributeOption;
-
-      // console.log(attr);
-      // console.log(opt);
 
       if (!attributesMap.has(attr)) {
         attributesMap.set(attr, new Map());
@@ -84,7 +110,7 @@ const buildAvailableOptionsWithStatus = (
     }
   }
 
-  // evaluate enabled
+  // Evaluate enabled status
   for (const [attr, optMap] of attributesMap.entries()) {
     for (const option of optMap.values()) {
       const testOptions = {
@@ -94,17 +120,10 @@ const buildAvailableOptionsWithStatus = (
 
       option.enabled = isOptionEnabled(variants, testOptions);
 
-      // chỉ color mới có image
+      // Attach image for color attribute
       if (attr === "color" && !option.image) {
-        const matchedVariant = variants.find((v) =>
-          v.variantAttributes.some(
-            (va) =>
-              va.attributeOption.attribute.name === "color" &&
-              va.attributeOption.value === option.value,
-          ),
-        );
-
-        option.image = matchedVariant?.images?.[0] ?? null;
+        const colorImgs = getImagesForColor(colorImages, option.value);
+        option.image = colorImgs[0] || null;
       }
     }
   }
@@ -136,7 +155,11 @@ export const calculateOverallStockStatus = (
 
 export const transformProductCard = (product: any): ProductCard => {
   const defaultVariant = product.variants[0];
-  const thumbnail = defaultVariant?.images[0]?.imageUrl || "";
+
+  // Get first available color image as thumbnail
+  const firstColorImage = product.img?.[0];
+  const thumbnail = firstColorImage?.imageUrl || "";
+
   const inStock = defaultVariant?.inventory
     ? defaultVariant.inventory.quantity > defaultVariant.inventory.reservedQuantity
     : false;
@@ -184,13 +207,11 @@ export const transformProductDetail = (
   const currentVariant =
     validVariants.find((v: { isDefault: boolean }) => v.isDefault) ?? validVariants[0];
 
-  // lấy option của currentVariant
+  // Get selected options from current variant
   const selectedOptions: Record<string, string> = {};
   for (const va of currentVariant.variantAttributes) {
     selectedOptions[va.attributeOption.attribute.name] = va.attributeOption.value;
   }
-
-  // console.log(selectedOptions);
 
   return {
     id: product.id,
@@ -200,8 +221,12 @@ export const transformProductDetail = (
     brand: product.brand,
     category: product.category || [],
     priceRange: calculatePriceRange(product.variants),
-    currentVariant: transformVariant(currentVariant),
-    availableOptions: buildAvailableOptionsWithStatus(validVariants, selectedOptions),
+    currentVariant: transformVariant(currentVariant, product.img),
+    availableOptions: buildAvailableOptionsWithStatus(
+      validVariants,
+      product.img || [],
+      selectedOptions,
+    ),
     warranty: "12 tháng chính hãng",
     stockStatus: calculateOverallStockStatus(product.variants),
     rating: reviewStats!,
@@ -213,10 +238,16 @@ export const transformProductDetail = (
   };
 };
 
-export const transformVariant = (variant: RawVariant): ProductVariant => {
+export const transformVariant = (variant: RawVariant, colorImages: any[]): ProductVariant => {
   const quantity = variant.inventory?.quantity ?? 0;
   const reservedQuantity = variant.inventory?.reservedQuantity ?? 0;
   const available = Math.max(0, quantity - reservedQuantity);
+
+  // Get color of this variant
+  const color = getVariantColor(variant);
+
+  // Get images for this color
+  const images = getImagesForColor(colorImages || [], color);
 
   return {
     id: variant.id,
@@ -232,7 +263,8 @@ export const transformVariant = (variant: RawVariant): ProductVariant => {
       reservedQuantity,
       available,
     },
-    images: variant.images || [],
+    color,
+    images,
   };
 };
 
@@ -245,8 +277,12 @@ export const transformProductVariantResponse = (product: any, variant: RawVarian
   }
 
   return {
-    variant: transformVariant(variant),
-    availableOptions: buildAvailableOptionsWithStatus(validVariants, selectedOptions),
+    variant: transformVariant(variant, product.img),
+    availableOptions: buildAvailableOptionsWithStatus(
+      validVariants,
+      product.img || [],
+      selectedOptions,
+    ),
   };
 };
 
