@@ -1,6 +1,6 @@
 export * from "./brand.seed";
 export * from "./category.seed";
-export * from "./attribute.seed";
+export * from "./attribute-options.seed";
 export * from "./specifications.seed";
 export * from "./product-specifications.seed";
 export * from "./product-highlight.seed";

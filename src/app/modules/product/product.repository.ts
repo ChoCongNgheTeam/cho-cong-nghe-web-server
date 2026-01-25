@@ -26,7 +26,6 @@ const selectCategoryTree = {
   },
 };
 
-// XÓA selectVariantImage (không còn dùng)
 const selectColorImage = {
   id: true,
   color: true,
@@ -35,43 +34,31 @@ const selectColorImage = {
   position: true,
 };
 
-const selectInventory = {
-  quantity: true,
-  reservedQuantity: true,
-};
-
 const selectVariantAttribute = {
   id: true,
   attributeOption: {
     select: {
       id: true,
+      type: true,
       value: true,
       label: true,
-      attribute: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
     },
   },
 };
 
-// UPDATE: Variant không còn include images
 const selectVariant = {
   id: true,
   code: true,
   price: true,
+  quantity: true,
   soldCount: true,
   isDefault: true,
   isActive: true,
-  inventory: { select: selectInventory },
   variantAttributes: {
     select: selectVariantAttribute,
   },
 };
 
-// UPDATE: ProductCard include img (color images)
 const selectProductCard = {
   id: true,
   name: true,
@@ -83,7 +70,7 @@ const selectProductCard = {
   img: {
     select: selectColorImage,
     orderBy: [{ color: "asc" as const }, { position: "asc" as const }],
-    take: 1, // Chỉ lấy 1 ảnh đầu tiên cho thumbnail
+    take: 1,
   },
   viewsCount: true,
   ratingAverage: true,
@@ -92,7 +79,7 @@ const selectProductCard = {
   variants: {
     where: { isActive: true },
     select: selectVariant,
-    take: 1, // Chỉ lấy variant mặc định cho card
+    take: 1,
     orderBy: { isDefault: "desc" as const },
   },
   productSpecifications: {
@@ -111,7 +98,6 @@ const selectProductCard = {
   createdAt: true,
 };
 
-// UPDATE: ProductDetail include img
 const selectProductDetail = {
   id: true,
   name: true,
@@ -191,7 +177,6 @@ const buildProductWhere = (
 
   if (onlyActive) where.isActive = true;
 
-  // Search
   if (query.search) {
     where.OR = [
       { name: { contains: query.search, mode: "insensitive" } },
@@ -199,7 +184,6 @@ const buildProductWhere = (
     ];
   }
 
-  // Category filters
   if (query.category) {
     where.category = { slug: query.category };
   }
@@ -208,13 +192,10 @@ const buildProductWhere = (
     where.categoryId = query.categoryId;
   }
 
-  // Brand filter
   if (query.brandId) where.brandId = query.brandId;
 
-  // Featured filter
   if (query.isFeatured !== undefined) where.isFeatured = query.isFeatured;
 
-  // Price range (qua variants)
   if (query.minPrice || query.maxPrice) {
     where.variants = {
       some: {
@@ -225,19 +206,15 @@ const buildProductWhere = (
     };
   }
 
-  // Rating filter
   if (query.minRating) {
     where.ratingAverage = { gte: query.minRating };
   }
 
-  // In stock filter
   if (query.inStock) {
     where.variants = {
       some: {
         isActive: true,
-        inventory: {
-          quantity: { gt: 0 },
-        },
+        quantity: { gt: 0 },
       },
     };
   }
@@ -253,11 +230,6 @@ export const findAllAdmin = async (query: ListProductsQuery) => {
   return findAll(query, false);
 };
 
-// XÓA findAllVariantsWithImages (không còn cần thiết)
-
-/**
- * Find all color images for a product
- */
 export const findColorImagesByProductId = async (productId: string) => {
   return prisma.product_color_images.findMany({
     where: { productId },
@@ -265,9 +237,6 @@ export const findColorImagesByProductId = async (productId: string) => {
   });
 };
 
-/**
- * Get color images by product ID (for deletion)
- */
 export const getColorImagesByProductId = async (productId: string) => {
   return prisma.product_color_images.findMany({
     where: { productId },
@@ -279,9 +248,6 @@ export const getColorImagesByProductId = async (productId: string) => {
   });
 };
 
-/**
- * Delete color images
- */
 export const deleteColorImages = async (imageIds: string[]) => {
   return prisma.product_color_images.deleteMany({
     where: {
@@ -290,9 +256,6 @@ export const deleteColorImages = async (imageIds: string[]) => {
   });
 };
 
-/**
- * Create color images
- */
 export const createColorImages = async (productId: string, images: any[]) => {
   return prisma.product_color_images.createMany({
     data: images.map((img) => ({
@@ -332,11 +295,9 @@ const findAll = async (query: ListProductsQuery, onlyActive: boolean) => {
 
   const where = buildProductWhere(query, onlyActive);
 
-  // Xử lý sort theo price (cần join với variants)
   let orderBy: any = { [sortBy]: sortOrder };
 
   if (sortBy === "price") {
-    // Sort theo giá của variant mặc định
     orderBy = {
       variants: {
         _count: sortOrder,
@@ -354,6 +315,7 @@ const findAll = async (query: ListProductsQuery, onlyActive: boolean) => {
     }),
     prisma.products.count({ where }),
   ]);
+  console.log(data);
 
   return {
     data,
@@ -376,7 +338,6 @@ export const findVariantByCode = async (productId: string, code: string) => {
 };
 
 export const findVariantByOptions = async (productId: string, options: Record<string, string>) => {
-  // Lấy tất cả variants của product
   const variants = await prisma.products_variants.findMany({
     where: {
       productId,
@@ -385,24 +346,22 @@ export const findVariantByOptions = async (productId: string, options: Record<st
     select: selectVariant,
   });
 
-  // Tìm variant match với tất cả options
   const matchedVariant = variants.find((variant) => {
     const variantOptions: Record<string, string> = {};
 
     variant.variantAttributes.forEach((attr) => {
-      const attributeName = attr.attributeOption.attribute.name;
-      const optionValue = attr.attributeOption.value;
-      variantOptions[attributeName] = optionValue;
+      const type = attr.attributeOption.type;
+      const value = attr.attributeOption.value;
+      variantOptions[type] = value;
     });
 
-    // Kiểm tra tất cả options có match không
     return Object.entries(options).every(([key, value]) => variantOptions[key] === value);
   });
 
   return matchedVariant || null;
 };
 
-// UPDATE: findById include img
+// UPDATE: findById - không include inventory
 export const findById = async (id: string) => {
   return prisma.products.findUnique({
     where: { id },
@@ -422,14 +381,9 @@ export const findById = async (id: string) => {
       },
       variants: {
         include: {
-          inventory: true,
           variantAttributes: {
             include: {
-              attributeOption: {
-                include: {
-                  attribute: true,
-                },
-              },
+              attributeOption: true,
             },
           },
         },
@@ -444,7 +398,7 @@ export const findById = async (id: string) => {
   });
 };
 
-// UPDATE: findBySlug include img
+// UPDATE: findBySlug - không include inventory
 export const findBySlug = async (slug: string) => {
   return prisma.products.findUnique({
     where: { slug },
@@ -464,14 +418,9 @@ export const findBySlug = async (slug: string) => {
       },
       variants: {
         include: {
-          inventory: true,
           variantAttributes: {
             include: {
-              attributeOption: {
-                include: {
-                  attribute: true,
-                },
-              },
+              attributeOption: true,
             },
           },
         },
@@ -493,7 +442,6 @@ export const findSpecificationsBySlug = (slug: string) =>
   });
 
 export const findRelatedProducts = async (productId: string, limit: number = 8) => {
-  // Lấy thông tin sản phẩm hiện tại
   const product = await prisma.products.findUnique({
     where: { id: productId },
     select: {
@@ -590,14 +538,13 @@ export const getReviewStats = async (productId: string) => {
   };
 };
 
-// UPDATE: create với color images
+// UPDATE: create - không tạo inventory, dùng quantity trực tiếp
 export const create = async (data: any) => {
   const { variants, specifications, colorImages, ...product } = data;
 
   return prisma.products.create({
     data: {
       ...product,
-      // Tạo color images
       img: colorImages
         ? {
             create: colorImages.map((img: any) => ({
@@ -609,7 +556,6 @@ export const create = async (data: any) => {
             })),
           }
         : undefined,
-      // Tạo specifications
       productSpecifications: {
         create:
           specifications?.map((s: any, index: number) => ({
@@ -619,17 +565,14 @@ export const create = async (data: any) => {
             sortOrder: index,
           })) ?? [],
       },
-      // Tạo variants (KHÔNG còn images)
       variants: {
         create:
           variants?.map((v: any) => ({
             code: v.code,
             price: v.price,
+            quantity: v.quantity ?? 10, // ✅ Direct field với default value
             isDefault: v.isDefault || false,
             isActive: v.isActive ?? true,
-            inventory: {
-              create: { quantity: v.quantity ?? 0 },
-            },
             variantAttributes: {
               create:
                 v.variantAttributes?.map((attr: any) => ({
@@ -643,22 +586,18 @@ export const create = async (data: any) => {
   });
 };
 
-// UPDATE: update với color images
+// UPDATE: update - không update inventory, dùng quantity trực tiếp
 export const update = async (id: string, data: any) => {
   const { specifications, variants, colorImages, ...updateData } = data;
 
-  // Xử lý color images
   if (colorImages !== undefined) {
-    // Xóa ảnh cũ
     await prisma.product_color_images.deleteMany({ where: { productId: id } });
 
-    // Tạo ảnh mới nếu có
     if (colorImages.length > 0) {
       await createColorImages(id, colorImages);
     }
   }
 
-  // Xử lý specifications
   if (specifications !== undefined) {
     await prisma.product_specifications.deleteMany({ where: { productId: id } });
     if (specifications.length > 0) {
@@ -674,9 +613,7 @@ export const update = async (id: string, data: any) => {
     }
   }
 
-  // Xử lý variants nếu có
   if (variants !== undefined) {
-    // Lấy variants hiện tại
     const existingVariants = await prisma.products_variants.findMany({
       where: { productId: id },
       select: { id: true },
@@ -685,48 +622,32 @@ export const update = async (id: string, data: any) => {
     const existingIds = existingVariants.map((v) => v.id);
     const updateIds = variants.filter((v: any) => v.id).map((v: any) => v.id);
 
-    // Xóa variants không còn trong danh sách
     const toDelete = existingIds.filter((id) => !updateIds.includes(id));
     if (toDelete.length > 0) {
-      // Xóa các relation trước
       await prisma.variants_attributes.deleteMany({
         where: { productVariantId: { in: toDelete } },
       });
-      await prisma.inventory.deleteMany({
-        where: { productVariantId: { in: toDelete } },
-      });
-      // Xóa variants
+      // REMOVED: Delete inventory
       await prisma.products_variants.deleteMany({
         where: { id: { in: toDelete } },
       });
     }
 
-    // Update hoặc create variants
     for (const variant of variants) {
       if (variant._delete) {
-        // Skip deleted variants
         continue;
       }
 
       if (variant.id) {
-        // Update existing variant
+        // UPDATE existing variant - quantity là direct field
         await prisma.products_variants.update({
           where: { id: variant.id },
           data: {
             code: variant.code,
             price: variant.price,
+            quantity: variant.quantity, // ✅ Direct field
             isDefault: variant.isDefault,
             isActive: variant.isActive,
-            inventory:
-              variant.quantity !== undefined
-                ? {
-                    upsert: {
-                      create: { quantity: variant.quantity },
-                      update: { quantity: variant.quantity },
-                    },
-                  }
-                : undefined,
-            // Update variant attributes nếu có
             ...(variant.variantAttributes && {
               variantAttributes: {
                 deleteMany: {},
@@ -738,17 +659,15 @@ export const update = async (id: string, data: any) => {
           },
         });
       } else {
-        // Create new variant
+        // CREATE new variant
         await prisma.products_variants.create({
           data: {
             productId: id,
             code: variant.code,
             price: variant.price,
+            quantity: variant.quantity ?? 10,
             isDefault: variant.isDefault || false,
             isActive: variant.isActive ?? true,
-            inventory: {
-              create: { quantity: variant.quantity ?? 0 },
-            },
             variantAttributes: {
               create:
                 variant.variantAttributes?.map((attr: any) => ({
@@ -761,7 +680,6 @@ export const update = async (id: string, data: any) => {
     }
   }
 
-  // Update product data
   return prisma.products.update({
     where: { id },
     data: updateData,
@@ -769,36 +687,26 @@ export const update = async (id: string, data: any) => {
   });
 };
 
-// UPDATE: remove - xóa color images thay vì variant images
+// UPDATE: remove - không xóa inventory
 export const remove = async (id: string) => {
-  // Xóa cascade theo thứ tự
   const variants = await prisma.products_variants.findMany({
     where: { productId: id },
     select: { id: true },
   });
 
   for (const variant of variants) {
-    // XÓA logic xóa variant images
     await prisma.variants_attributes.deleteMany({
       where: { productVariantId: variant.id },
     });
   }
 
-  await prisma.inventory.deleteMany({
-    where: { variant: { productId: id } },
-  });
-
+  // REMOVED: Delete inventory
   await prisma.products_variants.deleteMany({ where: { productId: id } });
-
-  // XÓA color images
   await prisma.product_color_images.deleteMany({ where: { productId: id } });
-
   await prisma.product_specifications.deleteMany({ where: { productId: id } });
 
   return prisma.products.delete({ where: { id } });
 };
-
-// XÓA getVariantImagesByProductId (thay bằng getColorImagesByProductId)
 
 export const bulkUpdate = async (productIds: string[], updates: any) => {
   return prisma.products.updateMany({
@@ -821,13 +729,9 @@ export const getProductVariantOptionsMap = async (productIds: string[]) => {
       },
       attributeOption: {
         select: {
+          type: true,
           value: true,
           label: true,
-          attribute: {
-            select: {
-              name: true, // color, size, storage
-            },
-          },
         },
       },
     },
@@ -837,7 +741,7 @@ export const getProductVariantOptionsMap = async (productIds: string[]) => {
   const map = new Map<
     string,
     {
-      attribute: { name: string };
+      type: string;
       options: { value: string; label: string }[];
     }[]
   >();
@@ -846,11 +750,11 @@ export const getProductVariantOptionsMap = async (productIds: string[]) => {
     const productId = row.productVariant.productId;
     const list = map.get(productId) ?? [];
 
-    let group = list.find((g) => g.attribute.name === row.attributeOption.attribute.name);
+    let group = list.find((g) => g.type === row.attributeOption.type);
 
     if (!group) {
       group = {
-        attribute: { name: row.attributeOption.attribute.name },
+        type: row.attributeOption.type,
         options: [],
       };
       list.push(group);

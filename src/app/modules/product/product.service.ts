@@ -25,6 +25,7 @@ export const getProductsPublic = async (query: ListProductsQuery) => {
 
   const productIds = result.data.map((p) => p.id);
   const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
+  // console.log(variantOptionsMap);
 
   return {
     ...result,
@@ -38,14 +39,12 @@ export const getProductsPublic = async (query: ListProductsQuery) => {
           variantOptions,
         },
 
-        // chỉ dùng nội bộ - KHÔNG trả về client
         pricingContext: defaultVariant
           ? {
               productId: product.id,
               variantId: defaultVariant.id,
               price: Number(defaultVariant.price),
               brandId: product.brand?.id,
-              categoryId: product.category?.id,
               categoryPath: buildCategoryPath(product.category),
             }
           : null,
@@ -77,6 +76,8 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
     distribution: reviewStats.distribution as any,
   });
 
+  // console.log(productDetail);
+
   const highlights = transformProductHighlights(product);
 
   // Check if user can review
@@ -91,12 +92,7 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
 
   return {
     ...productDetail,
-    pricingContext: {
-      productId: product.id,
-      brandId: product.brand?.id,
-      categoryId: product.category?.id,
-      categoryPath: buildCategoryPath(product.category),
-    },
+    categoryPath: buildCategoryPath(product.category),
     highlights,
     canReview,
     orderItemId,
@@ -121,7 +117,6 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
   const normalizedVariant: RawVariant = {
     ...variant,
     code: variant.code ?? "",
-    inventory: variant.inventory ?? undefined,
   };
 
   const variantResponse = transformProductVariantResponse(product, normalizedVariant);
@@ -130,8 +125,9 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
     ...variantResponse,
     pricingContext: {
       productId: product.id,
+      variantId: variant.id,
+      price: Number(variant.price),
       brandId: product.brand?.id,
-      categoryId: product.category?.id,
       categoryPath: buildCategoryPath(product.category),
     },
   };
@@ -170,9 +166,7 @@ export const getProductGallery = async (slug: string) => {
     position: img.position,
   }));
 };
-/**
- * IMPROVED: Return related products with pricing context
- */
+
 export const getRelatedProducts = async (slug: string, limit: number = 8) => {
   const product = await repo.findBySlug(slug);
   if (!product) {
@@ -183,21 +177,24 @@ export const getRelatedProducts = async (slug: string, limit: number = 8) => {
 
   const related = await repo.findRelatedProducts(product.id, limit);
 
-  // Transform and include pricing context for each product
+  const productIds = related.map((p) => p.id);
+  const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
+
   return related.map((p) => {
     const defaultVariant = p.variants?.[0];
-    const transformed = transformProductCard(p);
+    const variantOptions = variantOptionsMap.get(p.id) ?? [];
 
     return {
-      ...transformed,
-      // Internal use only - needed for pricing
-      _pricingContext: defaultVariant
+      card: {
+        ...transformProductCard(p),
+        variantOptions,
+      },
+      pricingContext: defaultVariant
         ? {
             productId: p.id,
             variantId: defaultVariant.id,
             price: Number(defaultVariant.price),
             brandId: p.brand?.id,
-            categoryId: p.category?.id,
             categoryPath: buildCategoryPath(p.category),
           }
         : null,

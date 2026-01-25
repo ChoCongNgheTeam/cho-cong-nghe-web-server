@@ -12,11 +12,14 @@ export const getProductsWithPricing = async (query: ListProductsQuery, userId?: 
         return { ...card, pricing: null };
       }
 
+      console.log(pricingContext.categoryPath);
+
       const fullPricing = await getVariantPricing(
         pricingContext.productId,
         pricingContext.variantId,
         pricingContext.price,
-        pricingContext,
+        pricingContext.brandId,
+        pricingContext.categoryPath,
         userId,
       );
 

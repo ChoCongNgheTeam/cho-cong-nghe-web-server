@@ -22,14 +22,11 @@ export interface ColorImage {
   position: number;
 }
 
-export interface Inventory {
-  quantity: number;
-  reservedQuantity: number;
-  available: number;
-}
+// REMOVED: Inventory interface - không còn dùng
+// Thông tin inventory giờ là part of variant
 
 export interface AvailableOption {
-  attribute: string;
+  type: string; // "color" hoặc "storage"
   values: AvailableOptionValue[];
 }
 
@@ -37,7 +34,7 @@ export interface AvailableOptionValue {
   id: string;
   value: string;
   label?: string;
-  image?: ColorImage | null; // Ảnh cho option color
+  image?: ColorImage | null;
 }
 
 export interface PriceRange {
@@ -64,14 +61,14 @@ export interface ProductVariant {
   originalPrice?: number;
   discountPrice?: number;
   discountPercentage?: number;
+  quantity: number; // ✅ NEW: Direct field
   soldCount: number;
   isDefault: boolean;
   isActive: boolean;
   available: boolean;
   stockStatus: "in_stock" | "low_stock" | "out_of_stock";
-  inventory: Inventory;
-  color?: string; // Màu của variant này
-  images: ColorImage[]; // Ảnh theo màu
+  color?: string;
+  images: ColorImage[];
 }
 
 // =====================
@@ -222,26 +219,20 @@ export interface ProductListResponse extends PaginatedResponse<ProductCard> {
 export interface RawVariantAttribute {
   attributeOption: {
     id: string;
+    type: string;
     value: string;
     label: string;
-    attribute: {
-      id: string;
-      name: string;
-    };
   };
 }
 
+// UPDATE: RawVariant không còn nested inventory
 export interface RawVariant {
   id: string;
   code: string;
   price: any;
-  images?: string[];
+  quantity: number;
   soldCount: number;
   isDefault: boolean;
   isActive: boolean;
-  inventory?: {
-    quantity: number;
-    reservedQuantity: number;
-  };
   variantAttributes: RawVariantAttribute[];
 }

@@ -11,6 +11,21 @@ export interface PricingProductInput {
   categoryPath?: string[];
 }
 
+export interface PricingContext {
+  userId?: string;
+  currentDate: Date;
+  availablePromotions: PromotionData[];
+  voucher?: VoucherData;
+
+  categoryPath?: string[];
+  brandId?: string;
+}
+
+export interface PricingContextInput {
+  brandId?: string;
+  categoryPath?: string[];
+}
+
 export interface PricingCartInput {
   items: PricingProductInput[];
   voucherCode?: string;
@@ -149,22 +164,4 @@ export interface PricingResult {
   // Validation
   isValid: boolean;
   errors: string[];
-}
-
-// ===== PRICING CONTEXT =====
-
-export interface PricingContext {
-  userId?: string;
-  currentDate: Date;
-  availablePromotions: PromotionData[];
-  voucher?: VoucherData;
-
-  categoryPath?: string[];
-  brandId?: string;
-}
-
-export interface PricingContextInput {
-  brandId?: string;
-  categoryId?: string;
-  categoryPath?: string[];
 }

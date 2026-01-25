@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import {
   seedBrands,
   seedCategories,
-  seedAttributes,
+  seedAttributeOptions,
   seedSpecifications,
   seedProductSpecifications,
   seedProductHighlights,
@@ -24,7 +24,7 @@ async function main() {
 
   const brands = await seedBrands();
   const categories = await seedCategories();
-  const attributes = await seedAttributes();
+  const attributes = await seedAttributeOptions();
   await seedSpecifications();
   await seedPaymentMethods();
   const users = await seedUsers();
@@ -40,7 +40,7 @@ async function main() {
   });
   await seedProductSpecifications();
   await seedProductHighlights();
-  await seedVariants({ products, attributes });
+  await seedVariants({ products });
   await seedProductColorImages({ products });
   console.log("Seeding hoàn tất thành công!");
 }

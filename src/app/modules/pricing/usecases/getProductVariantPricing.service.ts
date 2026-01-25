@@ -10,9 +10,10 @@ export const getProductVariantWithPricing = async (
 
   const price = await getVariantPricing(
     pricingContext.productId,
-    variant.id,
-    Number(variant.price),
-    pricingContext,
+    pricingContext.variantId,
+    pricingContext.price,
+    pricingContext.brandId,
+    pricingContext.categoryPath,
     userId,
   );
 

@@ -88,7 +88,6 @@ model users {
   updatedAt    DateTime @updatedAt
 
   userAddresses user_addresses[]
-  orders        orders[]
   cartItems     cart_items[]
   wishlist      wishlist[]
   reviews       reviews[]
@@ -176,7 +175,6 @@ model categories {
   parent                 categories?               @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children               categories[]              @relation("CategoryHierarchy")
   products               products[]
-  attributes             category_attributes[]
   categorySpecifications category_specifications[]
 
   @@unique([parentId, position])
@@ -218,43 +216,42 @@ model products {
   productSpecifications product_specifications[]
 }
 
-model category_attributes {
-  categoryId  String @db.Uuid
-  attributeId String @db.Uuid
+// model category_attributes {
+//   categoryId  String @db.Uuid
+//   attributeId String @db.Uuid
 
-  category  categories @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  attribute attributes @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+//   category  categories @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+//   attribute attributes @relation(fields: [attributeId], references: [id], onDelete: Cascade)
 
-  // Optional: tùy chỉnh thêm
-  isRequired Boolean @default(false) // bắt buộc cho category này?
-  sortOrder  Int     @default(0)
+//   // Optional: tùy chỉnh thêm
+//   isRequired Boolean @default(false) // bắt buộc cho category này?
+//   sortOrder  Int     @default(0)
 
-  @@id([categoryId, attributeId])
-}
+//   @@id([categoryId, attributeId])
+// }
 
-model attributes {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String   @unique
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+// model attributes {
+//   id          String   @id @default(uuid()) @db.Uuid
+//   name        String   @unique
+//   description String?
+//   createdAt   DateTime @default(now())
+//   updatedAt   DateTime @updatedAt
 
-  options             attributes_options[]
-  allowedInCategories category_attributes[]
-}
+//   options             attributes_options[]
+//   allowedInCategories category_attributes[]
+// }
 
 model attributes_options {
   id          String   @id @default(uuid()) @db.Uuid
-  attributeId String   @db.Uuid
+  type        String
   value       String
   label       String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  attribute    attributes            @relation(fields: [attributeId], references: [id])
   variantAttrs variants_attributes[]
 
-  @@unique([attributeId, value])
+  @@unique([type, value])
 }
 
 model products_variants {
@@ -262,6 +259,7 @@ model products_variants {
   productId String   @db.Uuid
   code      String?  @unique // SKU
   price     Decimal  @db.Decimal(10, 2)
+  quantity  Int @default(10)
   soldCount Int      @default(0)
   // weight    Decimal? @db.Decimal(10, 2) // gram/kg
   isDefault Boolean  @default(false)
@@ -271,7 +269,7 @@ model products_variants {
 
   product           products                 @relation(fields: [productId], references: [id])
   variantAttributes variants_attributes[]
-  inventory         inventory?
+  // inventory         inventory?
   cartItems         cart_items[]
   orderItems        order_items[]
   wishlist          wishlist[]
@@ -320,14 +318,14 @@ model variants_attributes {
 //   productVariant products_variants @relation(fields: [productVariantId], references: [id])
 // }
 
-model inventory {
-  variantId        String   @id @db.Uuid
-  quantity         Int      @default(0)
-  reservedQuantity Int      @default(0)
-  updatedAt        DateTime @updatedAt
+// model inventory {
+//   variantId        String   @id @db.Uuid
+//   quantity         Int      @default(0)
+//   reservedQuantity Int      @default(0)
+//   updatedAt        DateTime @updatedAt
 
-  variant products_variants @relation(fields: [variantId], references: [id])
-}
+//   variant products_variants @relation(fields: [variantId], references: [id])
+// }
 
 model category_specifications {
   categoryId      String @db.Uuid
@@ -416,7 +414,6 @@ model orders {
   user            users                  @relation(fields: [userId], references: [id])
   paymentMethod   payment_methods        @relation(fields: [paymentMethodId], references: [id])
   voucher         vouchers?              @relation(fields: [voucherId], references: [id])
-  shippingAddress user_addresses         @relation(fields: [shippingAddressId], references: [id])
   orderItems      order_items[]
   voucherUsages   voucher_usages[]
   transactions    payment_transactions[]
@@ -568,4 +565,97 @@ model promotion_targets {
   updatedAt DateTime @updatedAt
 
   promotion promotions @relation(fields: [promotionId], references: [id])
+}
+
+// =======================
+// ENUMS
+// =======================
+
+enum BlogStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CommentTargetType {
+  BLOG
+  PRODUCT
+  PAGE
+}
+
+enum PageType {
+  PAGE
+  POLICY
+}
+
+enum PolicyType {
+  PRIVACY
+  TERMS
+  SHIPPING
+  RETURN
+  PAYMENT
+}
+
+model blogs {
+  id         String     @id @default(uuid()) @db.Uuid
+  authorId   String     @db.Uuid
+
+  title      String
+  slug       String     @unique
+  content    String
+  thumbnail  String?
+  viewCount  Int        @default(0)
+  status     BlogStatus @default(DRAFT)
+
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  publishedAt DateTime?
+
+  author     users      @relation(fields: [authorId], references: [id])
+  comments   comments[]
+}
+
+// =======================
+// COMMENTS (POLYMORPHIC)
+// =======================
+
+model comments {
+  id          String             @id @default(uuid()) @db.Uuid
+  userId      String             @db.Uuid
+
+  content     String
+  targetType  CommentTargetType
+  targetId    String
+
+  parentId    String?
+  isApproved  Boolean            @default(false)
+
+  createdAt   DateTime           @default(now())
+
+  user        users              @relation(fields: [userId], references: [id])
+  parent      comments?          @relation("CommentParent", fields: [parentId], references: [id])
+  replies     comments[]         @relation("CommentParent")
+
+  @@index([targetType, targetId])
+}
+
+// =======================
+// PAGES / POLICIES
+// =======================
+
+model pages {
+  id          String     @id @default(uuid()) @db.Uuid
+
+  type        PageType
+  policyType  PolicyType?
+
+  title       String
+  slug        String     @unique
+  content     String
+
+  isPublished Boolean    @default(true)
+  priority    Int        @default(0)
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 }

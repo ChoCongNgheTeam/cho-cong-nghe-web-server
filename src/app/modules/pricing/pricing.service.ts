@@ -48,6 +48,8 @@ export const calculateProductPrice = async (
     brandId: input.brandId,
   };
 
+  // console.log(context);
+
   let finalPrice = input.basePrice;
   let totalDiscount = 0;
   const appliedPromotions: AppliedDiscount[] = [];
@@ -323,7 +325,8 @@ export const getVariantPricing = async (
   productId: string,
   variantId: string,
   basePrice: number,
-  context?: PricingContextInput,
+  brandId?: string,
+  categoryPath?: string[],
   userId?: string,
 ) => {
   // Use DETAIL MODE to show all promotions
@@ -333,12 +336,14 @@ export const getVariantPricing = async (
       variantId,
       basePrice,
       quantity: 1,
-      categoryPath: context?.categoryPath,
-      brandId: context?.brandId,
+      brandId,
+      categoryPath,
     },
     userId,
     "detail", // Show all available promotions
   );
+
+  // console.log(pricedProduct);
 
   return {
     base: pricedProduct.basePrice,
