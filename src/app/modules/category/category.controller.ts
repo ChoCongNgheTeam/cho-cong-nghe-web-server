@@ -17,6 +17,21 @@ export const getRootCategoriesHandler = async (req: Request, res: Response) => {
   }
 };
 
+// Lấy featured categories cho Home
+export const getFeaturedCategoriesHandler = async (req: Request, res: Response) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+    const categories = await categoryService.getFeaturedCategories(limit);
+    res.json({
+      data: categories,
+      total: categories.length,
+      message: "Lấy danh mục nổi bật thành công",
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || "Lỗi server" });
+  }
+};
+
 // Lấy category tree cho menu
 export const getCategoryTreeHandler = async (req: Request, res: Response) => {
   try {

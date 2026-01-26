@@ -14,3 +14,5 @@ export * from "./user-address.seed";
 export * from "./voucher.seed";
 export * from "./promotion.seed";
 export * from "./blog.seed";
+export * from "./comment.seed";
+export * from "./image-media.seed";

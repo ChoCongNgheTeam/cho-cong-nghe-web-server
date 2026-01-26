@@ -2,6 +2,7 @@ import { Router } from "express";
 import { validate } from "@/app/middlewares/validate.middleware";
 import {
   getRootCategoriesHandler,
+  getFeaturedCategoriesHandler, // ✅ MỚI
   getCategoryTreeHandler,
   getCategoryBySlugHandler,
   getAllCategoriesHandler,
@@ -27,6 +28,10 @@ const router = Router();
 // Lấy root categories cho home page
 router.get("/roots", getRootCategoriesHandler);
 
+// Lấy featured categories cho home (orchestrator sẽ dùng)
+// Query params: ?limit=6 (optional)
+router.get("/featured", getFeaturedCategoriesHandler);
+
 // Lấy category tree cho menu (nested structure)
 router.get("/tree", getCategoryTreeHandler);
 
@@ -49,7 +54,7 @@ router.post(
   authMiddleware,
   requireRole("ADMIN"),
   validate(createCategorySchema),
-  createCategoryHandler
+  createCategoryHandler,
 );
 
 // Update category
@@ -58,7 +63,7 @@ router.patch(
   authMiddleware,
   requireRole("ADMIN"),
   validate(updateCategorySchema),
-  updateCategoryHandler
+  updateCategoryHandler,
 );
 
 // Xóa category
@@ -70,7 +75,7 @@ router.post(
   authMiddleware,
   requireRole("ADMIN"),
   validate(reorderCategorySchema),
-  reorderCategoryHandler
+  reorderCategoryHandler,
 );
 
 export default router;

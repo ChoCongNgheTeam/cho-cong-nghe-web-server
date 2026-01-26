@@ -11,9 +11,11 @@ export const createCategorySchema = z.object({
 
   description: z.string().trim().max(500, "Mô tả tối đa 500 ký tự").optional().or(z.literal("")),
 
-  categoryImage: z.url("URL hình ảnh không hợp lệ").optional().or(z.literal("")),
+  imagePath: z.url("URL hình ảnh không hợp lệ").optional().or(z.literal("")),
 
   position: z.number().int().min(0).optional(),
+
+  isFeatured: z.boolean().optional().default(false),
 
   isActive: z.boolean().optional().default(true),
 });
@@ -31,9 +33,11 @@ export const updateCategorySchema = z
 
     description: z.string().trim().max(500, "Mô tả tối đa 500 ký tự").optional().or(z.literal("")),
 
-    categoryImage: z.url("URL hình ảnh không hợp lệ").optional().or(z.literal("")),
+    imagePath: z.url("URL hình ảnh không hợp lệ").optional().or(z.literal("")),
 
     position: z.number().int().min(0).optional(),
+
+    isFeatured: z.boolean().optional(),
 
     isActive: z.boolean().optional(),
   })

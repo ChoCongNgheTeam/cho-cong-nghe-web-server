@@ -16,6 +16,8 @@ import {
   seedVouchers,
   seedPromotions,
   seedBlogs,
+  seedComments,
+  seedImageMedia,
 } from "./seeds";
 
 const prisma = new PrismaClient();
@@ -45,6 +47,10 @@ async function main() {
   await seedProductColorImages({ products });
 
   await seedBlogs();
+
+  await seedComments();
+
+  await seedImageMedia();
 
   console.log("Seeding hoàn tất thành công!");
 }

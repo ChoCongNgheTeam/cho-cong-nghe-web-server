@@ -13,6 +13,11 @@ export const getRootCategories = async () => {
   return categoryRepository.findRootCategories(true);
 };
 
+//  Lấy featured categories cho Home (orchestrator sẽ dùng)
+export const getFeaturedCategories = async (limit?: number) => {
+  return categoryRepository.findFeaturedCategories(limit);
+};
+
 // 2. Lấy category tree cho menu
 export const getCategoryTree = async () => {
   const categories = await categoryRepository.findAllCategoriesForTree(true);
@@ -53,7 +58,7 @@ export const getCategoryDetail = async (id: string) => {
   const childrenTree = buildCategoryTree(categories, id);
 
   const parent = current.parentId
-    ? categories.find((c) => c.id === current.parentId) ?? null
+    ? (categories.find((c) => c.id === current.parentId) ?? null)
     : null;
 
   return {
@@ -106,7 +111,6 @@ export const createCategory = async (input: CreateCategoryInput) => {
   }
 };
 
-let newPosition: number | undefined;
 // Update category
 export const updateCategory = async (id: string, input: UpdateCategoryInput) => {
   const { name, parentId, ...rest } = input;
@@ -178,7 +182,7 @@ export const deleteCategory = async (id: string) => {
   const hasChildren = await categoryRepository.hasChildren(id);
   if (hasChildren) {
     throw new BadRequestError(
-      "Không thể xóa danh mục có danh mục con. Vui lòng xóa danh mục con trước."
+      "Không thể xóa danh mục có danh mục con. Vui lòng xóa danh mục con trước.",
     );
   }
 
@@ -186,7 +190,7 @@ export const deleteCategory = async (id: string) => {
   const hasProducts = await categoryRepository.hasProducts(id);
   if (hasProducts) {
     throw new BadRequestError(
-      "Không thể xóa danh mục đang có sản phẩm. Vui lòng chuyển sản phẩm sang danh mục khác trước."
+      "Không thể xóa danh mục đang có sản phẩm. Vui lòng chuyển sản phẩm sang danh mục khác trước.",
     );
   }
 
@@ -221,7 +225,7 @@ export const reorderCategory = async (categoryId: string, newPosition: number) =
     prisma.categories.update({
       where: { id: categoryId },
       data: { position: newPosition },
-    })
+    }),
   );
 
   await prisma.$transaction(updates);

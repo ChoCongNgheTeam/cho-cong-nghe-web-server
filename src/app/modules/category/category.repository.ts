@@ -7,8 +7,10 @@ const selectCategory = {
   slug: true,
   parentId: true,
   description: true,
-  categoryImage: true,
+  imagePath: true,
+  imageUrl: true,
   position: true,
+  isFeatured: true, // ✅ Thêm field mới
   isActive: true,
   createdAt: true,
   updatedAt: true,
@@ -52,31 +54,26 @@ export const findRootCategories = async (onlyActive: boolean = true) => {
   });
 };
 
-// Lấy category tree đầy đủ cho menu (recursive)
-// export const findCategoryTree = async (onlyActive: boolean = true) => {
-//   const categories = await prisma.categories.findMany({
-//     where: {
-//       parentId: null,
-//       ...(onlyActive && { isActive: true }),
-//     },
-//     select: {
-//       ...selectCategory,
-//       children: {
-//         select: {
-//           ...selectCategory,
-//           children: {
-//             select: selectCategory,
-//             orderBy: { position: "asc" },
-//           },
-//         },
-//         orderBy: { position: "asc" },
-//       },
-//     },
-//     orderBy: { position: "asc" },
-//   });
-
-//   return categories;
-// };
+// ✅ MỚI: Lấy featured categories cho Home
+export const findFeaturedCategories = async (limit?: number) => {
+  return prisma.categories.findMany({
+    where: {
+      isFeatured: true,
+      isActive: true,
+    },
+    select: {
+      ...selectCategory,
+      _count: {
+        select: {
+          children: true,
+          products: true, // Đếm số products để hiển thị
+        },
+      },
+    },
+    orderBy: { position: "asc" },
+    ...(limit && { take: limit }),
+  });
+};
 
 export const findAllCategoriesForTree = async (onlyActive: boolean = true) => {
   return prisma.categories.findMany({
@@ -94,40 +91,6 @@ export const findAllCategoriesForTree = async (onlyActive: boolean = true) => {
   });
 };
 
-// Lấy category với children
-// export const findByIdWithChildren = async (id: string) => {
-//   return prisma.categories.findUnique({
-//     where: { id },
-//     select: {
-//       ...selectCategory,
-//       parent: {
-//         select: {
-//           id: true,
-//           name: true,
-//           slug: true,
-//         },
-//       },
-//       children: {
-//         select: {
-//           ...selectCategory,
-//           _count: {
-//             select: {
-//               children: true,
-//             },
-//           },
-//         },
-//         orderBy: { position: "asc" },
-//       },
-//       _count: {
-//         select: {
-//           children: true,
-//           productCategories: true,
-//         },
-//       },
-//     },
-//   });
-// };
-
 // Lấy category theo ID (simple)
 export const findById = async (id: string) => {
   return prisma.categories.findUnique({
@@ -135,17 +98,6 @@ export const findById = async (id: string) => {
     select: selectCategory,
   });
 };
-
-// export const getMaxPositionByParent = async (parentId: string | null) => {
-//   const result = await prisma.categories.aggregate({
-//     where: { parentId },
-//     _max: {
-//       position: true,
-//     },
-//   });
-
-//   return result._max.position ?? -1;
-// };
 
 // Lấy category theo slug
 export const findBySlug = async (slug: string) => {
@@ -203,8 +155,8 @@ export const hasChildren = async (id: string): Promise<boolean> => {
 
 // Check category có products không
 export const hasProducts = async (id: string): Promise<boolean> => {
-  const count = await prisma.product_categories.count({
-    where: { categoryId: id },
+  const count = await prisma.categories.count({
+    where: { id: id },
   });
   return count > 0;
 };
@@ -222,7 +174,7 @@ export const findSiblings = async (parentId: string | null) => {
 export const existsByNameInParent = async (
   name: string,
   parentId: string | null,
-  excludeId?: string
+  excludeId?: string,
 ) => {
   const category = await prisma.categories.findFirst({
     where: {

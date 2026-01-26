@@ -4,14 +4,14 @@ import { generateUniqueSlug } from "./generate-unique-slug";
 interface CategorySeedData {
   name: string;
   description?: string;
-  categoryImage?: string;
+  imagePath?: string;
   parentName?: string;
 }
 
 export async function seedCategoryGroup(
   prisma: PrismaClient,
   categoryData: CategorySeedData[],
-  groupName?: string
+  groupName?: string,
 ) {
   if (groupName) {
     console.log(`  📦 Seeding ${groupName}...`);
@@ -34,7 +34,7 @@ export async function seedCategoryGroup(
         name: cat.name,
         slug,
         description: cat.description,
-        categoryImage: cat.categoryImage,
+        imagePath: cat.imagePath,
         position: siblingCount,
       },
     });
@@ -71,7 +71,7 @@ export async function seedCategoryGroup(
           name: cat.name,
           slug,
           description: cat.description,
-          categoryImage: cat.categoryImage,
+          imagePath: cat.imagePath,
           parentId: parent.id,
           position: siblingCount,
         },

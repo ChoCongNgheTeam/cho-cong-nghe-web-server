@@ -14,6 +14,9 @@ import userAddressRoutes from "@/app/modules/user-address/user-address.route";
 import voucherRoutes from "@/app/modules/voucher/voucher.route";
 import promotionRoutes from "@/app/modules/promotion/promotion.route";
 import blogRouters from "@/app/modules/blog/blog.routes";
+import commentRoutes from "@/app/modules/comment/comment.routes";
+import blogWithCommentsRoutes from "@/app/modules/blog-with-comments/blog-with-comments.routes";
+import imageMediaRouter from "@/app/modules/image-media/media.route";
 
 const router = Router();
 
@@ -31,4 +34,7 @@ router.use("/addresses", userAddressRoutes);
 router.use("/vouchers", voucherRoutes);
 router.use("/promotions", promotionRoutes);
 router.use("/blogs", blogRouters);
+router.use("/comments", commentRoutes);
+router.use("/blog-with-comments", blogWithCommentsRoutes);
+router.use("/media", imageMediaRouter);
 export default router;

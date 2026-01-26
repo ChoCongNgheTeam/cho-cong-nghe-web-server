@@ -20,62 +20,120 @@ cloudinary.config({
 // ==========================
 const ASSETS_DIR = path.join(process.cwd(), "assets");
 
-async function uploadAssets() {
-  console.log("🚀 Start uploading assets...");
+// ==========================
+// Generic upload function
+// ==========================
+async function uploadImages<T extends { id: string; imagePath: string | null }>(
+  items: T[],
+  updateFn: (id: string, imageUrl: string) => Promise<unknown>,
+) {
+  let notFoundCount = 0;
 
-  const images = await prisma.product_color_images.findMany({
-    where: {
-      imageUrl: null,
-    },
-  });
+  for (const item of items) {
+    if (!item.imagePath) continue;
 
-  if (images.length === 0) {
-    console.log("✅ No images to upload");
-    return;
-  }
-
-  for (const img of images) {
-    const localFilePath = path.join(ASSETS_DIR, img.imagePath);
+    const localFilePath = path.join(ASSETS_DIR, item.imagePath);
 
     if (!fs.existsSync(localFilePath)) {
+      notFoundCount++;
       console.warn(`❌ File not found: ${localFilePath}`);
       continue;
     }
 
     try {
-      // Normalize path separators to forward slashes
-      const normalizedPath = img.imagePath.replace(/\\/g, "/");
-
-      // Split path into folder and filename
-      // e.g., "products/iphone-13/black/front.webp"
-      const pathParts = normalizedPath.split("/");
-      const fileName = pathParts.pop()!; // "front.webp"
-      const folderPath = pathParts.join("/"); // "products/iphone-13/black"
-
-      // Remove file extension from filename
-      const fileNameWithoutExt = fileName.replace(path.extname(fileName), "");
+      const normalizedPath = item.imagePath.replace(/\\/g, "/");
+      const parts = normalizedPath.split("/");
+      const fileName = parts.pop()!;
+      const folderPath = parts.join("/");
+      const publicId = fileName.replace(path.extname(fileName), "");
 
       const result = await cloudinary.uploader.upload(localFilePath, {
-        folder: folderPath, // ✅ Explicitly set folder
-        public_id: fileNameWithoutExt, // ✅ Just the filename without extension
+        folder: folderPath,
+        public_id: publicId,
         overwrite: true,
         resource_type: "image",
       });
 
-      await prisma.product_color_images.update({
-        where: { id: img.id },
-        data: {
-          imageUrl: result.secure_url,
-        },
-      });
+      await updateFn(item.id, result.secure_url);
 
-      console.log(`☁️ Uploaded: ${folderPath}/${fileNameWithoutExt}`);
+      console.log(`☁️ Uploaded: ${folderPath}/${publicId}`);
     } catch (error) {
-      console.error(`🔥 Upload failed: ${img.imagePath}`, error);
+      console.error(`🔥 Upload failed: ${item.imagePath}`, error);
     }
   }
+
+  console.log(`⚠️ File not found total: ${notFoundCount}`);
 }
 
+// ==========================
+// Main script
+// ==========================
+async function uploadAssets() {
+  console.log("🚀 Start uploading assets...");
+
+  // -------- Products --------
+  const productImages = await prisma.product_color_images.findMany({
+    where: { imageUrl: null },
+  });
+
+  await uploadImages(productImages, (id, url) =>
+    prisma.product_color_images.update({
+      where: { id },
+      data: { imageUrl: url },
+    }),
+  );
+
+  // -------- Brands --------
+  const brands = await prisma.brands.findMany({
+    where: {
+      imagePath: { not: null },
+      imageUrl: null,
+    },
+  });
+
+  await uploadImages(brands, (id, url) =>
+    prisma.brands.update({
+      where: { id },
+      data: { imageUrl: url },
+    }),
+  );
+
+  // -------- Categories --------
+  const categories = await prisma.categories.findMany({
+    where: {
+      imagePath: { not: null },
+      imageUrl: null,
+    },
+  });
+
+  await uploadImages(categories, (id, url) =>
+    prisma.categories.update({
+      where: { id },
+      data: { imageUrl: url },
+    }),
+  );
+
+  // -------- Images Media --------
+  const imagesMedia = await prisma.image_media.findMany({
+    where: {
+      imagePath: { not: null },
+      imageUrl: null,
+    },
+  });
+
+  await uploadImages(imagesMedia, (id, url) =>
+    prisma.image_media.update({
+      where: { id },
+      data: { imageUrl: url },
+    }),
+  );
+
+  console.log("✅ All assets uploaded");
+}
+
+// ==========================
+// Run
+// ==========================
 uploadAssets()
   .catch((e) => {
     console.error("❌ Script error:", e);
