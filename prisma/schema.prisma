@@ -71,6 +71,31 @@ enum ReviewStatus {
   REJECTED
 }
 
+enum BlogStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CommentTargetType {
+  BLOG
+  PRODUCT
+  PAGE
+}
+
+enum PageType {
+  PAGE
+  POLICY
+}
+
+enum PolicyType {
+  PRIVACY
+  TERMS
+  SHIPPING
+  RETURN
+  PAYMENT
+}
+
 // --------------------- MODELS ---------------------
 
 model users {
@@ -87,12 +112,15 @@ model users {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  orders        orders[]
   userAddresses user_addresses[]
   cartItems     cart_items[]
   wishlist      wishlist[]
   reviews       reviews[]
   voucherUsers  voucher_user[]
   voucherUsages voucher_usages[]
+  blogs         blogs[]
+  comments      comments[]
 
   passwordResetTokens password_reset_tokens[]
   refreshTokens       refresh_tokens[]
@@ -141,8 +169,6 @@ model user_addresses {
   updatedAt     DateTime     @updatedAt
 
   user users @relation(fields: [userId], references: [id])
-
-  orders orders[]
 
   @@unique([userId, detailAddress, phone])
 }
@@ -567,35 +593,6 @@ model promotion_targets {
   promotion promotions @relation(fields: [promotionId], references: [id])
 }
 
-// =======================
-// ENUMS
-// =======================
-
-enum BlogStatus {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
-}
-
-enum CommentTargetType {
-  BLOG
-  PRODUCT
-  PAGE
-}
-
-enum PageType {
-  PAGE
-  POLICY
-}
-
-enum PolicyType {
-  PRIVACY
-  TERMS
-  SHIPPING
-  RETURN
-  PAYMENT
-}
-
 model blogs {
   id         String     @id @default(uuid()) @db.Uuid
   authorId   String     @db.Uuid
@@ -615,10 +612,6 @@ model blogs {
   comments   comments[]
 }
 
-// =======================
-// COMMENTS (POLYMORPHIC)
-// =======================
-
 model comments {
   id          String             @id @default(uuid()) @db.Uuid
   userId      String             @db.Uuid
@@ -627,7 +620,7 @@ model comments {
   targetType  CommentTargetType
   targetId    String
 
-  parentId    String?
+  parentId    String?            @db.Uuid 
   isApproved  Boolean            @default(false)
 
   createdAt   DateTime           @default(now())
@@ -635,6 +628,7 @@ model comments {
   user        users              @relation(fields: [userId], references: [id])
   parent      comments?          @relation("CommentParent", fields: [parentId], references: [id])
   replies     comments[]         @relation("CommentParent")
+  blogs       blogs[]
 
   @@index([targetType, targetId])
 }
