@@ -1,7 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs"; // npm i bcryptjs @types/bcryptjs
-
-const prisma = new PrismaClient();
+import bcrypt from "bcryptjs";
 
 const usersData = [
   {
@@ -39,20 +37,27 @@ const usersData = [
   },
 ];
 
-export async function seedUsers() {
-  console.log("Seeding users...");
+export async function seedUsers(prisma: PrismaClient) {
+  console.log("🌱 Seeding users...");
 
   const users = [];
   for (const data of usersData) {
     const user = await prisma.users.upsert({
       where: { email: data.email },
-      update: {},
+      update: {
+        userName: data.userName,
+        passwordHash: data.passwordHash,
+        fullName: data.fullName,
+        phone: data.phone,
+        gender: data.gender,
+        avatarImage: data.avatarImage,
+      },
       create: data,
     });
     users.push(user);
   }
 
-  console.log(`🚶‍➡️    Đã tạo ${users.length} users`);
+  console.log(`Seeded ${users.length} users`);
   return {
     admin: users.find((u) => u.role === "ADMIN")!,
     staff: users.find((u) => u.role === "STAFF"),

@@ -1,10 +1,8 @@
 import { PrismaClient } from "@prisma/client";
 import { allProducts } from "../seed-data/products";
 
-const prisma = new PrismaClient();
-
-export async function seedProductHighlights() {
-  console.log("🌟 Seeding product highlights...");
+export async function seedProductHighlights(prisma: PrismaClient) {
+  console.log("🌱 Seeding product highlights...");
 
   for (const data of allProducts) {
     if (!data.highlights?.length) continue;
@@ -14,7 +12,7 @@ export async function seedProductHighlights() {
     });
 
     if (!product) {
-      console.warn(`⚠️ Không tìm thấy product: ${data.name}`);
+      console.warn(`⚠️ Product not found for product: ${data.name}`);
       continue;
     }
 
@@ -37,5 +35,5 @@ export async function seedProductHighlights() {
     }
   }
 
-  console.log("✅ Product highlights seeded");
+  console.log("Seeded product highlights");
 }

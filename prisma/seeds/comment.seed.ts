@@ -1,10 +1,8 @@
 import { PrismaClient, CommentTargetType } from "@prisma/client";
 import { commentSeeds } from "../seed-data/comments";
 
-const prisma = new PrismaClient();
-
-export async function seedComments() {
-  console.log("🌱 Bắt đầu seeding comments...");
+export async function seedComments(prisma: PrismaClient) {
+  console.log("🌱 seeding comments...");
 
   let createdCount = 0;
   let skippedCount = 0;
@@ -15,14 +13,13 @@ export async function seedComments() {
 
   for (const data of commentSeeds) {
     try {
-      // Tìm user
       const user = await prisma.users.findUnique({
         where: { email: data.userEmail },
         select: { id: true },
       });
 
       if (!user) {
-        console.warn(`⚠️ Không tìm thấy user: ${data.userEmail} → bỏ qua comment`);
+        console.warn(`⚠️ Not found user:  ${data.userEmail}`);
         skippedCount++;
         continue;
       }
@@ -44,13 +41,13 @@ export async function seedComments() {
         if (product) targetId = product.id;
       } else if (data.targetType === "PAGE") {
         // Nếu có model page sau này thì xử lý tương tự
-        console.warn(`PAGE target chưa được implement → bỏ qua`);
+        console.warn(`⚠️ Page not supported yet`);
         skippedCount++;
         continue;
       }
 
       if (!targetId) {
-        console.warn(`⚠️ Không tìm thấy target: ${data.targetType} / ${data.targetSlug} → bỏ qua`);
+        console.warn(`⚠️ Not found target: ${data.targetType} / ${data.targetSlug} → bỏ qua`);
         skippedCount++;
         continue;
       }
@@ -93,24 +90,9 @@ export async function seedComments() {
     }
   }
 
-  console.log("\n" + "=".repeat(60));
-  console.log(`Hoàn thành seeding comments:`);
   console.log(`   - Total created: ${createdCount}`);
   console.log(`   - Replies: ${replyCount}`);
   console.log(`   - Skipped: ${skippedCount}`);
-  console.log("=".repeat(60) + "\n");
 
   return { created: createdCount, replies: replyCount, skipped: skippedCount };
-}
-
-// Chạy trực tiếp khi gọi file riêng lẻ
-if (require.main === module) {
-  seedComments()
-    .catch((e) => {
-      console.error("Seed comments thất bại:", e);
-      process.exit(1);
-    })
-    .finally(async () => {
-      await prisma.$disconnect();
-    });
 }

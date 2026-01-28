@@ -14,6 +14,10 @@ import {
   getProductVariantWithPricing,
   getRelatedProductsWithPricing,
 } from "../pricing";
+import { getFlashSaleProductsWithPricing } from "../pricing/use-cases/getFlashSaleProductsWithPricing.service";
+import { getFeaturedProductsByCategoriesWithPricing } from "../pricing/use-cases/getFeaturedProductsByCategoriesWithPricing.service";
+import { getNewArrivalProductsWithPricing } from "../pricing/use-cases/getNewArrivalProductsWithPricing.service";
+import { getBestSellingProductsWithPricing } from "../pricing/use-cases/getBestSellingProductsWithPricing.service";
 
 type ValidatedQuery<T> = Request & {
   query: T;
@@ -368,6 +372,228 @@ export const deleteProductHandler = async (req: Request, res: Response) => {
   } catch (error: any) {
     const status = error.statusCode || 500;
     res.status(status).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
+  }
+};
+
+/**
+ * Get flash sale products (active today)
+ * GET /products/flash-sale?date=2026-01-27&limit=20&categoryId=xxx
+ */
+export const getFlashSaleProductsHandler = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    const dateParam = req.query.date as string;
+    const date = dateParam ? new Date(dateParam) : new Date();
+
+    const limit = req.query.limit ? Number(req.query.limit) : 20;
+    const categoryId = req.query.categoryId as string | undefined;
+
+    const result = await getFlashSaleProductsWithPricing(date, { limit, categoryId }, userId);
+
+    res.json({
+      success: true,
+      data: result.data,
+      total: result.total,
+      date: result.date,
+      message: "Lấy sản phẩm flash sale thành công",
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
+  }
+};
+
+/**
+ * Get categories with sale products
+ * GET /products/sale-categories?date=2026-01-27
+ */
+export const getCategoriesWithSaleProductsHandler = async (req: Request, res: Response) => {
+  try {
+    const dateParam = req.query.date as string;
+    const date = dateParam ? new Date(dateParam) : new Date();
+
+    const categories = await productService.getCategoriesWithSaleProducts(date);
+
+    res.json({
+      success: true,
+      data: categories,
+      total: categories.length,
+      message: "Lấy danh mục có sản phẩm sale thành công",
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
+  }
+};
+
+/**
+ * Get featured products by categories
+ * GET /products/featured-by-categories?limit=8&categoriesLimit=6
+ */
+export const getFeaturedProductsByCategoriesHandler = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 8;
+    const categoriesLimit = req.query.categoriesLimit
+      ? parseInt(req.query.categoriesLimit as string)
+      : 6;
+
+    const sections = await getFeaturedProductsByCategoriesWithPricing(
+      {
+        limit,
+        categoriesLimit,
+      },
+      userId,
+    );
+
+    res.json({
+      success: true,
+      data: sections,
+      total: sections.length,
+      message: "Lấy sản phẩm featured theo danh mục thành công",
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
+  }
+};
+
+/**
+ * Get upcoming promotions
+ * GET /products/upcoming-promotions?limit=5
+ */
+export const getUpcomingPromotionsHandler = async (req: Request, res: Response) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 5;
+    const promotions = await productService.getUpcomingPromotions(limit);
+
+    res.json({
+      success: true,
+      data: promotions,
+      total: promotions.length,
+      message: "Lấy danh sách promotion sắp tới thành công",
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
+  }
+};
+
+/**
+ * Get products by promotion (preview)
+ * GET /products/promotion/:promotionId?limit=20
+ */
+export const getProductsByPromotionHandler = async (req: Request, res: Response) => {
+  try {
+    const { promotionId } = req.params;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+
+    const result = await productService.getProductsByPromotion(promotionId, limit);
+
+    res.json({
+      success: true,
+      data: result,
+      message: "Lấy sản phẩm trong promotion thành công",
+    });
+  } catch (error: any) {
+    const status = error.statusCode || 500;
+    res.status(status).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
+  }
+};
+
+/**
+ * Get best selling products
+ * GET /products/best-selling?limit=12
+ */
+export const getBestSellingProductsHandler = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 12;
+    const products = await getBestSellingProductsWithPricing(limit, userId);
+
+    res.json({
+      success: true,
+      data: products,
+      total: products.length,
+      message: "Lấy sản phẩm bán chạy thành công",
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
+  }
+};
+
+/**
+ * Get new arrival products
+ * GET /products/new-arrivals?daysAgo=30&limit=12
+ */
+export const getNewArrivalProductsHandler = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    const daysAgo = req.query.daysAgo ? parseInt(req.query.daysAgo as string) : 30;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 12;
+
+    const products = await getNewArrivalProductsWithPricing(daysAgo, limit, userId);
+
+    res.json({
+      success: true,
+      data: products,
+      total: products.length,
+      message: "Lấy sản phẩm mới về thành công",
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
+  }
+};
+
+/**
+ * Get sale schedule (Flash Sale timeline)
+ * GET /products/sale-schedule?startDate=2026-01-27&endDate=2026-01-31
+ */
+export const getSaleScheduleHandler = async (req: Request, res: Response) => {
+  try {
+    const startDateParam = req.query.startDate as string;
+    const endDateParam = req.query.endDate as string;
+
+    // Default: today to 7 days later
+    const startDate = startDateParam ? new Date(startDateParam) : new Date();
+    const endDate = endDateParam
+      ? new Date(endDateParam)
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    const schedule = await productService.getSaleSchedule(startDate, endDate);
+
+    res.json({
+      success: true,
+      data: schedule,
+      total: schedule.length,
+      message: "Lấy lịch sale thành công",
+    });
+  } catch (error: any) {
+    res.status(500).json({
       success: false,
       message: error.message || "Lỗi server",
     });

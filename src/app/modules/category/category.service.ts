@@ -126,7 +126,7 @@ export const updateCategory = async (id: string, input: UpdateCategoryInput) => 
       throw new BadRequestError("Danh mục không thể là cha của chính nó");
     }
 
-    // 🔥 CHỈ kiểm tra khi parentId THAY ĐỔI
+    // CHỈ kiểm tra khi parentId THAY ĐỔI
     const isChangingParent = parentId !== category.parentId;
 
     if (isChangingParent && parentId) {

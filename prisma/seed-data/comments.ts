@@ -13,7 +13,7 @@ export const commentSeeds: CommentSeedData[] = [
     content:
       "Bài viết rất chi tiết và hữu ích! Mình đang định mua iPhone 13 cũ, nhờ bài này mà biết nên check những gì rồi. Cảm ơn admin nhé!",
     targetType: "BLOG",
-    targetSlug: "so-sanh-galaxy-s25-ultra-vs-iphone-16-pro-max",
+    targetSlug: "huong-dan-chon-mua-iphone-cu-dang-tin-cay-2025",
     isApproved: true,
     userEmail: "customer2@example.com",
   },
@@ -21,7 +21,7 @@ export const commentSeeds: CommentSeedData[] = [
     content:
       "Mình mua iPhone 12 cũ hồi đầu năm nay, pin còn 87% mà dùng vẫn ổn. Nhưng đúng là nên ưu tiên máy từ iPhone 13 trở lên để còn update iOS lâu dài.",
     targetType: "BLOG",
-    targetSlug: "so-sanh-galaxy-s25-ultra-vs-iphone-16-pro-max",
+    targetSlug: "huong-dan-chon-mua-iphone-cu-dang-tin-cay-2025",
     isApproved: true,
     userEmail: "customer2@example.com",
   },
@@ -31,7 +31,7 @@ export const commentSeeds: CommentSeedData[] = [
     content:
       "@user1 Cảm ơn bạn đã đọc bài! Nếu mua thì nhớ check kỹ Face ID và nguồn gốc máy nhé, tránh mua phải hàng dựng rất khó phát hiện.",
     targetType: "BLOG",
-    targetSlug: "so-sanh-galaxy-s25-ultra-vs-iphone-16-pro-max",
+    targetSlug: "huong-dan-chon-mua-iphone-cu-dang-tin-cay-2025",
     parentContent:
       "Bài viết rất chi tiết và hữu ích! Mình đang định mua iPhone 13 cũ, nhờ bài này mà biết nên check những gì rồi. Cảm ơn admin nhé!",
     isApproved: true,

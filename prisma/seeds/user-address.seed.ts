@@ -1,7 +1,5 @@
 import { PrismaClient, AddressType } from "@prisma/client";
 
-const prisma = new PrismaClient();
-
 interface SeedUserAddressesParams {
   users: { admin: any; customers: any[] };
 }
@@ -49,8 +47,8 @@ const addressData = [
   },
 ];
 
-export async function seedUserAddresses({ users }: SeedUserAddressesParams) {
-  console.log("Seeding user addresses...");
+export async function seedUserAddresses(prisma: PrismaClient, { users }: SeedUserAddressesParams) {
+  console.log(" 🌱 Seeding user addresses...");
 
   let createdCount = 0;
 
@@ -68,7 +66,16 @@ export async function seedUserAddresses({ users }: SeedUserAddressesParams) {
             phone: addr.phone,
           },
         },
-        update: {},
+        update: {
+          contactName: addr.contactName,
+          phone: addr.phone,
+          provinceId: addr.provinceId,
+          districtId: addr.districtId,
+          wardId: addr.wardId,
+          detailAddress: addr.detailAddress,
+          type: addr.type,
+          isDefault: addr.isDefault,
+        },
         create: {
           userId: user.id,
           contactName: addr.contactName,
@@ -85,5 +92,5 @@ export async function seedUserAddresses({ users }: SeedUserAddressesParams) {
     }
   }
 
-  console.log(`🚶‍➡️    Đã tạo ${createdCount} địa chỉ người dùng`);
+  console.log(`Seeded ${createdCount} user addresses`);
 }

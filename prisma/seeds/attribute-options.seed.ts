@@ -1,7 +1,5 @@
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
-
 const attributeOptionsData = [
   // COLOR
   { type: "color", value: "black", label: "Đen" },
@@ -21,7 +19,7 @@ const attributeOptionsData = [
   { type: "storage", value: "1tb", label: "1TB" },
 ];
 
-export async function seedAttributeOptions() {
+export async function seedAttributeOptions(prisma: PrismaClient) {
   console.log("🌱 Seeding attribute options...");
 
   for (const option of attributeOptionsData) {
@@ -39,5 +37,5 @@ export async function seedAttributeOptions() {
     });
   }
 
-  console.log(`✅ Seeded ${attributeOptionsData.length} attribute options`);
+  console.log(`Seeded ${attributeOptionsData.length} attribute options`);
 }

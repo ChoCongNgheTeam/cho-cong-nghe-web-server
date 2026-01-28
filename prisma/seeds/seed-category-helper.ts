@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { generateUniqueSlug } from "./generate-unique-slug";
+import { generateUniqueSlug } from "@/utils/generate-unique-slug";
 
 interface CategorySeedData {
   name: string;
@@ -14,7 +14,7 @@ export async function seedCategoryGroup(
   groupName?: string,
 ) {
   if (groupName) {
-    console.log(`  📦 Seeding ${groupName}...`);
+    console.log(` 🌱 Seeding ${groupName}`);
   }
 
   const created: any[] = [];
@@ -29,7 +29,12 @@ export async function seedCategoryGroup(
     const slug = await generateUniqueSlug(prisma.categories, cat.name);
     const category = await prisma.categories.upsert({
       where: { name: cat.name },
-      update: {},
+      update: {
+        slug,
+        description: cat.description,
+        imagePath: cat.imagePath,
+        position: siblingCount,
+      },
       create: {
         name: cat.name,
         slug,
@@ -66,7 +71,13 @@ export async function seedCategoryGroup(
       const slug = await generateUniqueSlug(prisma.categories, cat.name);
       const category = await prisma.categories.upsert({
         where: { name: cat.name },
-        update: {},
+        update: {
+          slug,
+          description: cat.description,
+          imagePath: cat.imagePath,
+          parentId: parent.id,
+          position: siblingCount,
+        },
         create: {
           name: cat.name,
           slug,
@@ -92,7 +103,7 @@ export async function seedCategoryGroup(
   }
 
   if (groupName) {
-    console.log(`    ✅ Created ${created.length} categories for ${groupName}`);
+    console.log(`Created ${created.length} categories for ${groupName}`);
   }
 
   return created;

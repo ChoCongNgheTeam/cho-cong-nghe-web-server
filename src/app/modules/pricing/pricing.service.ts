@@ -16,7 +16,12 @@ import {
   getApplicablePromotionTargets,
   getAllAvailablePromotions,
 } from "./pricing.rules";
-import { calculateDiscountPercentage, validatePricingInput } from "./pricing.helpers";
+import {
+  calculateDiscountPercentage,
+  formatPromotionDescription,
+  formatVoucherDescription,
+  validatePricingInput,
+} from "./pricing.helpers";
 import { PromotionActionType } from "@prisma/client";
 import * as promotionRepo from "../promotion/promotion.repository";
 import * as voucherRepo from "../voucher/voucher.repository";
@@ -73,6 +78,8 @@ export const calculateProductPrice = async (
     );
 
     if (bestPromotionResult) {
+      console.log(bestPromotionResult);
+
       const { promotion, target } = bestPromotionResult;
       const { discountAmount } = calculatePromotionTargetDiscount(
         target,
@@ -317,10 +324,6 @@ export const calculateCartPrice = async (input: PricingCartInput): Promise<Prici
   };
 };
 
-/**
- * ===== PUBLIC API FOR PRODUCT MODULE =====
- * Lấy giá cho variant (dùng khi get product detail)
- */
 export const getVariantPricing = async (
   productId: string,
   variantId: string,
@@ -361,33 +364,4 @@ export const getVariantPricing = async (
     availablePromotions: pricedProduct.availablePromotions,
     gifts: pricedProduct.giftProducts,
   };
-};
-
-/**
- * ===== HELPERS =====
- */
-const formatPromotionDescription = (target: any): string => {
-  switch (target.actionType) {
-    case PromotionActionType.DISCOUNT_PERCENT:
-      return `Giảm ${target.discountValue}%`;
-
-    case PromotionActionType.DISCOUNT_FIXED:
-      return `Giảm ${Number(target.discountValue).toLocaleString()}đ`;
-
-    case PromotionActionType.BUY_X_GET_Y:
-      return `Mua ${target.buyQuantity} tặng ${target.getQuantity}`;
-
-    case PromotionActionType.GIFT_PRODUCT:
-      return `Tặng quà khi mua ${target.description || 1} sản phẩm`;
-
-    default:
-      return "Khuyến mãi đặc biệt";
-  }
-};
-
-const formatVoucherDescription = (voucher: any): string => {
-  if (voucher.discountType === "DISCOUNT_PERCENT") {
-    return `Giảm ${voucher.discountValue}%`;
-  }
-  return `Giảm ${Number(voucher.discountValue).toLocaleString()}đ`;
 };

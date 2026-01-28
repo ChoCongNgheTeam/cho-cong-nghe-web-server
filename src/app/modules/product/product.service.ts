@@ -15,6 +15,7 @@ import {
 } from "./product.transformers";
 import { RawVariant, ReviewStats } from "./product.types";
 import { buildCategoryPath } from "../category/category.helper";
+import prisma from "prisma/client";
 
 // =====================
 // === PUBLIC SERVICES ===
@@ -297,4 +298,320 @@ export const updateProduct = async (id: string, input: UpdateProductInput) => {
 export const deleteProduct = async (id: string) => {
   await getProductById(id);
   return repo.remove(id);
+};
+
+/**
+ * 1. Get flash sale products (products on sale today)
+ * For Home: Container Flash Sale
+ */
+export const getFlashSaleProducts = async (
+  date: Date = new Date(),
+  options: { limit?: number; categoryId?: string } = {},
+) => {
+  const products = await repo.findProductsOnSaleByDate(date, options);
+
+  const productIds = products.map((p) => p.id);
+  const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
+
+  return {
+    data: products.map((product) => {
+      const defaultVariant = product.variants?.[0];
+      const variantOptions = variantOptionsMap.get(product.id) ?? [];
+
+      return {
+        card: {
+          ...transformProductCard(product),
+          variantOptions,
+        },
+        pricingContext: defaultVariant
+          ? {
+              productId: product.id,
+              variantId: defaultVariant.id,
+              price: Number(defaultVariant.price),
+              brandId: product.brand?.id,
+              categoryPath: buildCategoryPath(product.category),
+            }
+          : null,
+      };
+    }),
+    total: products.length,
+    date,
+  };
+};
+
+/**
+ * 2. Get categories with sale products
+ * For Home: Container liệt kê categories có sản phẩm sale
+ */
+export const getCategoriesWithSaleProducts = async (date: Date = new Date()) => {
+  const categories = await repo.findCategoriesWithSaleProducts(date);
+
+  // Get sale products count for each category
+  const countMap = await repo.getSaleProductsCountByCategories(date);
+
+  return categories.map((category) => ({
+    id: category.id,
+    name: category.name,
+    slug: category.slug,
+    imageUrl: category.imageUrl,
+    totalProducts: category._count.products,
+    saleProductsCount: countMap.get(category.id) || 0,
+  }));
+};
+
+/**
+ * 3. Get featured products by categories
+ * For Home: Sections sản phẩm featured theo category
+ */
+export const getFeaturedProductsByCategories = async (
+  options: {
+    limit?: number;
+    categoriesLimit?: number;
+  } = {},
+) => {
+  const results = await repo.findFeaturedProductsByCategories(options);
+
+  // Lấy productIds để query variant options
+  const allProductIds = results.flatMap((result) => result.products.map((p) => p.id));
+  const variantOptionsMap = await repo.getProductVariantOptionsMap(allProductIds);
+
+  return results.map((result) => ({
+    category: result.category,
+    products: result.products.map((product) => {
+      const defaultVariant = product.variants?.[0];
+      const variantOptions = variantOptionsMap.get(product.id) ?? [];
+
+      return {
+        card: {
+          ...transformProductCard(product),
+          variantOptions,
+        },
+        pricingContext: defaultVariant
+          ? {
+              productId: product.id,
+              variantId: defaultVariant.id,
+              price: Number(defaultVariant.price),
+              brandId: product.brand?.id,
+              categoryPath: buildCategoryPath(product.category),
+            }
+          : null,
+      };
+    }),
+    total: result.total,
+  }));
+};
+/**
+ * 4. Get upcoming promotions
+ * For Home: Preview các đợt sale sắp tới
+ */
+export const getUpcomingPromotions = async (limit: number = 5) => {
+  const currentDate = new Date();
+  const promotions = await repo.findUpcomingPromotions(currentDate, limit);
+
+  return promotions.map((promo) => ({
+    id: promo.id,
+    name: promo.name,
+    description: promo.description,
+    startDate: promo.startDate,
+    endDate: promo.endDate,
+    priority: promo.priority,
+    targetsCount: promo._count.targets,
+  }));
+};
+
+/**
+ * 5. Get products by promotion (for preview)
+ * For Home: Xem trước sản phẩm của promotion sắp tới
+ */
+export const getProductsByPromotion = async (promotionId: string, limit: number = 20) => {
+  const result = await repo.findProductsByPromotionId(promotionId, limit);
+
+  if (!result) {
+    const error: any = new Error("Không tìm thấy promotion");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return {
+    promotion: result.promotion,
+    products: result.products.map(transformProductCard),
+    total: result.total,
+  };
+};
+
+/**
+ * 6. Get best selling products
+ * For Home: Sản phẩm bán chạy
+ */
+export const getBestSellingProducts = async (limit: number = 12) => {
+  const products = await repo.findBestSellingProducts(limit);
+
+  const productIds = products.map((p) => p.id);
+  const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
+
+  return products.map((product) => {
+    const defaultVariant = product.variants?.[0];
+    const variantOptions = variantOptionsMap.get(product.id) ?? [];
+
+    return {
+      card: {
+        ...transformProductCard(product),
+        variantOptions,
+      },
+      pricingContext: defaultVariant
+        ? {
+            productId: product.id,
+            variantId: defaultVariant.id,
+            price: Number(defaultVariant.price),
+            brandId: product.brand?.id,
+            categoryPath: buildCategoryPath(product.category),
+          }
+        : null,
+    };
+  });
+};
+
+/**
+ * 7. Get new arrival products
+ * For Home: Sản phẩm mới về
+ */
+export const getNewArrivalProducts = async (daysAgo: number = 30, limit: number = 12) => {
+  const products = await repo.findNewArrivalProducts(daysAgo, limit);
+
+  const productIds = products.map((p) => p.id);
+  const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
+
+  return products.map((product) => {
+    const defaultVariant = product.variants?.[0];
+    const variantOptions = variantOptionsMap.get(product.id) ?? [];
+
+    return {
+      card: {
+        ...transformProductCard(product),
+        variantOptions,
+      },
+      pricingContext: defaultVariant
+        ? {
+            productId: product.id,
+            variantId: defaultVariant.id,
+            price: Number(defaultVariant.price),
+            brandId: product.brand?.id,
+            categoryPath: buildCategoryPath(product.category),
+          }
+        : null,
+    };
+  });
+};
+
+/**
+ * 8. Get sale schedule (for Flash Sale timeline)
+ * For Home: Lịch sale theo ngày
+ */
+export const getSaleSchedule = async (startDate: Date, endDate: Date) => {
+  // Get all promotions in date range
+  const allPromotions = await prisma.promotions.findMany({
+    where: {
+      isActive: true,
+      OR: [
+        // Promotions that start before endDate and end after startDate
+        {
+          AND: [
+            {
+              OR: [{ startDate: null }, { startDate: { lte: endDate } }],
+            },
+            {
+              OR: [{ endDate: null }, { endDate: { gte: startDate } }],
+            },
+          ],
+        },
+      ],
+    },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      startDate: true,
+      endDate: true,
+      priority: true,
+      _count: {
+        select: {
+          targets: true,
+        },
+      },
+    },
+    orderBy: [{ priority: "desc" }, { startDate: "asc" }],
+  });
+
+  // Group promotions by date
+  const schedule: Map<string, any[]> = new Map();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  allPromotions.forEach((promo) => {
+    const promoStart = promo.startDate ? new Date(promo.startDate) : startDate;
+    const promoEnd = promo.endDate ? new Date(promo.endDate) : endDate;
+
+    let currentDate = new Date(Math.max(promoStart.getTime(), startDate.getTime()));
+    const lastDate = new Date(Math.min(promoEnd.getTime(), endDate.getTime()));
+
+    while (currentDate <= lastDate) {
+      const dateKey = currentDate.toISOString().split("T")[0]; // YYYY-MM-DD
+
+      if (!schedule.has(dateKey)) {
+        schedule.set(dateKey, []);
+      }
+
+      const existing = schedule.get(dateKey)!;
+      if (!existing.some((p) => p.id === promo.id)) {
+        const currentDateOnly = new Date(currentDate);
+        currentDateOnly.setHours(0, 0, 0, 0);
+
+        existing.push({
+          id: promo.id,
+          name: promo.name,
+          description: promo.description,
+          startDate: promo.startDate,
+          endDate: promo.endDate,
+          priority: promo.priority,
+          targetsCount: promo._count.targets,
+          isActive: currentDateOnly.getTime() === today.getTime(),
+        });
+      }
+
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+  });
+
+  // Convert map to array and sort by date
+  return Array.from(schedule.entries())
+    .map(([date, promotions]) => {
+      const dateObj = new Date(date);
+      dateObj.setHours(0, 0, 0, 0);
+
+      return {
+        date,
+        promotions: promotions.sort((a, b) => b.priority - a.priority),
+        isToday: dateObj.getTime() === today.getTime(),
+      };
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+};
+
+/**
+ * 9. Get active promotions
+ * For Home: Danh sách promotions đang active hôm nay
+ */
+export const getActivePromotions = async () => {
+  const today = new Date();
+  const promotions = await repo.findActivePromotions(today);
+
+  return promotions.map((promo) => ({
+    id: promo.id,
+    name: promo.name,
+    description: promo.description,
+    startDate: promo.startDate,
+    endDate: promo.endDate,
+    priority: promo.priority,
+    targetsCount: promo._count.targets,
+  }));
 };

@@ -1,7 +1,5 @@
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
-
 const methods = [
   { name: "COD", description: "Thanh toán khi nhận hàng" },
   { name: "Momo", description: "Ví điện tử MoMo" },
@@ -10,16 +8,18 @@ const methods = [
   { name: "Credit Card", description: "Thẻ tín dụng / ghi nợ" },
 ];
 
-export async function seedPaymentMethods() {
-  console.log("Seeding payment methods...");
+export async function seedPaymentMethods(prisma: PrismaClient) {
+  console.log(" 🌱 Seeding payment methods...");
 
   for (const method of methods) {
     await prisma.payment_methods.upsert({
       where: { name: method.name },
-      update: {},
+      update: {
+        description: method.description,
+      },
       create: { ...method, isActive: true },
     });
   }
 
-  console.log(`🚶‍➡️    Đã tạo ${methods.length} payment methods`);
+  console.log(`Seeded ${methods.length} payment methods`);
 }

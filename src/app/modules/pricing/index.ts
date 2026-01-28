@@ -1,44 +1,37 @@
-/**
- * ===== PRICING MODULE - PUBLIC API =====
- * Central export file for all pricing usecases
- */
+export { getProductsWithPricing } from "./use-cases/getProductsWithPricing.service";
+export { getProductDetailWithPricing } from "./use-cases/getProductDetailWithPricing.service";
+export { getProductVariantWithPricing } from "./use-cases/getProductVariantPricing.service";
+export { getRelatedProductsWithPricing } from "./use-cases/getRelatedProductsWithPricing.service";
 
-// ===== PRODUCT USECASES =====
-export { getProductsWithPricing } from "./usecases/getProductsWithPricing.service";
-export { getProductDetailWithPricing } from "./usecases/getProductDetailWithPricing.service";
-export { getProductVariantWithPricing } from "./usecases/getProductVariantPricing.service";
-export { getRelatedProductsWithPricing } from "./usecases/getRelatedProductsWithPricing.service";
-
-// ===== CART USECASES =====
 export {
   getCartWithPricing,
   validateCartForCheckout,
   applyVoucherToCart,
   removeVoucherFromCart,
-} from "./usecases/getCartWithPricing.service";
+} from "./use-cases/getCartWithPricing.service";
 
-export type { CartItemInput, CartWithPricingResponse } from "./usecases/getCartWithPricing.service";
+export type {
+  CartItemInput,
+  CartWithPricingResponse,
+} from "./use-cases/getCartWithPricing.service";
 
-// ===== CHECKOUT USECASES =====
 export {
   getCheckoutWithPricing,
   validateCheckoutBeforeOrder,
   calculateShippingFee,
   previewOrder,
   prepareOrderData,
-} from "./usecases/getCheckoutWithPricing.service";
+} from "./use-cases/getCheckoutWithPricing.service";
 
 export type {
   CheckoutItemInput,
   CheckoutWithPricingResponse,
   ShippingMethod,
   PaymentMethod,
-} from "./usecases/getCheckoutWithPricing.service";
+} from "./use-cases/getCheckoutWithPricing.service";
 
-// ===== CORE PRICING (if needed directly) =====
 export { getVariantPricing } from "./pricing.service";
 
-// ===== TYPES =====
 export type {
   PricingProductInput,
   PricingCartInput,
@@ -49,5 +42,4 @@ export type {
   DisplayPromotion,
 } from "./pricing.types";
 
-// ===== HELPERS =====
 export { formatPrice, calculateDiscountPercentage, mapPricingToSummary } from "./pricing.helpers";

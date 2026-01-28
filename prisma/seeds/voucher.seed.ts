@@ -1,9 +1,5 @@
 import { PrismaClient, DiscountType, TargetType } from "@prisma/client";
 
-const prisma = new PrismaClient();
-
-/* ---------- TYPES ---------- */
-
 type VoucherTarget =
   | { targetType: "ALL" }
   | { targetType: "BRAND"; targetIdFromBrandName: string }
@@ -16,6 +12,7 @@ const voucherData: {
   discountType: DiscountType;
   discountValue: string;
   minOrderValue: string;
+  maxDiscountValue?: string;
   maxUses?: number | null;
   maxUsesPerUser?: number | null;
   startDate?: Date;
@@ -30,6 +27,7 @@ const voucherData: {
     discountType: DiscountType.DISCOUNT_FIXED,
     discountValue: "100000.00",
     minOrderValue: "500000.00",
+    maxDiscountValue: "100000.00",
     maxUses: 100,
     maxUsesPerUser: 1,
     startDate: new Date(),
@@ -44,6 +42,7 @@ const voucherData: {
     discountType: DiscountType.DISCOUNT_FIXED,
     discountValue: "0.00",
     minOrderValue: "300000.00",
+    maxDiscountValue: "0.00",
     priority: 5,
     isActive: true,
     targets: [{ targetType: "ALL" }],
@@ -54,6 +53,7 @@ const voucherData: {
     discountType: DiscountType.DISCOUNT_PERCENT,
     discountValue: "20.00",
     minOrderValue: "10000000.00",
+    maxDiscountValue: "2000000.00",
     maxUses: 50,
     maxUsesPerUser: 1,
     priority: 15,
@@ -62,21 +62,34 @@ const voucherData: {
   },
 ];
 
-export async function seedVouchers() {
-  console.log("Seeding vouchers...");
+export async function seedVouchers(prisma: PrismaClient) {
+  console.log(" 🌱 Seeding vouchers...");
 
   const createdVouchers = [];
 
   for (const data of voucherData) {
     const voucher = await prisma.vouchers.upsert({
       where: { code: data.code },
-      update: {},
+      update: {
+        description: data.description,
+        discountType: data.discountType,
+        discountValue: data.discountValue,
+        minOrderValue: data.minOrderValue,
+        maxDiscountValue: data.maxDiscountValue,
+        maxUses: data.maxUses,
+        maxUsesPerUser: data.maxUsesPerUser,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        priority: data.priority,
+        isActive: data.isActive,
+      },
       create: {
         code: data.code,
         description: data.description,
         discountType: data.discountType,
         discountValue: data.discountValue,
         minOrderValue: data.minOrderValue,
+        maxDiscountValue: data.maxDiscountValue,
         maxUses: data.maxUses,
         maxUsesPerUser: data.maxUsesPerUser,
         startDate: data.startDate,
@@ -86,7 +99,6 @@ export async function seedVouchers() {
       },
     });
 
-    // Tạo targets
     if (data.targets) {
       for (const target of data.targets) {
         let targetId: string | null = null;
@@ -122,6 +134,6 @@ export async function seedVouchers() {
     createdVouchers.push(voucher);
   }
 
-  console.log(`🚀 Đã tạo/upsert ${createdVouchers.length} vouchers`);
+  console.log(`Seeded ${createdVouchers.length} vouchers`);
   return createdVouchers;
 }

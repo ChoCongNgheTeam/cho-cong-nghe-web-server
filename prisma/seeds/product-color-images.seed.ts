@@ -1,13 +1,14 @@
 import { PrismaClient } from "@prisma/client";
 import { variantImages } from "../seed-data/variants";
 
-const prisma = new PrismaClient();
-
 interface SeedProductColorImagesParams {
   products: Array<{ id: string; name: string; slug: string }>;
 }
 
-export async function seedProductColorImages({ products }: SeedProductColorImagesParams) {
+export async function seedProductColorImages(
+  prisma: PrismaClient,
+  { products }: SeedProductColorImagesParams,
+) {
   console.log("🌱 Seeding product color images...");
 
   for (const product of products) {
@@ -38,5 +39,5 @@ export async function seedProductColorImages({ products }: SeedProductColorImage
     }
   }
 
-  console.log("✅ Done seeding product color images");
+  console.log("Seeded product color images");
 }

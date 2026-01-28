@@ -1,9 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { productSpecificationsData } from "../seed-data/product-specifications";
 
-const prisma = new PrismaClient();
-
-export async function seedProductSpecifications() {
+export async function seedProductSpecifications(prisma: PrismaClient) {
   console.log("🌱 Seeding product specifications...");
 
   let totalCreated = 0;
@@ -22,7 +20,7 @@ export async function seedProductSpecifications() {
       continue;
     }
 
-    console.log(`  Processing: ${product.name} (${item.specifications.length} specifications)`);
+    console.log(`Processing: ${product.name} (${item.specifications.length} specifications)`);
 
     for (const [index, specItem] of item.specifications.entries()) {
       // Tìm specification theo key (giả định key là unique)
@@ -32,7 +30,7 @@ export async function seedProductSpecifications() {
       });
 
       if (!specification) {
-        console.warn(`    ⚠️ Specification key không tồn tại: ${specItem.key} → bỏ qua`);
+        console.warn(`⚠️ Specification key không tồn tại: ${specItem.key} → bỏ qua`);
         totalSkipped++;
         continue;
       }
@@ -45,11 +43,7 @@ export async function seedProductSpecifications() {
               specificationId: specification.id,
             },
           },
-          update: {
-            value: specItem.value,
-            sortOrder: index,
-            isHighlight: false, // bạn có thể thêm logic highlight sau
-          },
+          update: {},
           create: {
             productId: product.id,
             specificationId: specification.id,
@@ -60,31 +54,17 @@ export async function seedProductSpecifications() {
         });
 
         totalCreated++;
-        console.log(`    → Upserted: ${specItem.key} = ${specItem.value}`);
+        console.log(`Seeded ${specItem.key} = ${specItem.value}`);
       } catch (err) {
-        console.error(`    Lỗi khi upsert ${specItem.key} cho ${product.name}:`, err);
+        console.error(`⚠️ Error upsert ${specItem.key} cho ${product.name}:`, err);
         totalSkipped++;
       }
     }
   }
 
-  console.log("\n" + "=".repeat(50));
-  console.log(`🚀 Hoàn thành seeding specifications`);
+  console.log(`🚀 Successfully seeded specifications`);
   console.log(`   - Created / Updated: ${totalCreated}`);
   console.log(`   - Skipped: ${totalSkipped}`);
-  console.log("=".repeat(50) + "\n");
 
   return { created: totalCreated, skipped: totalSkipped };
-}
-
-// Nếu bạn chạy trực tiếp file này (ví dụ: ts-node seed-product-specifications.ts)
-if (require.main === module) {
-  seedProductSpecifications()
-    .catch((e) => {
-      console.error(e);
-      process.exit(1);
-    })
-    .finally(async () => {
-      await prisma.$disconnect();
-    });
 }

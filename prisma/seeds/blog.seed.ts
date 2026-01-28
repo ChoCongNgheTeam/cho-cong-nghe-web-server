@@ -1,10 +1,8 @@
 import { PrismaClient, BlogStatus } from "@prisma/client";
 import { blogSeeds } from "../seed-data/blogs";
-import { generateUniqueSlug } from "@/utils/generate-unique-slug"; // nếu bạn đã có hàm này
+import { generateUniqueSlug } from "@/utils/generate-unique-slug";
 
-const prisma = new PrismaClient();
-
-export async function seedBlogs() {
+export async function seedBlogs(prisma: PrismaClient) {
   console.log("🌱 Bắt đầu seeding blogs...");
 
   let createdCount = 0;
@@ -57,7 +55,7 @@ export async function seedBlogs() {
         `  → ${blog.status === BlogStatus.PUBLISHED ? "Published" : "Saved"}: ${blog.title} (slug: ${blog.slug})`,
       );
     } catch (err) {
-      console.error(`Lỗi khi seed bài viết "${data.title}":`, err);
+      console.error(`⚠️  Error seeding "${data.title}":`, err);
       skippedCount++;
     }
   }
@@ -69,16 +67,4 @@ export async function seedBlogs() {
   console.log("=".repeat(60) + "\n");
 
   return { created: createdCount, skipped: skippedCount };
-}
-
-// Chạy trực tiếp khi gọi file riêng lẻ (ts-node seeds/seed-blogs.ts)
-if (require.main === module) {
-  seedBlogs()
-    .catch((e) => {
-      console.error("Seed blogs thất bại:", e);
-      process.exit(1);
-    })
-    .finally(async () => {
-      await prisma.$disconnect();
-    });
 }

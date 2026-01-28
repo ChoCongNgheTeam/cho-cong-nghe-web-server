@@ -10,7 +10,7 @@ const selectCategory = {
   imagePath: true,
   imageUrl: true,
   position: true,
-  isFeatured: true, // ✅ Thêm field mới
+  isFeatured: true,
   isActive: true,
   createdAt: true,
   updatedAt: true,
@@ -54,7 +54,6 @@ export const findRootCategories = async (onlyActive: boolean = true) => {
   });
 };
 
-// ✅ MỚI: Lấy featured categories cho Home
 export const findFeaturedCategories = async (limit?: number) => {
   return prisma.categories.findMany({
     where: {

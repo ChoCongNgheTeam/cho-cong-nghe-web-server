@@ -1,8 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { generateUniqueSlug } from "@/utils/generate-unique-slug";
 
-const prisma = new PrismaClient();
-
 const brandData = [
   {
     name: "Apple",
@@ -95,20 +93,27 @@ const brandData = [
     imagePath: "brands/zte.webp",
   },
 ];
-export async function seedBrands() {
-  console.log("Seeding brands...");
+
+export async function seedBrands(prisma: PrismaClient) {
+  console.log("🌱 Seeding brands...");
 
   const brands = [];
+
   for (const data of brandData) {
     const slug = await generateUniqueSlug(prisma.brands, data.name);
+
     const brand = await prisma.brands.upsert({
       where: { name: data.name },
-      update: {},
+      update: {
+        description: data.description,
+        imagePath: data.imagePath,
+      },
       create: { ...data, slug },
     });
+
     brands.push(brand);
   }
 
-  console.log(`🚶‍➡️    Đã tạo ${brands.length} brands`);
+  console.log(`Seeded ${brands.length} brands`);
   return brands;
 }

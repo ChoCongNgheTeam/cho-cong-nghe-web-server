@@ -9,9 +9,6 @@ import {
 import { TargetType, PromotionActionType, DiscountType } from "@prisma/client";
 import { DISCOUNT_CALCULATION } from "./pricing.constants";
 
-/**
- * Kiểm tra promotion target có áp dụng cho sản phẩm không
- */
 export const isPromotionTargetApplicable = (
   target: PromotionTargetData,
   productId: string,
@@ -85,7 +82,7 @@ export const getApplicablePromotionTargets = (
 };
 
 /**
- * NEW: Lấy TẤT CẢ promotions có thể áp dụng (KHÔNG check quantity)
+ * Lấy TẤT CẢ promotions có thể áp dụng (KHÔNG check quantity)
  * Dùng cho product detail để hiển thị tất cả chương trình
  */
 export const getAllAvailablePromotions = (
@@ -123,7 +120,6 @@ export const getAllAvailablePromotions = (
         promotions.push({
           id: promotion.id,
           name: promotion.name,
-          // description: formatPromotionDescriptionForDisplay(representativeTarget, promotion),
           description: promotion.description,
           actionType: representativeTarget.actionType,
           buyQuantity: representativeTarget.buyQuantity ?? null,
@@ -171,15 +167,6 @@ export const calculatePromotionTargetDiscount = (
       break;
 
     case PromotionActionType.BUY_X_GET_Y:
-      // Mua X tặng Y: giảm giá cho Y sản phẩm
-      if (target.buyQuantity && target.getQuantity) {
-        const sets = Math.floor(quantity / target.buyQuantity);
-        const freeItems = Math.min(sets * target.getQuantity, quantity);
-        discountAmount = freeItems * basePrice;
-        applicableQuantity = freeItems;
-      }
-      break;
-
     case PromotionActionType.GIFT_PRODUCT:
       // Gift product không giảm giá, chỉ tặng quà
       discountAmount = 0;
@@ -221,11 +208,17 @@ export const getBestPromotionTarget = (
       context,
     );
 
+    const PRICE_AFFECTING_ACTIONS: PromotionActionType[] = [
+      PromotionActionType.DISCOUNT_PERCENT,
+      PromotionActionType.DISCOUNT_FIXED,
+    ];
+
     // Find best target in this promotion
     for (const target of applicableTargets) {
-      if (target.actionType === PromotionActionType.GIFT_PRODUCT) {
+      if (!PRICE_AFFECTING_ACTIONS.includes(target.actionType)) {
         continue;
       }
+
       const { discountAmount } = calculatePromotionTargetDiscount(target, basePrice, quantity);
 
       if (!bestResult || discountAmount > bestResult.discountAmount) {
@@ -234,7 +227,6 @@ export const getBestPromotionTarget = (
         discountAmount === bestResult.discountAmount &&
         promotion.priority < bestResult.promotion.priority
       ) {
-        // Same discount, check priority (lower = better)
         bestResult = { promotion, target, discountAmount };
       }
     }
@@ -360,29 +352,4 @@ export const calculateVoucherDiscount = (
   }
 
   return Math.round(discount);
-};
-
-/**
- * HELPER: Format promotion description for display
- */
-const formatPromotionDescriptionForDisplay = (
-  target: PromotionTargetData,
-  promotion: PromotionData,
-): string => {
-  switch (target.actionType) {
-    case PromotionActionType.DISCOUNT_PERCENT:
-      return `Giảm ${target.discountValue}%`;
-
-    case PromotionActionType.DISCOUNT_FIXED:
-      return `Giảm ${Number(target.discountValue).toLocaleString()}đ`;
-
-    case PromotionActionType.BUY_X_GET_Y:
-      return `Mua ${target.buyQuantity} tặng ${target.getQuantity}`;
-
-    case PromotionActionType.GIFT_PRODUCT:
-      return `Tặng quà khi mua ${target.buyQuantity || 1} sản phẩm`;
-
-    default:
-      return promotion.description || "Khuyến mãi đặc biệt";
-  }
 };

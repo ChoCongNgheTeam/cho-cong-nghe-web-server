@@ -2,14 +2,15 @@ import { PrismaClient } from "@prisma/client";
 import { generateUniqueSlug } from "@/utils/generate-unique-slug";
 import { allProducts } from "../seed-data/products";
 
-const prisma = new PrismaClient();
-
 interface SeedProductsParams {
   brands: any[];
   categories: any[];
 }
 
-export async function seedProducts({ brands, categories }: SeedProductsParams) {
+export async function seedProducts(
+  prisma: PrismaClient,
+  { brands, categories }: SeedProductsParams,
+) {
   console.log("🌱 Seeding products...");
 
   const createdProducts = [];
@@ -17,7 +18,7 @@ export async function seedProducts({ brands, categories }: SeedProductsParams) {
   for (const data of allProducts) {
     const brand = brands.find((b) => b.name === data.brandName);
     if (!brand) {
-      console.warn(`⚠️ Brand "${data.brandName}" không tồn tại → bỏ qua ${data.name}`);
+      console.warn(`⚠️ Brand "${data.brandName}" not found. Skipping... ${data.name}`);
       continue;
     }
 
@@ -53,9 +54,9 @@ export async function seedProducts({ brands, categories }: SeedProductsParams) {
     });
 
     createdProducts.push(product);
-    console.log(`  → Created/Upserted: ${product.name}`);
+    console.log(`Seeded ${product.name}`);
   }
 
-  console.log(`\n🚀 Hoàn thành! Đã xử lý ${createdProducts.length} sản phẩm\n`);
+  console.log(`\n Seeded ${createdProducts.length} products\n`);
   return createdProducts;
 }

@@ -16,9 +16,9 @@ export const createMediaSchema = z.object({
 
   title: z.string().trim().max(200, "Tiêu đề tối đa 200 ký tự").optional().or(z.literal("")),
 
-  imagePath: z.url("URL hình ảnh không hợp lệ").optional().or(z.literal("")),
+  imagePath: z.string("URL hình ảnh không hợp lệ").optional().or(z.literal("")),
 
-  linkUrl: z.string().trim().url("URL liên kết không hợp lệ").optional().or(z.literal("")),
+  linkUrl: z.string("URL hình ảnh không hợp lệ").optional().or(z.literal("")),
 
   order: z.number().int().min(0, "Order phải >= 0").optional(),
 
@@ -33,9 +33,9 @@ export const updateMediaSchema = z
 
     title: z.string().trim().max(200, "Tiêu đề tối đa 200 ký tự").optional().or(z.literal("")),
 
-    imagePath: z.url("URL hình ảnh không hợp lệ").optional().or(z.literal("")),
+    imagePath: z.string("URL hình ảnh không hợp lệ").optional().or(z.literal("")),
 
-    linkUrl: z.string().trim().url("URL liên kết không hợp lệ").optional().or(z.literal("")),
+    linkUrl: z.string("URL hình ảnh không hợp lệ").optional().or(z.literal("")),
 
     order: z.number().int().min(0, "Order phải >= 0").optional(),
 

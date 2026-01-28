@@ -3,7 +3,6 @@ import * as categoryService from "./category.service";
 
 // === PUBLIC CONTROLLERS ===
 
-// Lấy root categories cho home
 export const getRootCategoriesHandler = async (req: Request, res: Response) => {
   try {
     const categories = await categoryService.getRootCategories();
@@ -17,7 +16,6 @@ export const getRootCategoriesHandler = async (req: Request, res: Response) => {
   }
 };
 
-// Lấy featured categories cho Home
 export const getFeaturedCategoriesHandler = async (req: Request, res: Response) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
@@ -32,7 +30,6 @@ export const getFeaturedCategoriesHandler = async (req: Request, res: Response) 
   }
 };
 
-// Lấy category tree cho menu
 export const getCategoryTreeHandler = async (req: Request, res: Response) => {
   try {
     const tree = await categoryService.getCategoryTree();
@@ -45,7 +42,6 @@ export const getCategoryTreeHandler = async (req: Request, res: Response) => {
   }
 };
 
-// Lấy category theo slug
 export const getCategoryBySlugHandler = async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
@@ -62,7 +58,6 @@ export const getCategoryBySlugHandler = async (req: Request, res: Response) => {
 
 // === ADMIN CONTROLLERS ===
 
-// Lấy tất cả categories (admin)
 export const getAllCategoriesHandler = async (req: Request, res: Response) => {
   try {
     const categories = await categoryService.getAllCategories();
@@ -76,7 +71,6 @@ export const getAllCategoriesHandler = async (req: Request, res: Response) => {
   }
 };
 
-// Lấy root categories cho admin
 export const getRootCategoriesForAdminHandler = async (req: Request, res: Response) => {
   try {
     const categories = await categoryService.getRootCategoriesForAdmin();
@@ -90,7 +84,6 @@ export const getRootCategoriesForAdminHandler = async (req: Request, res: Respon
   }
 };
 
-// Lấy category detail với children (admin)
 export const getCategoryDetailHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -105,7 +98,6 @@ export const getCategoryDetailHandler = async (req: Request, res: Response) => {
   }
 };
 
-// Tạo category
 export const createCategoryHandler = async (req: Request, res: Response) => {
   try {
     const category = await categoryService.createCategory(req.body);
@@ -119,7 +111,6 @@ export const createCategoryHandler = async (req: Request, res: Response) => {
   }
 };
 
-// Update category
 export const updateCategoryHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -134,7 +125,6 @@ export const updateCategoryHandler = async (req: Request, res: Response) => {
   }
 };
 
-// Delete category
 export const deleteCategoryHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;

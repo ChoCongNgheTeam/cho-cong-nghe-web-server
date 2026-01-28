@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { seedCategoryGroup } from "@/utils/seed-category-helper";
+import { seedCategoryGroup } from "prisma/seeds/seed-category-helper";
 import {
   phoneCategoryData,
   laptopCategoryData,
@@ -12,14 +12,13 @@ import {
   ketNoiTienIchGiaiTriData,
 } from "../seed-data/categories";
 
-const prisma = new PrismaClient();
-
-export async function seedCategories() {
+export async function seedCategories(prisma: PrismaClient) {
   console.log("🌱 Seeding categories...");
 
   const allCreated = [];
 
-  // Seed từng nhóm
+  // Seed categories group
+
   const phoneCategories = await seedCategoryGroup(prisma, phoneCategoryData, "Điện thoại");
   allCreated.push(...phoneCategories);
 
@@ -35,14 +34,15 @@ export async function seedCategories() {
   const congNgheThietBiSoCategories = await seedCategoryGroup(
     prisma,
     congNgheThietBiSoData,
-    "Công nghệ & thiết bị số"
+    "Công nghệ & thiết bị số",
   );
+
   allCreated.push(...congNgheThietBiSoCategories);
 
   const chamSocNhaCuaSucKhoeCategories = await seedCategoryGroup(
     prisma,
     chamSocNhaCuaSucKhoeData,
-    "Chăm sóc nhà cửa & sức khỏe"
+    "Chăm sóc nhà cửa & sức khỏe",
   );
 
   allCreated.push(...chamSocNhaCuaSucKhoeCategories);
@@ -50,21 +50,21 @@ export async function seedCategories() {
   const thietBiGiaDinhCategories = await seedCategoryGroup(
     prisma,
     thietBiGiaDinhData,
-    "Thiết bị gia đình"
+    "Thiết bị gia đình",
   );
   allCreated.push(...thietBiGiaDinhCategories);
 
   const thietBiNhaBepCategories = await seedCategoryGroup(
     prisma,
     thietBiNhaBepData,
-    "Thiết bị nhà bếp"
+    "Thiết bị nhà bếp",
   );
   allCreated.push(...thietBiNhaBepCategories);
 
   const ketNoiTienIchGiaiTriCategories = await seedCategoryGroup(
     prisma,
     ketNoiTienIchGiaiTriData,
-    "Kết nối, tiện ích & giải trí"
+    "Kết nối, tiện ích & giải trí",
   );
   allCreated.push(...ketNoiTienIchGiaiTriCategories);
 

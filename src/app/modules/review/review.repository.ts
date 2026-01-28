@@ -1,6 +1,14 @@
 import prisma from "@/config/db";
 import { Prisma, ReviewStatus } from "@prisma/client";
 
+const selectColorImage = {
+  id: true,
+  color: true,
+  imageUrl: true,
+  altText: true,
+  position: true,
+};
+
 const reviewSelect = {
   id: true,
   rating: true,
@@ -16,26 +24,31 @@ const reviewSelect = {
       avatarImage: true,
     },
   },
+
   orderItem: {
     select: {
       id: true,
       quantity: true,
       unitPrice: true,
+
       productVariant: {
         select: {
           id: true,
           code: true,
           price: true,
+
           product: {
             select: {
               id: true,
               name: true,
               slug: true,
+
+              img: {
+                select: selectColorImage,
+                orderBy: [{ color: "asc" as const }, { position: "asc" as const }],
+                take: 1,
+              },
             },
-          },
-          images: {
-            take: 1,
-            select: { imageUrl: true },
           },
         },
       },

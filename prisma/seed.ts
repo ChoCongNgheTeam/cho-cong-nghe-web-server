@@ -6,7 +6,6 @@ import {
   seedSpecifications,
   seedProductSpecifications,
   seedProductHighlights,
-  // seedReviews,
   seedPaymentMethods,
   seedUsers,
   seedProducts,
@@ -23,41 +22,45 @@ import {
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("Bắt đầu seeding dữ liệu...");
+  console.log("🚀 Start seeding...");
 
-  const brands = await seedBrands();
-  const categories = await seedCategories();
-  const attributes = await seedAttributeOptions();
-  await seedSpecifications();
-  await seedPaymentMethods();
-  const users = await seedUsers();
-  await seedVouchers();
+  const brands = await seedBrands(prisma);
 
-  await seedPromotions();
+  const categories = await seedCategories(prisma);
 
-  await seedUserAddresses({ users });
+  const users = await seedUsers(prisma);
 
-  const products = await seedProducts({
+  await seedUserAddresses(prisma, { users });
+
+  console.log("Seeding attribute options and specifications...");
+
+  await seedAttributeOptions(prisma);
+  await seedSpecifications(prisma);
+
+  const products = await seedProducts(prisma, {
     brands,
     categories,
   });
-  await seedProductSpecifications();
-  await seedProductHighlights();
-  await seedVariants({ products });
-  await seedProductColorImages({ products });
 
-  await seedBlogs();
+  (await seedProductSpecifications(prisma),
+    await seedProductHighlights(prisma),
+    await seedVariants(prisma, { products }),
+    await seedProductColorImages(prisma, { products }),
+    await Promise.all([
+      seedPaymentMethods(prisma),
+      seedVouchers(prisma),
+      seedPromotions(prisma),
+      seedBlogs(prisma),
+      seedComments(prisma),
+      seedImageMedia(prisma),
+    ]));
 
-  await seedComments();
-
-  await seedImageMedia();
-
-  console.log("Seeding hoàn tất thành công!");
+  console.log("✅ Seeding completed successfully!");
 }
 
 main()
-  .catch((e) => {
-    console.error("Lỗi khi seeding:", e);
+  .catch((error) => {
+    console.error("❌ Seeding failed:", error);
     process.exit(1);
   })
   .finally(async () => {

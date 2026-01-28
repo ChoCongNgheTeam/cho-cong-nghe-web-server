@@ -1,5 +1,3 @@
-// seed-data/image-media.ts
-
 export interface ImageMediaSeed {
   type: "SLIDER" | "BANNER";
   position: "HOME_TOP" | "BELOW_SLIDER" | "HOME_SECTION_1" | "HOME_SECTION_2";

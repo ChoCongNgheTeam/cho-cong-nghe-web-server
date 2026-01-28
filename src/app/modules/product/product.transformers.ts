@@ -16,7 +16,6 @@ import {
   return this.toString();
 };
 
-// UPDATE: Simplified - dùng quantity trực tiếp
 const getStockStatus = (quantity: number): "in_stock" | "low_stock" | "out_of_stock" => {
   if (quantity <= 0) return "out_of_stock";
   if (quantity <= 5) return "low_stock";
@@ -124,9 +123,6 @@ const buildAvailableOptionsWithStatus = (
   }));
 };
 
-/**
- * UPDATE: Calculate overall stock status - dùng quantity trực tiếp
- */
 export const calculateOverallStockStatus = (
   variants: RawVariant[],
 ): "in_stock" | "low_stock" | "out_of_stock" | "pre_order" => {
@@ -143,13 +139,12 @@ export const calculateOverallStockStatus = (
 };
 
 export const transformProductCard = (product: any): ProductCard => {
+  // console.log(product);
   const defaultVariant = product.variants[0];
 
   const firstColorImage = product.img?.[0];
   const thumbnail = firstColorImage?.imageUrl || "";
   const inStock = defaultVariant?.quantity > 0;
-
-  // console.log(product);
 
   const highlights =
     product.productSpecifications.map((spec: any) => ({
@@ -219,9 +214,8 @@ export const transformProductDetail = (
   };
 };
 
-// UPDATE: transformVariant - dùng quantity trực tiếp
 export const transformVariant = (variant: RawVariant, colorImages: any[]): ProductVariant => {
-  const quantity = variant.quantity ?? 0; // ✅ Direct field
+  const quantity = variant.quantity ?? 0;
   const available = Math.max(0, quantity);
 
   const color = getVariantColor(variant);
@@ -231,12 +225,12 @@ export const transformVariant = (variant: RawVariant, colorImages: any[]): Produ
     id: variant.id,
     code: variant.code,
     price: Number(variant.price),
-    quantity, // ✅ NEW: Direct field
+    quantity,
     soldCount: variant.soldCount,
     isDefault: variant.isDefault,
     isActive: variant.isActive,
     available: available > 0,
-    stockStatus: getStockStatus(quantity), // ✅ Simplified
+    stockStatus: getStockStatus(quantity),
     color,
     images,
   };
