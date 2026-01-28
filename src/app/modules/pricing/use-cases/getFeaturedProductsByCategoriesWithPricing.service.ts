@@ -11,6 +11,8 @@ export const getFeaturedProductsByCategoriesWithPricing = async (
 ) => {
   const sections = await getFeaturedProductsByCategories(options);
 
+  // console.log(sections);
+
   const sectionsWithPricing = await Promise.all(
     sections.map(async (section) => {
       const productsWithPricing = await Promise.all(
@@ -36,6 +38,8 @@ export const getFeaturedProductsByCategoriesWithPricing = async (
           };
         }),
       );
+
+      // console.log(section);
 
       return {
         category: section.category,

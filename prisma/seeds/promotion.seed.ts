@@ -34,7 +34,7 @@ const promotionData: {
 
     targets: [
       {
-        targetType: TargetType.BRAND,
+        targetType: TargetType.PRODUCT,
         actionType: PromotionActionType.DISCOUNT_FIXED,
         discountValue: "400000.00",
       },
@@ -48,7 +48,7 @@ const promotionData: {
 
     targets: [
       {
-        targetType: TargetType.BRAND,
+        targetType: TargetType.PRODUCT,
         actionType: PromotionActionType.GIFT_PRODUCT,
         getQuantity: 1,
       },
@@ -62,7 +62,7 @@ const promotionData: {
 
     targets: [
       {
-        targetType: TargetType.BRAND,
+        targetType: TargetType.PRODUCT,
         buyQuantity: 1,
         actionType: PromotionActionType.BUY_X_GET_Y,
         discountValue: "500000.00",
@@ -78,11 +78,88 @@ const promotionData: {
 
     targets: [
       {
-        targetType: TargetType.BRAND,
+        targetType: TargetType.PRODUCT,
         buyQuantity: 1,
         actionType: PromotionActionType.BUY_X_GET_Y,
         discountValue: "1000000.00",
         getQuantity: 1,
+      },
+    ],
+  },
+
+  // --- LAPTOP (MACBOOK) PROMOTIONS ---
+  {
+    name: "APPLE_MACBOOK_GIAM_1TR",
+    description: "Giảm ngay 1.000.000đ khi mua MacBook Air/Pro",
+    priority: 35,
+    isActive: true,
+    startDate: new Date("2026-01-27"),
+    endDate: new Date("2026-03-31"),
+
+    targets: [
+      {
+        targetType: TargetType.PRODUCT,
+        actionType: PromotionActionType.DISCOUNT_FIXED,
+        discountValue: "1000000.00",
+      },
+    ],
+  },
+  {
+    name: "APPLE_MACBOOK_TANG_COMBO_PHU_KIEN",
+    description: "Tặng Túi chống sốc và Bộ vệ sinh MacBook",
+    priority: 28,
+    isActive: true,
+
+    targets: [
+      {
+        targetType: TargetType.PRODUCT,
+        actionType: PromotionActionType.GIFT_PRODUCT,
+        getQuantity: 1, // Tặng 1 set combo
+      },
+    ],
+  },
+  {
+    name: "APPLE_MACBOOK_BUY_GET_MOUSE_500K",
+    description: "Ưu đãi 500.000đ khi mua kèm Magic Mouse / Magic Keyboard",
+    priority: 22,
+    isActive: true,
+
+    targets: [
+      {
+        targetType: TargetType.PRODUCT,
+        buyQuantity: 1,
+        actionType: PromotionActionType.BUY_X_GET_Y,
+        discountValue: "500000.00",
+        getQuantity: 1,
+      },
+    ],
+  },
+  {
+    name: "APPLE_MACBOOK_BUY_GET_USB_C_HUB",
+    description: "Tặng Hub chuyển đổi USB-C 5-in-1 khi mua MacBook Pro",
+    priority: 21,
+    isActive: true,
+
+    targets: [
+      {
+        targetType: TargetType.PRODUCT,
+        buyQuantity: 1,
+        actionType: PromotionActionType.BUY_X_GET_Y,
+        getQuantity: 1,
+      },
+    ],
+  },
+  {
+    name: "MACBOOK_STUDENT_DISCOUNT",
+    description: "Đặc quyền học sinh sinh viên: Giảm thêm 500.000đ",
+    priority: 40,
+    isActive: true,
+
+    targets: [
+      {
+        targetType: TargetType.PRODUCT,
+        actionType: PromotionActionType.DISCOUNT_FIXED,
+        discountValue: "500000.00",
       },
     ],
   },

@@ -92,6 +92,21 @@ const brandData = [
     description: "Tiên phong công nghệ 5G và camera ẩn dưới màn hình",
     imagePath: "brands/zte.webp",
   },
+  {
+    name: "Casper",
+    description: "Casper",
+    imagePath: "brands/casper.webp",
+  },
+  {
+    name: "Comfee",
+    description: "Comfee",
+    imagePath: "brands/comfee.webp",
+  },
+  {
+    name: "Sharp",
+    description: "Sharp",
+    imagePath: "brands/sharp.webp",
+  },
 ];
 
 export async function seedBrands(prisma: PrismaClient) {

@@ -78,7 +78,7 @@ export const calculateProductPrice = async (
     );
 
     if (bestPromotionResult) {
-      console.log(bestPromotionResult);
+      // console.log(bestPromotionResult);
 
       const { promotion, target } = bestPromotionResult;
       const { discountAmount } = calculatePromotionTargetDiscount(

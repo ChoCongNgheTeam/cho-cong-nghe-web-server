@@ -2,6 +2,7 @@ import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
 import { ListProductsQuery, ReviewsQuery } from "./product.validation";
 import { OrderStatus } from "@prisma/client";
+import { fa } from "zod/v4/locales";
 
 const selectBrand = {
   id: true,
@@ -75,7 +76,7 @@ const selectProductCard = {
   viewsCount: true,
   ratingAverage: true,
   ratingCount: true,
-  isFeatured: true,
+  isFeatured: false,
   variants: {
     where: { isActive: true },
     select: selectVariant,
@@ -114,7 +115,7 @@ const selectProductDetail = {
   viewsCount: true,
   ratingAverage: true,
   ratingCount: true,
-  isFeatured: true,
+  isFeatured: false,
   isActive: true,
   createdAt: true,
   updatedAt: true,
@@ -735,28 +736,23 @@ export const getProductVariantOptionsMap = async (productIds: string[]) => {
         },
       },
     },
-    distinct: ["attributeOptionId"],
   });
 
-  const map = new Map<
-    string,
-    {
-      type: string;
-      options: { value: string; label: string }[];
-    }[]
-  >();
+  const map = new Map<string, { type: string; options: { value: string; label: string }[] }[]>();
+
+  // ensure all products exist
+  for (const productId of productIds) {
+    map.set(productId, []);
+  }
 
   for (const row of rows) {
     const productId = row.productVariant.productId;
-    const list = map.get(productId) ?? [];
+    const list = map.get(productId)!;
 
     let group = list.find((g) => g.type === row.attributeOption.type);
 
     if (!group) {
-      group = {
-        type: row.attributeOption.type,
-        options: [],
-      };
+      group = { type: row.attributeOption.type, options: [] };
       list.push(group);
     }
 
@@ -766,8 +762,6 @@ export const getProductVariantOptionsMap = async (productIds: string[]) => {
         label: row.attributeOption.label,
       });
     }
-
-    map.set(productId, list);
   }
 
   return map;
@@ -841,10 +835,12 @@ export const findProductsOnSaleByDate = async (
     categoryId?: string;
   } = {},
 ) => {
-  const { limit = 20, categoryId } = options;
+  const { limit = 15, categoryId } = options;
 
   // Get product IDs affected by promotions
   const productIds = await getProductIdsFromPromotions(date);
+
+  // console.log(productIds);
 
   if (productIds.size === 0) {
     return [];
@@ -868,26 +864,39 @@ export const findProductsOnSaleByDate = async (
  * For Home: Container hiển thị categories có sản phẩm sale
  */
 export const findCategoriesWithSaleProducts = async (date: Date) => {
-  // Get product IDs affected by promotions
+  // 1. Lấy productIds đang có promotion
   const productIds = await getProductIdsFromPromotions(date);
 
   if (productIds.size === 0) {
     return [];
   }
 
-  // Get categories from these products
+  // 2. Lấy category + parent của các product đó
   const products = await prisma.products.findMany({
     where: { id: { in: Array.from(productIds) } },
-    select: { categoryId: true },
-    distinct: ["categoryId"],
+    select: {
+      category: {
+        select: {
+          id: true,
+          parent: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      },
+    },
   });
 
-  const categoryIds = products.map((p) => p.categoryId);
+  // 3. Xác định category hiển thị (CHA nếu có)
+  const displayCategoryIds = Array.from(
+    new Set(products.map((p) => p.category.parent?.id ?? p.category.id)),
+  );
 
-  // Get categories info
+  // 4. Lấy thông tin category CHA để render
   return prisma.categories.findMany({
     where: {
-      id: { in: categoryIds },
+      id: { in: displayCategoryIds },
       isActive: true,
     },
     select: {
@@ -915,13 +924,17 @@ export const findFeaturedProductsByCategories = async (
     categoriesLimit?: number;
   } = {},
 ) => {
-  const { limit = 8, categoriesLimit = 6 } = options;
+  const { limit = 5, categoriesLimit = 6 } = options;
 
-  // Get featured categories
-  const featuredCategories = await prisma.categories.findMany({
+  /**
+   * Lấy category GỐC (Laptop, Phone, Tablet...)
+   *    => chỉ category cha mới tạo section
+   */
+  const rootFeaturedCategories = await prisma.categories.findMany({
     where: {
       isFeatured: true,
       isActive: true,
+      parentId: null,
     },
     select: {
       id: true,
@@ -932,12 +945,45 @@ export const findFeaturedProductsByCategories = async (
     take: categoriesLimit,
   });
 
-  // Get featured products for each category
+  /**
+   * Với mỗi category cha
+   *    → lấy toàn bộ category con (nhiều cấp nếu có)
+   *    → lấy sản phẩm isFeatured bên trong
+   */
   const results = await Promise.all(
-    featuredCategories.map(async (category) => {
+    rootFeaturedCategories.map(async (rootCategory) => {
+      /**
+       * Lấy category cấp 1 (vd: Apple (Macbook))
+       */
+      const level1Categories = await prisma.categories.findMany({
+        where: {
+          parentId: rootCategory.id,
+          isActive: true,
+        },
+        select: { id: true },
+      });
+
+      const level1Ids = level1Categories.map((c) => c.id);
+
+      /**
+       * Lấy category cấp 2 (vd: MacBook Air 13 / 15)
+       */
+      const level2Categories = await prisma.categories.findMany({
+        where: {
+          parentId: { in: level1Ids },
+          isActive: true,
+        },
+        select: { id: true },
+      });
+
+      const allCategoryIds = [...level1Ids, ...level2Categories.map((c) => c.id)];
+
+      /**
+       * Lấy sản phẩm nổi bật từ TOÀN BỘ category con
+       */
       const products = await prisma.products.findMany({
         where: {
-          categoryId: category.id,
+          categoryId: { in: allCategoryIds },
           isFeatured: true,
           isActive: true,
         },
@@ -947,14 +993,16 @@ export const findFeaturedProductsByCategories = async (
       });
 
       return {
-        category,
+        category: rootCategory,
         products,
         total: products.length,
       };
     }),
   );
 
-  // Filter out categories with no featured products
+  /**
+   * Loại bỏ section không có sản phẩm
+   */
   return results.filter((r) => r.products.length > 0);
 };
 
@@ -1055,28 +1103,38 @@ export const findProductsByPromotionId = async (promotionId: string, limit: numb
  * 6. Get sale products count by categories (for stats)
  * For Home: Đếm số sản phẩm sale theo từng category
  */
-export const getSaleProductsCountByCategories = async (
-  date: Date,
-): Promise<Map<string, number>> => {
+export const getSaleProductsCountByCategories = async (date: Date) => {
   const productIds = await getProductIdsFromPromotions(date);
 
   if (productIds.size === 0) {
-    return new Map();
+    return new Map<string, number>();
   }
 
-  // Get products with category
   const products = await prisma.products.findMany({
     where: { id: { in: Array.from(productIds) } },
-    select: { categoryId: true },
+    select: {
+      category: {
+        select: {
+          id: true,
+          parent: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      },
+    },
   });
 
-  // Count by category
-  const countMap = new Map<string, number>();
-  products.forEach((p) => {
-    countMap.set(p.categoryId, (countMap.get(p.categoryId) || 0) + 1);
-  });
+  const map = new Map<string, number>();
 
-  return countMap;
+  for (const product of products) {
+    const displayCategoryId = product.category.parent?.id ?? product.category.id;
+
+    map.set(displayCategoryId, (map.get(displayCategoryId) || 0) + 1);
+  }
+
+  return map;
 };
 
 /**

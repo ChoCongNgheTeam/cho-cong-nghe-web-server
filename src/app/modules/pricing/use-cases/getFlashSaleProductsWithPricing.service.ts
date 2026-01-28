@@ -12,6 +12,8 @@ export const getFlashSaleProductsWithPricing = async (
 ) => {
   const result = await getFlashSaleProducts(date, options);
 
+  // console.log(result);
+
   const data = await Promise.all(
     result.data.map(async ({ card, pricingContext }) => {
       if (!pricingContext) {

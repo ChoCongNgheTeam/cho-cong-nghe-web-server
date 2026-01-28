@@ -59,6 +59,7 @@ export const findFeaturedCategories = async (limit?: number) => {
     where: {
       isFeatured: true,
       isActive: true,
+      parentId: null,
     },
     select: {
       ...selectCategory,

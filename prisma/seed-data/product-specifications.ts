@@ -202,4 +202,223 @@ export const productSpecificationsData: ProductSpecificationSeed[] = [
       { key: "in_the_box", value: "Cáp USB-C to Lightning, Sách HDSD, Que lấy SIM" },
     ],
   },
+
+  {
+    productSlug: "iphone-15",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+
+  {
+    productSlug: "iphone-16",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+
+  {
+    productSlug: "iphone-16-pro",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+
+  {
+    productSlug: "iphone-16-plus",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+
+  {
+    productSlug: "iphone-16-pro-max",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "iphone-17",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+
+  {
+    productSlug: "iphone-17-pro",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+
+  {
+    productSlug: "iphone-17-pro-max",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+
+  {
+    productSlug: "macbook-air-13-m4-2025-10cpu-8gpu-16gb-256gb",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+
+  {
+    productSlug: "macbook-air-13-m2-2024-8cpu-8gpu-16gb-256gb",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+
+  {
+    productSlug: "macbook-air-13-m4-2025-10cpu-10gpu-16gb-512gb",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+
+  {
+    productSlug: "macbook-air-13-m4-2025-10cpu-10gpu-24gb-512gb",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "macbook-air-13-m4-2025-10cpu-10gpu-24gb-512gb",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "macbook-air-15-m4-2025-10cpu-10gpu-16gb-512gb",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "macbook-air-15-m4-2025-10cpu-10gpu-16gb-256gb",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "macbook-air-15-inch-m2-2023-8cpu-10gpu-8gb-512gb-sac-70w",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "macbook-pro-14-m4-pro-2024-12cpu-16gpu-24gb-512gb",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "macbook-pro-14-m4-pro-2024-14cpu-20gpu-24gb-1tb",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "macbook-pro-14-2023-m3-pro-12-cpu-18-gpu-18gb-1tb",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "macbook-pro-14-m4-max-2024-14cpu-32gpu-36gb-1tb",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "macbook-pro-14-m5-2025-10cpu-10gpu-16gb-512gb",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "macbook-pro-14-m5-2025-10cpu-10gpu-24gb-512gb",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "macbook-pro-16-m4-pro-2024-14cpu-20gpu-24gb-512gb",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "macbook-pro-16-m4-pro-2024-14cpu-20gpu-48gb-512gb",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "macbook-pro-16-m4-max-2024-14cpu-32gpu-36gb-1tb",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "macbook-pro-16-m4-max-2024-16cpu-40gpu-48gb-1tb",
+    specifications: [
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "max_brightness", value: "800 - 1200" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
 ];

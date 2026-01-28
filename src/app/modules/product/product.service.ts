@@ -23,6 +23,7 @@ import prisma from "prisma/client";
 
 export const getProductsPublic = async (query: ListProductsQuery) => {
   const result = await repo.findAllPublic(query);
+  // console.log(result);
 
   const productIds = result.data.map((p) => p.id);
   const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
@@ -310,8 +311,12 @@ export const getFlashSaleProducts = async (
 ) => {
   const products = await repo.findProductsOnSaleByDate(date, options);
 
+  console.log(products);
+
   const productIds = products.map((p) => p.id);
   const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
+
+  // console.log(productIds);
 
   return {
     data: products.map((product) => {
@@ -363,6 +368,7 @@ export const getCategoriesWithSaleProducts = async (date: Date = new Date()) => 
  * 3. Get featured products by categories
  * For Home: Sections sản phẩm featured theo category
  */
+
 export const getFeaturedProductsByCategories = async (
   options: {
     limit?: number;
@@ -372,7 +378,7 @@ export const getFeaturedProductsByCategories = async (
   const results = await repo.findFeaturedProductsByCategories(options);
 
   // Lấy productIds để query variant options
-  const allProductIds = results.flatMap((result) => result.products.map((p) => p.id));
+  const allProductIds = results.flatMap((r) => r.products.map((p) => p.id));
   const variantOptionsMap = await repo.getProductVariantOptionsMap(allProductIds);
 
   return results.map((result) => ({
@@ -397,7 +403,7 @@ export const getFeaturedProductsByCategories = async (
           : null,
       };
     }),
-    total: result.total,
+    total: result.products.length,
   }));
 };
 /**
@@ -445,6 +451,8 @@ export const getProductsByPromotion = async (promotionId: string, limit: number 
  */
 export const getBestSellingProducts = async (limit: number = 12) => {
   const products = await repo.findBestSellingProducts(limit);
+
+  console.log(products);
 
   const productIds = products.map((p) => p.id);
   const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);

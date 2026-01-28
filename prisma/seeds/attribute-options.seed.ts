@@ -17,6 +17,14 @@ const attributeOptionsData = [
   { type: "storage", value: "256gb", label: "256GB" },
   { type: "storage", value: "512gb", label: "512GB" },
   { type: "storage", value: "1tb", label: "1TB" },
+
+  // SCREEN SIZE (TV)
+  { type: "size", value: "43-inch", label: "43 inch" },
+  { type: "size", value: "50-inch", label: "50 inch" },
+  { type: "size", value: "55-inch", label: "55 inch" },
+  { type: "size", value: "65-inch", label: "65 inch" },
+  { type: "size", value: "75-inch", label: "75 inch" },
+  { type: "size", value: "85-inch", label: "85 inch" },
 ];
 
 export async function seedAttributeOptions(prisma: PrismaClient) {

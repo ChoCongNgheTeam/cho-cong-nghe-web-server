@@ -78,8 +78,8 @@ export const getHomePageData = async (userId?: string): Promise<HomeResponse> =>
       sortOrder: "desc",
     }),
 
-    // 7. Featured Categories (limit 6)
-    categoryService.getFeaturedCategories(6),
+    // 7. Featured Categories (limit 18)
+    categoryService.getFeaturedCategories(18),
   ]);
 
   // Extract media by position

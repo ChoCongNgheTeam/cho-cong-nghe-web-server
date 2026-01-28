@@ -12,7 +12,7 @@ export const getProductsWithPricing = async (query: ListProductsQuery, userId?: 
         return { ...card, pricing: null };
       }
 
-      console.log(pricingContext.categoryPath);
+      // console.log(pricingContext.categoryPath);
 
       const fullPricing = await getVariantPricing(
         pricingContext.productId,
