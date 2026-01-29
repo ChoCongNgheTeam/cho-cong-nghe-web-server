@@ -34,17 +34,32 @@ export interface PricingCartInput {
 
 // ===== PROMOTION DATA =====
 
-export interface PromotionTargetData {
+/**
+ * Promotion Rule - action để áp dụng
+ */
+export interface PromotionRuleData {
   id: string;
-  targetType: TargetType;
-  targetId: string | null;
-  buyQuantity: number | null;
+  promotionId: string;
   actionType: PromotionActionType;
   discountValue: number | null;
-  giftProductVariantId: string | null;
+  buyQuantity: number | null;
   getQuantity: number | null;
+  giftProductVariantId: string | null;
 }
 
+/**
+ * Promotion Target - đối tượng áp dụng
+ */
+export interface PromotionTargetData {
+  id: string;
+  promotionId: string;
+  targetType: TargetType;
+  targetId: string | null;
+}
+
+/**
+ * Promotion đầy đủ với rules và targets
+ */
 export interface PromotionData {
   id: string;
   name: string;
@@ -53,6 +68,13 @@ export interface PromotionData {
   isActive: boolean;
   startDate: Date | null;
   endDate: Date | null;
+  minOrderValue: number | null;
+  maxDiscountValue: number | null;
+  usageLimit: number | null;
+  usedCount: number;
+
+  // Relations
+  rules: PromotionRuleData[];
   targets: PromotionTargetData[];
 }
 
@@ -71,6 +93,7 @@ export interface VoucherData {
   discountType: DiscountType;
   discountValue: number;
   minOrderValue: number;
+  maxDiscountValue: number | null;
   maxUses: number | null;
   maxUsesPerUser: number | null;
   usesCount: number;

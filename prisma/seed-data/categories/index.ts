@@ -2,8 +2,3 @@ export * from "./phone";
 export * from "./laptop";
 export * from "./dienmay";
 export * from "./phukien";
-export * from "./congnghethietbiso";
-export * from "./chamsocnhacuasuckhoe";
-export * from "./thietbigiadinh";
-export * from "./thietbinhabep";
-export * from "./kenhketnoitienitgiaitri";

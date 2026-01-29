@@ -5,6 +5,7 @@ export const phuKienCategoryData = [
     description:
       "Hệ sinh thái phụ kiện công nghệ đa dạng, giúp tối ưu hóa trải nghiệm và bảo vệ thiết bị của bạn.",
     imagePath: "categories/phu-kien.webp",
+    isFeatured: true,
   },
   // Âm thanh
   {
@@ -144,40 +145,7 @@ export const phuKienCategoryData = [
     imagePath: "categories/stylus-pen.webp",
     parentName: "Phụ kiện di động",
   },
-  {
-    name: "Thiết bị định vị",
-    description:
-      "Dễ dàng tìm thấy đồ vật thất lạc như chìa khóa, ví tiền thông qua ứng dụng điện thoại.",
-    imagePath: "categories/smart-tag.webp",
-    parentName: "Phụ kiện di động",
-  },
-  {
-    name: "Gậy chụp ảnh, Gimbal",
-    description:
-      "Thiết bị chống rung chuyên nghiệp giúp bạn có những thước phim và hình ảnh mượt mà.",
-    imagePath: "categories/gimbal.webp",
-    parentName: "Phụ kiện di động",
-  },
-  // Thiết bị lưu trữ dữ liệu
-  {
-    name: "Thiết bị lưu trữ dữ liệu",
-    description:
-      "Giải pháp sao lưu và truyền tải dữ liệu an toàn, tốc độ cao cho công việc và học tập.",
-    imagePath: "categories/luu-tru.webp",
-    parentName: "Phụ Kiện",
-  },
-  {
-    name: "USB",
-    description: "Nhỏ gọn, tiện lợi để lưu trữ và di chuyển tài liệu giữa các máy tính.",
-    imagePath: "categories/usb-flash-drive.webp",
-    parentName: "Thiết bị lưu trữ dữ liệu",
-  },
-  {
-    name: "Ổ cứng di động",
-    description: "Kho lưu trữ khổng lồ cho video 4K và các tệp tin nặng với độ bền cao.",
-    imagePath: "categories/portable-hard-drive.webp",
-    parentName: "Thiết bị lưu trữ dữ liệu",
-  },
+
   // Phụ kiện Laptop
   {
     name: "Phụ kiện Laptop",

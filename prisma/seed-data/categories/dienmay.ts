@@ -4,6 +4,7 @@ export const dienMayCategoryData = [
     name: "Điện máy",
     description: "Giải pháp thiết bị gia đình thông minh, nâng tầm chất lượng cuộc sống hiện đại.",
     imagePath: "categories/dien-may.webp",
+    isFeatured: true,
   },
   // Tivi
   {
@@ -84,32 +85,7 @@ export const dienMayCategoryData = [
     imagePath: "categories/ac-inverter.webp",
     parentName: "Máy lạnh - Điều hòa",
   },
-  // Máy sấy
-  {
-    name: "Máy sấy",
-    description: "Làm khô quần áo nhanh chóng, diệt khuẩn và giữ cho trang phục luôn phẳng phiu.",
-    imagePath: "categories/may-say.webp",
-    parentName: "Điện máy",
-  },
-  {
-    name: "Sấy thông hơi",
-    description: "Giải pháp sấy khô nhanh, giá thành hợp lý và lắp đặt dễ dàng ở nơi thoáng đãng.",
-    imagePath: "categories/vented-dryer.webp",
-    parentName: "Máy sấy",
-  },
-  {
-    name: "Sấy ngưng tụ",
-    description: "Công nghệ hiện đại không cần ống thoát khí, phù hợp cho căn hộ và chung cư.",
-    imagePath: "categories/condenser-dryer.webp",
-    parentName: "Máy sấy",
-  },
-  {
-    name: "Sấy bơm nhiệt",
-    description:
-      "Công nghệ Heatpump sấy khô ở nhiệt độ thấp giúp bảo vệ sợi vải và tiết kiệm điện tối đa.",
-    imagePath: "categories/heatpump-dryer.webp",
-    parentName: "Máy sấy",
-  },
+
   // Tủ lạnh
   {
     name: "Tủ lạnh",
@@ -148,31 +124,5 @@ export const dienMayCategoryData = [
     description: "Chuyên dụng để cấp đông thực phẩm số lượng lớn with khả năng làm lạnh sâu.",
     imagePath: "categories/tu-dong.webp",
     parentName: "Điện máy",
-  },
-  // Phụ kiện điện máy
-  {
-    name: "Phụ kiện điện máy",
-    description: "Các linh kiện và vật tư bổ trợ giúp thiết bị điện máy vận hành hoàn hảo.",
-    imagePath: "categories/phu-kien-dien-may.webp",
-    parentName: "Điện máy",
-  },
-  {
-    name: "Vật tư máy lạnh",
-    description: "Ống đồng, dây điện và các vật tư chuyên dụng cho việc lắp đặt điều hòa.",
-    imagePath: "categories/ac-materials.webp",
-    parentName: "Phụ kiện điện máy",
-  },
-  {
-    name: "Phụ kiện máy giặt",
-    description: "Ống cấp nước, chân đế và các phụ kiện hỗ trợ tối ưu cho máy giặt.",
-    imagePath: "categories/washer-accessories.webp",
-    parentName: "Phụ kiện điện máy",
-  },
-  {
-    name: "Phụ kiện Tivi",
-    description:
-      "Giá treo tường, remote thông minh và các thiết bị kết nối hình ảnh chất lượng cao.",
-    imagePath: "categories/tivi-accessories.webp",
-    parentName: "Phụ kiện điện máy",
   },
 ];

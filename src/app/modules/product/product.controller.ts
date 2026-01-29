@@ -8,12 +8,10 @@ import {
   uploadColorImages,
   deleteOldImages,
 } from "./product.helpers";
-import {
-  getProductsWithPricing,
-  getProductDetailWithPricing,
-  getProductVariantWithPricing,
-  getRelatedProductsWithPricing,
-} from "../pricing";
+import { getProductsWithPricing } from "../pricing/use-cases/getProductsWithPricing.service";
+import { getProductDetailWithPricing } from "../pricing/use-cases/getProductDetailWithPricing.service";
+import { getProductVariantWithPricing } from "../pricing/use-cases/getProductVariantPricing.service";
+import { getRelatedProductsWithPricing } from "../pricing/use-cases/getRelatedProductsWithPricing.service";
 import { getFlashSaleProductsWithPricing } from "../pricing/use-cases/getFlashSaleProductsWithPricing.service";
 import { getFeaturedProductsByCategoriesWithPricing } from "../pricing/use-cases/getFeaturedProductsByCategoriesWithPricing.service";
 import { getNewArrivalProductsWithPricing } from "../pricing/use-cases/getNewArrivalProductsWithPricing.service";

@@ -13,8 +13,9 @@ export const PRICING_RULES = {
 } as const;
 
 export const DISCOUNT_CALCULATION = {
-  DISCOUNT_PERCENT: (basePrice: number, value: number) => {
-    return Math.round(basePrice * (value / 100));
+  DISCOUNT_PERCENT: (basePrice: number, value: number, maxDiscount?: number) => {
+    const discount = Math.round(basePrice * (value / 100));
+    return maxDiscount ? Math.min(discount, maxDiscount) : discount;
   },
 
   DISCOUNT_FIXED: (basePrice: number, value: number) => {

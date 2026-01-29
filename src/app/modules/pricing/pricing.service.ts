@@ -5,15 +5,14 @@ import {
   PricedProduct,
   PricingContext,
   AppliedDiscount,
-  PricingContextInput,
   DisplayPromotion,
 } from "./pricing.types";
 import {
-  getBestPromotionTarget,
-  calculatePromotionTargetDiscount,
+  getBestPromotionRule,
+  calculatePromotionRuleDiscount,
   isVoucherValid,
   calculateVoucherDiscount,
-  getApplicablePromotionTargets,
+  getApplicablePromotionRules,
   getAllAvailablePromotions,
 } from "./pricing.rules";
 import {
@@ -53,8 +52,6 @@ export const calculateProductPrice = async (
     brandId: input.brandId,
   };
 
-  // console.log(context);
-
   let finalPrice = input.basePrice;
   let totalDiscount = 0;
   const appliedPromotions: AppliedDiscount[] = [];
@@ -68,7 +65,7 @@ export const calculateProductPrice = async (
     availablePromotions.push(...allPromotions);
 
     // Still apply best discount for price display
-    const bestPromotionResult = getBestPromotionTarget(
+    const bestPromotionResult = getBestPromotionRule(
       input.productId,
       input.basePrice,
       input.quantity,
@@ -78,13 +75,12 @@ export const calculateProductPrice = async (
     );
 
     if (bestPromotionResult) {
-      // console.log(bestPromotionResult);
-
-      const { promotion, target } = bestPromotionResult;
-      const { discountAmount } = calculatePromotionTargetDiscount(
-        target,
+      const { promotion, rule } = bestPromotionResult;
+      const { discountAmount } = calculatePromotionRuleDiscount(
+        rule,
         input.basePrice,
         input.quantity,
+        promotion.maxDiscountValue,
       );
 
       finalPrice = input.basePrice - discountAmount / input.quantity;
@@ -95,13 +91,13 @@ export const calculateProductPrice = async (
         id: promotion.id,
         name: promotion.name,
         discountAmount,
-        description: formatPromotionDescription(target),
-        actionType: target.actionType,
+        description: formatPromotionDescription(rule),
+        actionType: rule.actionType,
       });
     }
   } else {
     // CART MODE: Apply promotions with quantity validation
-    const bestPromotionResult = getBestPromotionTarget(
+    const bestPromotionResult = getBestPromotionRule(
       input.productId,
       input.basePrice,
       input.quantity,
@@ -113,7 +109,7 @@ export const calculateProductPrice = async (
     const addedPromotionIds = new Set<string>();
 
     for (const promotion of context.availablePromotions) {
-      const applicableTargets = getApplicablePromotionTargets(
+      const applicableRules = getApplicablePromotionRules(
         promotion,
         input.productId,
         input.quantity,
@@ -121,28 +117,32 @@ export const calculateProductPrice = async (
         context,
       );
 
-      if (applicableTargets.length > 0) {
+      if (applicableRules.length > 0) {
         // Add to available promotions (unique by promotion ID)
         if (!addedPromotionIds.has(promotion.id)) {
-          const representativeTarget = applicableTargets[0];
+          const representativeRule = applicableRules[0];
           availablePromotions.push({
             id: promotion.id,
             name: promotion.name,
-            description: formatPromotionDescription(representativeTarget),
-            actionType: representativeTarget.actionType,
-            buyQuantity: representativeTarget.buyQuantity ?? null,
-            getQuantity: representativeTarget.getQuantity ?? null,
+            description: formatPromotionDescription(representativeRule),
+            actionType: representativeRule.actionType,
+            buyQuantity: representativeRule.buyQuantity,
+            getQuantity: representativeRule.getQuantity,
+            discountValue: representativeRule.discountValue
+              ? Number(representativeRule.discountValue)
+              : undefined,
           });
           addedPromotionIds.add(promotion.id);
         }
 
         // Apply promotion if it's the best one
         if (bestPromotionResult && bestPromotionResult.promotion.id === promotion.id) {
-          const { target } = bestPromotionResult;
-          const { discountAmount } = calculatePromotionTargetDiscount(
-            target,
+          const { rule } = bestPromotionResult;
+          const { discountAmount } = calculatePromotionRuleDiscount(
+            rule,
             input.basePrice,
             input.quantity,
+            promotion.maxDiscountValue,
           );
 
           finalPrice = input.basePrice - discountAmount / input.quantity;
@@ -154,33 +154,33 @@ export const calculateProductPrice = async (
               id: promotion.id,
               name: promotion.name,
               discountAmount,
-              description: formatPromotionDescription(target),
-              actionType: target.actionType,
+              description: formatPromotionDescription(rule),
+              actionType: rule.actionType,
             });
           }
 
           // Handle gifts for this promotion
-          const giftTargets = applicableTargets.filter(
-            (t) =>
-              t.actionType === PromotionActionType.GIFT_PRODUCT &&
-              t.giftProductVariantId &&
-              t.getQuantity,
+          const giftRules = applicableRules.filter(
+            (r) =>
+              r.actionType === PromotionActionType.GIFT_PRODUCT &&
+              r.giftProductVariantId &&
+              r.getQuantity,
           );
 
-          for (const giftTarget of giftTargets) {
-            const sets = giftTarget.buyQuantity
-              ? Math.floor(input.quantity / giftTarget.buyQuantity)
+          for (const giftRule of giftRules) {
+            const sets = giftRule.buyQuantity
+              ? Math.floor(input.quantity / giftRule.buyQuantity)
               : 1;
 
-            const giftQuantity = sets * giftTarget.getQuantity!;
+            const giftQuantity = sets * giftRule.getQuantity!;
 
             if (giftQuantity > 0) {
               giftProducts.push({
-                variantId: giftTarget.giftProductVariantId!,
+                variantId: giftRule.giftProductVariantId!,
                 quantity: giftQuantity,
               });
 
-              const giftDescription = formatPromotionDescription(giftTarget);
+              const giftDescription = formatPromotionDescription(giftRule);
               if (
                 !appliedPromotions.some(
                   (ap) =>
@@ -345,8 +345,6 @@ export const getVariantPricing = async (
     userId,
     "detail", // Show all available promotions
   );
-
-  // console.log(pricedProduct);
 
   return {
     base: pricedProduct.basePrice,

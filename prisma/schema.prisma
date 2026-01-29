@@ -53,6 +53,7 @@ enum DiscountType {
 
 enum TargetType {
   PRODUCT
+  PRODUCT_VARIANT
   CATEGORY
   BRAND
   ALL
@@ -190,14 +191,14 @@ model brands {
 
 model categories {
   id            String   @id @default(uuid()) @db.Uuid
-  name          String   @unique
+  name          String  
   parentId      String?  @db.Uuid
   description   String?
   imagePath     String?
   imageUrl      String?
   slug          String   @unique
   position      Int      @default(0)
-  isFeatured    Boolean @default(false)
+  isFeatured    Boolean  @default(false)
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -208,6 +209,7 @@ model categories {
   categorySpecifications category_specifications[]
 
   @@unique([parentId, position])
+  @@unique([name, parentId]) 
 }
 
 // model product_categories {
@@ -570,37 +572,55 @@ model promotions {
   id          String   @id @default(uuid()) @db.Uuid
   name        String   @unique
   description String?
+
   priority    Int      @default(0)
   isActive    Boolean  @default(true)
+
   startDate   DateTime?
   endDate     DateTime?
+
   minOrderValue    Decimal? @db.Decimal(12,2)
   maxDiscountValue Decimal? @db.Decimal(12,2)
+
   usageLimit       Int?
   usedCount        Int      @default(0)
+
   createdAt   DateTime @default(now())
 
-  targets promotion_targets[]
+  rules    promotion_rules[]
+  targets  promotion_targets[]
 }
 
-model promotion_targets {
-  id                   String   @id @default(uuid()) @db.Uuid
-  promotionId           String   @db.Uuid
 
-  targetType            TargetType
-  targetId              String?
-  buyQuantity           Int?
+model promotion_rules {
+  id          String   @id @default(uuid()) @db.Uuid
+  promotionId String   @db.Uuid
 
-  actionType            PromotionActionType
-  discountValue         Decimal? @db.Decimal(10,2)
-  giftProductVariantId  String?  @db.Uuid
-  getQuantity           Int?
+  actionType  PromotionActionType
 
-  createdAt             DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  discountValue        Decimal? @db.Decimal(10,2)
+  buyQuantity          Int?
+  getQuantity          Int?
+  giftProductVariantId String?  @db.Uuid
+
+  createdAt DateTime @default(now())
 
   promotion promotions @relation(fields: [promotionId], references: [id])
 }
+
+model promotion_targets {
+  id          String   @id @default(uuid()) @db.Uuid
+  promotionId String   @db.Uuid
+
+  targetType  TargetType
+  targetId    String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  promotion promotions @relation(fields: [promotionId], references: [id])
+}
+
 
 model blogs {
   id         String     @id @default(uuid()) @db.Uuid

@@ -38,29 +38,17 @@ export const promotionParamsSchema = z.object({
 // === CREATE/UPDATE SCHEMAS ===
 // =====================
 
-const promotionTargetSchema = z
+/**
+ * Promotion Rule Schema
+ */
+const promotionRuleSchema = z
   .object({
-    targetType: TargetTypeEnum,
-    targetId: z.string().uuid().optional(),
-    buyQuantity: z.coerce.number().int().positive().optional(),
     actionType: PromotionActionTypeEnum,
     discountValue: z.coerce.number().positive().optional(),
-    giftProductVariantId: z.string().uuid().optional(),
+    buyQuantity: z.coerce.number().int().positive().optional(),
     getQuantity: z.coerce.number().int().positive().optional(),
+    giftProductVariantId: z.string().uuid().optional(),
   })
-  .refine(
-    (data) => {
-      // If targetType is not ALL, targetId is required
-      if (data.targetType !== "ALL" && !data.targetId) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: "targetId bắt buộc khi targetType không phải ALL",
-      path: ["targetId"],
-    },
-  )
   .refine(
     (data) => {
       // DISCOUNT_PERCENT requires discountValue <= 100
@@ -109,15 +97,37 @@ const promotionTargetSchema = z
   )
   .refine(
     (data) => {
-      // FREE_GIFT requires giftProductVariantId
+      // GIFT_PRODUCT requires giftProductVariantId
       if (data.actionType === "GIFT_PRODUCT" && !data.giftProductVariantId) {
         return false;
       }
       return true;
     },
     {
-      message: "giftProductVariantId bắt buộc cho action FREE_GIFT",
+      message: "giftProductVariantId bắt buộc cho action GIFT_PRODUCT",
       path: ["giftProductVariantId"],
+    },
+  );
+
+/**
+ * Promotion Target Schema
+ */
+const promotionTargetSchema = z
+  .object({
+    targetType: TargetTypeEnum,
+    targetId: z.string().uuid().optional(),
+  })
+  .refine(
+    (data) => {
+      // If targetType is not ALL, targetId is required
+      if (data.targetType !== "ALL" && !data.targetId) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: "targetId bắt buộc khi targetType không phải ALL",
+      path: ["targetId"],
     },
   );
 
@@ -129,6 +139,10 @@ export const createPromotionSchema = z
     isActive: z.boolean().default(true),
     startDate: z.coerce.date().optional(),
     endDate: z.coerce.date().optional(),
+    minOrderValue: z.coerce.number().positive().optional(),
+    maxDiscountValue: z.coerce.number().positive().optional(),
+    usageLimit: z.coerce.number().int().positive().optional(),
+    rules: z.array(promotionRuleSchema).min(1, "Promotion phải có ít nhất 1 rule"),
     targets: z.array(promotionTargetSchema).min(1, "Promotion phải có ít nhất 1 target"),
   })
   .refine(
@@ -152,6 +166,10 @@ export const updatePromotionSchema = z
     isActive: z.boolean().optional(),
     startDate: z.coerce.date().optional(),
     endDate: z.coerce.date().optional(),
+    minOrderValue: z.coerce.number().positive().optional(),
+    maxDiscountValue: z.coerce.number().positive().optional(),
+    usageLimit: z.coerce.number().int().positive().optional(),
+    rules: z.array(promotionRuleSchema).optional(),
     targets: z.array(promotionTargetSchema).optional(),
   })
   .refine(

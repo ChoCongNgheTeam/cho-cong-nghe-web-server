@@ -5,6 +5,7 @@ export const laptopCategoryData = [
     description:
       "Hệ thống máy tính xách tay đa dạng từ học tập, văn phòng đến đồ họa và gaming chuyên nghiệp.",
     imagePath: "categories/laptop.webp",
+    isFeatured: true,
   },
   // Apple (Macbook)
   {
@@ -79,74 +80,6 @@ export const laptopCategoryData = [
     description: "Đỉnh cao laptop gaming với cấu hình khủng và hệ thống tản nhiệt tiên tiến.",
     imagePath: "categories/asus-rog.webp",
     parentName: "Asus",
-  },
-  // MSI
-  {
-    name: "MSI",
-    description: "Chuyên gia laptop gaming và máy trạm với hiệu suất tối đa.",
-    imagePath: "categories/msi-laptop.webp",
-    parentName: "Laptop",
-  },
-  {
-    name: "MSI Gaming Thin GF / Cyborg",
-    description: "Sự kết hợp giữa thiết kế mỏng nhẹ và khả năng chơi game ổn định.",
-    imagePath: "categories/msi-cyborg.webp",
-    parentName: "MSI",
-  },
-  {
-    name: "MSI Gaming Katana/ Sword/ Crosshair",
-    description: "Lấy cảm hứng từ những vũ khí sắc bén, tối ưu cho các game thủ chuyên nghiệp.",
-    imagePath: "categories/msi-katana.webp",
-    parentName: "MSI",
-  },
-  {
-    name: "MSI Modern",
-    description: "Dòng văn phòng thời trang, mỏng gọn giúp bạn xử lý công việc mọi lúc mọi nơi.",
-    imagePath: "categories/msi-modern.webp",
-    parentName: "MSI",
-  },
-  // Theo phân khúc giá
-  {
-    name: "Theo phân khúc giá",
-    description: "Lọc laptop theo ngân sách để tìm được sản phẩm ưng ý nhất.",
-    imagePath: "categories/laptop-price.webp",
-    parentName: "Laptop",
-  },
-  {
-    name: "Dưới 10 triệu",
-    description: "Laptop giá rẻ đáp ứng nhu cầu học tập cơ bản và lướt web.",
-    imagePath: "categories/price-under-10m.webp",
-    parentName: "Theo phân khúc giá",
-  },
-  {
-    name: "Từ 10 - 15 triệu",
-    description: "Phân khúc phổ thông với cấu hình ổn định cho công việc văn phòng.",
-    imagePath: "categories/price-10-15m.webp",
-    parentName: "Theo phân khúc giá",
-  },
-  {
-    name: "Từ 15 - 20 triệu",
-    description: "Lựa chọn tốt cho các bạn cần laptop mỏng nhẹ hoặc chơi game tầm trung.",
-    imagePath: "categories/price-15-20m.webp",
-    parentName: "Theo phân khúc giá",
-  },
-  {
-    name: "Từ 20 - 25 triệu",
-    description: "Cấu hình mạnh mẽ, màn hình đẹp cho trải nghiệm làm việc chuyên nghiệp.",
-    imagePath: "categories/price-20-25m.webp",
-    parentName: "Theo phân khúc giá",
-  },
-  {
-    name: "Từ 25 - 30 triệu",
-    description: "Dòng máy cận cao cấp với vật liệu hoàn thiện tốt và hiệu năng cao.",
-    imagePath: "categories/price-25-30m.webp",
-    parentName: "Theo phân khúc giá",
-  },
-  {
-    name: "Trên 30 triệu",
-    description: "Laptop cao cấp, Flagship hội tụ những tinh hoa công nghệ mới nhất.",
-    imagePath: "categories/price-over-30m.webp",
-    parentName: "Theo phân khúc giá",
   },
   // Lenovo
   {
@@ -228,37 +161,6 @@ export const laptopCategoryData = [
     imagePath: "categories/acer-predator.webp",
     parentName: "Acer",
   },
-  // Thương hiệu khác
-  {
-    name: "Thương hiệu khác",
-    description: "Nơi quy tụ những cái tên laptop chất lượng và đầy tiềm năng khác.",
-    imagePath: "categories/other-laptop.webp",
-    parentName: "Laptop",
-  },
-  {
-    name: "Gigabyte",
-    description: "Laptop hiệu năng cao cho game thủ và những người làm đồ họa chuyên nghiệp.",
-    imagePath: "categories/gigabyte-laptop.webp",
-    parentName: "Thương hiệu khác",
-  },
-  {
-    name: "Huawei",
-    description: "Thiết kế mỏng gọn đầy tinh tế cùng khả năng đồng bộ hệ sinh thái tuyệt vời.",
-    imagePath: "categories/huawei-laptop.webp",
-    parentName: "Thương hiệu khác",
-  },
-  {
-    name: "Masstel",
-    description: "Laptop giá rẻ dành riêng cho học sinh, sinh viên với các tính năng giáo dục.",
-    imagePath: "categories/masstel-laptop.webp",
-    parentName: "Thương hiệu khác",
-  },
-  {
-    name: "Colorful",
-    description: "Dòng laptop mới mẻ với thiết kế độc đáo và cấu hình phần cứng mạnh mẽ.",
-    imagePath: "categories/colorful-laptop.webp",
-    parentName: "Thương hiệu khác",
-  },
   // Dell
   {
     name: "Dell",
@@ -338,38 +240,5 @@ export const laptopCategoryData = [
     description: "Laptop làm việc tin cậy cho doanh nhân với thiết kế vỏ nhôm chắc chắn.",
     imagePath: "categories/hp-probook.webp",
     parentName: "HP",
-  },
-  // Theo nhu cầu
-  {
-    name: "Theo nhu cầu",
-    description: "Tìm kiếm laptop chuẩn xác dựa trên mục đích sử dụng thực tế của bạn.",
-    imagePath: "categories/laptop-needs.webp",
-    parentName: "Laptop",
-  },
-  {
-    name: "Gaming - Đồ họa",
-    description:
-      "Trang bị card đồ họa rời mạnh mẽ cho các trận game đỉnh cao và thiết kế 3D chuyên nghiệp.",
-    imagePath: "categories/gaming-graphic-laptop.webp",
-    parentName: "Theo nhu cầu",
-  },
-  {
-    name: "Laptop AI",
-    description: "Thế hệ máy tính tích hợp NPU chuyên dụng để xử lý các tác vụ trí tuệ nhân tạo.",
-    imagePath: "categories/ai-laptop.webp",
-    parentName: "Theo nhu cầu",
-  },
-  {
-    name: "Sinh viên - Văn phòng",
-    description: "Tối ưu cho việc soạn thảo văn bản, làm slide và các phần mềm quản lý.",
-    imagePath: "categories/office-student-laptop.webp",
-    parentName: "Theo nhu cầu",
-  },
-  {
-    name: "Mỏng nhẹ",
-    description:
-      "Ưu tiên trọng lượng dưới 1.5kg, dễ dàng mang đi công tác hoặc di chuyển hàng ngày.",
-    imagePath: "categories/thin-light-laptop.webp",
-    parentName: "Theo nhu cầu",
   },
 ];

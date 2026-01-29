@@ -6,6 +6,7 @@ interface CategorySeedData {
   description?: string;
   imagePath?: string;
   parentName?: string;
+  isFeatured?: boolean;
 }
 
 export async function seedCategoryGroup(
@@ -18,38 +19,59 @@ export async function seedCategoryGroup(
   }
 
   const created: any[] = [];
+  // Map để track các category đã tạo trong nhóm này theo tên
+  const categoryMap = new Map<string, any>();
 
   // Tạo root categories trước
   const rootCategories = categoryData.filter((c) => !c.parentName);
   for (const cat of rootCategories) {
-    const siblingCount = await prisma.categories.count({
-      where: { parentId: null },
+    // Tìm theo name VÀ parentId (null cho root)
+    const existing = await prisma.categories.findFirst({
+      where: {
+        name: cat.name,
+        parentId: { equals: null }, // ✅ Đổi thành này
+      },
     });
 
-    const slug = await generateUniqueSlug(prisma.categories, cat.name);
-    const category = await prisma.categories.upsert({
-      where: { name: cat.name },
-      update: {
-        slug,
-        description: cat.description,
-        imagePath: cat.imagePath,
-        position: siblingCount,
-      },
-      create: {
-        name: cat.name,
-        slug,
-        description: cat.description,
-        imagePath: cat.imagePath,
-        position: siblingCount,
-      },
-    });
+    let category;
+    if (existing) {
+      category = await prisma.categories.update({
+        where: { id: existing.id },
+        data: {
+          description: cat.description,
+          imagePath: cat.imagePath,
+          isFeatured: cat.isFeatured,
+        },
+      });
+    } else {
+      const maxPosition = await prisma.categories.findFirst({
+        where: { parentId: { equals: null } }, // ✅ Đổi thành này
+        orderBy: { position: "desc" },
+        select: { position: true },
+      });
+
+      const nextPosition = (maxPosition?.position ?? -1) + 1;
+      const slug = await generateUniqueSlug(prisma.categories, cat.name);
+
+      category = await prisma.categories.create({
+        data: {
+          name: cat.name,
+          slug,
+          description: cat.description,
+          imagePath: cat.imagePath,
+          position: nextPosition,
+          isFeatured: cat.isFeatured,
+          // parentId sẽ tự động là null nếu không truyền
+        },
+      });
+    }
+
     created.push(category);
+    categoryMap.set(cat.name, category);
   }
 
-  // Tạo children - có thể có nhiều cấp
+  // Tạo children
   const childCategories = categoryData.filter((c) => c.parentName);
-
-  // Lặp cho đến khi tạo hết tất cả children (support multi-level)
   let remainingChildren = [...childCategories];
   let previousCount = remainingChildren.length;
 
@@ -57,44 +79,67 @@ export async function seedCategoryGroup(
     const processedInThisRound: CategorySeedData[] = [];
 
     for (const cat of remainingChildren) {
-      const parent = await prisma.categories.findUnique({
-        where: { name: cat.parentName! },
-      });
+      // Tìm parent trong map của nhóm này trước
+      let parent = categoryMap.get(cat.parentName!);
 
-      // Nếu parent chưa tồn tại, skip qua và sẽ xử lý ở vòng lặp sau
+      // Nếu không có trong map, tìm trong DB
+      if (!parent) {
+        parent = await prisma.categories.findFirst({
+          where: {
+            name: cat.parentName!,
+            parentId: { equals: null }, // ✅ Đổi thành này
+          },
+        });
+      }
+
       if (!parent) continue;
 
-      const siblingCount = await prisma.categories.count({
-        where: { parentId: parent.id },
+      // Tìm theo name VÀ parentId
+      const existing = await prisma.categories.findFirst({
+        where: {
+          name: cat.name,
+          parentId: { equals: parent.id }, // ✅ Đổi thành này
+        },
       });
 
-      const slug = await generateUniqueSlug(prisma.categories, cat.name);
-      const category = await prisma.categories.upsert({
-        where: { name: cat.name },
-        update: {
-          slug,
-          description: cat.description,
-          imagePath: cat.imagePath,
-          parentId: parent.id,
-          position: siblingCount,
-        },
-        create: {
-          name: cat.name,
-          slug,
-          description: cat.description,
-          imagePath: cat.imagePath,
-          parentId: parent.id,
-          position: siblingCount,
-        },
-      });
+      let category;
+      if (existing) {
+        category = await prisma.categories.update({
+          where: { id: existing.id },
+          data: {
+            description: cat.description,
+            imagePath: cat.imagePath,
+          },
+        });
+      } else {
+        const maxPosition = await prisma.categories.findFirst({
+          where: { parentId: { equals: parent.id } }, // ✅ Đổi thành này
+          orderBy: { position: "desc" },
+          select: { position: true },
+        });
+
+        const nextPosition = (maxPosition?.position ?? -1) + 1;
+        const slug = await generateUniqueSlug(prisma.categories, cat.name);
+
+        category = await prisma.categories.create({
+          data: {
+            name: cat.name,
+            slug,
+            description: cat.description,
+            imagePath: cat.imagePath,
+            parentId: parent.id,
+            position: nextPosition,
+          },
+        });
+      }
+
       created.push(category);
+      categoryMap.set(cat.name, category);
       processedInThisRound.push(cat);
     }
 
-    // Remove processed items
     remainingChildren = remainingChildren.filter((c) => !processedInThisRound.includes(c));
 
-    // Tránh infinite loop nếu có parent không tồn tại
     if (remainingChildren.length === previousCount) {
       const missingParents = remainingChildren.map((c) => c.parentName).join(", ");
       throw new Error(`Cannot create categories. Missing parents: ${missingParents}`);

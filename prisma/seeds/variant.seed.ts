@@ -5,6 +5,13 @@ interface SeedVariantsParams {
   products: Array<{ id: string; name: string; slug: string }>;
 }
 
+function buildVariantCode(productSlug: string, v: any) {
+  return [productSlug.toUpperCase(), v.storage?.toUpperCase(), v.color?.toUpperCase()]
+    .filter(Boolean)
+    .join("-")
+    .replace(/\s+/g, "");
+}
+
 export async function seedVariants(prisma: PrismaClient, { products }: SeedVariantsParams) {
   console.log("🌱 Seeding product variants...");
 
@@ -22,11 +29,7 @@ export async function seedVariants(prisma: PrismaClient, { products }: SeedVaria
     );
 
     for (const [index, v] of variantsForThisProduct.entries()) {
-      const code =
-        `${product.slug.toUpperCase()}-${v.storage.toUpperCase()}-${v.color.toUpperCase()}`.replace(
-          /\s+/g,
-          "",
-        );
+      const code = buildVariantCode(product.slug, v);
 
       try {
         const variant = await prisma.products_variants.upsert({

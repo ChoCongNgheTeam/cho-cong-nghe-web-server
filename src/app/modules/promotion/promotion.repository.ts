@@ -15,6 +15,11 @@ const selectPromotionCard = {
   startDate: true,
   endDate: true,
   createdAt: true,
+  rules: {
+    select: {
+      id: true,
+    },
+  },
   targets: {
     select: {
       id: true,
@@ -30,17 +35,26 @@ const selectPromotionDetail = {
   isActive: true,
   startDate: true,
   endDate: true,
+  minOrderValue: true,
+  maxDiscountValue: true,
+  usageLimit: true,
+  usedCount: true,
   createdAt: true,
+  rules: {
+    select: {
+      id: true,
+      actionType: true,
+      discountValue: true,
+      buyQuantity: true,
+      getQuantity: true,
+      giftProductVariantId: true,
+    },
+  },
   targets: {
     select: {
       id: true,
       targetType: true,
       targetId: true,
-      buyQuantity: true,
-      actionType: true,
-      discountValue: true,
-      giftProductVariantId: true,
-      getQuantity: true,
     },
   },
 };
@@ -139,7 +153,7 @@ export const findActivePromotions = async () => {
       ],
     },
     select: selectPromotionDetail,
-    orderBy: { priority: "desc" },
+    orderBy: { priority: "asc" }, // Priority thấp = ưu tiên cao
   });
 };
 
@@ -164,7 +178,7 @@ export const findActivePromotionsForProduct = async (productId: string) => {
       },
     },
     select: selectPromotionDetail,
-    orderBy: { priority: "desc" },
+    orderBy: { priority: "asc" },
   });
 };
 
@@ -189,7 +203,7 @@ export const findActivePromotionsForCategory = async (categoryId: string) => {
       },
     },
     select: selectPromotionDetail,
-    orderBy: { priority: "desc" },
+    orderBy: { priority: "asc" },
   });
 };
 
@@ -214,7 +228,7 @@ export const findActivePromotionsForBrand = async (brandId: string) => {
       },
     },
     select: selectPromotionDetail,
-    orderBy: { priority: "desc" },
+    orderBy: { priority: "asc" },
   });
 };
 
@@ -223,11 +237,14 @@ export const findActivePromotionsForBrand = async (brandId: string) => {
 // =====================
 
 export const create = async (data: any) => {
-  const { targets, ...promotionData } = data;
+  const { rules, targets, ...promotionData } = data;
 
   return prisma.promotions.create({
     data: {
       ...promotionData,
+      rules: {
+        create: rules || [],
+      },
       targets: {
         create: targets || [],
       },
@@ -237,9 +254,12 @@ export const create = async (data: any) => {
 };
 
 export const update = async (id: string, data: any) => {
-  const { targets, ...updateData } = data;
+  const { rules, targets, ...updateData } = data;
 
-  // Delete old targets if new ones are provided
+  // Delete old rules and targets if new ones are provided
+  if (rules !== undefined) {
+    await prisma.promotion_rules.deleteMany({ where: { promotionId: id } });
+  }
   if (targets !== undefined) {
     await prisma.promotion_targets.deleteMany({ where: { promotionId: id } });
   }
@@ -248,6 +268,11 @@ export const update = async (id: string, data: any) => {
     where: { id },
     data: {
       ...updateData,
+      ...(rules !== undefined && {
+        rules: {
+          create: rules,
+        },
+      }),
       ...(targets !== undefined && {
         targets: {
           create: targets,
@@ -259,7 +284,8 @@ export const update = async (id: string, data: any) => {
 };
 
 export const remove = async (id: string) => {
-  // Delete related targets first
+  // Delete related rules and targets first
+  await prisma.promotion_rules.deleteMany({ where: { promotionId: id } });
   await prisma.promotion_targets.deleteMany({ where: { promotionId: id } });
 
   return prisma.promotions.delete({ where: { id } });
@@ -297,16 +323,25 @@ export const getActivePromotions = async () => {
       isActive: true,
       startDate: true,
       endDate: true,
+      minOrderValue: true,
+      maxDiscountValue: true,
+      usageLimit: true,
+      usedCount: true,
+      rules: {
+        select: {
+          id: true,
+          actionType: true,
+          discountValue: true,
+          buyQuantity: true,
+          getQuantity: true,
+          giftProductVariantId: true,
+        },
+      },
       targets: {
         select: {
           id: true,
           targetType: true,
           targetId: true,
-          buyQuantity: true,
-          actionType: true,
-          discountValue: true,
-          giftProductVariantId: true,
-          getQuantity: true,
         },
       },
     },
@@ -323,15 +358,24 @@ export const getActivePromotions = async () => {
     isActive: promo.isActive,
     startDate: promo.startDate,
     endDate: promo.endDate,
+    minOrderValue: promo.minOrderValue ? Number(promo.minOrderValue) : null,
+    maxDiscountValue: promo.maxDiscountValue ? Number(promo.maxDiscountValue) : null,
+    usageLimit: promo.usageLimit,
+    usedCount: promo.usedCount,
+    rules: promo.rules.map((r) => ({
+      id: r.id,
+      promotionId: promo.id,
+      actionType: r.actionType,
+      discountValue: r.discountValue ? Number(r.discountValue) : null,
+      buyQuantity: r.buyQuantity,
+      getQuantity: r.getQuantity,
+      giftProductVariantId: r.giftProductVariantId,
+    })),
     targets: promo.targets.map((t) => ({
       id: t.id,
+      promotionId: promo.id,
       targetType: t.targetType,
       targetId: t.targetId,
-      buyQuantity: t.buyQuantity,
-      actionType: t.actionType,
-      discountValue: t.discountValue ? Number(t.discountValue) : null,
-      giftProductVariantId: t.giftProductVariantId,
-      getQuantity: t.getQuantity,
     })),
   }));
 };

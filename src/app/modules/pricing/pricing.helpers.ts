@@ -1,23 +1,23 @@
 import { PromotionActionType } from "@prisma/client";
-import { PricedProduct, AppliedDiscount } from "./pricing.types";
+import { PromotionRuleData } from "./pricing.types";
 
 export const formatPrice = (amount: number): string => {
   return amount.toLocaleString("vi-VN") + "đ";
 };
 
-export const formatPromotionDescription = (target: any): string => {
-  switch (target.actionType) {
+export const formatPromotionDescription = (rule: PromotionRuleData): string => {
+  switch (rule.actionType) {
     case PromotionActionType.DISCOUNT_PERCENT:
-      return `Giảm ${target.discountValue}%`;
+      return `Giảm ${rule.discountValue}%`;
 
     case PromotionActionType.DISCOUNT_FIXED:
-      return `Giảm ${Number(target.discountValue).toLocaleString()}đ`;
+      return `Giảm ${Number(rule.discountValue).toLocaleString()}đ`;
 
     case PromotionActionType.BUY_X_GET_Y:
-      return `Mua ${target.buyQuantity} tặng ${target.getQuantity}`;
+      return `Mua ${rule.buyQuantity} tặng ${rule.getQuantity}`;
 
     case PromotionActionType.GIFT_PRODUCT:
-      return `Tặng quà khi mua ${target.description || 1} sản phẩm`;
+      return `Tặng quà khi mua ${rule.buyQuantity || 1} sản phẩm`;
 
     default:
       return "Khuyến mãi đặc biệt";
@@ -51,20 +51,6 @@ export const validatePricingInput = (
 
   return { valid: true };
 };
-
-// export const createPricingSummary = (pricedProduct: PricedProduct) => {
-//   return {
-//     basePrice: formatPrice(pricedProduct.basePrice),
-//     finalPrice: formatPrice(pricedProduct.finalPrice),
-//     discount: formatPrice(pricedProduct.totalDiscount),
-//     discountPercentage: `${pricedProduct.discountPercentage}%`,
-//     hasDiscount: pricedProduct.hasPromotion,
-//     promotions: pricedProduct.appliedPromotions.map((p) => ({
-//       name: p.name,
-//       discount: formatPrice(p.discountAmount),
-//     })),
-//   };
-// };
 
 export const mapPricingToSummary = (pricing: any) => {
   if (!pricing) return null;

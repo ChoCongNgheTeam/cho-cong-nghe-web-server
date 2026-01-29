@@ -13,22 +13,32 @@ export enum PromotionActionType {
   DISCOUNT_PERCENT = "DISCOUNT_PERCENT",
   DISCOUNT_FIXED = "DISCOUNT_FIXED",
   BUY_X_GET_Y = "BUY_X_GET_Y",
-  FREE_GIFT = "GIFT_PRODUCT",
+  GIFT_PRODUCT = "GIFT_PRODUCT",
 }
 
 // =====================
 // === BASIC TYPES ===
 // =====================
 
+/**
+ * Promotion Rule - what action to perform
+ */
+export interface PromotionRule {
+  id: string;
+  actionType: PromotionActionType;
+  discountValue?: number;
+  buyQuantity?: number;
+  getQuantity?: number;
+  giftProductVariantId?: string;
+}
+
+/**
+ * Promotion Target - who/what to apply to
+ */
 export interface PromotionTarget {
   id: string;
   targetType: TargetType;
   targetId?: string;
-  buyQuantity?: number;
-  actionType: PromotionActionType;
-  discountValue?: number;
-  giftProductVariantId?: string;
-  getQuantity?: number;
 }
 
 // =====================
@@ -45,6 +55,7 @@ export interface PromotionCard {
   endDate?: Date;
   isExpired: boolean;
   isAvailable: boolean;
+  ruleCount: number;
   targetCount: number;
 }
 
@@ -60,9 +71,14 @@ export interface PromotionDetail {
   isActive: boolean;
   startDate?: Date;
   endDate?: Date;
+  minOrderValue?: number;
+  maxDiscountValue?: number;
+  usageLimit?: number;
+  usedCount: number;
   isExpired: boolean;
   isAvailable: boolean;
   createdAt: Date;
+  rules: PromotionRule[];
   targets: PromotionTarget[];
 }
 
@@ -73,7 +89,7 @@ export interface PromotionDetail {
 export interface PromotionApplicationResult {
   promotionId: string;
   promotionName: string;
-  targetId: string;
+  ruleId: string;
   actionType: PromotionActionType;
   discountValue?: number;
   discount?: number; // Calculated discount amount
@@ -107,17 +123,28 @@ export interface RawPromotion {
   isActive: boolean;
   startDate: Date | null;
   endDate: Date | null;
+  minOrderValue: any;
+  maxDiscountValue: any;
+  usageLimit: number | null;
+  usedCount: number;
   createdAt: Date;
+  rules?: any[];
   targets?: any[];
+}
+
+export interface RawPromotionRule {
+  id: string;
+  promotionId: string;
+  actionType: any;
+  discountValue: any;
+  buyQuantity: number | null;
+  getQuantity: number | null;
+  giftProductVariantId: string | null;
 }
 
 export interface RawPromotionTarget {
   id: string;
+  promotionId: string;
   targetType: any;
   targetId: string | null;
-  buyQuantity: number | null;
-  actionType: any;
-  discountValue: any;
-  giftProductVariantId: string | null;
-  getQuantity: number | null;
 }

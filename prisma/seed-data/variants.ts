@@ -1,8 +1,8 @@
 export const variantData: Record<
   string,
   Array<{
-    storage: string;
-    color: string;
+    storage?: string;
+    color?: string;
     price: number;
     isDefault?: boolean;
   }>
@@ -74,6 +74,20 @@ export const variantData: Record<
     { storage: "512gb", color: "black", price: 59990000 },
   ],
 
+  "Samsung Galaxy Z Fold7 5G 12GB": [
+    { storage: "256gb", color: "black", price: 40990000, isDefault: true },
+    { storage: "512gb", color: "black", price: 44990000 },
+  ],
+  "Samsung Galaxy Z Flip7 5G 12GB": [
+    { storage: "256gb", color: "black", price: 25990000, isDefault: true },
+  ],
+  "Samsung Galaxy A56 5G 8GB": [
+    { storage: "128gb", color: "black", price: 10990000, isDefault: true },
+  ],
+  "Samsung Galaxy A36 5G 8GB": [
+    { storage: "128gb", color: "black", price: 8990000, isDefault: true },
+  ],
+
   "Macbook Air 13 M4 2025 10CPU/8GPU/16GB/256GB": [
     { storage: "256gb", color: "black", price: 15990000, isDefault: true },
   ],
@@ -131,6 +145,28 @@ export const variantData: Record<
   "MacBook Pro 16 M4 Max 2024 16CPU/40GPU/48GB/1TB": [
     { storage: "1tb", color: "black", price: 41990000, isDefault: true },
   ],
+
+  "Comfee Inverter 1.5 HP CFS-13VGP": [{ color: "black", price: 20990000, isDefault: true }],
+
+  "Casper Inverter 1.5 HP GC-12IB36": [{ color: "black", price: 21990000, isDefault: true }],
+
+  "Casper Inverter 1 HP TC-09IS35": [{ color: "black", price: 22990000, isDefault: true }],
+
+  "Casper Inverter 1.5 HP GC-12IS35": [{ color: "black", price: 23990000, isDefault: true }],
+
+  "Tai nghe có dây Apple EarPods USB-C 2023 (MYQY3ZA/A)": [
+    { color: "black", price: 24990000, isDefault: true },
+  ],
+
+  "Tai nghe có dây Apple EarPods Lightning (MWTY3ZA/A)": [
+    { color: "black", price: 25990000, isDefault: true },
+  ],
+
+  "Tai nghe có dây Apple EarPods Lightning (MMTN2ZA/A)": [
+    { color: "black", price: 26990000, isDefault: true },
+  ],
+
+  "Tai nghe Apple AirPods Pro 3 2025 USB-C": [{ color: "black", price: 27990000, isDefault: true }],
 };
 
 export const variantImages: Record<string, Record<string, string[]>> = {
