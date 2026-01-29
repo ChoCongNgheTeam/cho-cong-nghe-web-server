@@ -35,6 +35,7 @@ export const phoneCategoryData = [
     parentName: "Điện thoại",
   },
 
+  // Apple (iPhone)
   {
     name: "iPhone 17 Series",
     description: "Siêu phẩm iPhone mới nhất với những đột phá công nghệ dẫn đầu thị trường.",
@@ -93,7 +94,7 @@ export const phoneCategoryData = [
     imagePath: "categories/redmi-series.webp",
     parentName: "Xiaomi",
   },
-
+  // Samsung
   {
     name: "Galaxy AI",
     description: "Kỷ nguyên điện thoại trí tuệ nhân tạo, hỗ trợ tối đa cho công việc và sáng tạo.",
@@ -132,7 +133,7 @@ export const phoneCategoryData = [
     imagePath: "categories/galaxy-xcover.webp",
     parentName: "Samsung",
   },
-
+  // Oppo
   {
     name: "OPPO Reno Series",
     description: "Dòng máy dẫn đầu xu hướng thiết kế và khả năng chụp ảnh chân dung nghệ thuật.",

@@ -34,6 +34,7 @@ export const dienMayCategoryData = [
     imagePath: "categories/google-tv.webp",
     parentName: "Tivi",
   },
+
   // Máy giặt
   {
     name: "Máy giặt",
@@ -60,6 +61,7 @@ export const dienMayCategoryData = [
     imagePath: "categories/washer-dryer-combo.webp",
     parentName: "Máy giặt",
   },
+
   // Máy lạnh - Điều hòa
   {
     name: "Máy lạnh - Điều hòa",
@@ -118,6 +120,7 @@ export const dienMayCategoryData = [
     imagePath: "categories/mini-fridge.webp",
     parentName: "Tủ lạnh",
   },
+
   // Tủ đông
   {
     name: "Tủ đông",

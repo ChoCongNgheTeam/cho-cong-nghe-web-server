@@ -81,6 +81,7 @@ export const laptopCategoryData = [
     imagePath: "categories/asus-rog.webp",
     parentName: "Asus",
   },
+
   // Lenovo
   {
     name: "Lenovo",
@@ -124,6 +125,7 @@ export const laptopCategoryData = [
     imagePath: "categories/lenovo-ideapad.webp",
     parentName: "Lenovo",
   },
+
   // Acer
   {
     name: "Acer",
@@ -161,6 +163,7 @@ export const laptopCategoryData = [
     imagePath: "categories/acer-predator.webp",
     parentName: "Acer",
   },
+
   // Dell
   {
     name: "Dell",
@@ -198,6 +201,7 @@ export const laptopCategoryData = [
     imagePath: "categories/dell-gaming.webp",
     parentName: "Dell",
   },
+
   // HP
   {
     name: "HP",

@@ -421,4 +421,291 @@ export const productSpecificationsData: ProductSpecificationSeed[] = [
       { key: "selfie_camera_count", value: "1" },
     ],
   },
+  /* --- SAMSUNG SERIES --- */
+  {
+    productSlug: "samsung-galaxy-z-fold7-5g-12gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass Victus 3" },
+      { key: "max_brightness", value: "2600" },
+      { key: "selfie_camera_count", value: "2" },
+    ],
+  },
+  {
+    productSlug: "samsung-galaxy-z-flip7-5g-12gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass Victus 3" },
+      { key: "max_brightness", value: "2600" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "samsung-galaxy-a56-5g-8gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass 5" },
+      { key: "max_brightness", value: "1000" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "samsung-galaxy-a36-5g-8gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass 5" },
+      { key: "max_brightness", value: "1000" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "samsung-galaxy-s25-ultra-5g-12gb",
+    specifications: [
+      { key: "screen_glass", value: "Corning Gorilla Armor" },
+      { key: "max_brightness", value: "3000" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "samsung-galaxy-s25-5g-12gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass Victus 3" },
+      { key: "max_brightness", value: "2400" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "samsung-galaxy-s25-plus-5g-12gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass Victus 3" },
+      { key: "max_brightness", value: "2400" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "samsung-galaxy-s25-fe-5g-8gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass Victus 2" },
+      { key: "max_brightness", value: "1900" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "samsung-galaxy-a26-5g-8gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass 3" },
+      { key: "max_brightness", value: "800" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "samsung-galaxy-z-fold6-5g",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass Victus 2" },
+      { key: "max_brightness", value: "2600" },
+      { key: "selfie_camera_count", value: "2" },
+    ],
+  },
+  {
+    productSlug: "samsung-galaxy-s24-fe-5g",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass Victus 2" },
+      { key: "max_brightness", value: "1900" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "samsung-galaxy-s25-edge-5g",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass Victus 3" },
+      { key: "max_brightness", value: "2500" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "samsung-galaxy-s24-ultra-5g",
+    specifications: [
+      { key: "screen_glass", value: "Corning Gorilla Armor" },
+      { key: "max_brightness", value: "2600" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+
+  /* --- XIAOMI SERIES --- */
+  {
+    productSlug: "xiaomi-poco-f8-pro-5g-12gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass Victus" },
+      { key: "max_brightness", value: "4000" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "xiaomi-poco-x7-5g-12gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass 5" },
+      { key: "max_brightness", value: "1800" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "xiaomi-poco-m7-pro-5g-8gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass 3" },
+      { key: "max_brightness", value: "1300" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "xiaomi-poco-m6-pro-8gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass 5" },
+      { key: "max_brightness", value: "1300" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "xiaomi-poco-c71-4gb",
+    specifications: [
+      { key: "screen_glass", value: "Tempered Glass" },
+      { key: "max_brightness", value: "600" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "xiaomi-redmi-note-15-pro-5g-12gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass Victus" },
+      { key: "max_brightness", value: "2000" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "xiaomi-redmi-note-15-5g-6gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass 3" },
+      { key: "max_brightness", value: "1000" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "xiaomi-redmi-note-15-6gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass 3" },
+      { key: "max_brightness", value: "1000" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "xiaomi-redmi-note-14-pro-plus-5g-8gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass Victus 2" },
+      { key: "max_brightness", value: "3000" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "xiaomi-redmi-note-14-5g-8gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass 5" },
+      { key: "max_brightness", value: "1000" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "xiaomi-redmi-note-14-6gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass 3" },
+      { key: "max_brightness", value: "1000" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "xiaomi-redmi-15-5g-8gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass 3" },
+      { key: "max_brightness", value: "1000" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "xiaomi-redmi-14c-4gb",
+    specifications: [
+      { key: "screen_glass", value: "Tempered Glass" },
+      { key: "max_brightness", value: "600" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+  {
+    productSlug: "xiaomi-redmi-13x-8gb",
+    specifications: [
+      { key: "screen_glass", value: "Gorilla Glass 3" },
+      { key: "max_brightness", value: "800" },
+      { key: "selfie_camera_count", value: "1" },
+    ],
+  },
+
+  /* --- AIR CONDITIONERS --- */
+  {
+    productSlug: "comfee-inverter-1-5-hp-cfs-13vgp",
+    specifications: [
+      { key: "screen_glass", value: "None" },
+      { key: "max_brightness", value: "None" },
+      { key: "selfie_camera_count", value: "0" },
+    ],
+  },
+  {
+    productSlug: "casper-inverter-1-5-hp-gc-12ib36",
+    specifications: [
+      { key: "screen_glass", value: "None" },
+      { key: "max_brightness", value: "None" },
+      { key: "selfie_camera_count", value: "0" },
+    ],
+  },
+  {
+    productSlug: "casper-inverter-1-hp-tc-09is35",
+    specifications: [
+      { key: "screen_glass", value: "None" },
+      { key: "max_brightness", value: "None" },
+      { key: "selfie_camera_count", value: "0" },
+    ],
+  },
+  {
+    productSlug: "casper-inverter-1-5-hp-gc-12is35",
+    specifications: [
+      { key: "screen_glass", value: "None" },
+      { key: "max_brightness", value: "None" },
+      { key: "selfie_camera_count", value: "0" },
+    ],
+  },
+
+  /* --- ACCESSORIES --- */
+  {
+    productSlug: "tai-nghe-co-day-apple-earpods-usb-c-2023-myqy3za-a",
+    specifications: [
+      { key: "screen_glass", value: "None" },
+      { key: "max_brightness", value: "None" },
+      { key: "selfie_camera_count", value: "0" },
+    ],
+  },
+  {
+    productSlug: "tai-nghe-co-day-apple-earpods-lightning-mwty3za-a",
+    specifications: [
+      { key: "screen_glass", value: "None" },
+      { key: "max_brightness", value: "None" },
+      { key: "selfie_camera_count", value: "0" },
+    ],
+  },
+  {
+    productSlug: "tai-nghe-co-day-apple-earpods-lightning-mmtn2za-a",
+    specifications: [
+      { key: "screen_glass", value: "None" },
+      { key: "max_brightness", value: "None" },
+      { key: "selfie_camera_count", value: "0" },
+    ],
+  },
+  {
+    productSlug: "tai-nghe-apple-airpods-pro-3-2025-usb-c",
+    specifications: [
+      { key: "screen_glass", value: "None" },
+      { key: "max_brightness", value: "None" },
+      { key: "selfie_camera_count", value: "0" },
+    ],
+  },
 ];

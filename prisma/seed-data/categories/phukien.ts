@@ -57,6 +57,7 @@ export const phuKienCategoryData = [
     imagePath: "categories/computer-speaker.webp",
     parentName: "Âm thanh",
   },
+
   // Gaming Gear
   {
     name: "Gaming Gear",
@@ -97,6 +98,7 @@ export const phuKienCategoryData = [
     imagePath: "categories/gaming-keyboard.webp",
     parentName: "Gaming Gear",
   },
+
   // Phụ kiện di động
   {
     name: "Phụ kiện di động",
@@ -126,12 +128,7 @@ export const phuKienCategoryData = [
     imagePath: "categories/phone-case.webp",
     parentName: "Phụ kiện di động",
   },
-  {
-    name: "Thẻ nhớ",
-    description: "Mở rộng không gian lưu trữ ảnh và video chất lượng cao một cách nhanh chóng.",
-    imagePath: "categories/memory-card.webp",
-    parentName: "Phụ kiện di động",
-  },
+
   {
     name: "Miếng dán màn hình",
     description: "Lớp bảo vệ cường lực giúp chống trầy xước và hạn chế nứt vỡ màn hình tối đa.",
@@ -206,42 +203,5 @@ export const phuKienCategoryData = [
     description: "Ngăn bụi bẩn và chất lỏng rơi vào các khe phím, giữ laptop luôn sạch sẽ.",
     imagePath: "categories/keyboard-cover.webp",
     parentName: "Phụ kiện Laptop",
-  },
-  // Phụ kiện khác
-  {
-    name: "Phụ kiện khác",
-    description: "Tổng hợp các thiết bị tiện ích bổ trợ cho cuộc sống công nghệ hiện đại.",
-    imagePath: "categories/phu-kien-khac.webp",
-    parentName: "Phụ Kiện",
-  },
-  {
-    name: "TV Box",
-    description: "Biến chiếc tivi thường thành tivi thông minh với kho ứng dụng giải trí khổng lồ.",
-    imagePath: "categories/tv-box.webp",
-    parentName: "Phụ kiện khác",
-  },
-  {
-    name: "Máy tính cầm tay",
-    description: "Hỗ trợ tính toán chính xác cho học sinh, sinh viên và người làm kế toán.",
-    imagePath: "categories/calculator.webp",
-    parentName: "Phụ kiện khác",
-  },
-  {
-    name: "Pin kiềm",
-    description: "Nguồn năng lượng bền bỉ cho các thiết bị điều khiển, đồng hồ và đồ chơi.",
-    imagePath: "categories/battery.webp",
-    parentName: "Phụ kiện khác",
-  },
-  {
-    name: "Mực in",
-    description: "Đảm bảo bản in sắc nét, không bị lem và bảo vệ tuổi thọ cho máy in.",
-    imagePath: "categories/printer-ink.webp",
-    parentName: "Phụ kiện khác",
-  },
-  {
-    name: "Máy bơm cầm tay",
-    description: "Giải pháp cứu hộ lốp xe nhanh chóng và tiện lợi trong những tình huống khẩn cấp.",
-    imagePath: "categories/portable-pump.webp",
-    parentName: "Phụ kiện khác",
   },
 ];
