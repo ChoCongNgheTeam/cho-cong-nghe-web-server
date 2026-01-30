@@ -43,7 +43,7 @@ const brandData = [
     imagePath: "brands/nokia.webp",
   },
   {
-    name: "Oppo",
+    name: "OPPO",
     description: "Chuyên gia selfie, sạc nhanh dẫn đầu",
     imagePath: "brands/oppo.webp",
   },

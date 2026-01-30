@@ -55,15 +55,15 @@ export interface HomeResponse {
   bannersSection1: HomeBanner[];
   saleCategoriesWithCount: CategoryWithSaleCount[];
   bestSellingProducts: any[];
-  featuredSections: {
-    category: {
-      id: string;
-      name: string;
-      slug: string;
-    };
-    products: any[];
-    total: number;
-  }[];
+  // featuredSections: {
+  //   category: {
+  //     id: string;
+  //     name: string;
+  //     slug: string;
+  //   };
+  //   products: any[];
+  //   total: number;
+  // }[];
   blogs: {
     data: any[];
     page: number;

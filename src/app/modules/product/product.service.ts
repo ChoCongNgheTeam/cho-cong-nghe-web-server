@@ -25,20 +25,20 @@ export const getProductsPublic = async (query: ListProductsQuery) => {
   const result = await repo.findAllPublic(query);
   // console.log(result);
 
-  const productIds = result.data.map((p) => p.id);
-  const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
+  // const productIds = result.data.map((p) => p.id);
+  // const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
   // console.log(variantOptionsMap);
 
   return {
     ...result,
     data: result.data.map((product) => {
       const defaultVariant = product.variants?.[0];
-      const variantOptions = variantOptionsMap.get(product.id) ?? [];
+      // const variantOptions = variantOptionsMap.get(product.id) ?? [];
 
       return {
         card: {
           ...transformProductCard(product),
-          variantOptions,
+          // variantOptions,
         },
 
         pricingContext: defaultVariant
@@ -179,17 +179,17 @@ export const getRelatedProducts = async (slug: string, limit: number = 8) => {
 
   const related = await repo.findRelatedProducts(product.id, limit);
 
-  const productIds = related.map((p) => p.id);
-  const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
+  // const productIds = related.map((p) => p.id);
+  // const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
 
   return related.map((p) => {
     const defaultVariant = p.variants?.[0];
-    const variantOptions = variantOptionsMap.get(p.id) ?? [];
+    // const variantOptions = variantOptionsMap.get(p.id) ?? [];
 
     return {
       card: {
         ...transformProductCard(p),
-        variantOptions,
+        // variantOptions,
       },
       pricingContext: defaultVariant
         ? {
@@ -311,22 +311,22 @@ export const getFlashSaleProducts = async (
 ) => {
   const products = await repo.findProductsOnSaleByDate(date, options);
 
-  console.log(products);
+  // console.log(products);
 
-  const productIds = products.map((p) => p.id);
-  const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
+  // const productIds = products.map((p) => p.id);
+  // const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
 
   // console.log(productIds);
 
   return {
     data: products.map((product) => {
       const defaultVariant = product.variants?.[0];
-      const variantOptions = variantOptionsMap.get(product.id) ?? [];
+      // const variantOptions = variantOptionsMap.get(product.id) ?? [];
 
       return {
         card: {
           ...transformProductCard(product),
-          variantOptions,
+          // variantOptions,
         },
         pricingContext: defaultVariant
           ? {
@@ -452,19 +452,19 @@ export const getProductsByPromotion = async (promotionId: string, limit: number 
 export const getBestSellingProducts = async (limit: number = 12) => {
   const products = await repo.findBestSellingProducts(limit);
 
-  console.log(products);
+  // console.log(products);
 
-  const productIds = products.map((p) => p.id);
-  const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
+  // const productIds = products.map((p) => p.id);
+  // const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
 
   return products.map((product) => {
     const defaultVariant = product.variants?.[0];
-    const variantOptions = variantOptionsMap.get(product.id) ?? [];
+    // const variantOptions = variantOptionsMap.get(product.id) ?? [];
 
     return {
       card: {
         ...transformProductCard(product),
-        variantOptions,
+        // variantOptions,
       },
       pricingContext: defaultVariant
         ? {
@@ -486,17 +486,17 @@ export const getBestSellingProducts = async (limit: number = 12) => {
 export const getNewArrivalProducts = async (daysAgo: number = 30, limit: number = 12) => {
   const products = await repo.findNewArrivalProducts(daysAgo, limit);
 
-  const productIds = products.map((p) => p.id);
-  const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
+  // const productIds = products.map((p) => p.id);
+  // const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
 
   return products.map((product) => {
     const defaultVariant = product.variants?.[0];
-    const variantOptions = variantOptionsMap.get(product.id) ?? [];
+    // const variantOptions = variantOptionsMap.get(product.id) ?? [];
 
     return {
       card: {
         ...transformProductCard(product),
-        variantOptions,
+        // variantOptions,
       },
       pricingContext: defaultVariant
         ? {

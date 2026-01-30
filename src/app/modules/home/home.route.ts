@@ -4,7 +4,7 @@ import {
   getHomePageHandler,
   getFlashSaleSectionHandler,
   getBestSellingSectionHandler,
-  getFeaturedSectionHandler,
+  // getFeaturedSectionHandler,
 } from "./home.controller";
 
 const router = Router();
@@ -47,6 +47,6 @@ router.get("/best-selling", optionalAuthMiddleware, getBestSellingSectionHandler
  * Get Featured Products section only
  * GET /api/home/featured?limit=8&categoriesLimit=6
  */
-router.get("/featured", optionalAuthMiddleware, getFeaturedSectionHandler);
+// router.get("/featured", optionalAuthMiddleware, getFeaturedSectionHandler);
 
 export default router;

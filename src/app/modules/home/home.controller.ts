@@ -83,27 +83,27 @@ export const getBestSellingSectionHandler = async (req: Request, res: Response) 
  * Get Featured Products section only
  * GET /api/home/featured?limit=8&categoriesLimit=6
  */
-export const getFeaturedSectionHandler = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user?.id;
-    const limit = req.query.limit ? parseInt(req.query.limit as string) : 8;
-    const categoriesLimit = req.query.categoriesLimit
-      ? parseInt(req.query.categoriesLimit as string)
-      : 6;
+// export const getFeaturedSectionHandler = async (req: Request, res: Response) => {
+//   try {
+//     const userId = (req as any).user?.id;
+//     const limit = req.query.limit ? parseInt(req.query.limit as string) : 8;
+//     const categoriesLimit = req.query.categoriesLimit
+//       ? parseInt(req.query.categoriesLimit as string)
+//       : 6;
 
-    const sections = await homeService.getFeaturedSection(userId, { limit, categoriesLimit });
+//     const sections = await homeService.getFeaturedSection(userId, { limit, categoriesLimit });
 
-    res.json({
-      success: true,
-      data: sections,
-      total: sections.length,
-      message: "Lấy sản phẩm featured thành công",
-    });
-  } catch (error: any) {
-    console.error("Error in getFeaturedSectionHandler:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
-};
+//     res.json({
+//       success: true,
+//       data: sections,
+//       total: sections.length,
+//       message: "Lấy sản phẩm featured thành công",
+//     });
+//   } catch (error: any) {
+//     console.error("Error in getFeaturedSectionHandler:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: error.message || "Lỗi server",
+//     });
+//   }
+// };

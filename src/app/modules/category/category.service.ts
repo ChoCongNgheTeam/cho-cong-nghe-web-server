@@ -15,7 +15,18 @@ export const getRootCategories = async () => {
 
 //  Lấy featured categories cho Home (orchestrator sẽ dùng)
 export const getFeaturedCategories = async (limit?: number) => {
-  return categoryRepository.findFeaturedCategories(limit);
+  const categories = await categoryRepository.findFeaturedCategories(limit);
+
+  return categories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    description: c.description,
+    imageUrl: c.imageUrl,
+    position: c.position,
+    isFeatured: c.isFeatured,
+    productsCount: c._count.products,
+  }));
 };
 
 // 2. Lấy category tree cho menu

@@ -21,7 +21,7 @@ import {
   deleteProductHandler,
   getFlashSaleProductsHandler,
   getCategoriesWithSaleProductsHandler,
-  getFeaturedProductsByCategoriesHandler,
+  // getFeaturedProductsByCategoriesHandler,
   getUpcomingPromotionsHandler,
   getProductsByPromotionHandler,
   getBestSellingProductsHandler,
@@ -105,7 +105,7 @@ router.get("/sale-categories", getCategoriesWithSaleProductsHandler);
  * Get featured products by categories
  * GET /products/featured-by-categories?limit=8&categoriesLimit=6
  */
-router.get("/featured-by-categories", getFeaturedProductsByCategoriesHandler);
+// router.get("/featured-by-categories", getFeaturedProductsByCategoriesHandler);
 
 /**
  * Get upcoming promotions (preview future sales)

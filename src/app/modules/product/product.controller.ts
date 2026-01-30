@@ -13,7 +13,7 @@ import { getProductDetailWithPricing } from "../pricing/use-cases/getProductDeta
 import { getProductVariantWithPricing } from "../pricing/use-cases/getProductVariantPricing.service";
 import { getRelatedProductsWithPricing } from "../pricing/use-cases/getRelatedProductsWithPricing.service";
 import { getFlashSaleProductsWithPricing } from "../pricing/use-cases/getFlashSaleProductsWithPricing.service";
-import { getFeaturedProductsByCategoriesWithPricing } from "../pricing/use-cases/getFeaturedProductsByCategoriesWithPricing.service";
+// import { getFeaturedProductsByCategoriesWithPricing } from "../pricing/use-cases/getFeaturedProductsByCategoriesWithPricing.service";
 import { getNewArrivalProductsWithPricing } from "../pricing/use-cases/getNewArrivalProductsWithPricing.service";
 import { getBestSellingProductsWithPricing } from "../pricing/use-cases/getBestSellingProductsWithPricing.service";
 
@@ -436,36 +436,36 @@ export const getCategoriesWithSaleProductsHandler = async (req: Request, res: Re
  * Get featured products by categories
  * GET /products/featured-by-categories?limit=8&categoriesLimit=6
  */
-export const getFeaturedProductsByCategoriesHandler = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user?.id;
+// export const getFeaturedProductsByCategoriesHandler = async (req: Request, res: Response) => {
+//   try {
+//     const userId = (req as any).user?.id;
 
-    const limit = req.query.limit ? parseInt(req.query.limit as string) : 8;
-    const categoriesLimit = req.query.categoriesLimit
-      ? parseInt(req.query.categoriesLimit as string)
-      : 6;
+//     const limit = req.query.limit ? parseInt(req.query.limit as string) : 8;
+//     const categoriesLimit = req.query.categoriesLimit
+//       ? parseInt(req.query.categoriesLimit as string)
+//       : 6;
 
-    const sections = await getFeaturedProductsByCategoriesWithPricing(
-      {
-        limit,
-        categoriesLimit,
-      },
-      userId,
-    );
+//     const sections = await getFeaturedProductsByCategoriesWithPricing(
+//       {
+//         limit,
+//         categoriesLimit,
+//       },
+//       userId,
+//     );
 
-    res.json({
-      success: true,
-      data: sections,
-      total: sections.length,
-      message: "Lấy sản phẩm featured theo danh mục thành công",
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
-};
+//     res.json({
+//       success: true,
+//       data: sections,
+//       total: sections.length,
+//       message: "Lấy sản phẩm featured theo danh mục thành công",
+//     });
+//   } catch (error: any) {
+//     res.status(500).json({
+//       success: false,
+//       message: error.message || "Lỗi server",
+//     });
+//   }
+// };
 
 /**
  * Get upcoming promotions

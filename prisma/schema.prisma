@@ -64,6 +64,7 @@ enum PromotionActionType {
   DISCOUNT_FIXED
   BUY_X_GET_Y
   GIFT_PRODUCT
+  FREE_SHIPPING
 }
 
 enum ReviewStatus {

@@ -3,7 +3,7 @@ import * as categoryService from "../category/category.service";
 import * as productService from "../product/product.service";
 import { getFlashSaleProductsWithPricing } from "../pricing/use-cases/getFlashSaleProductsWithPricing.service";
 import { getBestSellingProductsWithPricing } from "../pricing/use-cases/getBestSellingProductsWithPricing.service";
-import { getFeaturedProductsByCategoriesWithPricing } from "../pricing/use-cases/getFeaturedProductsByCategoriesWithPricing.service";
+// import { getFeaturedProductsByCategoriesWithPricing } from "../pricing/use-cases/getFeaturedProductsByCategoriesWithPricing.service";
 import * as blogService from "../blog/blog.service";
 import { MediaPosition } from "@prisma/client";
 import { HomeResponse } from "./home.types";
@@ -41,7 +41,7 @@ export const getHomePageData = async (userId?: string): Promise<HomeResponse> =>
     bestSellingProducts,
 
     // 5. Featured Sections (categories + products)
-    featuredSections,
+    // featuredSections,
 
     // 6. Blogs
     blogs,
@@ -53,7 +53,7 @@ export const getHomePageData = async (userId?: string): Promise<HomeResponse> =>
     mediaService.getAllActiveMedia(),
 
     // 2. Flash Sale Products (limit 20)
-    getFlashSaleProductsWithPricing(today, { limit: 20 }, userId),
+    getFlashSaleProductsWithPricing(today, { limit: 12 }, userId),
 
     // 3. Categories có sản phẩm sale
     productService.getCategoriesWithSaleProducts(today),
@@ -62,13 +62,13 @@ export const getHomePageData = async (userId?: string): Promise<HomeResponse> =>
     getBestSellingProductsWithPricing(12, userId),
 
     // 5. Featured Products by Categories (8 products per category, 6 categories)
-    getFeaturedProductsByCategoriesWithPricing(
-      {
-        limit: 8,
-        categoriesLimit: 6,
-      },
-      userId,
-    ),
+    // getFeaturedProductsByCategoriesWithPricing(
+    //   {
+    //     limit: 8,
+    //     categoriesLimit: 6,
+    //   },
+    //   userId,
+    // ),
 
     // 6. Latest Blogs (limit 6)
     blogService.getBlogsPublic({
@@ -79,7 +79,7 @@ export const getHomePageData = async (userId?: string): Promise<HomeResponse> =>
     }),
 
     // 7. Featured Categories (limit 18)
-    categoryService.getFeaturedCategories(18),
+    categoryService.getFeaturedCategories(12),
   ]);
 
   // Extract media by position
@@ -98,7 +98,7 @@ export const getHomePageData = async (userId?: string): Promise<HomeResponse> =>
     bannersSection1,
     saleCategoriesWithCount: saleCategoriesData,
     bestSellingProducts,
-    featuredSections,
+    // featuredSections,
     blogs,
     featuredCategories,
   };
@@ -117,18 +117,18 @@ export const getBestSellingSection = async (userId?: string, limit: number = 12)
   return getBestSellingProductsWithPricing(limit, userId);
 };
 
-export const getFeaturedSection = async (
-  userId?: string,
-  options?: {
-    limit?: number;
-    categoriesLimit?: number;
-  },
-) => {
-  return getFeaturedProductsByCategoriesWithPricing(
-    {
-      limit: options?.limit || 8,
-      categoriesLimit: options?.categoriesLimit || 6,
-    },
-    userId,
-  );
-};
+// export const getFeaturedSection = async (
+//   userId?: string,
+//   options?: {
+//     limit?: number;
+//     categoriesLimit?: number;
+//   },
+// ) => {
+//   return getFeaturedProductsByCategoriesWithPricing(
+//     {
+//       limit: options?.limit || 8,
+//       categoriesLimit: options?.categoriesLimit || 6,
+//     },
+//     userId,
+//   );
+// };

@@ -109,6 +109,7 @@ export async function seedCategoryGroup(
           data: {
             description: cat.description,
             imagePath: cat.imagePath,
+            isFeatured: true,
           },
         });
       } else {
@@ -127,6 +128,7 @@ export async function seedCategoryGroup(
             slug,
             description: cat.description,
             imagePath: cat.imagePath,
+            isFeatured: cat.isFeatured,
             parentId: parent.id,
             position: nextPosition,
           },

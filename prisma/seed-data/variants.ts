@@ -134,6 +134,121 @@ export const variantData: Record<
     { storage: "512gb", color: "black", price: 26990000 },
   ],
 
+  "OPPO Reno15 5G 12GB": [
+    { storage: "256gb", color: "black", price: 13990000, isDefault: true },
+    { storage: "512gb", color: "black", price: 15490000 },
+  ],
+
+  "OPPO Reno15 F 5G 8GB": [
+    { storage: "128gb", color: "black", price: 10990000, isDefault: true },
+    { storage: "256gb", color: "black", price: 12990000 },
+  ],
+
+  "OPPO Reno14 5G 12GB": [
+    { storage: "256gb", color: "black", price: 13990000, isDefault: true },
+    { storage: "512gb", color: "black", price: 15490000 },
+  ],
+
+  "OPPO Reno14 F 5G 8GB": [
+    { storage: "128gb", color: "black", price: 10990000, isDefault: true },
+    { storage: "256gb", color: "black", price: 12990000 },
+  ],
+
+  "OPPO Reno13 F 5G 12GB": [
+    { storage: "256gb", color: "black", price: 13990000, isDefault: true },
+    { storage: "512gb", color: "black", price: 15490000 },
+  ],
+
+  "OPPO Reno12 F 5G 8GB": [
+    { storage: "128gb", color: "black", price: 10990000, isDefault: true },
+    { storage: "256gb", color: "black", price: 12990000 },
+  ],
+
+  "OPPO Reno11 F 5G 8GB": [
+    { storage: "128gb", color: "black", price: 10990000, isDefault: true },
+    { storage: "256gb", color: "black", price: 12990000 },
+  ],
+
+  "OPPO A6 Pro 8GB": [
+    { storage: "128gb", color: "black", price: 10990000, isDefault: true },
+    { storage: "256gb", color: "black", price: 12990000 },
+  ],
+
+  "OPPO A5i Pro 8GB": [
+    { storage: "128gb", color: "black", price: 10990000, isDefault: true },
+    { storage: "256gb", color: "black", price: 12990000 },
+  ],
+
+  "OPPO A6T 6GB": [
+    { storage: "128gb", color: "black", price: 10990000, isDefault: true },
+    { storage: "256gb", color: "black", price: 12990000 },
+  ],
+
+  "OPPO A6T 4GB": [
+    { storage: "128gb", color: "black", price: 10990000, isDefault: true },
+    { storage: "256gb", color: "black", price: 12990000 },
+  ],
+
+  "OPPO A5i 6GB": [
+    { storage: "128gb", color: "black", price: 10990000, isDefault: true },
+    { storage: "256gb", color: "black", price: 12990000 },
+  ],
+
+  "OPPO A5i 4GB": [
+    { storage: "128gb", color: "black", price: 10990000, isDefault: true },
+    { storage: "256gb", color: "black", price: 12990000 },
+  ],
+
+  "OPPO A3 8GB": [
+    { storage: "128gb", color: "black", price: 10990000, isDefault: true },
+    { storage: "256gb", color: "black", price: 12990000 },
+  ],
+
+  "OPPO A3 6GB": [
+    { storage: "128gb", color: "black", price: 10990000, isDefault: true },
+    { storage: "256gb", color: "black", price: 12990000 },
+  ],
+
+  "OPPO A58 8GB": [
+    { storage: "128gb", color: "black", price: 10990000, isDefault: true },
+    { storage: "256gb", color: "black", price: 12990000 },
+  ],
+
+  "OPPO A58 6GB": [
+    { storage: "128gb", color: "black", price: 10990000, isDefault: true },
+    { storage: "256gb", color: "black", price: 12990000 },
+  ],
+
+  "OPPO A18 4GB": [
+    { storage: "128gb", color: "black", price: 10990000, isDefault: true },
+    { storage: "256gb", color: "black", price: 12990000 },
+  ],
+
+  "OPPO Find X9 Pro 5G 16GB": [
+    { storage: "256gb", color: "black", price: 13990000, isDefault: true },
+    { storage: "512gb", color: "black", price: 15490000 },
+  ],
+
+  "OPPO Find X9 5G 16GB": [
+    { storage: "256gb", color: "black", price: 13990000, isDefault: true },
+    { storage: "512gb", color: "black", price: 15490000 },
+  ],
+
+  "OPPO Find X9 5G 12GB": [
+    { storage: "256gb", color: "black", price: 13990000, isDefault: true },
+    { storage: "512gb", color: "black", price: 15490000 },
+  ],
+
+  "OPPO Find N5 5G 16GB": [
+    { storage: "256gb", color: "black", price: 13990000, isDefault: true },
+    { storage: "512gb", color: "black", price: 15490000 },
+  ],
+
+  "OPPO Find N3 5G 16GB": [
+    { storage: "256gb", color: "black", price: 13990000, isDefault: true },
+    { storage: "512gb", color: "black", price: 15490000 },
+  ],
+
   "Xiaomi Poco F8 Pro 5G 12GB": [
     { storage: "256gb", color: "black", price: 13990000, isDefault: true },
     { storage: "512gb", color: "black", price: 15490000 },

@@ -14,6 +14,7 @@ export const phuKienCategoryData = [
       "Tận hưởng không gian âm nhạc đỉnh cao với hệ thống loa và tai nghe chất lượng trung thực.",
     imagePath: "categories/am-thanh.webp",
     parentName: "Phụ Kiện",
+    isFeatured: true,
   },
   {
     name: "Tai nghe nhét tai",
@@ -91,6 +92,7 @@ export const phuKienCategoryData = [
     description: "Sở hữu mắt đọc quang học độ nhạy cao và các nút bấm có thể lập trình linh hoạt.",
     imagePath: "categories/gaming-mouse.webp",
     parentName: "Gaming Gear",
+    isFeatured: true,
   },
   {
     name: "Bàn phím",

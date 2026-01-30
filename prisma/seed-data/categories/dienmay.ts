@@ -12,6 +12,7 @@ export const dienMayCategoryData = [
     description:
       "Trung tâm giải trí gia đình với công nghệ hình ảnh sắc nét và âm thanh sống động.",
     imagePath: "categories/tivi.webp",
+    isFeatured: true,
     parentName: "Điện máy",
   },
   {
@@ -40,6 +41,7 @@ export const dienMayCategoryData = [
     name: "Máy giặt",
     description: "Trợ thủ đắc lực giúp chăm sóc quần áo sạch thơm và bảo vệ sợi vải tối ưu.",
     imagePath: "categories/may-giat.webp",
+    isFeatured: true,
     parentName: "Điện máy",
   },
   {
@@ -93,6 +95,7 @@ export const dienMayCategoryData = [
     name: "Tủ lạnh",
     description: "Hệ thống bảo quản thực phẩm tươi ngon lâu hơn với công nghệ làm lạnh đa chiều.",
     imagePath: "categories/tu-lanh.webp",
+    isFeatured: true,
     parentName: "Điện máy",
   },
   {
