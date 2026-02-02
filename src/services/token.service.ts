@@ -4,7 +4,7 @@ import { AccessTokenPayload } from "@/types/jwt";
 
 export const signAccessToken = (payload: { userId: string; role: string }) => {
   return jwt.sign(payload, jwtConfig.accessToken.secret as Secret, {
-    expiresIn: jwtConfig.accessToken.expiresIn as SignOptions["expiresIn"],
+    expiresIn: jwtConfig.accessToken.expiresIn,
   });
 };
 

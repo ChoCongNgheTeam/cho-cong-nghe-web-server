@@ -24,12 +24,14 @@ export const registerHandler = async (req: Request, res: Response) => {
 export const loginHandler = async (req: Request, res: Response) => {
   const userAgent = req.headers["user-agent"];
   const ip = req.ip;
-  try {
-    const { accessToken, refreshToken, refreshTokenTTL, user } = await login(req.body, {
-      userAgent,
-      ip,
-    });
 
+  try {
+    const { accessToken, accessTokenTTL, refreshToken, refreshTokenTTL, user } = await login(
+      req.body,
+      { userAgent, ip },
+    );
+
+    // refresh token
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -37,8 +39,15 @@ export const loginHandler = async (req: Request, res: Response) => {
       maxAge: refreshTokenTTL,
     });
 
+    // access token
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: accessTokenTTL,
+    });
+
     res.json({
-      accessToken,
       user,
       message: "Đăng nhập thành công",
     });
@@ -50,12 +59,15 @@ export const loginHandler = async (req: Request, res: Response) => {
 export const refreshTokenHandler = async (req: Request, res: Response) => {
   try {
     const token = req.cookies.refreshToken;
+
     if (!token) {
       return res.status(401).json({ message: "No refresh token" });
     }
 
-    const { accessToken, refreshToken, refreshTokenTTL } = await refreshTokenRotation(token);
+    const { accessToken, accessTokenTTL, refreshToken, refreshTokenTTL } =
+      await refreshTokenRotation(token);
 
+    // refresh token
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -63,7 +75,15 @@ export const refreshTokenHandler = async (req: Request, res: Response) => {
       maxAge: refreshTokenTTL,
     });
 
-    return res.json({ accessToken });
+    // access token
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: accessTokenTTL,
+    });
+
+    return res.status(200).json({ message: "Token refreshed" });
   } catch (err: any) {
     return res.status(401).json({ message: err.message });
   }

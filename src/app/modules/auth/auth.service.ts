@@ -70,7 +70,8 @@ export const login = async (input: LoginInput, meta?: { userAgent?: string; ip?:
     role: user.role,
   });
 
-  // TTL = Time To Live
+  const accessTokenTTL = jwtConfig.accessToken.ttl;
+
   const refreshTokenTTL = rememberMe
     ? jwtConfig.refreshToken.ttl.long
     : jwtConfig.refreshToken.ttl.short;
@@ -87,6 +88,7 @@ export const login = async (input: LoginInput, meta?: { userAgent?: string; ip?:
 
   return {
     accessToken,
+    accessTokenTTL,
     refreshToken,
     refreshTokenTTL,
     user: {
@@ -115,7 +117,7 @@ export const forgotPassword = async (email: string, req: Request) => {
   const resetToken = jwt.sign(
     { userId: user.id },
     jwtConfig.resetToken.secret,
-    { expiresIn: jwtConfig.resetToken.expiresIn / 1000 } // ms → s
+    { expiresIn: jwtConfig.resetToken.expiresIn / 1000 }, // ms → s
   );
 
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
@@ -161,7 +163,7 @@ export const resetPassword = async (input: ResetPasswordInput) => {
 export const changePassword = async (
   userId: string,
   currentPassword: string,
-  newPassword: string
+  newPassword: string,
 ) => {
   // Lấy user kèm passwordHash
   const user = await prisma.users.findUnique({
@@ -184,34 +186,27 @@ export const changePassword = async (
 };
 
 export const refreshTokenRotation = async (refreshToken: string) => {
-  //  Verify JWT signature + exp
-  const decoded = verifyRefreshToken(refreshToken) as {
-    userId: string;
-  };
+  const decoded = verifyRefreshToken(refreshToken) as { userId: string };
 
-  // Check DB
   const tokenInDb = await findValidRefreshTokenWithUser(refreshToken);
 
   if (!tokenInDb) {
-    // reuse / stolen token
     await revokeAllRefreshTokensByUser(decoded.userId);
     throw new Error("Refresh token không hợp lệ hoặc đã bị thu hồi");
   }
 
-  // Revoke old refresh token
   await revokeRefreshTokenById(tokenInDb.id);
 
-  // Issue new tokens
   const accessToken = signAccessToken({
     userId: decoded.userId,
     role: tokenInDb.user.role,
   });
 
-  const refreshTokenTTL = jwtConfig.refreshToken.ttl.long;
+  const accessTokenTTL = jwtConfig.accessToken.ttl;
 
+  const refreshTokenTTL = jwtConfig.refreshToken.ttl.long;
   const newRefreshToken = signRefreshToken({ userId: decoded.userId }, refreshTokenTTL);
 
-  // Save new refresh token
   await createRefreshToken({
     userId: decoded.userId,
     token: newRefreshToken,
@@ -220,6 +215,7 @@ export const refreshTokenRotation = async (refreshToken: string) => {
 
   return {
     accessToken,
+    accessTokenTTL,
     refreshToken: newRefreshToken,
     refreshTokenTTL,
   };

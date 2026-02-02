@@ -4,15 +4,13 @@ import { verifyAccessToken } from "src/services/token.service";
 
 export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const authHeader = req.headers.authorization;
+    const accessToken = req.cookies?.accessToken;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "Không có token, truy cập bị từ chối" });
+    if (!accessToken) {
+      return res.status(401).json({ message: "Chưa đăng nhập" });
     }
 
-    const token = authHeader.split(" ")[1];
-
-    const decoded = verifyAccessToken(token);
+    const decoded = verifyAccessToken(accessToken);
 
     const user = await prisma.users.findUnique({
       where: { id: decoded.userId },
@@ -27,44 +25,38 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
       return res.status(401).json({ message: "Tài khoản đã bị khóa" });
     }
 
-    // Gán đúng kiểu đã declare global
     req.user = {
       id: user.id,
       role: user.role,
     };
 
     next();
-  } catch (error) {
-    return res.status(401).json({ message: "Token không hợp lệ hoặc đã hết hạn" });
+  } catch {
+    return res.status(401).json({ message: "Access token không hợp lệ hoặc hết hạn" });
   }
 };
 
 export const optionalAuthMiddleware = async (req: Request, _res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
+  const accessToken = req.cookies?.accessToken;
 
-  if (!authHeader?.startsWith("Bearer ")) {
-    return next(); // public
-  }
+  if (!accessToken) return next();
 
   try {
-    const token = authHeader.split(" ")[1];
-    const decoded = verifyAccessToken(token);
+    const decoded = verifyAccessToken(accessToken);
 
     const user = await prisma.users.findUnique({
       where: { id: decoded.userId },
       select: { id: true, role: true, isActive: true },
     });
 
-    if (!user || !user.isActive) {
-      return next(); // user không hợp lệ → coi như chưa login
-    }
+    if (!user || !user.isActive) return next();
 
     req.user = {
       id: user.id,
       role: user.role,
     };
-  } catch (error) {
-    // token sai / hết hạn → bỏ qua
+  } catch {
+    // token sai / hết hạn → coi như chưa login
   }
 
   next();
