@@ -61,13 +61,23 @@ export const calculatePriceRange = (variants: RawVariant[]): PriceRange => {
 };
 
 const isOptionEnabled = (variants: RawVariant[], testOptions: Record<string, string>) => {
-  return variants.some((variant) =>
-    variant.variantAttributes.every((va) => {
-      const type = va.attributeOption.type;
-      return testOptions[type] === va.attributeOption.value;
-    }),
-  );
+  return variants.some((variant) => {
+    return Object.entries(testOptions).every(([type, value]) => {
+      return variant.variantAttributes.some(
+        (va) => va.attributeOption.type === type && va.attributeOption.value === value,
+      );
+    });
+  });
 };
+
+// const isOptionEnabled = (variants: RawVariant[], testOptions: Record<string, string>) => {
+//   return variants.some((variant) =>
+//     variant.variantAttributes.every((va) => {
+//       const type = va.attributeOption.type;
+//       return testOptions[type] === va.attributeOption.value;
+//     }),
+//   );
+// };
 
 /**
  * Build available options theo type
@@ -98,6 +108,7 @@ const buildAvailableOptionsWithStatus = (
           image: null,
         });
       }
+      // console.log(optMap);
     }
   }
 
@@ -109,6 +120,8 @@ const buildAvailableOptionsWithStatus = (
       };
 
       option.enabled = isOptionEnabled(variants, testOptions);
+
+      // console.log("TEST", testOptions, "→", option.value, option.enabled);
 
       if (type === "color" && !option.image) {
         const colorImgs = getImagesForColor(colorImages, option.value);
