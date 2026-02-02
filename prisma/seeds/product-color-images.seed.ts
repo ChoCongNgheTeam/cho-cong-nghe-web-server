@@ -12,7 +12,7 @@ export async function seedProductColorImages(
   console.log("🌱 Seeding product color images...");
 
   for (const product of products) {
-    const colors = variantImages[product.name];
+    const colors = variantImages[product.slug];
     if (!colors) continue;
 
     for (const [color, images] of Object.entries(colors)) {

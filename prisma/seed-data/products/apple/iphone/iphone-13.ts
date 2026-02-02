@@ -14,7 +14,7 @@ export const iphone13: SeedProductInput = {
 
     <figure class="my-6 rounded-lg overflow-hidden">
       <img
-        src="https://example.com/iphone-13-tong-quan.jpg"
+        src="https://res.cloudinary.com/da3eksemd/image/upload/v1770007804/products-content/products/iphone-13/overview.jpg"
         alt="Tổng quan iPhone 13"
         class="mx-auto rounded-lg max-w-full"
       />
@@ -37,7 +37,7 @@ export const iphone13: SeedProductInput = {
 
     <figure class="my-6 rounded-lg overflow-hidden">
       <img
-        src="https://example.com/iphone-13-design.jpg"
+        src="https://res.cloudinary.com/da3eksemd/image/upload/v1770008057/products-content/products/iphone-13/design.jpg"
         alt="Thiết kế iPhone 13"
         class="mx-auto rounded-lg max-w-full"
       />
@@ -60,7 +60,7 @@ export const iphone13: SeedProductInput = {
 
     <figure class="my-6 rounded-lg overflow-hidden">
       <img
-        src="https://example.com/iphone-13-camera.jpg"
+        src="https://res.cloudinary.com/da3eksemd/image/upload/v1770008056/products-content/products/iphone-13/camera.jpg"
         alt="Hệ thống camera iPhone 13"
         class="mx-auto rounded-lg max-w-full"
       />
@@ -91,7 +91,7 @@ export const iphone13: SeedProductInput = {
 
     <figure class="my-6 rounded-lg overflow-hidden">
       <img
-        src="https://example.com/iphone-13-performance.jpg"
+        src="https://res.cloudinary.com/da3eksemd/image/upload/v1770008059/products-content/products/iphone-13/performance.jpg"
         alt="Chip Apple A15 Bionic"
         class="mx-auto rounded-lg max-w-full"
       />
@@ -114,7 +114,7 @@ export const iphone13: SeedProductInput = {
 
     <figure class="my-6 rounded-lg overflow-hidden">
       <img
-        src="https://example.com/iphone-13-battery.jpg"
+        src="https://res.cloudinary.com/da3eksemd/image/upload/v1770008055/products-content/products/iphone-13/battery.jpg"
         alt="Thời lượng pin iPhone 13"
         class="mx-auto rounded-lg max-w-full"
       />

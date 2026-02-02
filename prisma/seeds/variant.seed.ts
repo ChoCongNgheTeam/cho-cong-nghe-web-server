@@ -18,7 +18,7 @@ export async function seedVariants(prisma: PrismaClient, { products }: SeedVaria
   const createdVariants = [];
 
   for (const product of products) {
-    const variantsForThisProduct = variantData[product.name];
+    const variantsForThisProduct = variantData[product.slug];
     if (!variantsForThisProduct || variantsForThisProduct.length === 0) {
       console.log(`⚠️ Product has no variants: ${product.name}`);
       continue;

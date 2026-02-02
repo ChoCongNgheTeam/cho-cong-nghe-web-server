@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "cleanup:refresh-token": "ts-node src/scripts/cleanup-refresh-token.ts",
-    "upload:assets": "ts-node scripts/upload-assets.ts"
+    "upload:assets": "ts-node scripts/upload-assets.ts",
+    "upload:content": "ts-node scripts/upload-content.ts"
   },
   "prisma": {
     "seed": "ts-node -r tsconfig-paths/register prisma/seed.ts"
