@@ -3,7 +3,7 @@ paths:
   /api/media/all:
     get:
       tags:
-        - Media (Public)
+        - Public - Media
       summary: Lấy tất cả media active (grouped by position)
       description: Dùng cho Home orchestrator - lấy 1 lần hết data, group theo position
       responses:
@@ -41,7 +41,7 @@ paths:
   /api/media/type/{type}:
     get:
       tags:
-        - Media (Public)
+        - Public - Media
       summary: Lấy media theo type
       parameters:
         - in: path
@@ -62,7 +62,7 @@ paths:
   /api/media/position/{position}:
     get:
       tags:
-        - Media (Public)
+        - Public - Media
       summary: Lấy media theo position
       parameters:
         - in: path
@@ -83,7 +83,7 @@ paths:
   /api/media/filter:
     get:
       tags:
-        - Media (Public)
+        - Public - Media
       summary: Lấy media theo type + position
       parameters:
         - in: query
@@ -110,7 +110,7 @@ paths:
   /api/media/admin/all:
     get:
       tags:
-        - Media (Admin)
+        - Admin - Media
       summary: Lấy tất cả media (bao gồm inactive)
       security:
         - bearerAuth: []
@@ -129,7 +129,7 @@ paths:
   /api/media/admin/{id}:
     get:
       tags:
-        - Media (Admin)
+        - Admin - Media
       summary: Lấy chi tiết media
       security:
         - bearerAuth: []
@@ -157,7 +157,7 @@ paths:
 
     patch:
       tags:
-        - Media (Admin)
+        - Admin - Media
       summary: Cập nhật media
       security:
         - bearerAuth: []
@@ -193,7 +193,7 @@ paths:
 
     delete:
       tags:
-        - Media (Admin)
+        - Admin - Media
       summary: Xóa media
       security:
         - bearerAuth: []
@@ -221,7 +221,7 @@ paths:
   /api/media/admin:
     post:
       tags:
-        - Media (Admin)
+        - Admin - Media
       summary: Tạo media mới
       security:
         - bearerAuth: []
@@ -249,7 +249,7 @@ paths:
   /api/media/admin/reorder:
     post:
       tags:
-        - Media (Admin)
+        - Admin - Media
       summary: Sắp xếp lại thứ tự media
       security:
         - bearerAuth: []

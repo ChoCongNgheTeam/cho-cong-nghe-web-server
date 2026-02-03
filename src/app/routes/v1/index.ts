@@ -10,6 +10,7 @@ import wishlistRoutes from "@/app/modules/wishlist/wishlist.route";
 
 // ===== Catalog =====
 import categoryRoutes from "@/app/modules/category/category.route";
+import brandRoutes from "@/app/modules/brand/brand.route";
 import productRoutes from "@/app/modules/product/product.route";
 import reviewRoutes from "@/app/modules/review/review.route";
 
@@ -42,6 +43,7 @@ router.use("/wishlist", wishlistRoutes);
 
 // ===== Catalog =====
 router.use("/categories", categoryRoutes);
+router.use("/brands", brandRoutes);
 router.use("/products", productRoutes);
 router.use("/reviews", reviewRoutes);
 

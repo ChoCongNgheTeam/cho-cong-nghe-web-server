@@ -129,6 +129,8 @@ export const getProductBySpecificationsHandler = async (req: Request, res: Respo
     const { slug } = req.params;
     const specs = await productService.getProductSpecificationsBySlug(slug);
 
+    // console.log(specs);
+
     res.json({
       success: true,
       data: specs,

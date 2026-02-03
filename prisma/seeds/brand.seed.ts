@@ -2,110 +2,164 @@ import { PrismaClient } from "@prisma/client";
 import { generateUniqueSlug } from "@/utils/generate-unique-slug";
 
 const brandData = [
+  // Điện thoại & Tablet
   {
     name: "Apple",
-    description: "Đẳng cấp công nghệ, hệ điều hành tối ưu",
+    description: "iPhone, iPad, MacBook và hệ sinh thái cao cấp",
     imagePath: "brands/apple.webp",
-  },
-  {
-    name: "Benco",
-    description: "Điện thoại phổ thông, độ bền cao",
-    imagePath: "brands/benco.webp",
-  },
-  {
-    name: "Honor",
-    description: "Thiết kế thời thượng, hiệu năng mạnh mẽ",
-    imagePath: "brands/honor.webp",
-  },
-  {
-    name: "Inoi",
-    description: "Thương hiệu mới nổi, giá thành hợp lý",
-    imagePath: "brands/inoi.webp",
-  },
-  {
-    name: "Itel",
-    description: "Smartphone giá rẻ cho mọi đối tượng",
-    imagePath: "brands/itel.webp",
-  },
-  {
-    name: "Masstel",
-    description: "Thương hiệu Việt, chất lượng ổn định",
-    imagePath: "brands/masstel.webp",
-  },
-  {
-    name: "Mobell",
-    description: "Điện thoại bình dân, dễ dàng sử dụng",
-    imagePath: "brands/mobell.webp",
-  },
-  {
-    name: "Nokia",
-    description: "Biểu tượng độ bền, kết nối tin cậy",
-    imagePath: "brands/nokia.webp",
-  },
-  {
-    name: "OPPO",
-    description: "Chuyên gia selfie, sạc nhanh dẫn đầu",
-    imagePath: "brands/oppo.webp",
-  },
-  {
-    name: "Realme",
-    description: "Sức trẻ đột phá, cấu hình vượt tầm giá",
-    imagePath: "brands/realme.webp",
-  },
-  {
-    name: "Red Magic",
-    description: "Gaming phone đỉnh cao, tản nhiệt cực tốt",
-    imagePath: "brands/redmagic.webp",
+    categoryGroup: "Điện thoại",
   },
   {
     name: "Samsung",
-    description: "Màn hình đỉnh cao, dẫn đầu xu hướng gập",
+    description: "Galaxy S, Z Fold/Flip, A, M series và thiết bị gia dụng",
     imagePath: "brands/samsung.webp",
-  },
-  {
-    name: "TCL",
-    description: "Công nghệ hiển thị vượt trội từ tập đoàn đa quốc gia",
-    imagePath: "brands/tcl.webp",
-  },
-  {
-    name: "Tecno",
-    description: "Thiết kế độc đáo, camera ấn tượng",
-    imagePath: "brands/tecno.webp",
-  },
-  {
-    name: "Viettel",
-    description: "Sản phẩm viễn thông từ nhà mạng hàng đầu Việt Nam",
-    imagePath: "brands/viettel.webp",
-  },
-  {
-    name: "Vivo",
-    description: "Âm thanh Hi-Fi, dẫn đầu công nghệ chụp ảnh",
-    imagePath: "brands/vivo.webp",
+    categoryGroup: "Điện thoại",
   },
   {
     name: "Xiaomi",
-    description: "Hệ sinh thái thông minh, cấu hình mạnh mẽ",
+    description: "Redmi, Poco, Xiaomi series - giá tốt, cấu hình mạnh",
     imagePath: "brands/xiaomi.webp",
+    categoryGroup: "Điện thoại",
   },
   {
-    name: "ZTE",
-    description: "Tiên phong công nghệ 5G và camera ẩn dưới màn hình",
-    imagePath: "brands/zte.webp",
+    name: "OPPO",
+    description: "Reno, Find, A series - camera đẹp, thiết kế thời thượng",
+    imagePath: "brands/oppo.webp",
+    categoryGroup: "Điện thoại",
+  },
+
+  // Laptop & MacBook
+  {
+    name: "Apple MacBook",
+    description: "MacBook Air, MacBook Pro - M series chip mạnh mẽ",
+    imagePath: "brands/apple-macbook.webp",
+    categoryGroup: "Laptop",
   },
   {
-    name: "Casper",
-    description: "Casper",
-    imagePath: "brands/casper.webp",
+    name: "Asus",
+    description: "ZenBook, VivoBook, ROG, TUF Gaming",
+    imagePath: "brands/asus.webp",
+    categoryGroup: "Laptop",
   },
   {
-    name: "Comfee",
-    description: "Comfee",
-    imagePath: "brands/comfee.webp",
+    name: "Lenovo",
+    description: "ThinkPad, Legion, Yoga, LOQ, IdeaPad",
+    imagePath: "brands/lenovo.webp",
+    categoryGroup: "Laptop",
   },
   {
-    name: "Sharp",
-    description: "Sharp",
-    imagePath: "brands/sharp.webp",
+    name: "Acer",
+    description: "Predator, Nitro, Swift, Aspire",
+    imagePath: "brands/acer.webp",
+    categoryGroup: "Laptop",
+  },
+  {
+    name: "Dell",
+    description: "XPS, Inspiron, Latitude, Gaming G Series",
+    imagePath: "brands/dell.webp",
+    categoryGroup: "Laptop",
+  },
+  {
+    name: "HP",
+    description: "Pavilion, Envy, Victus, ProBook, dòng cơ bản",
+    imagePath: "brands/hp.webp",
+    categoryGroup: "Laptop",
+  },
+
+  // Điện máy - Gia dụng
+  {
+    name: "Samsung",
+    description: "Tivi QLED, tủ lạnh, máy giặt, điều hòa",
+    imagePath: "brands/samsung.webp",
+    categoryGroup: "Điện máy",
+  },
+  {
+    name: "LG",
+    description: "Tivi OLED/QNED, tủ lạnh, máy giặt, điều hòa",
+    imagePath: "brands/lg.webp",
+    categoryGroup: "Điện máy",
+  },
+  {
+    name: "TCL",
+    description: "Tivi Google TV, QLED giá tốt",
+    imagePath: "brands/tcl.webp",
+    categoryGroup: "Điện máy",
+  },
+  {
+    name: "Panasonic",
+    description: "Điều hòa, tủ lạnh, máy giặt",
+    imagePath: "brands/panasonic.webp",
+    categoryGroup: "Điện máy",
+  },
+  {
+    name: "Electrolux",
+    description: "Máy giặt, tủ lạnh, điều hòa",
+    imagePath: "brands/electrolux.webp",
+    categoryGroup: "Điện máy",
+  },
+  {
+    name: "Toshiba",
+    description: "Tủ lạnh, máy giặt, điều hòa",
+    imagePath: "brands/toshiba.webp",
+    categoryGroup: "Điện máy",
+  },
+
+  // Âm thanh & Gaming Gear
+  {
+    name: "Sony",
+    description: "Tai nghe, loa, âm thanh chất lượng cao",
+    imagePath: "brands/sony.webp",
+    categoryGroup: "Âm thanh",
+  },
+  {
+    name: "JBL",
+    description: "Loa Bluetooth, tai nghe, loa karaoke",
+    imagePath: "brands/jbl.webp",
+    categoryGroup: "Âm thanh",
+  },
+  {
+    name: "Anker",
+    description: "Loa Soundcore, tai nghe, sạc dự phòng",
+    imagePath: "brands/anker.webp",
+    categoryGroup: "Âm thanh",
+  },
+  {
+    name: "Logitech",
+    description: "Chuột, bàn phím, tai nghe gaming, webcam",
+    imagePath: "brands/logitech.webp",
+    categoryGroup: "Gaming Gear",
+  },
+  {
+    name: "Razer",
+    description: "Chuột, bàn phím, tai nghe, laptop gaming",
+    imagePath: "brands/razer.webp",
+    categoryGroup: "Gaming Gear",
+  },
+
+  // Phụ kiện chung
+  {
+    name: "Baseus",
+    description: "Sạc, cáp, ốp lưng, sạc dự phòng",
+    imagePath: "brands/baseus.webp",
+    categoryGroup: "Phụ kiện",
+  },
+  {
+    name: "Anker",
+    description: "Sạc dự phòng, sạc nhanh, cáp chất lượng cao",
+    imagePath: "brands/anker.webp",
+    categoryGroup: "Phụ kiện",
+  },
+  {
+    name: "Ugreen",
+    description: "Hub, cáp, sạc, phụ kiện laptop & điện thoại",
+    imagePath: "brands/ugreen.webp",
+    categoryGroup: "Phụ kiện",
+  },
+  {
+    name: "Xiaomi",
+    description: "Phụ kiện Mi, Redmi, sạc, ốp, tai nghe",
+    imagePath: "brands/xiaomi.webp",
+    categoryGroup: "Phụ kiện",
   },
 ];
 
@@ -122,13 +176,21 @@ export async function seedBrands(prisma: PrismaClient) {
       update: {
         description: data.description,
         imagePath: data.imagePath,
+        // Nếu bảng brands có thêm field categoryGroup thì thêm dòng này
+        // categoryGroup: data.categoryGroup,
       },
-      create: { ...data, slug },
+      create: {
+        name: data.name,
+        slug,
+        description: data.description,
+        imagePath: data.imagePath,
+        // categoryGroup: data.categoryGroup, // nếu có field này
+      },
     });
 
     brands.push(brand);
   }
 
-  console.log(`Seeded ${brands.length} brands`);
+  console.log(`Seeded ${brands.length} brands successfully!`);
   return brands;
 }

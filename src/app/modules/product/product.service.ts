@@ -138,6 +138,8 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
 export const getProductSpecificationsBySlug = async (slug: string) => {
   const product = await repo.findSpecificationsBySlug(slug);
 
+  // console.log(product);
+
   if (!product || !product.isActive) {
     const error: any = new Error("Không tìm thấy thông số sản phẩm");
     error.statusCode = 404;
