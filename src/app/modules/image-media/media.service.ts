@@ -22,7 +22,6 @@ export const getMediaByTypeAndPosition = async (type: MediaType, position: Media
   return mediaRepository.findByTypeAndPosition(type, position, true);
 };
 
-// Lấy tất cả media active (cho Home orchestrator - 1 lần lấy hết)
 export const getAllActiveMedia = async () => {
   const media = await mediaRepository.findAll(true);
 

@@ -18,8 +18,8 @@ const selectBlogCard = {
   id: true,
   title: true,
   slug: true,
-  content: true, // Sẽ extract excerpt trong transformer
-  thumbnail: true,
+  content: true,
+  imageUrl: true,
   viewCount: true,
   status: true,
   createdAt: true,

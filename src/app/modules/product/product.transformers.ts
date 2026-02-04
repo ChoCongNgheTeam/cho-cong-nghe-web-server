@@ -152,7 +152,6 @@ export const calculateOverallStockStatus = (
 };
 
 export const transformProductCard = (product: any): ProductCard => {
-  // console.log(product);
   const defaultVariant = product.variants[0];
 
   const firstColorImage = product.img?.[0];
@@ -267,37 +266,49 @@ export const transformProductVariantResponse = (product: any, variant: RawVarian
   };
 };
 
-export const transformProductSpecifications = (
-  product: any,
-): { specifications: ProductSpecificationGroup[] } => {
-  const valueMap = new Map(
-    product.productSpecifications.map((ps: any) => [ps.specificationId, ps.value]),
+export const transformProductSpecifications = (product: {
+  productSpecifications: {
+    specificationId: string;
+    value: string | null;
+  }[];
+  categorySpecifications: {
+    groupName: string;
+    specification: {
+      id: string;
+      key: string;
+      name: string;
+      icon?: string | null;
+      unit?: string | null;
+    };
+  }[];
+}): { specifications: ProductSpecificationGroup[] } => {
+  const valueMap = new Map<string, string | null>(
+    product.productSpecifications.map((ps) => [ps.specificationId, ps.value]),
   );
 
   const groups: ProductSpecificationGroup[] = [];
 
-  for (const cs of product.category.categorySpecifications) {
-    const existingGroup = groups.find((g) => g.groupName === cs.groupName);
+  for (const cs of product.categorySpecifications) {
+    let group = groups.find((g) => g.groupName === cs.groupName);
 
-    const rawValue = valueMap.get(cs.specification.id);
+    if (!group) {
+      group = {
+        groupName: cs.groupName,
+        items: [],
+      };
+      groups.push(group);
+    }
 
-    const item = {
+    const rawValue = valueMap.get(cs.specification.id) ?? null;
+
+    group.items.push({
       id: cs.specification.id,
       key: cs.specification.key,
       name: cs.specification.name,
-      icon: cs.specification.icon,
-      unit: cs.specification.unit,
+      icon: cs.specification.icon ?? undefined,
+      unit: cs.specification.unit ?? undefined,
       value: typeof rawValue === "string" ? rawValue : null,
-    };
-
-    if (existingGroup) {
-      existingGroup.items.push(item);
-    } else {
-      groups.push({
-        groupName: cs.groupName,
-        items: [item],
-      });
-    }
+    });
   }
 
   return { specifications: groups };

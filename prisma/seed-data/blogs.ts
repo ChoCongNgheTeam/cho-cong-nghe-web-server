@@ -2,92 +2,64 @@ export interface BlogSeedData {
   title: string;
   slug: string;
   content: string;
-  thumbnail?: string;
+  imagePath?: string;
   status?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
   publishedAt?: Date;
-  authorEmail: string; // dùng email để tìm authorId sau
+  authorEmail: string;
 }
 
 export const blogSeeds: BlogSeedData[] = [
   {
-    title: "Hướng dẫn chọn mua iPhone cũ đáng tin cậy năm 2025",
-    slug: "huong-dan-chon-mua-iphone-cu-dang-tin-cay-2025",
+    title: "Honor Power 2 gây chú ý với viên pin cực khủng và giao diện Transparency độc đáo",
+    slug: "honor-power-2-gay-chu-y-voi-pin-khung-va-giao-dien-transparency",
     content: `
-# Hướng dẫn chọn mua iPhone cũ đáng tin cậy năm 2025
+# Honor Power 2: Bước đột phá về pin và thiết kế giao diện năm 2026
 
-Trong bối cảnh iPhone mới ngày càng đắt đỏ, việc mua iPhone cũ (refurbished hoặc second-hand) đang trở thành lựa chọn phổ biến. Bài viết này sẽ giúp bạn tránh "tiền mất tật mang" khi mua máy cũ.
+Honor vừa chính thức trình làng mẫu smartphone mới mang tên **Honor Power 2**, nhắm thẳng vào phân khúc người dùng cần hiệu năng pin bền bỉ nhưng vẫn yêu thích sự đột phá trong thiết kế.
 
-### 1. Ưu tiên các dòng máy còn hỗ trợ cập nhật iOS
-- iPhone 13 series và mới hơn: còn hỗ trợ ít nhất 4–5 năm nữa
-- iPhone 12 series: vẫn ổn đến khoảng 2027–2028
-- Tránh iPhone 11 trở về trước nếu bạn muốn dùng lâu dài
+### 1. Dung lượng pin "vô đối" trong phân khúc
+Điểm nhấn lớn nhất chính là viên pin thế hệ mới giúp người dùng có thể sử dụng liên tục lên đến 3 ngày. Đây là nỗ lực của Honor trong việc tối ưu hóa kích thước pin mà không làm máy quá dày.
 
-### 2. Kiểm tra tình trạng máy thật kỹ
-- **Pin health**: Nên ≥ 85% (tốt nhất ≥ 90%)
-- **Face ID / Touch ID**: hoạt động bình thường
-- **Camera**: chụp thử cả trước + sau, kiểm tra vết xước lens
-- **Màn hình**: không ám vàng, không điểm chết, True Tone hoạt động
-- **Khung viền & mặt lưng**: không cong vênh, không thay vỏ kém chất lượng
+### 2. Giao diện Transparency (Trong suốt) độc đáo
+Khác với các giao diện Android thông thường, Honor Power 2 giới thiệu ngôn ngữ thiết kế **Transparency**. Các widget và thông báo được hiển thị với hiệu ứng kính mờ, giúp trải nghiệm thị giác trở nên nhẹ nhàng và hiện đại hơn rất nhiều.
 
-### 3. Nguồn gốc và bảo hành
-- Ưu tiên mua từ cửa hàng uy tín có bảo hành 6–12 tháng
-- Kiểm tra IMEI trên website Apple để xem còn bảo hành chính hãng không
-- Tránh máy lock, máy dựng, hoặc máy từ nước ngoài không rõ nguồn gốc
+### 3. Hiệu năng ổn định
+- **Chipset:** Tối ưu cho việc tiết kiệm điện năng.
+- **Màn hình:** Tần số quét thích ứng giúp giảm tiêu thụ pin khi không cần thiết.
 
-### 4. Giá tham khảo (tháng 1/2025)
-- iPhone 13 128GB pin 88–92%: ~9.5–11 triệu
-- iPhone 14 128GB pin 90%+: ~12–14 triệu
-- iPhone 15 128GB pin 90%+: ~16–18 triệu
-
-Chúc bạn tìm được chiếc iPhone ưng ý với mức giá hợp lý!
-
-(Nguồn: kinh nghiệm thực tế từ cộng đồng và các cửa hàng uy tín tại Việt Nam)
+Đây hứa hẹn sẽ là mẫu máy làm chao đảo thị trường tầm trung trong thời gian tới.
     `.trim(),
-    thumbnail: "blogs/iphone-cu-2025.jpg",
+    imagePath: "blogs/honor_power2_gay_chu_y_voi_pin_lon_va_giao_dien_transparency.jpg",
     status: "PUBLISHED",
-    publishedAt: new Date("2025-01-15"),
-    authorEmail: "admin@example.com", // thay bằng email admin thật của bạn
+    publishedAt: new Date("2026-01-15"),
+    authorEmail: "admin@example.com",
   },
 
   {
-    title: "So sánh nhanh Galaxy S25 Ultra vs iPhone 16 Pro Max",
-    slug: "so-sanh-galaxy-s25-ultra-vs-iphone-16-pro-max",
+    title: "So sánh hiệu năng thực tế: RTX 2080 Super vs RTX 3080 trong năm 2026",
+    slug: "so-sanh-hieu-nang-rtx-2080-super-vs-rtx-3080-nam-2026",
     content: `
-# So sánh nhanh Galaxy S25 Ultra vs iPhone 16 Pro Max
+# RTX 2080 Super vs RTX 3080: Có còn đáng để nâng cấp?
 
-Cuộc chiến flagship 2025 đang rất nóng. Dưới đây là bảng so sánh ngắn gọn giữa hai "quái vật" Android và iOS.
+Dù đã ra mắt được một thời gian, nhưng cuộc chiến giữa các dòng card đồ họa cũ và mới vẫn luôn là chủ đề nóng cho những ai muốn build PC giá rẻ mà hiệu năng vẫn "chiến".
 
-### Thiết kế & Màn hình
-- **S25 Ultra**: Titanium frame, Gorilla Glass Armor 2, màn hình 6.9" Dynamic AMOLED 2X, 120Hz LTPO, viền siêu mỏng
-- **iPhone 16 Pro Max**: Titanium grade 5, Ceramic Shield, màn hình 6.9" Super Retina XDR, 120Hz ProMotion
+### 1. Sức mạnh thuần túy (Raw Performance)
+- **RTX 3080:** Vẫn là một con quái vật ở độ phân giải 4K nhờ kiến trúc Ampere và số lượng nhân CUDA vượt trội.
+- **RTX 2080 Super:** Dù đuối sức hơn ở 4K, nhưng ở độ phân giải 2K, nó vẫn cân tốt hầu hết các tựa game AAA hiện nay ở mức setting High.
 
-→ S25 Ultra thắng về chống xước & viền mỏng hơn.
+### 2. Công nghệ DLSS và Ray Tracing
+Cả hai đều hỗ trợ Ray Tracing, nhưng thế hệ nhân RT thứ 2 trên RTX 3080 cho khả năng xử lý ánh sáng mượt mà hơn hẳn, giảm thiểu tình trạng tụt FPS khi bật các hiệu ứng đồ họa nặng.
 
-### Camera
-- **S25 Ultra**: Chính 200MP + Ultra-wide 50MP + 3x & 5x telephoto 50MP, zoom quang 5x, zoom số 100x
-- **iPhone 16 Pro Max**: Chính 48MP Fusion + Ultra-wide 48MP + 5x telephoto 12MP, quay video ProRes 4K 120fps
+### 3. Giá thành và sự lựa chọn
+Ở thị trường máy cũ năm 2026:
+- Nếu bạn làm đồ họa chuyên nghiệp và chơi game 4K: **RTX 3080** là lựa chọn bắt buộc.
+- Nếu ngân sách hạn chế và chỉ chơi game Esport hoặc 2K: **RTX 2080 Super** vẫn là một món hời về hiệu năng trên giá thành.
 
-→ S25 Ultra vượt trội về zoom, iPhone thắng về quay video chuyên nghiệp.
-
-### Hiệu năng & Pin
-- **S25 Ultra**: Snapdragon 8 Elite for Galaxy, pin 5000mAh, sạc 45W
-- **iPhone 16 Pro Max**: A18 Pro, pin ~4685mAh, sạc 25W có dây + 15W MagSafe
-
-→ S25 Ultra pin lớn hơn, sạc nhanh hơn. iPhone tối ưu năng lượng tốt hơn.
-
-### Phần mềm & Hỗ trợ
-- **S25 Ultra**: One UI 7 (Android 15) + 7 năm cập nhật
-- **iPhone 16 Pro Max**: iOS 18 + thường 6–7 năm cập nhật
-
-### Kết luận
-- Chọn S25 Ultra nếu bạn thích zoom cực mạnh, sạc nhanh, màn hình sáng & chống xước tốt.
-- Chọn iPhone 16 Pro Max nếu bạn cần hệ sinh thái Apple, quay video chuyên nghiệp, và sự ổn định lâu dài.
-
-Bạn sẽ chọn bên nào?
+Kết luận: RTX 3080 vẫn nhanh hơn khoảng 30-40% so với người tiền nhiệm trong các tác vụ thực tế.
     `.trim(),
-    thumbnail: "blogs/s25-vs-iphone16.jpg",
+    imagePath: "blogs/RTX_2080_Super_vs_RTX_3080_2.jpg",
     status: "PUBLISHED",
-    publishedAt: new Date("2025-02-10"),
+    publishedAt: new Date("2026-02-10"),
     authorEmail: "customer2@example.com",
   },
 ];

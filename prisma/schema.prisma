@@ -630,7 +630,8 @@ model blogs {
   title      String
   slug       String     @unique
   content    String
-  thumbnail  String?
+  imagePath   String?
+  imageUrl    String?
   viewCount  Int        @default(0)
   status     BlogStatus @default(DRAFT)
 

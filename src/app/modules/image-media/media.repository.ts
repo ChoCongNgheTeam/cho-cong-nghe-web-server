@@ -6,19 +6,14 @@ const selectMedia = {
   type: true,
   position: true,
   title: true,
-  imagePath: true,
   imageUrl: true,
   linkUrl: true,
   order: true,
-  isActive: true,
-  createdAt: true,
-  updatedAt: true,
 };
 
 type CreateMediaData = Prisma.image_mediaCreateInput;
 type UpdateMediaData = Prisma.image_mediaUpdateInput;
 
-// Lấy tất cả media
 export const findAll = async (onlyActive: boolean = false) => {
   return prisma.image_media.findMany({
     where: onlyActive ? { isActive: true } : undefined,

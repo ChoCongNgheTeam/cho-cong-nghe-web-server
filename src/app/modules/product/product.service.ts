@@ -16,6 +16,7 @@ import {
 import { RawVariant, ReviewStats } from "./product.types";
 import { buildCategoryPath } from "../category/category.helper";
 import prisma from "prisma/client";
+import { getProductIdsFromPromotions } from "./product.repository";
 
 // =====================
 // === PUBLIC SERVICES ===
@@ -150,6 +151,7 @@ export const getProductSpecificationsBySlug = async (slug: string) => {
 
   return { specifications };
 };
+
 export const getProductGallery = async (slug: string) => {
   const product = await repo.findBySlug(slug);
   if (!product || !product.isActive) {
@@ -303,10 +305,6 @@ export const deleteProduct = async (id: string) => {
   return repo.remove(id);
 };
 
-/**
- * 1. Get flash sale products (products on sale today)
- * For Home: Container Flash Sale
- */
 export const getFlashSaleProducts = async (
   date: Date = new Date(),
   options: { limit?: number; categoryId?: string } = {},
@@ -315,20 +313,13 @@ export const getFlashSaleProducts = async (
 
   // console.log(products);
 
-  // const productIds = products.map((p) => p.id);
-  // const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
-
-  // console.log(productIds);
-
   return {
     data: products.map((product) => {
       const defaultVariant = product.variants?.[0];
-      // const variantOptions = variantOptionsMap.get(product.id) ?? [];
 
       return {
         card: {
           ...transformProductCard(product),
-          // variantOptions,
         },
         pricingContext: defaultVariant
           ? {
@@ -346,24 +337,104 @@ export const getFlashSaleProducts = async (
   };
 };
 
-/**
- * 2. Get categories with sale products
- * For Home: Container liệt kê categories có sản phẩm sale
- */
+// export const getCategoriesWithSaleProducts = async (date: Date = new Date()) => {
+//   const categories = await repo.findCategoriesWithSaleProducts(date);
+
+//   // Get sale products count for each category
+//   const countMap = await repo.getSaleProductsCountByCategories(date);
+
+//   return categories.map((category) => ({
+//     id: category.id,
+//     name: category.name,
+//     slug: category.slug,
+//     imageUrl: category.imageUrl,
+//     totalProducts: category._count.products,
+//     saleProductsCount: countMap.get(category.id) || 0,
+//   }));
+// };
+
 export const getCategoriesWithSaleProducts = async (date: Date = new Date()) => {
-  const categories = await repo.findCategoriesWithSaleProducts(date);
+  const [products, saleProductIds] = await Promise.all([
+    repo.getProductsForCategoryRanking(date),
+    getProductIdsFromPromotions(date),
+  ]);
 
-  // Get sale products count for each category
-  const countMap = await repo.getSaleProductsCountByCategories(date);
+  const map = new Map<
+    string,
+    {
+      totalProducts: number;
+      saleProducts: number;
+      newProducts: number;
+      totalViews: number;
+      totalSold: number;
+    }
+  >();
 
-  return categories.map((category) => ({
-    id: category.id,
-    name: category.name,
-    slug: category.slug,
-    imageUrl: category.imageUrl,
-    totalProducts: category._count.products,
-    saleProductsCount: countMap.get(category.id) || 0,
-  }));
+  const NEW_DAYS = 15;
+  const now = Date.now();
+
+  for (const product of products) {
+    const categoryId = product.category.parent?.id ?? product.category.id;
+
+    if (!map.has(categoryId)) {
+      map.set(categoryId, {
+        totalProducts: 0,
+        saleProducts: 0,
+        newProducts: 0,
+        totalViews: 0,
+        totalSold: 0,
+      });
+    }
+
+    const data = map.get(categoryId)!;
+
+    data.totalProducts += 1;
+    data.totalViews += Number(product.viewsCount);
+
+    const sold = product.variants.reduce((sum, v) => sum + v.soldCount, 0);
+    data.totalSold += sold;
+
+    if (saleProductIds.has(product.id)) {
+      data.saleProducts += 1;
+    }
+
+    if (now - product.createdAt.getTime() < NEW_DAYS * 24 * 60 * 60 * 1000) {
+      data.newProducts += 1;
+    }
+  }
+
+  // Lấy category info
+  const categories = await prisma.categories.findMany({
+    where: {
+      id: { in: Array.from(map.keys()) },
+      isActive: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      imageUrl: true,
+    },
+  });
+
+  return categories
+    .map((cat) => {
+      const stat = map.get(cat.id)!;
+
+      const score =
+        stat.saleProducts * 5 +
+        stat.newProducts * 3 +
+        stat.totalSold * 0.1 +
+        stat.totalViews * 0.01 +
+        stat.totalProducts;
+
+      return {
+        ...cat,
+        ...stat,
+        score,
+      };
+    })
+    .sort((a, b) => b.score - a.score);
 };
 
 /**
@@ -447,26 +518,61 @@ export const getProductsByPromotion = async (promotionId: string, limit: number 
   };
 };
 
-/**
- * 6. Get best selling products
- * For Home: Sản phẩm bán chạy
- */
-export const getBestSellingProducts = async (limit: number = 12) => {
-  const products = await repo.findBestSellingProducts(limit);
-
-  // console.log(products);
-
-  // const productIds = products.map((p) => p.id);
-  // const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
+export const getFeaturedProducts = async (limit: number = 12) => {
+  const products = await repo.findFeaturedProducts(limit);
 
   return products.map((product) => {
     const defaultVariant = product.variants?.[0];
-    // const variantOptions = variantOptionsMap.get(product.id) ?? [];
 
     return {
       card: {
         ...transformProductCard(product),
-        // variantOptions,
+      },
+      pricingContext: defaultVariant
+        ? {
+            productId: product.id,
+            variantId: defaultVariant.id,
+            price: Number(defaultVariant.price),
+            brandId: product.brand?.id,
+            categoryPath: buildCategoryPath(product.category),
+          }
+        : null,
+    };
+  });
+};
+
+export const getBestSellingProducts = async (limit: number = 12) => {
+  const products = await repo.findBestSellingProducts(limit);
+
+  return products.map((product) => {
+    const defaultVariant = product.variants?.[0];
+
+    return {
+      card: {
+        ...transformProductCard(product),
+      },
+      pricingContext: defaultVariant
+        ? {
+            productId: product.id,
+            variantId: defaultVariant.id,
+            price: Number(defaultVariant.price),
+            brandId: product.brand?.id,
+            categoryPath: buildCategoryPath(product.category),
+          }
+        : null,
+    };
+  });
+};
+
+export const getRecentlyViewedProducts = async (productIds: string[]) => {
+  const products = await repo.findProductsByIds(productIds);
+
+  return products.map((product) => {
+    const defaultVariant = product.variants?.[0];
+
+    return {
+      card: {
+        ...transformProductCard(product),
       },
       pricingContext: defaultVariant
         ? {

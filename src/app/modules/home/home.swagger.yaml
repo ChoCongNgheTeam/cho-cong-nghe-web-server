@@ -1,0 +1,231 @@
+openapi: 3.0.3
+info:
+  title: Home Page API
+  description: |
+    API cho phần trang chủ (Home), bao gồm dữ liệu tổng hợp và các section riêng lẻ.
+    Hầu hết các endpoint hỗ trợ **optional authentication** (JWT) để hiển thị giá cá nhân hóa
+    (nếu người dùng đã đăng nhập).
+  version: 1.0.0
+
+servers:
+  - url: /api
+    description: API base path
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Nhập JWT token (không cần thêm 'Bearer ' ở đầu)"
+
+  schemas:
+    FlashSaleSection:
+      type: object
+      properties:
+        title:
+          type: string
+          example: "Flash Sale Hôm Nay"
+        endTime:
+          type: string
+          format: date-time
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductItem"
+      required:
+        - products
+
+    ProductSection:
+      type: object
+      properties:
+        title:
+          type: string
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductItem"
+      required:
+        - products
+
+    ProductItem:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        price:
+          type: number
+        originalPrice:
+          type: number
+          nullable: true
+        discountPercent:
+          type: integer
+          nullable: true
+        thumbnail:
+          type: string
+          format: uri
+        rating:
+          type: number
+        reviewCount:
+          type: integer
+      required:
+        - id
+        - name
+        - price
+        - thumbnail
+
+  responses:
+    Unauthorized:
+      description: Không có quyền truy cập (token không hợp lệ hoặc hết hạn)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Unauthorized"
+
+    InternalServerError:
+      description: Lỗi server
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+              error:
+                type: string
+
+paths:
+  /home:
+    get:
+      summary: Lấy toàn bộ dữ liệu trang chủ trong một request
+      description: |
+        Trả về hầu hết các khối dữ liệu cần thiết để render trang chủ: ...
+      operationId: getHomePage
+      security:
+        - bearerAuth: [] # optional
+      tags:
+        - Home
+      responses:
+        "200":
+          description: Dữ liệu trang chủ thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sliders:
+                    type: array
+                    items: { type: object }
+                  banners:
+                    type: array
+                    items: { type: object }
+                  featuredCategories:
+                    type: array
+                    items: { type: object }
+                  flashSale:
+                    $ref: "#/components/schemas/FlashSaleSection"
+                  bestSelling:
+                    $ref: "#/components/schemas/ProductSection"
+                  latestBlogs:
+                    type: array
+                    items: { type: object }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /home/flash-sale:
+    get:
+      summary: Lấy riêng section Flash Sale
+      operationId: getFlashSaleSection
+      security:
+        - bearerAuth: []
+      tags:
+        - Home
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 50
+      responses:
+        "200":
+          description: Dữ liệu flash sale
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlashSaleSection"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /home/best-selling:
+    get:
+      summary: Lấy riêng section Best Selling Products
+      operationId: getBestSellingSection
+      security:
+        - bearerAuth: []
+      tags:
+        - Home
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [day, week, month]
+            default: week
+      responses:
+        "200":
+          description: Dữ liệu sản phẩm bán chạy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductSection"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /home/recently-viewed:
+    post:
+      summary: Lấy danh sách sản phẩm đã xem gần đây
+      operationId: getRecentlyViewedSection
+      security:
+        - bearerAuth: []
+      tags:
+        - Home
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit:
+                  type: integer
+                  default: 10
+                productIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Danh sách sản phẩm đã xem gần đây
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductSection"
+        "401":
+          $ref: "#/components/responses/Unauthorized"

@@ -1,12 +1,7 @@
 import { Request, Response } from "express";
 import * as homeService from "./home.service";
+import { getRecentlyViewedSection } from "./home.service";
 
-/**
- * Get all home page data in one request
- * GET /api/home
- *
- * Supports optional authentication for personalized pricing
- */
 export const getHomePageHandler = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
@@ -79,31 +74,19 @@ export const getBestSellingSectionHandler = async (req: Request, res: Response) 
   }
 };
 
-/**
- * Get Featured Products section only
- * GET /api/home/featured?limit=8&categoriesLimit=6
- */
-// export const getFeaturedSectionHandler = async (req: Request, res: Response) => {
-//   try {
-//     const userId = (req as any).user?.id;
-//     const limit = req.query.limit ? parseInt(req.query.limit as string) : 8;
-//     const categoriesLimit = req.query.categoriesLimit
-//       ? parseInt(req.query.categoriesLimit as string)
-//       : 6;
+export const getRecentlyViewedSectionHandler = async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const { productIds } = req.body;
 
-//     const sections = await homeService.getFeaturedSection(userId, { limit, categoriesLimit });
+  if (!Array.isArray(productIds) || productIds.length === 0) {
+    return res.json({
+      products: [],
+    });
+  }
 
-//     res.json({
-//       success: true,
-//       data: sections,
-//       total: sections.length,
-//       message: "Lấy sản phẩm featured thành công",
-//     });
-//   } catch (error: any) {
-//     console.error("Error in getFeaturedSectionHandler:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: error.message || "Lỗi server",
-//     });
-//   }
-// };
+  const products = await getRecentlyViewedSection(productIds, userId);
+
+  return res.json({
+    products,
+  });
+};

@@ -5,11 +5,9 @@ export interface HomeSlider {
   type: MediaType;
   position: MediaPosition;
   title: string | null;
-  imagePath: string | null;
   imageUrl: string | null;
   linkUrl: string | null;
   order: number;
-  isActive: boolean;
 }
 
 export interface HomeBanner {
@@ -17,11 +15,9 @@ export interface HomeBanner {
   type: MediaType;
   position: MediaPosition;
   title: string | null;
-  imagePath: string | null;
   imageUrl: string | null;
   linkUrl: string | null;
   order: number;
-  isActive: boolean;
 }
 
 export interface CategoryWithSaleCount {
@@ -30,22 +26,24 @@ export interface CategoryWithSaleCount {
   slug: string;
   imageUrl: string | null;
   totalProducts: number;
-  saleProductsCount: number;
+  saleProducts: number;
+  newProducts: number;
+  totalViews: number;
+  totalSold: number;
+  score: number;
 }
 
 export interface FeaturedCategory {
   id: string;
   name: string;
   slug: string;
-  description: string | null;
   imageUrl: string | null;
   position: number;
-  isFeatured: boolean;
-  productsCount: number;
 }
 
 export interface HomeResponse {
   sliders: HomeSlider[];
+  featuredCategories: FeaturedCategory[];
   bannersTop: HomeBanner[];
   flashSaleProducts: {
     products: any[];
@@ -53,17 +51,9 @@ export interface HomeResponse {
     date: Date;
   };
   bannersSection1: HomeBanner[];
-  saleCategoriesWithCount: CategoryWithSaleCount[];
+  categoryRanking: CategoryWithSaleCount[];
+  featuredProducts: any[];
   bestSellingProducts: any[];
-  // featuredSections: {
-  //   category: {
-  //     id: string;
-  //     name: string;
-  //     slug: string;
-  //   };
-  //   products: any[];
-  //   total: number;
-  // }[];
   blogs: {
     data: any[];
     page: number;
@@ -71,5 +61,4 @@ export interface HomeResponse {
     total: number;
     totalPages: number;
   };
-  featuredCategories: FeaturedCategory[];
 }

@@ -170,6 +170,33 @@ export const selectProductSpecifications = {
   },
 };
 
+type CategoryNode = {
+  id: string;
+  parentId: string | null;
+};
+
+async function getCategoryHierarchy(categoryId: string): Promise<string[]> {
+  const result: string[] = [];
+  let currentId: string | null = categoryId;
+
+  while (currentId) {
+    const category: CategoryNode | null = await prisma.categories.findUnique({
+      where: { id: currentId },
+      select: {
+        id: true,
+        parentId: true,
+      },
+    });
+
+    if (!category) break;
+
+    result.push(category.id);
+    currentId = category.parentId;
+  }
+
+  return result;
+}
+
 const buildProductWhere = (
   query: ListProductsQuery,
   onlyActive: boolean,
@@ -436,11 +463,45 @@ export const findBySlug = async (slug: string) => {
   });
 };
 
-export const findSpecificationsBySlug = (slug: string) =>
-  prisma.products.findUnique({
+export const findSpecificationsBySlug = async (slug: string) => {
+  const product = await prisma.products.findUnique({
     where: { slug },
-    select: selectProductSpecifications,
+    select: {
+      isActive: true,
+      categoryId: true,
+      productSpecifications: {
+        select: {
+          specificationId: true,
+          value: true,
+        },
+      },
+    },
   });
+
+  if (!product) return null;
+
+  const categoryIds = await getCategoryHierarchy(product.categoryId);
+
+  // console.log(categoryIds);
+
+  const categorySpecifications = await prisma.category_specifications.findMany({
+    where: {
+      categoryId: { in: categoryIds },
+    },
+    orderBy: [{ sortOrder: "asc" }],
+    include: {
+      specification: true,
+      category: {
+        select: { id: true },
+      },
+    },
+  });
+
+  return {
+    ...product,
+    categorySpecifications,
+  };
+};
 
 export const findRelatedProducts = async (productId: string, limit: number = 8) => {
   const product = await prisma.products.findUnique({
@@ -767,10 +828,28 @@ export const getProductVariantOptionsMap = async (productIds: string[]) => {
   return map;
 };
 
-/**
- * Helper: Get product IDs affected by active promotions on a date
- */
-const getProductIdsFromPromotions = async (date: Date): Promise<Set<string>> => {
+const getAllDescendantCategoryIds = async (categoryId: string): Promise<string[]> => {
+  const result = new Set<string>();
+
+  const traverse = async (id: string) => {
+    result.add(id);
+
+    const children = await prisma.categories.findMany({
+      where: { parentId: id },
+      select: { id: true },
+    });
+
+    for (const child of children) {
+      await traverse(child.id);
+    }
+  };
+
+  await traverse(categoryId);
+
+  return Array.from(result);
+};
+
+export const getProductIdsFromPromotions = async (date: Date): Promise<Set<string>> => {
   const productIds = new Set<string>();
 
   // Get active promotions on this date
@@ -797,21 +876,24 @@ const getProductIdsFromPromotions = async (date: Date): Promise<Set<string>> => 
         // Direct product target
         productIds.add(target.targetId);
       } else if (target.targetType === "CATEGORY" && target.targetId) {
-        // Get all products in category
+        const categoryIds = await getAllDescendantCategoryIds(target.targetId);
+
         const products = await prisma.products.findMany({
-          where: { categoryId: target.targetId, isActive: true },
+          where: {
+            categoryId: { in: categoryIds },
+            isActive: true,
+          },
           select: { id: true },
         });
+
         products.forEach((p) => productIds.add(p.id));
       } else if (target.targetType === "BRAND" && target.targetId) {
-        // Get all products in brand
         const products = await prisma.products.findMany({
           where: { brandId: target.targetId, isActive: true },
           select: { id: true },
         });
         products.forEach((p) => productIds.add(p.id));
       } else if (target.targetType === "ALL") {
-        // Get all active products
         const products = await prisma.products.findMany({
           where: { isActive: true },
           select: { id: true },
@@ -824,10 +906,6 @@ const getProductIdsFromPromotions = async (date: Date): Promise<Set<string>> => 
   return productIds;
 };
 
-/**
- * 1. Get products on sale by date (Flash Sale)
- * For Home: Hiển thị sản phẩm đang sale hôm nay
- */
 export const findProductsOnSaleByDate = async (
   date: Date,
   options: {
@@ -859,19 +937,38 @@ export const findProductsOnSaleByDate = async (
   });
 };
 
-/**
- * 2. Get categories that have products on sale
- * For Home: Container hiển thị categories có sản phẩm sale
- */
+export const getProductsForCategoryRanking = async (date: Date) => {
+  return prisma.products.findMany({
+    where: {
+      isActive: true,
+    },
+    select: {
+      id: true,
+      createdAt: true,
+      viewsCount: true,
+      category: {
+        select: {
+          id: true,
+          parent: { select: { id: true } },
+        },
+      },
+      variants: {
+        where: { isActive: true },
+        select: {
+          soldCount: true,
+        },
+      },
+    },
+  });
+};
+
 export const findCategoriesWithSaleProducts = async (date: Date) => {
-  // 1. Lấy productIds đang có promotion
   const productIds = await getProductIdsFromPromotions(date);
 
   if (productIds.size === 0) {
     return [];
   }
 
-  // 2. Lấy category + parent của các product đó
   const products = await prisma.products.findMany({
     where: { id: { in: Array.from(productIds) } },
     select: {
@@ -888,12 +985,12 @@ export const findCategoriesWithSaleProducts = async (date: Date) => {
     },
   });
 
-  // 3. Xác định category hiển thị (CHA nếu có)
+  // Xác định category hiển thị (CHA nếu có)
   const displayCategoryIds = Array.from(
     new Set(products.map((p) => p.category.parent?.id ?? p.category.id)),
   );
 
-  // 4. Lấy thông tin category CHA để render
+  // Lấy thông tin category CHA để render
   return prisma.categories.findMany({
     where: {
       id: { in: displayCategoryIds },
@@ -1099,10 +1196,6 @@ export const findProductsByPromotionId = async (promotionId: string, limit: numb
   };
 };
 
-/**
- * 6. Get sale products count by categories (for stats)
- * For Home: Đếm số sản phẩm sale theo từng category
- */
 export const getSaleProductsCountByCategories = async (date: Date) => {
   const productIds = await getProductIdsFromPromotions(date);
 
@@ -1137,10 +1230,32 @@ export const getSaleProductsCountByCategories = async (date: Date) => {
   return map;
 };
 
-/**
- * 7. Get best selling products (for Home)
- * For Home: Sản phẩm bán chạy
- */
+export const findFeaturedProducts = async (limit: number = 12) => {
+  return prisma.products.findMany({
+    where: {
+      isActive: true,
+    },
+    select: {
+      ...selectProductCard,
+      variants: {
+        where: {
+          isActive: true,
+          isDefault: true,
+        },
+        take: 1,
+        select: {
+          id: true,
+          price: true,
+        },
+      },
+    },
+    orderBy: {
+      viewsCount: "desc",
+    },
+    take: limit,
+  });
+};
+
 export const findBestSellingProducts = async (limit: number = 12) => {
   // Get products with highest sold count from variants
   const products = await prisma.products.findMany({
@@ -1170,6 +1285,38 @@ export const findBestSellingProducts = async (limit: number = 12) => {
 
   // Sort by total soldCount and take top N
   return productsWithSoldCount.sort((a, b) => b.totalSoldCount - a.totalSoldCount).slice(0, limit);
+};
+
+export const findProductsByIds = async (ids: string[]) => {
+  if (ids.length === 0) return [];
+
+  const products = await prisma.products.findMany({
+    where: {
+      id: { in: ids },
+      isActive: true,
+    },
+    select: {
+      ...selectProductCard,
+      variants: {
+        where: {
+          isActive: true,
+          isDefault: true,
+        },
+        take: 1,
+        select: {
+          id: true,
+          price: true,
+        },
+      },
+    },
+  });
+
+  // giữ đúng thứ tự user đã xem
+  const map = new Map(products.map((p) => [p.id, p]));
+
+  return ids
+    .map((id) => map.get(id))
+    .filter((p): p is (typeof products)[number] => p !== undefined);
 };
 
 /**

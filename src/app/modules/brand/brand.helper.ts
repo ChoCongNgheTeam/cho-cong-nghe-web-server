@@ -1,6 +1,6 @@
 import slugify from "slugify";
 import fs from "fs";
-import { uploadImage, deleteImage } from "@/services/cloudinary.service";
+import { uploadImage } from "@/services/cloudinary.service";
 
 export const generateBrandSlug = (name: string): string => {
   return slugify(name, {

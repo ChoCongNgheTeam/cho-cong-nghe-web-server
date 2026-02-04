@@ -1,9 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { brandService } from "./brand.service";
-import { CreateBrandInput, UpdateBrandInput } from "./brand.validation";
 import { parseMultipartData, uploadBrandImage, cleanupTempFiles } from "./brand.helper";
-
-// Public routes
 
 export const getActiveBrandsHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -47,8 +44,6 @@ export const getBrandBySlugHandler = async (req: Request, res: Response, next: N
     next(error);
   }
 };
-
-// Admin routes
 
 export const getAllBrandsHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {

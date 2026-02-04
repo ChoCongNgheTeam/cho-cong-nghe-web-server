@@ -41,7 +41,7 @@ export const transformBlogCard = (blog: any): BlogCard => {
     id: blog.id,
     title: blog.title,
     slug: blog.slug,
-    thumbnail: blog.thumbnail || undefined,
+    imageUrl: blog.imageUrl || undefined,
     excerpt: extractExcerpt(blog.content),
     viewCount: blog.viewCount,
     status: blog.status,

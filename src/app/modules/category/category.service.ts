@@ -6,14 +6,10 @@ import { generateUniqueSlug } from "@/utils/generate-unique-slug";
 import prisma from "@/config/db";
 import buildCategoryTree from "@/utils/build-category-tree";
 
-// === PUBLIC SERVICES ===
-
-// 1. Lấy root categories cho home
 export const getRootCategories = async () => {
   return categoryRepository.findRootCategories(true);
 };
 
-//  Lấy featured categories cho Home (orchestrator sẽ dùng)
 export const getFeaturedCategories = async (limit?: number) => {
   const categories = await categoryRepository.findFeaturedCategories(limit);
 
@@ -21,11 +17,8 @@ export const getFeaturedCategories = async (limit?: number) => {
     id: c.id,
     name: c.name,
     slug: c.slug,
-    description: c.description,
     imageUrl: c.imageUrl,
     position: c.position,
-    isFeatured: c.isFeatured,
-    productsCount: c._count.products,
   }));
 };
 

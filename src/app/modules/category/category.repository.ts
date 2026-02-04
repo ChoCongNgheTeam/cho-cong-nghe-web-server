@@ -6,14 +6,10 @@ const selectCategory = {
   name: true,
   slug: true,
   parentId: true,
-  description: true,
-  imagePath: true,
   imageUrl: true,
   position: true,
   isFeatured: true,
   isActive: true,
-  createdAt: true,
-  updatedAt: true,
 };
 
 type CreateCategoryData = Prisma.categoriesCreateInput;
@@ -59,16 +55,9 @@ export const findFeaturedCategories = async (limit?: number) => {
     where: {
       isFeatured: true,
       isActive: true,
-      // parentId: null,
     },
     select: {
       ...selectCategory,
-      _count: {
-        select: {
-          children: true,
-          products: true, // Đếm số products để hiển thị
-        },
-      },
     },
     orderBy: { position: "asc" },
     ...(limit && { take: limit }),

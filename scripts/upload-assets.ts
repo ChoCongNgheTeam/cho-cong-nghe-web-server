@@ -128,6 +128,21 @@ async function uploadAssets() {
     }),
   );
 
+  // -------- Blogs --------
+  const blogs = await prisma.blogs.findMany({
+    where: {
+      imagePath: { not: null },
+      imageUrl: null,
+    },
+  });
+
+  await uploadImages(blogs, (id, url) =>
+    prisma.blogs.update({
+      where: { id },
+      data: { imageUrl: url },
+    }),
+  );
+
   console.log("✅ All assets uploaded");
 }
 

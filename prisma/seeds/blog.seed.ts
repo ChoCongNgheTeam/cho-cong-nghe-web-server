@@ -32,7 +32,7 @@ export async function seedBlogs(prisma: PrismaClient) {
         update: {
           title: data.title,
           content: data.content,
-          thumbnail: data.thumbnail,
+          imagePath: data.imagePath,
           status: data.status as BlogStatus,
           publishedAt: data.publishedAt,
           authorId: author.id,
@@ -42,7 +42,7 @@ export async function seedBlogs(prisma: PrismaClient) {
           title: data.title,
           slug: finalSlug,
           content: data.content,
-          thumbnail: data.thumbnail,
+          imagePath: data.imagePath,
           status: data.status as BlogStatus,
           publishedAt: data.publishedAt,
           authorId: author.id,
