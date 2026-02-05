@@ -102,6 +102,12 @@ export const logoutHandler = async (req: Request, res: Response) => {
     sameSite: "strict",
   });
 
+  res.clearCookie("accessToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
+
   return res.json({ message: "Đăng xuất thành công" });
 };
 

@@ -1,0 +1,630 @@
+paths:
+  # ==================== PUBLIC ENDPOINTS ====================
+  /comments:
+    get:
+      summary: Lấy danh sách comment đã duyệt (Public)
+      tags: [Comments - Public]
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Số trang
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Số lượng item mỗi trang
+        - in: query
+          name: targetType
+          schema:
+            type: string
+            enum: [BLOG, PRODUCT, PAGE]
+          description: Loại đối tượng được comment
+        - in: query
+          name: targetId
+          schema:
+            type: string
+            format: uuid
+          description: ID của đối tượng được comment
+        - in: query
+          name: parentId
+          schema:
+            type: string
+          description: ID comment cha (dùng 'null' để lấy comment gốc)
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt]
+            default: createdAt
+          description: Sắp xếp theo trường
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Thứ tự sắp xếp
+      responses:
+        "200":
+          description: Lấy danh sách comment thành công (chỉ hiển thị đã duyệt)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CommentDetail"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  message:
+                    type: string
+              example:
+                total: 50
+                page: 1
+                limit: 20
+                message: "Lấy danh sách comment thành công"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+    post:
+      summary: Tạo comment mới (User)
+      tags: [Comments - Public]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentRequest"
+      responses:
+        "201":
+          description: Tạo comment thành công (chờ duyệt)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/CommentDetail"
+                  message:
+                    type: string
+              example:
+                message: "Tạo comment thành công. Comment sẽ hiển thị sau khi được duyệt."
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /comments/{id}/replies:
+    get:
+      summary: Lấy danh sách reply của một comment (Public)
+      tags: [Comments - Public]
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: ID comment cha
+      responses:
+        "200":
+          description: Lấy danh sách reply thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CommentDetail"
+                  total:
+                    type: integer
+                  message:
+                    type: string
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /comments/{id}:
+    delete:
+      summary: Xóa comment của chính mình (User)
+      tags: [Comments - Public]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: ID comment
+      responses:
+        "200":
+          description: Xóa comment thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "Xóa comment thành công"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  # ==================== ADMIN ENDPOINTS ====================
+  /comments/admin/all:
+    get:
+      summary: Lấy tất cả comment (Admin only)
+      tags: [Comments - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - in: query
+          name: targetType
+          schema:
+            type: string
+            enum: [BLOG, PRODUCT, PAGE]
+        - in: query
+          name: targetId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: isApproved
+          schema:
+            type: boolean
+          description: Lọc theo trạng thái duyệt
+        - in: query
+          name: parentId
+          schema:
+            type: string
+          description: ID comment cha (dùng 'null' để lấy comment gốc)
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt]
+            default: createdAt
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CommentDetail"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /comments/admin/{id}:
+    get:
+      summary: Lấy chi tiết comment (Admin)
+      tags: [Comments - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: ID comment
+      responses:
+        "200":
+          description: Lấy chi tiết comment thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/CommentDetail"
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+    patch:
+      summary: Cập nhật comment (Admin)
+      tags: [Comments - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCommentRequest"
+      responses:
+        "200":
+          description: Cập nhật comment thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/CommentDetail"
+                  message:
+                    type: string
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+    delete:
+      summary: Xóa comment (Admin)
+      tags: [Comments - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+      responses:
+        "200":
+          description: Xóa thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "Xóa comment thành công"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /comments/admin/{id}/approve:
+    patch:
+      summary: Duyệt / từ chối comment (Admin)
+      tags: [Comments - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveCommentRequest"
+      responses:
+        "200":
+          description: Cập nhật trạng thái comment thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/CommentDetail"
+                  message:
+                    type: string
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /comments/admin/bulk/approve:
+    patch:
+      summary: Duyệt / từ chối hàng loạt comment (Admin)
+      tags: [Comments - Admin]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkApproveCommentsRequest"
+      responses:
+        "200":
+          description: Cập nhật hàng loạt thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      updated:
+                        type: integer
+                        description: Số lượng comment đã cập nhật
+                  message:
+                    type: string
+              example:
+                data:
+                  updated: 15
+                message: "Cập nhật trạng thái 15 comment thành công"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+components:
+  schemas:
+    CommentDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        targetType:
+          type: string
+          enum: [BLOG, PRODUCT, PAGE]
+          description: Loại đối tượng được comment
+        targetId:
+          type: string
+          description: ID của đối tượng được comment
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID comment cha (null nếu là comment gốc)
+        isApproved:
+          type: boolean
+          description: Trạng thái duyệt comment
+        createdAt:
+          type: string
+          format: date-time
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            fullName:
+              type: string
+            avatar:
+              type: string
+              nullable: true
+        replies:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommentDetail"
+          description: Danh sách comment trả lời (nếu có)
+
+    CreateCommentRequest:
+      type: object
+      required:
+        - content
+        - targetType
+        - targetId
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Nội dung comment
+        targetType:
+          type: string
+          enum: [BLOG, PRODUCT, PAGE]
+          description: Loại đối tượng được comment
+        targetId:
+          type: string
+          format: uuid
+          description: ID của đối tượng được comment
+        parentId:
+          type: string
+          format: uuid
+          description: ID comment cha (để tạo reply)
+
+    UpdateCommentRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Nội dung comment mới
+        isApproved:
+          type: boolean
+          description: Trạng thái duyệt
+
+    ApproveCommentRequest:
+      type: object
+      required:
+        - isApproved
+      properties:
+        isApproved:
+          type: boolean
+          description: True để duyệt, False để từ chối
+
+    BulkApproveCommentsRequest:
+      type: object
+      required:
+        - commentIds
+        - isApproved
+      properties:
+        commentIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+          description: Danh sách ID comment cần cập nhật
+        isApproved:
+          type: boolean
+          description: True để duyệt, False để từ chối
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Nhập JWT token (không cần thêm 'Bearer ' ở đầu)"
+
+  responses:
+    UnauthorizedError:
+      description: Chưa xác thực hoặc token không hợp lệ
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+          example:
+            message: "Unauthorized"
+
+    ForbiddenError:
+      description: Không có quyền truy cập
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+          example:
+            message: "Forbidden"
+
+    NotFoundError:
+      description: Không tìm thấy tài nguyên
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+          example:
+            message: "Comment không tồn tại"
+
+    BadRequestError:
+      description: Dữ liệu không hợp lệ
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+          example:
+            message: "Validation error"
+
+    ServerError:
+      description: Lỗi máy chủ
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+          example:
+            message: "Internal server error"
