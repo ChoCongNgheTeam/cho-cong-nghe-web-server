@@ -22,7 +22,6 @@ export const validateCartItems = async (
       productVariant: {
         include: {
           product: true,
-          inventory: true,
         },
       },
     },
@@ -50,7 +49,7 @@ export const validateCartItems = async (
     if (!productVariant) {
       itemErrors.push("Product does not exist");
     } else {
-      const { product, inventory, isActive } = productVariant;
+      const { product, quantity: availableQuantity, isActive } = productVariant;
 
       // Check if variant is active
       if (!isActive) {
@@ -62,11 +61,7 @@ export const validateCartItems = async (
         itemErrors.push(`${product.name} is no longer available`);
       }
 
-      // Check inventory
-      const availableQuantity = inventory
-        ? inventory.quantity - inventory.reservedQuantity
-        : 0;
-
+      // Check stock quantity
       if (availableQuantity < quantity) {
         itemErrors.push(
           `${product.name} only has ${availableQuantity} items available (you requested ${quantity})`
@@ -394,7 +389,6 @@ export const createOrderFromCheckout = async (
         subtotalAmount: new Prisma.Decimal(subtotalAmount),
         shippingFee: new Prisma.Decimal(shippingFee),
         voucherDiscount: new Prisma.Decimal(voucherDiscount),
-        taxAmount: new Prisma.Decimal(taxAmount), // 🔥 NEW - Add tax to order
         totalAmount: new Prisma.Decimal(totalAmount),
         orderStatus: "PENDING",
         paymentStatus: "UNPAID",
@@ -419,33 +413,35 @@ export const createOrderFromCheckout = async (
       },
     });
 
-    // Step 2: 🔥 FIXED - Reserve inventory for each item
+    // Step 2: 🔥 FIXED - Reduce stock for each item
     for (const item of items) {
-      // Check if inventory exists
-      const inventory = await tx.inventory.findUnique({
-        where: { variantId: item.productVariantId }
+      // Get the current variant to check stock
+      const variant = await tx.products_variants.findUnique({
+        where: { id: item.productVariantId },
       });
 
-      if (!inventory) {
-        throw new BadRequestError(`Inventory not found for variant ${item.productVariantId}`);
+      if (!variant) {
+        throw new BadRequestError(`Product variant not found: ${item.productVariantId}`);
       }
 
-      // Check if we have enough available stock
-      const availableStock = inventory.quantity - inventory.reservedQuantity;
-      if (availableStock < item.quantity) {
+      // Check if we have enough stock
+      if (variant.quantity < item.quantity) {
         throw new BadRequestError(
-          `Not enough stock for ${item.productName}. Available: ${availableStock}, Requested: ${item.quantity}`
+          `Not enough stock for ${item.productName}. Available: ${variant.quantity}, Requested: ${item.quantity}`
         );
       }
 
-      // Reserve the quantity
-      await tx.inventory.update({
-        where: { variantId: item.productVariantId },
+      // Reduce quantity and increase soldCount
+      await tx.products_variants.update({
+        where: { id: item.productVariantId },
         data: {
-          reservedQuantity: {
-            increment: item.quantity
-          }
-        }
+          quantity: {
+            decrement: item.quantity,
+          },
+          soldCount: {
+            increment: item.quantity,
+          },
+        },
       });
     }
 
@@ -498,24 +494,27 @@ export const createOrderFromCheckout = async (
 };
 
 /**
- * 🔥 NEW - Function to release reserved inventory when order is cancelled
+ * 🔥 NEW - Function to release (restore) inventory when order is cancelled
  */
 export const releaseOrderInventory = async (orderId: string) => {
   return await prisma.$transaction(async (tx) => {
     // Get order items
     const orderItems = await tx.order_items.findMany({
-      where: { orderId }
+      where: { orderId },
     });
 
-    // Release inventory for each item
+    // Restore inventory for each item
     for (const item of orderItems) {
-      await tx.inventory.update({
-        where: { variantId: item.productVariantId },
+      await tx.products_variants.update({
+        where: { id: item.productVariantId },
         data: {
-          reservedQuantity: {
-            decrement: item.quantity
-          }
-        }
+          quantity: {
+            increment: item.quantity,
+          },
+          soldCount: {
+            decrement: item.quantity,
+          },
+        },
       });
     }
 
@@ -523,43 +522,24 @@ export const releaseOrderInventory = async (orderId: string) => {
     await tx.orders.update({
       where: { id: orderId },
       data: {
-        orderStatus: 'CANCELLED'
-      }
+        orderStatus: "CANCELLED",
+      },
     });
   });
 };
 
 /**
- * 🔥 NEW - Function to confirm order and convert reserved to actual stock reduction
+ * 🔥 NEW - Function to confirm order
+ * Note: Stock is already reduced during createOrderFromCheckout
  */
 export const confirmOrderAndReduceStock = async (orderId: string) => {
   return await prisma.$transaction(async (tx) => {
-    // Get order items
-    const orderItems = await tx.order_items.findMany({
-      where: { orderId }
-    });
-
-    // Reduce actual quantity and reserved quantity
-    for (const item of orderItems) {
-      await tx.inventory.update({
-        where: { variantId: item.productVariantId },
-        data: {
-          quantity: {
-            decrement: item.quantity
-          },
-          reservedQuantity: {
-            decrement: item.quantity
-          }
-        }
-      });
-    }
-
-    // Update order status
+    // Update order status to PROCESSING
     await tx.orders.update({
       where: { id: orderId },
       data: {
-        orderStatus: 'PROCESSING'
-      }
+        orderStatus: "PROCESSING",
+      },
     });
   });
 };

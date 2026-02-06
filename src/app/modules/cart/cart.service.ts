@@ -32,13 +32,14 @@ export const getCart = async (userId: string): Promise<CartSummary> => {
 export const validateCartItem = async (
   productVariantId: string,
   quantity: number
-) => {
+): Promise<any> => {
   const variant = await prisma.products_variants.findUnique({
     where: { id: productVariantId },
     select: {
       id: true,
       code: true,
       price: true,
+      quantity: true,
       isActive: true,
       product: {
         select: {
@@ -47,21 +48,20 @@ export const validateCartItem = async (
           slug: true,
           isActive: true,
           brand: { select: { name: true } },
+          img: { select: { imageUrl: true } },
         },
       },
-      images: { select: { imageUrl: true }, take: 1 },
       variantAttributes: {
         select: {
           attributeOption: {
             select: {
-              attribute: { select: { name: true } },
+              type: true,
               label: true,
               value: true,
             },
           },
         },
       },
-      inventory: { select: { quantity: true, reservedQuantity: true } },
     },
   });
 
@@ -72,16 +72,16 @@ export const validateCartItem = async (
     errors.push("Sản phẩm ngừng kinh doanh");
   }
 
-  const available =
-    (variant.inventory?.quantity || 0) - (variant.inventory?.reservedQuantity || 0);
+  const available = variant.quantity || 0;
 
   if (available < quantity) {
     errors.push(`Chỉ còn ${available} sản phẩm`);
   }
 
   // Tìm màu sắc
-  const colorAttr = variant.variantAttributes.find((attr) =>
-    ["color", "màu"].includes(attr.attributeOption.attribute.name.toLowerCase())
+  const colorAttr = variant.variantAttributes.find(
+    (attr: any) =>
+      ["color", "màu"].includes((attr.attributeOption.type || "").toLowerCase())
   );
 
   return {
@@ -136,7 +136,7 @@ export const validateLocalStorageCart = async (
         productSlug: check.variant.product.slug,
         brandName: check.variant.product.brand.name,
         variantCode: check.variant.code || undefined,
-        image: check.variant.images[0]?.imageUrl || undefined,
+        image: check.variant.product.img[0]?.imageUrl || undefined,
         color: check.colorAttr?.attributeOption.label,
         colorValue: check.colorAttr?.attributeOption.value,
         quantity: item.quantity,

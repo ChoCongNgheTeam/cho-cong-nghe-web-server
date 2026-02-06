@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { optionalAuthMiddleware } from "@/app/middlewares/auth.middleware"; // Hoặc authMiddleware bắt buộc cho các route write
+import { optionalAuthMiddleware, authMiddleware } from "@/app/middlewares/auth.middleware";
 import { validate } from "@/app/middlewares/validate.middleware";
 import * as c from "./cart.controller";
 import {
@@ -17,30 +17,41 @@ import {
 
 const router = Router();
 
-// Middleware auth (Tùy logic app, ở đây dùng optional để getCart handle cả 2 case)
-router.use(optionalAuthMiddleware);
+// 1. Rate Limiter: Áp dụng cho toàn bộ router (An toàn)
 router.use(generalCartLimiter);
 
-// --- Public / Guest Routes (Validation Only) ---
+// ==========================================
+// A. PUBLIC / GUEST ROUTES (Không bắt buộc Login)
+// ==========================================
 
-// 1. Validate 1 item (Guest dùng khi click Add to cart để check tồn kho)
+// 1. Validate Item:
+// Route này hoàn toàn không cần biết user là ai, chỉ check logic sản phẩm
+// Nên KHÔNG gắn optionalAuthMiddleware để tránh rủi ro 401
 router.post(
   "/validate-item",
   validate(validateItemSchema, "body"),
   c.validateItemHandler
 );
 
-// 2. Lấy Cart (User: DB, Guest: Validate list gửi lên từ body)
-// Note: Guest phải dùng POST thay vì GET vì cần gửi body items lớn
+// 2. Lấy Cart (Hybrid):
+// Cần optionalAuthMiddleware vì Controller có check: if (req.user) ...
+// Nếu middleware này lỗi, chỉ route này bị ảnh hưởng, không chết route validate
 router.post(
   "/get",
-  validate(validateLocalCartSchema, "body"), // Validate array input
+  optionalAuthMiddleware, // <--- Chỉ áp dụng riêng cho route này
+  validate(validateLocalCartSchema, "body"),
   c.getCartHandler
 );
 
-// --- Authenticated Routes (Write to DB) ---
+// ==========================================
+// B. AUTHENTICATED ROUTES (Bắt buộc Login)
+// ==========================================
 
-// 3. Sync localStorage -> DB (Gọi khi login)
+// Áp dụng authMiddleware cho TẤT CẢ các route bên dưới dòng này.
+// Cách này gọn hơn là phải gán vào từng dòng router.post/put/delete.
+router.use(authMiddleware); 
+
+// 3. Sync localStorage -> DB
 router.post(
   "/sync",
   validate(syncCartSchema, "body"),

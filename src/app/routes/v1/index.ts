@@ -20,6 +20,7 @@ import orderRoutes from "@/app/modules/order/order.route";
 import paymentRoutes from "@/app/modules/payment/payment.route";
 import promotionRoutes from "@/app/modules/promotion/promotion.route";
 import voucherRoutes from "@/app/modules/voucher/voucher.route";
+import checkoutRouter from "@/app/modules/checkout/checkout.route";
 
 // ===== Content =====
 import blogRouters from "@/app/modules/blog/blog.route";
@@ -53,6 +54,7 @@ router.use("/orders", orderRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/promotions", promotionRoutes);
 router.use("/vouchers", voucherRoutes);
+router.use("/checkout", checkoutRouter)
 
 // ===== Content =====
 router.use("/blogs", blogRouters);

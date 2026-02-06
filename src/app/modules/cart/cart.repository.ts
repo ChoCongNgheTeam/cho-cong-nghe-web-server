@@ -13,6 +13,7 @@ const selectCartItem = {
     select: {
       id: true,
       code: true,
+      quantity: true,
       product: {
         select: {
           id: true,
@@ -21,24 +22,21 @@ const selectCartItem = {
           brand: {
             select: { id: true, name: true },
           },
+          img: {
+            select: { id: true, imageUrl: true, altText: true },
+          },
         },
-      },
-      images: {
-        select: { id: true, imageUrl: true, altText: true },
       },
       variantAttributes: {
         select: {
           attributeOption: {
             select: {
-              attribute: { select: { name: true } },
+              type: true,
               label: true,
               value: true,
             },
           },
         },
-      },
-      inventory: {
-        select: { quantity: true, reservedQuantity: true },
       },
     },
   },
@@ -137,10 +135,7 @@ export const clearCart = async (userId: string) => {
 export const transformToCartResponse = (
   item: CartItemWithProduct
 ): CartResponse => {
-  const availableQuantity = item.productVariant.inventory
-    ? item.productVariant.inventory.quantity -
-      item.productVariant.inventory.reservedQuantity
-    : 0;
+  const availableQuantity = item.productVariant.quantity || 0;
 
   const unitPrice =
     typeof item.unitPrice === "number"
@@ -148,8 +143,8 @@ export const transformToCartResponse = (
       : Number(item.unitPrice.toString());
 
   const colorAttribute = item.productVariant.variantAttributes.find(
-    (attr) =>
-      ["color", "màu"].includes(attr.attributeOption.attribute.name.toLowerCase())
+    (attr: any) =>
+      ["color", "màu"].includes((attr.attributeOption.type || "").toLowerCase())
   );
 
   return {
@@ -160,7 +155,7 @@ export const transformToCartResponse = (
     productSlug: item.productVariant.product.slug,
     brandName: item.productVariant.product.brand.name,
     variantCode: item.productVariant.code || undefined,
-    image: item.productVariant.images[0]?.imageUrl ?? undefined,
+    image: item.productVariant.product.img[0]?.imageUrl ?? undefined,
     color: colorAttribute?.attributeOption.label,
     colorValue: colorAttribute?.attributeOption.value,
     quantity: item.quantity,

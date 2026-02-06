@@ -23,6 +23,7 @@ enum UserRole {
 enum AddressType {
   HOME
   OFFICE
+  OTHER
 }
 
 enum OrderStatus {
@@ -156,23 +157,56 @@ model refresh_tokens {
   @@index([userId])
 }
 
+model provinces {
+  id       String   @id @default(uuid()) @db.Uuid
+  code     String   @unique
+  name     String
+  fullName String
+  type     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  wards           wards[]
+  userAddresses   user_addresses[]
+}
+
+model wards {
+  id         String   @id @default(uuid()) @db.Uuid
+  code       String   @unique
+  name       String
+  fullName   String
+  type       String
+  provinceId String   @db.Uuid
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  province       provinces        @relation(fields: [provinceId], references: [id], onDelete: Cascade)
+  userAddresses  user_addresses[]
+
+  @@index([provinceId])
+}
+
 model user_addresses {
   id            String       @id @default(uuid()) @db.Uuid
   userId        String       @db.Uuid
   contactName   String
   phone         String
-  provinceId    Int
-  districtId    Int
-  wardId        Int?
+  provinceId    String       @db.Uuid
+  wardId        String       @db.Uuid
   detailAddress String
   type          AddressType?
   isDefault     Boolean      @default(false)
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
-  user users @relation(fields: [userId], references: [id])
+  user      users      @relation(fields: [userId], references: [id])
+  province  provinces  @relation(fields: [provinceId], references: [id])
+  ward      wards      @relation(fields: [wardId], references: [id])
 
   @@unique([userId, detailAddress, phone])
+  @@index([userId])
+  @@index([provinceId])
+  @@index([wardId])
 }
 
 model brands {

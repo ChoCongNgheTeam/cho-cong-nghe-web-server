@@ -66,20 +66,20 @@ router.use(authMiddleware);
  * Lấy tất cả địa chỉ của user
  * GET /api/v1/addresses
  */
-router.get("/addresses", c.getUserAddressesHandler);
+router.get("/", c.getUserAddressesHandler);
 
 /**
  * Lấy địa chỉ mặc định
  * GET /api/v1/addresses/default
  */
-router.get("/addresses/default", c.getDefaultAddressHandler);
+router.get("/default", c.getDefaultAddressHandler);
 
 /**
  * Lấy một địa chỉ
  * GET /api/v1/addresses/:addressId
  */
 router.get(
-  "/addresses/:addressId",
+  "/:addressId",
   validate(addressIdSchema, "params"),
   c.getAddressHandler
 );
@@ -89,7 +89,7 @@ router.get(
  * POST /api/v1/addresses
  */
 router.post(
-  "/addresses",
+  "/",
   validate(createAddressSchema, "body"),
   c.createAddressHandler
 );
@@ -99,7 +99,7 @@ router.post(
  * PATCH /api/v1/addresses/:addressId
  */
 router.patch(
-  "/addresses/:addressId",
+  "/:addressId",
   validate(addressIdSchema, "params"),
   validate(updateAddressSchema, "body"),
   c.updateAddressHandler
@@ -110,7 +110,7 @@ router.patch(
  * DELETE /api/v1/addresses/:addressId
  */
 router.delete(
-  "/addresses/:addressId",
+  "/:addressId",
   validate(addressIdSchema, "params"),
   c.deleteAddressHandler
 );
@@ -120,7 +120,7 @@ router.delete(
  * PUT /api/v1/addresses/:addressId/set-default
  */
 router.put(
-  "/addresses/:addressId/set-default",
+  "/:addressId/set-default",
   validate(addressIdSchema, "params"),
   c.setDefaultAddressHandler
 );

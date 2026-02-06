@@ -23,25 +23,20 @@ export interface CartItemWithProduct extends CartItem {
         id: string;
         name: string;
       };
+      img: Array<{
+        id: string;
+        imageUrl: string | null;
+        altText: string | null;
+      }>;
     };
-    images: Array<{
-      id: string;
-      imageUrl: string | null;
-      altText: string | null;
-    }>;
     variantAttributes: Array<{
       attributeOption: {
-        attribute: {
-          name: string;
-        };
+        type: string;
         label: string;
         value: string;
       };
     }>;
-    inventory: {
-      quantity: number;
-      reservedQuantity: number;
-    } | null;
+    quantity: number;
   };
 }
 

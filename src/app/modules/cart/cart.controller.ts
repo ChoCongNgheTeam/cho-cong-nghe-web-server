@@ -94,6 +94,10 @@ export const addToCartHandler = async (req: Request, res: Response) => {
  */
 export const validateItemHandler = async (req: Request, res: Response) => {
   try {
+    console.log("🔍 validateItemHandler called");
+    console.log("📍 req.user:", req.user);
+    console.log("📦 req.body:", req.body);
+    
     const { productVariantId, quantity } = req.body;
     
     // Gọi service check tồn kho và lấy thông tin variant
@@ -116,7 +120,7 @@ export const validateItemHandler = async (req: Request, res: Response) => {
       productSlug: check.variant.product.slug,
       brandName: check.variant.product.brand.name,
       variantCode: check.variant.code || undefined,
-      image: check.variant.images[0]?.imageUrl || undefined,
+      image: check.variant.product.img[0]?.imageUrl || undefined,
       
       // --- THÊM PHẦN NÀY ĐỂ HIỆN MÀU ---
       color: colorLabel,       // Ví dụ: "Xanh"
@@ -130,11 +134,13 @@ export const validateItemHandler = async (req: Request, res: Response) => {
       
     };
 
+    console.log("✅ validateItemHandler success");
     res.json({
       data: responseData,
       message: "Sản phẩm hợp lệ",
     });
   } catch (error: any) {
+    console.error("❌ validateItemHandler error:", error.message);
     res.status(404).json({ message: error.message });
   }
 };
