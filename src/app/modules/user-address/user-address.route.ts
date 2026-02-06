@@ -6,31 +6,80 @@ import {
   createAddressSchema,
   updateAddressSchema,
   addressIdSchema,
+  provinceIdSchema,
+  wardSearchSchema,
+  createProvinceSchema,
+  createWardSchema,
 } from "./user-address.validation";
 
 const router = Router();
 
-// Tất cả các route yêu cầu đăng nhập
+// ==================== LOCATION ROUTES (PUBLIC) ====================
+
+/**
+ * Lấy tất cả tỉnh/thành phố
+ * GET /api/v1/locations/provinces
+ */
+router.get("/locations/provinces", c.getProvincesHandler);
+
+/**
+ * Lấy wards theo province
+ * GET /api/v1/locations/:provinceId/wards?page=1&perPage=50&q=search
+ */
+router.get(
+  "/locations/:provinceId/wards",
+  validate(provinceIdSchema, "params"),
+  validate(wardSearchSchema, "query"),
+  c.getWardsByProvinceHandler
+);
+
+/**
+ * Tạo mới Tỉnh/Thành phố (Nên dành cho Admin)
+ * POST /api/v1/locations/provinces
+ */
+router.post(
+  "/locations/provinces",
+  // authMiddleware,             <--  đăng nhập
+  // authorize(['ADMIN']),       <--  chỉ Admin được tạo
+  validate(createProvinceSchema, "body"),
+  c.createProvinceHandler
+);
+
+/**
+ * Tạo mới Phường/Xã (Nên dành cho Admin)
+ * POST /api/v1/locations/wards
+ */
+router.post(
+  "/locations/wards",
+  // authMiddleware,             <--  đăng nhập
+  // authorize(['ADMIN']),       <--  chỉ Admin được tạo
+  validate(createWardSchema, "body"),
+  c.createWardHandler
+);
+
+// ==================== ADDRESS ROUTES (PROTECTED) ====================
+
+// Tất cả các route address yêu cầu đăng nhập
 router.use(authMiddleware);
 
 /**
  * Lấy tất cả địa chỉ của user
  * GET /api/v1/addresses
  */
-router.get("/", c.getUserAddressesHandler);
+router.get("/addresses", c.getUserAddressesHandler);
 
 /**
  * Lấy địa chỉ mặc định
  * GET /api/v1/addresses/default
  */
-router.get("/default", c.getDefaultAddressHandler);
+router.get("/addresses/default", c.getDefaultAddressHandler);
 
 /**
  * Lấy một địa chỉ
  * GET /api/v1/addresses/:addressId
  */
 router.get(
-  "/:addressId",
+  "/addresses/:addressId",
   validate(addressIdSchema, "params"),
   c.getAddressHandler
 );
@@ -40,7 +89,7 @@ router.get(
  * POST /api/v1/addresses
  */
 router.post(
-  "/",
+  "/addresses",
   validate(createAddressSchema, "body"),
   c.createAddressHandler
 );
@@ -50,7 +99,7 @@ router.post(
  * PATCH /api/v1/addresses/:addressId
  */
 router.patch(
-  "/:addressId",
+  "/addresses/:addressId",
   validate(addressIdSchema, "params"),
   validate(updateAddressSchema, "body"),
   c.updateAddressHandler
@@ -61,7 +110,7 @@ router.patch(
  * DELETE /api/v1/addresses/:addressId
  */
 router.delete(
-  "/:addressId",
+  "/addresses/:addressId",
   validate(addressIdSchema, "params"),
   c.deleteAddressHandler
 );
@@ -71,7 +120,7 @@ router.delete(
  * PUT /api/v1/addresses/:addressId/set-default
  */
 router.put(
-  "/:addressId/set-default",
+  "/addresses/:addressId/set-default",
   validate(addressIdSchema, "params"),
   c.setDefaultAddressHandler
 );

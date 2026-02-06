@@ -1,40 +1,61 @@
 import { Router } from "express";
-import { authMiddleware } from "@/app/middlewares/auth.middleware";
+import { optionalAuthMiddleware } from "@/app/middlewares/auth.middleware"; // Hoặc authMiddleware bắt buộc cho các route write
 import { validate } from "@/app/middlewares/validate.middleware";
 import * as c from "./cart.controller";
 import {
   addToCartSchema,
   updateCartItemSchema,
   cartItemParamsSchema,
+  validateItemSchema,
+  syncCartSchema,
+  validateLocalCartSchema,
 } from "./cart.validation";
+import {
+  addToCartLimiter,
+  generalCartLimiter,
+} from "./cart.rate-limit";
 
 const router = Router();
 
-// Tất cả các route trong Cart đều yêu cầu đăng nhập
-router.use(authMiddleware);
+// Middleware auth (Tùy logic app, ở đây dùng optional để getCart handle cả 2 case)
+router.use(optionalAuthMiddleware);
+router.use(generalCartLimiter);
 
-/**
- * Lấy giỏ hàng của user hiện tại
- * GET /api/v1/cart
- */
-router.get("/", c.getCartHandler);
+// --- Public / Guest Routes (Validation Only) ---
 
-/**
- * Thêm sản phẩm vào giỏ hàng
- * POST /api/v1/cart
- */
-router.post("/", validate(addToCartSchema, "body"), c.addToCartHandler);
+// 1. Validate 1 item (Guest dùng khi click Add to cart để check tồn kho)
+router.post(
+  "/validate-item",
+  validate(validateItemSchema, "body"),
+  c.validateItemHandler
+);
 
-/**
- * Xác nhận giỏ hàng trước khi checkout
- * POST /api/v1/cart/validate
- */
-router.post("/validate", c.validateCartHandler);
+// 2. Lấy Cart (User: DB, Guest: Validate list gửi lên từ body)
+// Note: Guest phải dùng POST thay vì GET vì cần gửi body items lớn
+router.post(
+  "/get",
+  validate(validateLocalCartSchema, "body"), // Validate array input
+  c.getCartHandler
+);
 
-/**
- * Cập nhật số lượng sản phẩm trong giỏ hàng
- * PUT /api/v1/cart/:cartItemId
- */
+// --- Authenticated Routes (Write to DB) ---
+
+// 3. Sync localStorage -> DB (Gọi khi login)
+router.post(
+  "/sync",
+  validate(syncCartSchema, "body"),
+  c.syncCartHandler
+);
+
+// 4. Thêm item vào DB
+router.post(
+  "/",
+  addToCartLimiter,
+  validate(addToCartSchema, "body"),
+  c.addToCartHandler
+);
+
+// 5. Update item
 router.put(
   "/:cartItemId",
   validate(cartItemParamsSchema, "params"),
@@ -42,20 +63,14 @@ router.put(
   c.updateCartItemHandler
 );
 
-/**
- * Xóa sản phẩm khỏi giỏ hàng
- * DELETE /api/v1/cart/:cartItemId
- */
+// 6. Delete item
 router.delete(
   "/:cartItemId",
   validate(cartItemParamsSchema, "params"),
   c.removeFromCartHandler
 );
 
-/**
- * Xóa toàn bộ giỏ hàng
- * DELETE /api/v1/cart
- */
+// 7. Clear all
 router.delete("/", c.clearCartHandler);
 
 export default router;

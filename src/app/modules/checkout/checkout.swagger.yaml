@@ -1,0 +1,239 @@
+openapi: 3.0.0
+info:
+  title: Checkout API
+  version: 1.0.0
+  description: API quản lý quy trình thanh toán, giỏ hàng và tạo đơn hàng.
+
+tags:
+  - name: Checkout
+    description: Các endpoint xử lý thanh toán và đơn hàng
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # Schema cho input đầu vào (Request Body)
+    CheckoutInput:
+      type: object
+      required:
+        - paymentMethodId
+        - shippingAddressId
+      properties:
+        paymentMethodId:
+          type: string
+          format: uuid
+          description: ID của phương thức thanh toán
+          example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        shippingAddressId:
+          type: string
+          format: uuid
+          description: ID của địa chỉ giao hàng
+          example: "b1fdda88-8d1c-5ff9-cc7e-7cc8ce491b22"
+        voucherId:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID của voucher (nếu có)
+          example: "c2geeb77-7e2d-6aa0-dd8f-8dd0df502c33"
+
+    # Schema chi tiết từng món hàng
+    CheckoutItem:
+      type: object
+      properties:
+        productVariantId:
+          type: string
+          format: uuid
+        productName:
+          type: string
+        variantCode:
+          type: string
+          nullable: true
+        quantity:
+          type: integer
+          minimum: 1
+        unitPrice:
+          type: number
+        subtotal:
+          type: number
+
+    # Schema tổng hợp thông tin thanh toán (bao gồm Tax)
+    CheckoutSummary:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckoutItem'
+        subtotalAmount:
+          type: number
+          description: Tổng tiền hàng trước thuế
+        shippingFee:
+          type: number
+          description: Phí vận chuyển
+        voucherDiscount:
+          type: number
+          description: Số tiền giảm giá
+        taxAmount:
+          type: number
+          description: Thuế VAT (10%)
+        totalAmount:
+          type: number
+          description: Tổng thanh toán cuối cùng
+
+    # Schema phản hồi khi tạo đơn hàng thành công
+    OrderResponse:
+      type: object
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        orderDate:
+          type: string
+          format: date-time
+        summary:
+          $ref: '#/components/schemas/CheckoutSummary'
+        orderStatus:
+          type: string
+          enum: [PENDING, PROCESSING, COMPLETED, CANCELLED]
+        paymentStatus:
+          type: string
+          enum: [UNPAID, PAID, REFUNDED]
+
+    # Schema lỗi chuẩn
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Lỗi xử lý yêu cầu"
+
+paths:
+  /checkout/validate:
+    get:
+      summary: Validate giỏ hàng hiện tại
+      description: Kiểm tra tồn kho, trạng thái sản phẩm trong giỏ hàng trước khi cho phép checkout.
+      tags: [Checkout]
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Kết quả validate
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      isValid:
+                        type: boolean
+                      totalItems:
+                        type: integer
+                      errors:
+                        type: array
+                        items:
+                          type: string
+                  message:
+                    type: string
+        401:
+          description: Chưa đăng nhập
+
+  /checkout/preview:
+    get:
+      summary: Xem trước chi phí checkout
+      description: Tính toán tổng tiền, phí ship, thuế và giảm giá mà KHÔNG tạo đơn hàng.
+      tags: [Checkout]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: paymentMethodId
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: ID phương thức thanh toán để tính phí (nếu có)
+        - in: query
+          name: shippingAddressId
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: ID địa chỉ để tính phí ship
+        - in: query
+          name: voucherId
+          schema:
+            type: string
+            format: uuid
+          required: false
+          description: ID voucher để tính giảm giá
+      responses:
+        200:
+          description: Thông tin chi tiết chi phí
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/CheckoutSummary'
+                  message:
+                    type: string
+        400:
+          description: Thiếu thông tin query params
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        404:
+          description: Không tìm thấy địa chỉ hoặc phương thức thanh toán
+
+  /checkout:
+    post:
+      summary: Tạo đơn hàng (Checkout)
+      description: Thực hiện trừ tồn kho, tính thuế, áp dụng voucher và tạo đơn hàng chính thức.
+      tags: [Checkout]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutInput'
+      responses:
+        201:
+          description: Tạo đơn hàng thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/OrderResponse'
+                  message:
+                    type: string
+        400:
+          description: Lỗi validation (Hết hàng, Voucher lỗi...)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        500:
+          description: Lỗi server
