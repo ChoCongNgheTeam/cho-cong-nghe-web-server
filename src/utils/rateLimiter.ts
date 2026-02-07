@@ -40,3 +40,28 @@ export const forgotPasswordLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 3,
 });
+
+export const getCartLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+});
+
+export const addToCartLimiter = rateLimit({
+  windowMs: 30 * 1000,
+  max: 10,
+});
+
+export const updateCartLimiter = rateLimit({
+  windowMs: 30 * 1000,
+  max: 20,
+});
+
+export const removeCartLimiter = rateLimit({
+  windowMs: 30 * 1000,
+  max: 15,
+});
+
+export const generalCartLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 50,
+});
