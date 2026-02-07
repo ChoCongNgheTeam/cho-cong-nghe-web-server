@@ -2,16 +2,35 @@ openapi: 3.0.0
 info:
   title: Cart API
   version: 1.0.0
-  description: API quản lý giỏ hàng
+  description: |
+    API quản lý giỏ hàng cho cả người dùng đã đăng nhập (DB) và khách (localStorage).
+    - User: Lưu trữ trực tiếp trong Database.
+    - Guest: Lưu trữ tại localStorage phía FE, gửi lên BE để validate giá và tồn kho.
+
+tags:
+  - name: Cart
+    description: Các thao tác với giỏ hàng và quản lý session
 
 paths:
-  /cart:
-    get:
-      summary: Lấy giỏ hàng của user hiện tại
+  /cart/get:
+    post:
+      summary: Lấy thông tin giỏ hàng (Hỗ trợ cả Guest và User)
+      description: |
+        - Nếu có Token: Lấy từ DB.
+        - Nếu là Guest: Gửi danh sách items từ localStorage lên body để BE validate thông tin mới nhất.
+        - Rate limit: 30 requests/phút.
       tags:
         - Cart
-      security:
-        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/LocalStorageItem"
       responses:
         "200":
           description: Lấy giỏ hàng thành công
@@ -21,41 +40,18 @@ paths:
                 type: object
                 properties:
                   data:
-                    type: object
-                    properties:
-                      items:
-                        type: array
-                        items:
-                          $ref: "#/components/schemas/CartItem"
-                      totalItems:
-                        type: integer
-                        example: 3
-                      totalQuantity:
-                        type: integer
-                        example: 5
-                      subtotal:
-                        type: number
-                        format: float
-                        example: 1500000
-                  message:
-                    type: string
-                    example: Lấy giỏ hàng thành công
-        "401":
-          description: Chưa đăng nhập
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
+                    oneOf:
+                      - $ref: "#/components/schemas/CartSummary"
+                      - $ref: "#/components/schemas/ValidatedLocalStorageCart"
                   message:
                     type: string
 
+  /cart/validate-item:
     post:
-      summary: Thêm sản phẩm vào giỏ hàng
+      summary: Kiểm tra 1 sản phẩm trước khi thêm vào localStorage (Guest)
+      description: Check tồn kho, giá, màu sắc của 1 variant.
       tags:
         - Cart
-      security:
-        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -69,256 +65,184 @@ paths:
                 productVariantId:
                   type: string
                   format: uuid
-                  example: "550e8400-e29b-41d4-a716-446655440000"
-                  description: ID của variant sản phẩm
                 quantity:
                   type: integer
                   minimum: 1
-                  example: 2
-                  description: Số lượng muốn thêm
-      responses:
-        "201":
-          description: Thêm sản phẩm vào giỏ hàng thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    $ref: "#/components/schemas/CartItem"
-                  message:
-                    type: string
-        "400":
-          description: Dữ liệu không hợp lệ hoặc sản phẩm không đủ tồn kho
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "401":
-          description: Chưa đăng nhập
-        "404":
-          description: Sản phẩm không tồn tại
-
-    delete:
-      summary: Xóa toàn bộ giỏ hàng (DELETE /cart/clear-all)
-      tags:
-        - Cart
-      security:
-        - bearerAuth: []
       responses:
         "200":
-          description: Giỏ hàng đã được làm trống
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      message:
-                        type: string
-                  message:
-                    type: string
-        "401":
-          description: Chưa đăng nhập
+          description: Sản phẩm hợp lệ
+        "400":
+          description: Hết hàng hoặc sản phẩm ngừng kinh doanh
 
-  /cart/{cartItemId}:
-    put:
-      summary: Cập nhật số lượng sản phẩm trong giỏ hàng
+  /cart/sync:
+    post:
+      summary: Đồng bộ giỏ hàng từ localStorage vào DB (Khi Login)
       tags:
         - Cart
       security:
         - bearerAuth: []
-      parameters:
-        - in: path
-          name: cartItemId
-          required: true
-          schema:
-            type: string
-            format: uuid
-          description: ID của item trong giỏ hàng
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - quantity
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/LocalStorageItem"
+      responses:
+        "200":
+          description: Đồng bộ thành công
+
+  /cart:
+    post:
+      summary: Thêm sản phẩm vào DB (Chỉ cho User)
+      description: "Rate limit: 10 requests/phút."
+      tags:
+        - Cart
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddToCartInput"
+      responses:
+        "201":
+          description: Thêm thành công
+        "401":
+          description: Chưa đăng nhập
+
+    delete:
+      summary: Xóa sạch giỏ hàng (Chỉ cho User)
+      tags:
+        - Cart
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Đã làm trống giỏ hàng
+
+  /cart/{cartItemId}:
+    parameters:
+      - in: path
+        name: cartItemId
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Cập nhật số lượng item trong DB
+      tags:
+        - Cart
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
               properties:
                 quantity:
                   type: integer
                   minimum: 1
-                  example: 3
-                  description: Số lượng mới
       responses:
         "200":
-          description: Cập nhật giỏ hàng thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    $ref: "#/components/schemas/CartItem"
-                  message:
-                    type: string
-        "400":
-          description: Dữ liệu không hợp lệ hoặc sản phẩm không đủ tồn kho
-        "401":
-          description: Chưa đăng nhập
-        "403":
-          description: Không có quyền cập nhật sản phẩm này
-        "404":
-          description: Sản phẩm không tồn tại trong giỏ hàng
+          description: Cập nhật thành công
 
     delete:
-      summary: Xóa sản phẩm khỏi giỏ hàng
+      summary: Xóa 1 sản phẩm khỏi DB
       tags:
         - Cart
       security:
         - bearerAuth: []
-      parameters:
-        - in: path
-          name: cartItemId
-          required: true
-          schema:
-            type: string
-            format: uuid
-          description: ID của item trong giỏ hàng
       responses:
         "200":
-          description: Xóa sản phẩm thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      message:
-                        type: string
-                  message:
-                    type: string
-        "401":
-          description: Chưa đăng nhập
-        "403":
-          description: Không có quyền xóa sản phẩm này
-        "404":
-          description: Sản phẩm không tồn tại
-
-  /cart/validate:
-    post:
-      summary: Xác nhận giỏ hàng trước khi checkout
-      tags:
-        - Cart
-      security:
-        - bearerAuth: []
-      description: Kiểm tra xem tất cả sản phẩm trong giỏ hàng còn tồn kho không
-      responses:
-        "200":
-          description: Giỏ hàng hợp lệ
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      isValid:
-                        type: boolean
-                      items:
-                        type: array
-                        items:
-                          $ref: "#/components/schemas/CartItem"
-                  message:
-                    type: string
-        "400":
-          description: Giỏ hàng trống hoặc có sản phẩm không đủ tồn kho
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "401":
-          description: Chưa đăng nhập
+          description: Xóa thành công
 
 components:
-  schemas:
-    CartItem:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-          description: ID của item trong giỏ hàng
-        productVariantId:
-          type: string
-          format: uuid
-          description: ID của variant sản phẩm
-        productId:
-          type: string
-          format: uuid
-          description: ID của sản phẩm
-        productName:
-          type: string
-          example: "iPhone 15 Pro Max"
-          description: Tên sản phẩm
-        productSlug:
-          type: string
-          example: "iphone-15-pro-max"
-          description: Slug của sản phẩm
-        brandName:
-          type: string
-          example: "Apple"
-          description: Tên thương hiệu
-        variantCode:
-          type: string
-          example: "SKU-001"
-          description: Mã variant (SKU)
-        image:
-          type: string
-          format: uri
-          example: "https://example.com/image.jpg"
-          description: URL ảnh sản phẩm
-        quantity:
-          type: integer
-          example: 2
-          description: Số lượng trong giỏ hàng
-        unitPrice:
-          type: number
-          format: float
-          example: 1000000
-          description: Giá đơn vị
-        totalPrice:
-          type: number
-          format: float
-          example: 2000000
-          description: Tổng giá (quantity * unitPrice)
-        availableQuantity:
-          type: integer
-          example: 10
-          description: Số lượng còn trong kho
-        createdAt:
-          type: string
-          format: date-time
-          description: Thời gian thêm vào giỏ hàng
-        updatedAt:
-          type: string
-          format: date-time
-          description: Thời gian cập nhật lần cuối
-
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: "Nhập JWT token (không cần thêm 'Bearer ' ở đầu)"
+
+  schemas:
+    AddToCartInput:
+      type: object
+      required:
+        - productVariantId
+        - quantity
+      properties:
+        productVariantId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+
+    LocalStorageItem:
+      type: object
+      properties:
+        productVariantId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+        # Các field khác FE có thể gửi nhưng BE chủ yếu dùng 2 field trên
+
+    CartItemResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        productVariantId: { type: string, format: uuid }
+        productName: { type: string }
+        image: { type: string }
+        color: { type: string }
+        colorValue: { type: string }
+        quantity: { type: integer }
+        unitPrice: { type: number }
+        totalPrice: { type: number }
+        availableQuantity: { type: integer }
+
+    CartSummary:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CartItemResponse"
+        totalItems: { type: integer }
+        subtotal: { type: number }
+
+    ValidatedLocalStorageCart:
+      type: object
+      properties:
+        validItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/CartItemResponse"
+        invalidItems:
+          type: array
+          items:
+            type: object
+            properties:
+              productVariantId: { type: string }
+              reason: { type: string }
+        hasErrors: { type: boolean }
+
+  responses:
+    ServerError:
+      description: Lỗi hệ thống
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message: { type: string, example: Lỗi server }

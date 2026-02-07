@@ -4,7 +4,16 @@ import { verifyAccessToken } from "src/services/token.service";
 
 export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const accessToken = req.cookies?.accessToken;
+    // Lấy token từ cookie hoặc Authorization header
+    let accessToken = req.cookies?.accessToken;
+
+    // Nếu không có trong cookie, thử lấy từ Authorization header (Bearer scheme)
+    if (!accessToken) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith("Bearer ")) {
+        accessToken = authHeader.substring(7); // Lấy phần sau "Bearer "
+      }
+    }
 
     if (!accessToken) {
       return res.status(401).json({ message: "Chưa đăng nhập" });
@@ -37,7 +46,15 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
 };
 
 export const optionalAuthMiddleware = async (req: Request, _res: Response, next: NextFunction) => {
-  const accessToken = req.cookies?.accessToken;
+  // Lấy token từ cookie hoặc Authorization header
+  let accessToken = req.cookies?.accessToken;
+
+  if (!accessToken) {
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      accessToken = authHeader.substring(7);
+    }
+  }
 
   if (!accessToken) return next();
 

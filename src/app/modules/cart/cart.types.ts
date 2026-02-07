@@ -1,5 +1,6 @@
 import { Decimal } from "@prisma/client/runtime/library";
 
+// Database cart item (Chỉ còn userId)
 export interface CartItem {
   id: string;
   userId: string;
@@ -22,19 +23,24 @@ export interface CartItemWithProduct extends CartItem {
         id: string;
         name: string;
       };
+      img: Array<{
+        id: string;
+        imageUrl: string | null;
+        altText: string | null;
+      }>;
     };
-    images: Array<{
-      id: string;
-      imageUrl: string;
-      altText: string | null;
+    variantAttributes: Array<{
+      attributeOption: {
+        type: string;
+        label: string;
+        value: string;
+      };
     }>;
-    inventory: {
-      quantity: number;
-      reservedQuantity: number;
-    } | null;
+    quantity: number;
   };
 }
 
+// API response
 export interface CartResponse {
   id: string;
   productVariantId: string;
@@ -44,6 +50,8 @@ export interface CartResponse {
   brandName: string;
   variantCode?: string;
   image?: string;
+  color?: string;
+  colorValue?: string;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
@@ -59,6 +67,28 @@ export interface CartSummary {
   subtotal: number;
 }
 
+// LocalStorage & Sync types
+export interface ValidatedLocalStorageCart {
+  validItems: CartResponse[];
+  invalidItems?: Array<{
+    productVariantId: string;
+    productName: string;
+    reason: string;
+  }>;
+  totalItems: number;
+  totalQuantity: number;
+  subtotal: number;
+  hasErrors: boolean;
+}
+
+export interface LocalStorageCartItem {
+  productVariantId: string;
+  quantity: number;
+  addedAt?: number;
+  // Các field khác (name, price...) FE tự lưu để hiển thị nhanh, BE chỉ cần ID và Qty để validate
+}
+
+// Input types
 export type AddToCartInput = {
   productVariantId: string;
   quantity: number;
@@ -66,4 +96,13 @@ export type AddToCartInput = {
 
 export type UpdateCartItemInput = {
   quantity: number;
+};
+
+export type ValidateItemInput = {
+  productVariantId: string;
+  quantity: number;
+};
+
+export type SyncCartInput = {
+  items: LocalStorageCartItem[];
 };

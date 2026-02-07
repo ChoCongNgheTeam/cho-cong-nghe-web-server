@@ -6,11 +6,60 @@ import {
   createAddressSchema,
   updateAddressSchema,
   addressIdSchema,
+  provinceIdSchema,
+  wardSearchSchema,
+  createProvinceSchema,
+  createWardSchema,
 } from "./user-address.validation";
 
 const router = Router();
 
-// Tất cả các route yêu cầu đăng nhập
+// ==================== LOCATION ROUTES (PUBLIC) ====================
+
+/**
+ * Lấy tất cả tỉnh/thành phố
+ * GET /api/v1/locations/provinces
+ */
+router.get("/locations/provinces", c.getProvincesHandler);
+
+/**
+ * Lấy wards theo province
+ * GET /api/v1/locations/:provinceId/wards?page=1&perPage=50&q=search
+ */
+router.get(
+  "/locations/:provinceId/wards",
+  validate(provinceIdSchema, "params"),
+  validate(wardSearchSchema, "query"),
+  c.getWardsByProvinceHandler
+);
+
+/**
+ * Tạo mới Tỉnh/Thành phố (Nên dành cho Admin)
+ * POST /api/v1/locations/provinces
+ */
+router.post(
+  "/locations/provinces",
+  // authMiddleware,             <--  đăng nhập
+  // authorize(['ADMIN']),       <--  chỉ Admin được tạo
+  validate(createProvinceSchema, "body"),
+  c.createProvinceHandler
+);
+
+/**
+ * Tạo mới Phường/Xã (Nên dành cho Admin)
+ * POST /api/v1/locations/wards
+ */
+router.post(
+  "/locations/wards",
+  // authMiddleware,             <--  đăng nhập
+  // authorize(['ADMIN']),       <--  chỉ Admin được tạo
+  validate(createWardSchema, "body"),
+  c.createWardHandler
+);
+
+// ==================== ADDRESS ROUTES (PROTECTED) ====================
+
+// Tất cả các route address yêu cầu đăng nhập
 router.use(authMiddleware);
 
 /**
