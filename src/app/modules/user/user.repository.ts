@@ -4,6 +4,7 @@ import prisma from "src/config/db";
 const selectUserWithoutPassword = {
   id: true,
   userName: true,
+  dateOfBirth: true,
   email: true,
   fullName: true,
   phone: true,

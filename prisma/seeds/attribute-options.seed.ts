@@ -1,49 +1,67 @@
 import { PrismaClient } from "@prisma/client";
 
-const attributeOptionsData = [
-  // COLOR
-  { type: "color", value: "black", label: "Đen" },
-  { type: "color", value: "white", label: "Trắng" },
-  { type: "color", value: "red", label: "Đỏ" },
-  { type: "color", value: "pink", label: "Hồng" },
-  { type: "color", value: "blue", label: "Xanh dương" },
-  { type: "color", value: "green", label: "Xanh lá" },
-  { type: "color", value: "alpine-green", label: "Xanh rêu" },
-  { type: "color", value: "gray", label: "Xám" },
+const attributeOptionsData = {
+  color: [
+    { value: "black", label: "Đen" },
+    { value: "white", label: "Trắng" },
+    { value: "red", label: "Đỏ" },
+    { value: "pink", label: "Hồng" },
+    { value: "blue", label: "Xanh dương" },
+    { value: "green", label: "Xanh lá" },
+    { value: "alpine-green", label: "Xanh rêu" },
+    { value: "gray", label: "Xám" },
+  ],
+  storage: [
+    { value: "64gb", label: "64GB" },
+    { value: "128gb", label: "128GB" },
+    { value: "256gb", label: "256GB" },
+    { value: "512gb", label: "512GB" },
+    { value: "1tb", label: "1TB" },
+  ],
+  size: [
+    { value: "43-inch", label: "43 inch" },
+    { value: "50-inch", label: "50 inch" },
+    { value: "55-inch", label: "55 inch" },
+    { value: "65-inch", label: "65 inch" },
+    { value: "75-inch", label: "75 inch" },
+    { value: "85-inch", label: "85 inch" },
+  ],
+};
 
-  // STORAGE
-  { type: "storage", value: "64gb", label: "64GB" },
-  { type: "storage", value: "128gb", label: "128GB" },
-  { type: "storage", value: "256gb", label: "256GB" },
-  { type: "storage", value: "512gb", label: "512GB" },
-  { type: "storage", value: "1tb", label: "1TB" },
+export async function seedAttributesAndOptions(prisma: PrismaClient) {
+  console.log("🌱 Seeding attributes & options...");
 
-  // SCREEN SIZE (TV)
-  { type: "size", value: "43-inch", label: "43 inch" },
-  { type: "size", value: "50-inch", label: "50 inch" },
-  { type: "size", value: "55-inch", label: "55 inch" },
-  { type: "size", value: "65-inch", label: "65 inch" },
-  { type: "size", value: "75-inch", label: "75 inch" },
-  { type: "size", value: "85-inch", label: "85 inch" },
-];
-
-export async function seedAttributeOptions(prisma: PrismaClient) {
-  console.log("🌱 Seeding attribute options...");
-
-  for (const option of attributeOptionsData) {
-    await prisma.attributes_options.upsert({
-      where: {
-        type_value: {
-          type: option.type,
-          value: option.value,
-        },
+  for (const [code, options] of Object.entries(attributeOptionsData)) {
+    // 1upsert attribute
+    const attribute = await prisma.attributes.upsert({
+      where: { code },
+      update: {},
+      create: {
+        code,
+        name: code === "color" ? "Màu sắc" : code === "storage" ? "Bộ nhớ" : "Kích thước",
       },
-      update: {
-        label: option.label,
-      },
-      create: option,
     });
+
+    //  upsert options
+    for (const opt of options) {
+      await prisma.attributes_options.upsert({
+        where: {
+          attributeId_value: {
+            attributeId: attribute.id,
+            value: opt.value,
+          },
+        },
+        update: {
+          label: opt.label,
+        },
+        create: {
+          attributeId: attribute.id,
+          value: opt.value,
+          label: opt.label,
+        },
+      });
+    }
   }
 
-  console.log(`Seeded ${attributeOptionsData.length} attribute options`);
+  console.log(" Seeded attributes & options");
 }

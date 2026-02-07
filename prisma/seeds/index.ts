@@ -15,3 +15,4 @@ export * from "./promotion.seed";
 export * from "./blog.seed";
 export * from "./comment.seed";
 export * from "./image-media.seed";
+export * from "./category-variant-attribute.seed";

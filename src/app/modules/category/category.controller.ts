@@ -1,7 +1,9 @@
 import { Request, Response } from "express";
 import * as categoryService from "./category.service";
 
+// =====================
 // === PUBLIC CONTROLLERS ===
+// =====================
 
 export const getRootCategoriesHandler = async (req: Request, res: Response) => {
   try {
@@ -56,7 +58,9 @@ export const getCategoryBySlugHandler = async (req: Request, res: Response) => {
   }
 };
 
+// =====================
 // === ADMIN CONTROLLERS ===
+// =====================
 
 export const getAllCategoriesHandler = async (req: Request, res: Response) => {
   try {
@@ -138,7 +142,6 @@ export const deleteCategoryHandler = async (req: Request, res: Response) => {
   }
 };
 
-// Reorder category
 export const reorderCategoryHandler = async (req: Request, res: Response) => {
   try {
     const result = await categoryService.reorderCategory(req.body.categoryId, req.body.newPosition);
@@ -146,5 +149,95 @@ export const reorderCategoryHandler = async (req: Request, res: Response) => {
   } catch (error: any) {
     const status = error.statusCode || 500;
     res.status(status).json({ message: error.message || "Lỗi server" });
+  }
+};
+
+/**
+ * GET /api/v1/categories/:categoryId/template
+ * Lấy template (attributes + specifications) cho category
+ */
+export const getCategoryTemplateHandler = async (req: Request, res: Response) => {
+  try {
+    const { categoryId } = req.params;
+    const result = await categoryService.getCategoryTemplate(categoryId);
+
+    res.json({
+      success: true,
+      data: result,
+      message: "Lấy template thành công",
+    });
+  } catch (error: any) {
+    const status = error.statusCode || 500;
+    res.status(status).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
+  }
+};
+
+/**
+ * GET /api/v1/categories/attributes/all
+ * Lấy tất cả attributes (cho dropdown custom)
+ */
+export const getAllAttributesHandler = async (req: Request, res: Response) => {
+  try {
+    const attributes = await categoryService.getAllAttributes();
+
+    res.json({
+      success: true,
+      data: attributes,
+      total: attributes.length,
+      message: "Lấy danh sách attributes thành công",
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
+  }
+};
+
+/**
+ * GET /api/v1/categories/attributes/:attributeId/options
+ * Lấy options cho attribute
+ */
+export const getAttributeOptionsHandler = async (req: Request, res: Response) => {
+  try {
+    const { attributeId } = req.params;
+    const result = await categoryService.getAttributeOptions(attributeId);
+
+    res.json({
+      success: true,
+      data: result,
+      message: "Lấy options thành công",
+    });
+  } catch (error: any) {
+    const status = error.statusCode || 500;
+    res.status(status).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
+  }
+};
+
+/**
+ * GET /api/v1/categories/specifications/all
+ * Lấy tất cả specifications (cho dropdown custom)
+ */
+export const getAllSpecificationsHandler = async (req: Request, res: Response) => {
+  try {
+    const specifications = await categoryService.getAllSpecifications();
+
+    res.json({
+      success: true,
+      data: specifications,
+      total: specifications.length,
+      message: "Lấy danh sách specifications thành công",
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
   }
 };

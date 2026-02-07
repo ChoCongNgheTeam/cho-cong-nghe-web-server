@@ -22,11 +22,8 @@ export interface ColorImage {
   position: number;
 }
 
-// REMOVED: Inventory interface - không còn dùng
-// Thông tin inventory giờ là part of variant
-
 export interface AvailableOption {
-  type: string; // "color" hoặc "storage"
+  type: string; // attribute.code: "color", "storage", "inch", etc.
   values: AvailableOptionValue[];
 }
 
@@ -34,6 +31,7 @@ export interface AvailableOptionValue {
   id: string;
   value: string;
   label?: string;
+  enabled?: boolean; // ✅ NEW: Thêm enabled flag
   image?: ColorImage | null;
 }
 
@@ -61,7 +59,7 @@ export interface ProductVariant {
   originalPrice?: number;
   discountPrice?: number;
   discountPercentage?: number;
-  quantity: number; // ✅ NEW: Direct field
+  quantity: number;
   soldCount: number;
   isDefault: boolean;
   isActive: boolean;
@@ -166,6 +164,7 @@ export interface ProductDetail {
   category: Category;
   availableOptions: AvailableOption[];
   highlights: Highlight[];
+  highlightGroups: HighlightSpecificationGroup[];
   priceRange: PriceRange;
   warranty?: string;
   stockStatus: "in_stock" | "low_stock" | "out_of_stock" | "pre_order";
@@ -180,6 +179,18 @@ export interface ProductDetail {
   orderItemId?: string | null;
 }
 
+export interface HighlightSpecificationGroup {
+  groupName: string;
+  items: {
+    id: string;
+    key: string;
+    name: string;
+    icon?: string;
+    unit?: string;
+    value: string;
+    isHighlight?: boolean;
+  }[];
+}
 export interface ProductSpecificationGroup {
   groupName: string;
   items: {
@@ -219,16 +230,19 @@ export interface ProductListResponse extends PaginatedResponse<ProductCard> {
 export interface RawVariantAttribute {
   attributeOption: {
     id: string;
-    type: string;
     value: string;
     label: string;
+    attribute: {
+      id: string;
+      code: string;
+      name: string;
+    };
   };
 }
 
-// UPDATE: RawVariant không còn nested inventory
 export interface RawVariant {
   id: string;
-  code: string;
+  code: string | null;
   price: any;
   quantity: number;
   soldCount: number;

@@ -12,22 +12,30 @@ import {
   updateCategoryHandler,
   deleteCategoryHandler,
   reorderCategoryHandler,
+  getCategoryTemplateHandler,
+  getAllAttributesHandler,
+  getAttributeOptionsHandler,
+  getAllSpecificationsHandler,
 } from "./category.controller";
 import {
   createCategorySchema,
   updateCategorySchema,
   reorderCategorySchema,
+  categoryIdParamSchema,
+  attributeIdParamSchema,
 } from "./category.validation";
 import { authMiddleware } from "@/app/middlewares/auth.middleware";
 import { requireRole } from "@/app/middlewares/role.middleware";
 
 const router = Router();
 
-// Public
+// =====================
+// === PUBLIC ROUTES ===
+// =====================
 
 router.get("/roots", getRootCategoriesHandler);
 
-// Lấy featured categories cho home (orchestrator sẽ dùng)
+// Lấy featured categories cho home
 // Query params: ?limit=6 (optional)
 router.get("/featured", getFeaturedCategoriesHandler);
 
@@ -36,7 +44,10 @@ router.get("/tree", getCategoryTreeHandler);
 
 router.get("/slug/:slug", getCategoryBySlugHandler);
 
-// Admin only
+// ========================
+// === ADMIN ONLY ROUTES ===
+// ========================
+
 router.get("/admin/all", authMiddleware, requireRole("ADMIN"), getAllCategoriesHandler);
 
 router.get("/admin/roots", authMiddleware, requireRole("ADMIN"), getRootCategoriesForAdminHandler);
@@ -67,6 +78,47 @@ router.post(
   requireRole("ADMIN"),
   validate(reorderCategorySchema),
   reorderCategoryHandler,
+);
+
+/**
+ * GET /api/v1/categories/:categoryId/template
+ * Lấy template (attributes + specifications) cho category
+ */
+router.get(
+  "/:categoryId/template",
+  authMiddleware,
+  requireRole("ADMIN"),
+  validate(categoryIdParamSchema, "params"),
+  getCategoryTemplateHandler,
+);
+
+/**
+ * GET /api/v1/categories/attributes/all
+ * Lấy tất cả attributes (cho dropdown "Thêm attribute tuỳ chỉnh")
+ */
+router.get("/attributes/all", authMiddleware, requireRole("ADMIN"), getAllAttributesHandler);
+
+/**
+ * GET /api/v1/categories/attributes/:attributeId/options
+ * Lấy options cho một attribute
+ */
+router.get(
+  "/attributes/:attributeId/options",
+  authMiddleware,
+  requireRole("ADMIN"),
+  validate(attributeIdParamSchema, "params"),
+  getAttributeOptionsHandler,
+);
+
+/**
+ * GET /api/v1/categories/specifications/all
+ * Lấy tất cả specifications (cho dropdown "Thêm spec tuỳ chỉnh")
+ */
+router.get(
+  "/specifications/all",
+  authMiddleware,
+  requireRole("ADMIN"),
+  getAllSpecificationsHandler,
 );
 
 export default router;

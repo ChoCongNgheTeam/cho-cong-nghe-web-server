@@ -17,6 +17,7 @@ import { RawVariant, ReviewStats } from "./product.types";
 import { buildCategoryPath } from "../category/category.helper";
 import prisma from "prisma/client";
 import { getProductIdsFromPromotions } from "./product.repository";
+import { normalizeVariant } from "./product.helpers";
 
 // =====================
 // === PUBLIC SERVICES ===
@@ -79,9 +80,12 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
     distribution: reviewStats.distribution as any,
   });
 
-  // console.log(productDetail);
-
   const highlights = transformProductHighlights(product);
+
+  const { groups: highlightGroups } = await repo.findHighlightSpecificationGroups(
+    product.id,
+    product.categoryId,
+  );
 
   // Check if user can review
   let canReview = false;
@@ -97,6 +101,7 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
     ...productDetail,
     categoryPath: buildCategoryPath(product.category),
     highlights,
+    highlightGroups,
     canReview,
     orderItemId,
   };
@@ -110,6 +115,8 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
     throw error;
   }
 
+  console.log(options);
+
   const variant = await repo.findVariantByOptions(product.id, options || {});
   if (!variant || !variant.isActive) {
     const error: any = new Error("Không tìm thấy variant");
@@ -117,10 +124,7 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
     throw error;
   }
 
-  const normalizedVariant: RawVariant = {
-    ...variant,
-    code: variant.code ?? "",
-  };
+  const normalizedVariant = normalizeVariant(variant);
 
   const variantResponse = transformProductVariantResponse(product, normalizedVariant);
 
@@ -451,19 +455,18 @@ export const getFeaturedProductsByCategories = async (
   const results = await repo.findFeaturedProductsByCategories(options);
 
   // Lấy productIds để query variant options
-  const allProductIds = results.flatMap((r) => r.products.map((p) => p.id));
-  const variantOptionsMap = await repo.getProductVariantOptionsMap(allProductIds);
+  // const allProductIds = results.flatMap((r) => r.products.map((p) => p.id));
+  // const variantOptionsMap = await repo.getProductVariantOptionsMap(allProductIds);
 
   return results.map((result) => ({
     category: result.category,
     products: result.products.map((product) => {
       const defaultVariant = product.variants?.[0];
-      const variantOptions = variantOptionsMap.get(product.id) ?? [];
+      // const variantOptions = variantOptionsMap.get(product.id) ?? [];
 
       return {
         card: {
           ...transformProductCard(product),
-          variantOptions,
         },
         pricingContext: defaultVariant
           ? {

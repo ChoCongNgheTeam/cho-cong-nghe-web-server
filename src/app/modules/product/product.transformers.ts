@@ -1,3 +1,4 @@
+import { normalizeVariant } from "./product.helpers";
 import {
   ProductCard,
   ProductDetail,
@@ -22,11 +23,10 @@ const getStockStatus = (quantity: number): "in_stock" | "low_stock" | "out_of_st
   return "in_stock";
 };
 
-/**
- * Get color từ type="color"
- */
 const getVariantColor = (variant: RawVariant): string | undefined => {
-  const colorAttr = variant.variantAttributes.find((va) => va.attributeOption.type === "color");
+  const colorAttr = variant.variantAttributes.find(
+    (va) => va.attributeOption.attribute.code === "color",
+  );
   return colorAttr?.attributeOption.value;
 };
 
@@ -60,38 +60,48 @@ export const calculatePriceRange = (variants: RawVariant[]): PriceRange => {
   };
 };
 
-const isOptionEnabled = (variants: RawVariant[], testOptions: Record<string, string>) => {
+const isOptionEnabled = (
+  variants: RawVariant[],
+  testType: string,
+  testValue: string,
+  selectedOptions: Record<string, string>,
+): boolean => {
   return variants.some((variant) => {
-    return Object.entries(testOptions).every(([type, value]) => {
+    // Check xem variant có attribute testType = testValue không
+    const hasTestOption = variant.variantAttributes.some(
+      (va) =>
+        va.attributeOption.attribute.code === testType && va.attributeOption.value === testValue,
+    );
+
+    if (!hasTestOption) return false;
+
+    // Check xem variant có match với TẤT CẢ selectedOptions khác không
+    const matchesOtherSelections = Object.entries(selectedOptions).every(([type, value]) => {
+      if (type === testType) return true; // Skip type đang test
+
       return variant.variantAttributes.some(
-        (va) => va.attributeOption.type === type && va.attributeOption.value === value,
+        (va) => va.attributeOption.attribute.code === type && va.attributeOption.value === value,
       );
     });
+
+    return matchesOtherSelections;
   });
 };
 
-// const isOptionEnabled = (variants: RawVariant[], testOptions: Record<string, string>) => {
-//   return variants.some((variant) =>
-//     variant.variantAttributes.every((va) => {
-//       const type = va.attributeOption.type;
-//       return testOptions[type] === va.attributeOption.value;
-//     }),
-//   );
-// };
-
-/**
- * Build available options theo type
- */
 const buildAvailableOptionsWithStatus = (
   variants: RawVariant[],
   colorImages: any[],
   selectedOptions: Record<string, string>,
 ): AvailableOption[] => {
+  // Map: attributeCode -> Map(value -> option info)
   const typesMap = new Map<string, Map<string, any>>();
 
-  for (const v of variants) {
-    for (const va of v.variantAttributes) {
-      const type = va.attributeOption.type;
+  // Thu thập tất cả các options từ variants
+  for (const variant of variants) {
+    if (!variant.isActive) continue;
+
+    for (const va of variant.variantAttributes) {
+      const type = va.attributeOption.attribute.code;
       const opt = va.attributeOption;
 
       if (!typesMap.has(type)) {
@@ -108,21 +118,15 @@ const buildAvailableOptionsWithStatus = (
           image: null,
         });
       }
-      // console.log(optMap);
     }
   }
 
+  // Tính enabled status cho từng option
   for (const [type, optMap] of typesMap.entries()) {
     for (const option of optMap.values()) {
-      const testOptions = {
-        ...selectedOptions,
-        [type]: option.value,
-      };
+      option.enabled = isOptionEnabled(variants, type, option.value, selectedOptions);
 
-      option.enabled = isOptionEnabled(variants, testOptions);
-
-      // console.log("TEST", testOptions, "→", option.value, option.enabled);
-
+      // Thêm image nếu là color
       if (type === "color" && !option.image) {
         const colorImgs = getImagesForColor(colorImages, option.value);
         option.image = colorImgs[0] || null;
@@ -198,7 +202,8 @@ export const transformProductDetail = (
 
   const selectedOptions: Record<string, string> = {};
   for (const va of currentVariant.variantAttributes) {
-    selectedOptions[va.attributeOption.type] = va.attributeOption.value;
+    const type = va.attributeOption.attribute.code;
+    selectedOptions[type] = va.attributeOption.value;
   }
 
   return {
@@ -235,7 +240,7 @@ export const transformVariant = (variant: RawVariant, colorImages: any[]): Produ
 
   return {
     id: variant.id,
-    code: variant.code,
+    code: variant.code || "",
     price: Number(variant.price),
     quantity,
     soldCount: variant.soldCount,
@@ -249,11 +254,14 @@ export const transformVariant = (variant: RawVariant, colorImages: any[]): Produ
 };
 
 export const transformProductVariantResponse = (product: any, variant: RawVariant) => {
-  const validVariants = product.variants.filter((v: { isActive: boolean }) => v.isActive);
+  const validVariants: RawVariant[] = product.variants
+    .filter((v: { isActive: boolean }) => v.isActive)
+    .map(normalizeVariant);
 
   const selectedOptions: Record<string, string> = {};
   for (const va of variant.variantAttributes) {
-    selectedOptions[va.attributeOption.type] = va.attributeOption.value;
+    const type = va.attributeOption.attribute.code;
+    selectedOptions[type] = va.attributeOption.value;
   }
 
   return {

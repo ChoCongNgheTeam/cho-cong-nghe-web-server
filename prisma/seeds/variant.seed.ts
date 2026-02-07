@@ -12,6 +12,47 @@ function buildVariantCode(productSlug: string, v: any) {
     .replace(/\s+/g, "");
 }
 
+/**
+ * Attach attribute option to a variant
+ */
+async function attachAttributeOption(
+  prisma: PrismaClient,
+  productVariantId: string,
+  attributeCode: string,
+  value?: string,
+) {
+  if (!value) return;
+
+  const attribute = await prisma.attributes.findUnique({
+    where: { code: attributeCode },
+  });
+
+  if (!attribute) return;
+
+  const option = await prisma.attributes_options.findFirst({
+    where: {
+      attributeId: attribute.id,
+      value: { equals: value, mode: "insensitive" },
+    },
+  });
+
+  if (!option) return;
+
+  await prisma.variants_attributes.upsert({
+    where: {
+      productVariantId_attributeOptionId: {
+        productVariantId,
+        attributeOptionId: option.id,
+      },
+    },
+    update: {},
+    create: {
+      productVariantId,
+      attributeOptionId: option.id,
+    },
+  });
+}
+
 export async function seedVariants(prisma: PrismaClient, { products }: SeedVariantsParams) {
   console.log("🌱 Seeding product variants...");
 
@@ -19,6 +60,7 @@ export async function seedVariants(prisma: PrismaClient, { products }: SeedVaria
 
   for (const product of products) {
     const variantsForThisProduct = variantData[product.slug];
+
     if (!variantsForThisProduct || variantsForThisProduct.length === 0) {
       console.log(`⚠️ Product has no variants: ${product.name}`);
       continue;
@@ -28,7 +70,7 @@ export async function seedVariants(prisma: PrismaClient, { products }: SeedVaria
       `  Processing variants for: ${product.name} (${variantsForThisProduct.length} variants)`,
     );
 
-    for (const [index, v] of variantsForThisProduct.entries()) {
+    for (const v of variantsForThisProduct) {
       const code = buildVariantCode(product.slug, v);
 
       try {
@@ -43,70 +85,23 @@ export async function seedVariants(prisma: PrismaClient, { products }: SeedVaria
             productId: product.id,
             code,
             price: v.price,
-            // quantity: 10,
             isDefault: v.isDefault ?? false,
             isActive: true,
           },
         });
 
-        // Attach attributes
-        const colorOption = await prisma.attributes_options.findFirst({
-          where: {
-            type: "color",
-            value: { equals: v.color, mode: "insensitive" },
-          },
-        });
-
-        const storageOption = await prisma.attributes_options.findFirst({
-          where: {
-            type: "storage",
-            value: { equals: v.storage, mode: "insensitive" },
-          },
-        });
-
-        if (colorOption) {
-          await prisma.variants_attributes.upsert({
-            where: {
-              productVariantId_attributeOptionId: {
-                productVariantId: variant.id,
-                attributeOptionId: colorOption.id,
-              },
-            },
-            update: {
-              attributeOptionId: colorOption.id,
-            },
-            create: {
-              productVariantId: variant.id,
-              attributeOptionId: colorOption.id,
-            },
-          });
-        }
-
-        if (storageOption) {
-          await prisma.variants_attributes.upsert({
-            where: {
-              productVariantId_attributeOptionId: {
-                productVariantId: variant.id,
-                attributeOptionId: storageOption.id,
-              },
-            },
-            update: {
-              attributeOptionId: storageOption.id,
-            },
-            create: {
-              productVariantId: variant.id,
-              attributeOptionId: storageOption.id,
-            },
-          });
-        }
+        // 🔗 Attach attributes
+        await attachAttributeOption(prisma, variant.id, "color", v.color);
+        await attachAttributeOption(prisma, variant.id, "storage", v.storage);
+        // await attachAttributeOption(prisma, variant.id, "size", v.size);
 
         createdVariants.push(variant);
       } catch (err) {
-        console.error(`Error seeding variant ${code}:`, err);
+        console.error(`❌ Error seeding variant ${code}:`, err);
       }
     }
   }
 
-  console.log(`\n Seeded ${createdVariants.length} variants\n`);
+  console.log(`\n✅ Seeded ${createdVariants.length} variants\n`);
   return createdVariants;
 }

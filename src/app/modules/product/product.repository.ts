@@ -3,6 +3,8 @@ import { Prisma } from "@prisma/client";
 import { ListProductsQuery, ReviewsQuery } from "./product.validation";
 import { OrderStatus } from "@prisma/client";
 import { fa } from "zod/v4/locales";
+import { extractVariantOptions } from "@/helpers/variant-options";
+import { HighlightSpecificationGroup } from "./product.types";
 
 const selectBrand = {
   id: true,
@@ -40,9 +42,15 @@ const selectVariantAttribute = {
   attributeOption: {
     select: {
       id: true,
-      type: true,
       value: true,
       label: true,
+      attribute: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+        },
+      },
     },
   },
 };
@@ -375,13 +383,7 @@ export const findVariantByOptions = async (productId: string, options: Record<st
   });
 
   const matchedVariant = variants.find((variant) => {
-    const variantOptions: Record<string, string> = {};
-
-    variant.variantAttributes.forEach((attr) => {
-      const type = attr.attributeOption.type;
-      const value = attr.attributeOption.value;
-      variantOptions[type] = value;
-    });
+    const variantOptions = extractVariantOptions(variant);
 
     return Object.entries(options).every(([key, value]) => variantOptions[key] === value);
   });
@@ -426,19 +428,134 @@ export const findById = async (id: string) => {
   });
 };
 
-// UPDATE: findBySlug - không include inventory
+export const findHighlightSpecificationGroups = async (
+  productId: string,
+  categoryId: string,
+): Promise<{
+  groups: HighlightSpecificationGroup[];
+  productSpecs: Map<string, string>;
+}> => {
+  // 1. Lấy category hierarchy
+  const categoryIds = await getCategoryHierarchy(categoryId);
+
+  // 2. Lấy TẤT CẢ product specifications
+  const productSpecs = await prisma.product_specifications.findMany({
+    where: { productId },
+    select: {
+      specificationId: true,
+      value: true,
+      isHighlight: true,
+    },
+  });
+
+  // 3. Tạo map: specId -> value
+  const specValueMap = new Map(productSpecs.map((ps) => [ps.specificationId, ps.value]));
+
+  // 4. Lấy SET các specIds có isHighlight = true
+  const highlightSpecIds = new Set(
+    productSpecs.filter((ps) => ps.isHighlight).map((ps) => ps.specificationId),
+  );
+
+  if (highlightSpecIds.size === 0) {
+    return { groups: [], productSpecs: specValueMap };
+  }
+
+  // 5. Lấy TẤT CẢ category_specifications từ category hierarchy
+  const allCategorySpecs = await prisma.category_specifications.findMany({
+    where: {
+      categoryId: { in: categoryIds },
+    },
+    orderBy: { sortOrder: "asc" },
+    include: {
+      specification: {
+        select: {
+          id: true,
+          key: true,
+          name: true,
+          icon: true,
+          unit: true,
+        },
+      },
+    },
+  });
+
+  // 6. Group theo groupName
+  const groupsMap = new Map<
+    string,
+    {
+      groupName: string;
+      sortOrder: number;
+      hasHighlight: boolean;
+      items: any[];
+    }
+  >();
+
+  for (const cs of allCategorySpecs) {
+    if (!groupsMap.has(cs.groupName)) {
+      groupsMap.set(cs.groupName, {
+        groupName: cs.groupName,
+        sortOrder: cs.sortOrder,
+        hasHighlight: false,
+        items: [],
+      });
+    }
+
+    const group = groupsMap.get(cs.groupName)!;
+
+    // Check xem spec này có phải highlight không
+    const isHighlight = highlightSpecIds.has(cs.specification.id);
+    if (isHighlight) {
+      group.hasHighlight = true;
+    }
+
+    // Chỉ thêm spec có value trong product
+    const value = specValueMap.get(cs.specification.id);
+    if (value) {
+      group.items.push({
+        id: cs.specification.id,
+        key: cs.specification.key,
+        name: cs.specification.name,
+        icon: cs.specification.icon ?? undefined,
+        unit: cs.specification.unit ?? undefined,
+        value: value,
+        isHighlight, // Để FE biết spec nào là highlight
+      });
+    }
+  }
+
+  // 7. Lọc CHỈ các nhóm có highlight, sort và lấy 3 nhóm đầu
+  const groups = Array.from(groupsMap.values())
+    .filter((g) => g.hasHighlight && g.items.length > 0) // Nhóm phải có highlight VÀ có items
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .slice(0, 3); // Lấy 3 nhóm đầu tiên
+
+  return {
+    groups: groups.map((g) => ({
+      groupName: g.groupName,
+      items: g.items,
+    })),
+    productSpecs: specValueMap,
+  };
+};
 export const findBySlug = async (slug: string) => {
   return prisma.products.findUnique({
     where: { slug },
     include: {
       brand: true,
       category: {
-        include: {
-          categorySpecifications: {
-            include: {
-              specification: true,
-            },
-          },
+        select: {
+          id: true,
+          name: true,
+          parentId: true,
+          description: true,
+          imagePath: true,
+          imageUrl: true,
+          slug: true,
+          position: true,
+          isFeatured: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
         },
       },
       img: {
@@ -448,7 +565,11 @@ export const findBySlug = async (slug: string) => {
         include: {
           variantAttributes: {
             include: {
-              attributeOption: true,
+              attributeOption: {
+                include: {
+                  attribute: true,
+                },
+              },
             },
           },
         },
@@ -462,7 +583,6 @@ export const findBySlug = async (slug: string) => {
     },
   });
 };
-
 export const findSpecificationsBySlug = async (slug: string) => {
   const product = await prisma.products.findUnique({
     where: { slug },
@@ -632,7 +752,7 @@ export const create = async (data: any) => {
           variants?.map((v: any) => ({
             code: v.code,
             price: v.price,
-            quantity: v.quantity ?? 10, // ✅ Direct field với default value
+            quantity: v.quantity ?? 10, // Direct field với default value
             isDefault: v.isDefault || false,
             isActive: v.isActive ?? true,
             variantAttributes: {
@@ -777,56 +897,56 @@ export const bulkUpdate = async (productIds: string[], updates: any) => {
   });
 };
 
-export const getProductVariantOptionsMap = async (productIds: string[]) => {
-  const rows = await prisma.variants_attributes.findMany({
-    where: {
-      productVariant: {
-        productId: { in: productIds },
-        isActive: true,
-      },
-    },
-    select: {
-      productVariant: {
-        select: { productId: true },
-      },
-      attributeOption: {
-        select: {
-          type: true,
-          value: true,
-          label: true,
-        },
-      },
-    },
-  });
+// export const getProductVariantOptionsMap = async (productIds: string[]) => {
+//   const rows = await prisma.variants_attributes.findMany({
+//     where: {
+//       productVariant: {
+//         productId: { in: productIds },
+//         isActive: true,
+//       },
+//     },
+//     select: {
+//       productVariant: {
+//         select: { productId: true },
+//       },
+//       attributeOption: {
+//         select: {
+//           type: true,
+//           value: true,
+//           label: true,
+//         },
+//       },
+//     },
+//   });
 
-  const map = new Map<string, { type: string; options: { value: string; label: string }[] }[]>();
+//   const map = new Map<string, { type: string; options: { value: string; label: string }[] }[]>();
 
-  // ensure all products exist
-  for (const productId of productIds) {
-    map.set(productId, []);
-  }
+//   // ensure all products exist
+//   for (const productId of productIds) {
+//     map.set(productId, []);
+//   }
 
-  for (const row of rows) {
-    const productId = row.productVariant.productId;
-    const list = map.get(productId)!;
+//   for (const row of rows) {
+//     const productId = row.productVariant.productId;
+//     const list = map.get(productId)!;
 
-    let group = list.find((g) => g.type === row.attributeOption.type);
+//     let group = list.find((g) => g.type === row.attributeOption.type);
 
-    if (!group) {
-      group = { type: row.attributeOption.type, options: [] };
-      list.push(group);
-    }
+//     if (!group) {
+//       group = { type: row.attributeOption.type, options: [] };
+//       list.push(group);
+//     }
 
-    if (!group.options.some((o) => o.value === row.attributeOption.value)) {
-      group.options.push({
-        value: row.attributeOption.value,
-        label: row.attributeOption.label,
-      });
-    }
-  }
+//     if (!group.options.some((o) => o.value === row.attributeOption.value)) {
+//       group.options.push({
+//         value: row.attributeOption.value,
+//         label: row.attributeOption.label,
+//       });
+//     }
+//   }
 
-  return map;
-};
+//   return map;
+// };
 
 const getAllDescendantCategoryIds = async (categoryId: string): Promise<string[]> => {
   const result = new Set<string>();

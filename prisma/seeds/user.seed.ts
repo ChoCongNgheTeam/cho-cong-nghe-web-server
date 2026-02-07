@@ -5,6 +5,7 @@ const usersData = [
   {
     email: "admin@example.com",
     userName: "admin",
+    dateOfBirth: new Date("1990-01-01"),
     passwordHash: bcrypt.hashSync("admin123", 10),
     fullName: "Quản trị viên",
     role: "ADMIN" as const,

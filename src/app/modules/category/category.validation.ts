@@ -48,6 +48,16 @@ export const reorderCategorySchema = z.object({
   newPosition: z.number().int().min(0, "Position phải >= 0"),
 });
 
+export const categoryIdParamSchema = z.object({
+  categoryId: z.string().uuid({ message: "Category ID không hợp lệ" }),
+});
+
+export const attributeIdParamSchema = z.object({
+  attributeId: z.string().min(1, { message: "Attribute ID không hợp lệ" }),
+});
+
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
 export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
 export type ReorderCategoryInput = z.infer<typeof reorderCategorySchema>;
+export type CategoryIdParam = z.infer<typeof categoryIdParamSchema>;
+export type AttributeIdParam = z.infer<typeof attributeIdParamSchema>;

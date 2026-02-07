@@ -14,10 +14,37 @@ CREATE TYPE "OrderStatus" AS ENUM ('PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERE
 CREATE TYPE "PaymentStatus" AS ENUM ('UNPAID', 'PAID', 'REFUNDED');
 
 -- CreateEnum
-CREATE TYPE "DiscountType" AS ENUM ('PERCENTAGE', 'FIXED');
+CREATE TYPE "PaymentTransactionStatus" AS ENUM ('PENDING', 'COMPLETED', 'FAILED', 'REFUNDED');
 
 -- CreateEnum
-CREATE TYPE "VoucherActionType" AS ENUM ('DISCOUNT', 'FREE_SHIPPING', 'BUY_X_GET_Y');
+CREATE TYPE "DiscountType" AS ENUM ('DISCOUNT_PERCENT', 'DISCOUNT_FIXED');
+
+-- CreateEnum
+CREATE TYPE "TargetType" AS ENUM ('PRODUCT', 'PRODUCT_VARIANT', 'CATEGORY', 'BRAND', 'ALL');
+
+-- CreateEnum
+CREATE TYPE "PromotionActionType" AS ENUM ('DISCOUNT_PERCENT', 'DISCOUNT_FIXED', 'BUY_X_GET_Y', 'GIFT_PRODUCT', 'FREE_SHIPPING');
+
+-- CreateEnum
+CREATE TYPE "ReviewStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+
+-- CreateEnum
+CREATE TYPE "BlogStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'ARCHIVED');
+
+-- CreateEnum
+CREATE TYPE "CommentTargetType" AS ENUM ('BLOG', 'PRODUCT', 'PAGE');
+
+-- CreateEnum
+CREATE TYPE "PageType" AS ENUM ('PAGE', 'POLICY');
+
+-- CreateEnum
+CREATE TYPE "PolicyType" AS ENUM ('PRIVACY', 'TERMS', 'SHIPPING', 'RETURN', 'PAYMENT');
+
+-- CreateEnum
+CREATE TYPE "MediaType" AS ENUM ('SLIDER', 'BANNER');
+
+-- CreateEnum
+CREATE TYPE "MediaPosition" AS ENUM ('HOME_TOP', 'BELOW_SLIDER', 'HOME_SECTION_1', 'HOME_SECTION_2');
 
 -- CreateTable
 CREATE TABLE "users" (
@@ -35,6 +62,32 @@ CREATE TABLE "users" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "password_reset_tokens" (
+    "id" UUID NOT NULL,
+    "token" TEXT NOT NULL,
+    "userId" UUID NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "password_reset_tokens_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "refresh_tokens" (
+    "id" UUID NOT NULL,
+    "userId" UUID NOT NULL,
+    "token" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "revokedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deviceId" TEXT,
+    "userAgent" TEXT,
+    "ip" TEXT,
+
+    CONSTRAINT "refresh_tokens_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -60,8 +113,10 @@ CREATE TABLE "brands" (
     "id" UUID NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
-    "brandImage" TEXT,
+    "imagePath" TEXT,
+    "imageUrl" TEXT,
     "slug" TEXT NOT NULL,
+    "isFeatured" BOOLEAN NOT NULL DEFAULT false,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -75,9 +130,11 @@ CREATE TABLE "categories" (
     "name" TEXT NOT NULL,
     "parentId" UUID,
     "description" TEXT,
-    "categoryImage" TEXT,
+    "imagePath" TEXT,
+    "imageUrl" TEXT,
     "slug" TEXT NOT NULL,
     "position" INTEGER NOT NULL DEFAULT 0,
+    "isFeatured" BOOLEAN NOT NULL DEFAULT false,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -86,19 +143,10 @@ CREATE TABLE "categories" (
 );
 
 -- CreateTable
-CREATE TABLE "product_categories" (
-    "productId" UUID NOT NULL,
-    "categoryId" UUID NOT NULL,
-    "isPrimary" BOOLEAN NOT NULL DEFAULT false,
-    "position" INTEGER NOT NULL DEFAULT 0,
-
-    CONSTRAINT "product_categories_pkey" PRIMARY KEY ("productId","categoryId")
-);
-
--- CreateTable
 CREATE TABLE "products" (
     "id" UUID NOT NULL,
     "brandId" UUID NOT NULL,
+    "categoryId" UUID NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
     "slug" TEXT NOT NULL,
@@ -115,11 +163,10 @@ CREATE TABLE "products" (
 
 -- CreateTable
 CREATE TABLE "attributes" (
-    "id" UUID NOT NULL,
+    "id" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "description" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "attributes_pkey" PRIMARY KEY ("id")
 );
@@ -127,12 +174,19 @@ CREATE TABLE "attributes" (
 -- CreateTable
 CREATE TABLE "attributes_options" (
     "id" UUID NOT NULL,
-    "attributeId" UUID NOT NULL,
+    "attributeId" TEXT NOT NULL,
     "value" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "label" TEXT NOT NULL,
 
     CONSTRAINT "attributes_options_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "category_variant_attributes" (
+    "categoryId" UUID NOT NULL,
+    "attributeId" TEXT NOT NULL,
+
+    CONSTRAINT "category_variant_attributes_pkey" PRIMARY KEY ("categoryId","attributeId")
 );
 
 -- CreateTable
@@ -141,14 +195,29 @@ CREATE TABLE "products_variants" (
     "productId" UUID NOT NULL,
     "code" TEXT,
     "price" DECIMAL(10,2) NOT NULL,
+    "quantity" INTEGER NOT NULL DEFAULT 10,
     "soldCount" INTEGER NOT NULL DEFAULT 0,
-    "weight" DECIMAL(10,2),
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "products_variants_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "product_color_images" (
+    "id" UUID NOT NULL,
+    "productId" UUID NOT NULL,
+    "color" TEXT NOT NULL,
+    "imagePath" TEXT NOT NULL,
+    "imageUrl" TEXT,
+    "altText" TEXT,
+    "position" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "product_color_images_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -162,51 +231,41 @@ CREATE TABLE "variants_attributes" (
 );
 
 -- CreateTable
-CREATE TABLE "product_variant_images" (
-    "id" UUID NOT NULL,
-    "productVariantId" UUID NOT NULL,
-    "imageUrl" TEXT NOT NULL,
-    "altText" TEXT,
-    "position" INTEGER NOT NULL DEFAULT 0,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+CREATE TABLE "category_specifications" (
+    "categoryId" UUID NOT NULL,
+    "specificationId" UUID NOT NULL,
+    "groupName" TEXT NOT NULL,
+    "isRequired" BOOLEAN NOT NULL DEFAULT false,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
 
-    CONSTRAINT "product_variant_images_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "category_specifications_pkey" PRIMARY KEY ("categoryId","specificationId")
 );
 
 -- CreateTable
-CREATE TABLE "inventory" (
-    "variantId" UUID NOT NULL,
-    "quantity" INTEGER NOT NULL DEFAULT 0,
-    "reservedQuantity" INTEGER NOT NULL DEFAULT 0,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "inventory_pkey" PRIMARY KEY ("variantId")
-);
-
--- CreateTable
-CREATE TABLE "highlights" (
+CREATE TABLE "specifications" (
     "id" UUID NOT NULL,
     "key" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "group" TEXT NOT NULL DEFAULT 'Thông số khác',
+    "unit" TEXT,
     "icon" TEXT,
-    "title" TEXT NOT NULL,
-    "description" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "isFilterable" BOOLEAN NOT NULL DEFAULT false,
+    "isRequired" BOOLEAN NOT NULL DEFAULT false,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
 
-    CONSTRAINT "highlights_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "specifications_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "product_highlights" (
-    "id" UUID NOT NULL,
+CREATE TABLE "product_specifications" (
     "productId" UUID NOT NULL,
-    "highlightId" UUID NOT NULL,
-    "value" TEXT,
+    "specificationId" UUID NOT NULL,
+    "value" TEXT NOT NULL,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "isHighlight" BOOLEAN NOT NULL,
 
-    CONSTRAINT "product_highlights_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "product_specifications_pkey" PRIMARY KEY ("productId","specificationId")
 );
 
 -- CreateTable
@@ -270,7 +329,7 @@ CREATE TABLE "reviews" (
     "orderItemId" UUID NOT NULL,
     "rating" INTEGER NOT NULL,
     "comment" TEXT,
-    "isApproved" BOOLEAN NOT NULL DEFAULT false,
+    "isApproved" "ReviewStatus" NOT NULL DEFAULT 'PENDING',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -290,6 +349,21 @@ CREATE TABLE "payment_methods" (
 );
 
 -- CreateTable
+CREATE TABLE "payment_transactions" (
+    "id" UUID NOT NULL,
+    "orderId" UUID NOT NULL,
+    "paymentMethodId" UUID NOT NULL,
+    "amount" DECIMAL(10,2) NOT NULL,
+    "transactionRef" TEXT,
+    "status" "PaymentTransactionStatus" NOT NULL,
+    "payload" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "payment_transactions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "vouchers" (
     "id" UUID NOT NULL,
     "code" TEXT NOT NULL,
@@ -297,6 +371,7 @@ CREATE TABLE "vouchers" (
     "discountType" "DiscountType" NOT NULL,
     "discountValue" DECIMAL(10,2) NOT NULL,
     "minOrderValue" DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    "maxDiscountValue" DECIMAL(10,2),
     "maxUses" INTEGER,
     "maxUsesPerUser" INTEGER,
     "usesCount" INTEGER NOT NULL DEFAULT 0,
@@ -311,24 +386,10 @@ CREATE TABLE "vouchers" (
 );
 
 -- CreateTable
-CREATE TABLE "voucher_actions" (
-    "id" UUID NOT NULL,
-    "voucherId" UUID NOT NULL,
-    "actionType" "VoucherActionType" NOT NULL,
-    "value" TEXT,
-    "buyQuantity" INTEGER,
-    "getQuantity" INTEGER,
-    "giftProductVariantId" UUID,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "voucher_actions_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "voucher_targets" (
     "id" UUID NOT NULL,
     "voucherId" UUID NOT NULL,
-    "targetType" TEXT NOT NULL,
+    "targetType" "TargetType" NOT NULL,
     "targetId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -358,11 +419,140 @@ CREATE TABLE "voucher_usages" (
     CONSTRAINT "voucher_usages_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "promotions" (
+    "id" UUID NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "priority" INTEGER NOT NULL DEFAULT 0,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "startDate" TIMESTAMP(3),
+    "endDate" TIMESTAMP(3),
+    "minOrderValue" DECIMAL(12,2),
+    "maxDiscountValue" DECIMAL(12,2),
+    "usageLimit" INTEGER,
+    "usedCount" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "promotions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "promotion_rules" (
+    "id" UUID NOT NULL,
+    "promotionId" UUID NOT NULL,
+    "actionType" "PromotionActionType" NOT NULL,
+    "discountValue" DECIMAL(10,2),
+    "buyQuantity" INTEGER,
+    "getQuantity" INTEGER,
+    "giftProductVariantId" UUID,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "promotion_rules_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "promotion_targets" (
+    "id" UUID NOT NULL,
+    "promotionId" UUID NOT NULL,
+    "targetType" "TargetType" NOT NULL,
+    "targetId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "promotion_targets_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "blogs" (
+    "id" UUID NOT NULL,
+    "authorId" UUID NOT NULL,
+    "title" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "imagePath" TEXT,
+    "imageUrl" TEXT,
+    "viewCount" INTEGER NOT NULL DEFAULT 0,
+    "status" "BlogStatus" NOT NULL DEFAULT 'DRAFT',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "publishedAt" TIMESTAMP(3),
+
+    CONSTRAINT "blogs_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "comments" (
+    "id" UUID NOT NULL,
+    "userId" UUID NOT NULL,
+    "content" TEXT NOT NULL,
+    "targetType" "CommentTargetType" NOT NULL,
+    "targetId" TEXT NOT NULL,
+    "parentId" UUID,
+    "isApproved" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "comments_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "pages" (
+    "id" UUID NOT NULL,
+    "type" "PageType" NOT NULL,
+    "policyType" "PolicyType",
+    "title" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "isPublished" BOOLEAN NOT NULL DEFAULT true,
+    "priority" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "pages_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "image_media" (
+    "id" UUID NOT NULL,
+    "type" "MediaType" NOT NULL,
+    "position" "MediaPosition" NOT NULL,
+    "title" TEXT,
+    "imagePath" TEXT,
+    "imageUrl" TEXT,
+    "linkUrl" TEXT,
+    "order" INTEGER NOT NULL DEFAULT 0,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "image_media_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "_blogsTocomments" (
+    "A" UUID NOT NULL,
+    "B" UUID NOT NULL,
+
+    CONSTRAINT "_blogsTocomments_AB_pkey" PRIMARY KEY ("A","B")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "users_userName_key" ON "users"("userName");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "password_reset_tokens_token_key" ON "password_reset_tokens"("token");
+
+-- CreateIndex
+CREATE INDEX "password_reset_tokens_userId_idx" ON "password_reset_tokens"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "refresh_tokens_token_key" ON "refresh_tokens"("token");
+
+-- CreateIndex
+CREATE INDEX "refresh_tokens_userId_idx" ON "refresh_tokens"("userId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "user_addresses_userId_detailAddress_phone_key" ON "user_addresses"("userId", "detailAddress", "phone");
@@ -374,34 +564,34 @@ CREATE UNIQUE INDEX "brands_name_key" ON "brands"("name");
 CREATE UNIQUE INDEX "brands_slug_key" ON "brands"("slug");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "categories_name_key" ON "categories"("name");
-
--- CreateIndex
 CREATE UNIQUE INDEX "categories_slug_key" ON "categories"("slug");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "product_categories_productId_categoryId_key" ON "product_categories"("productId", "categoryId");
+CREATE UNIQUE INDEX "categories_parentId_position_key" ON "categories"("parentId", "position");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "categories_name_parentId_key" ON "categories"("name", "parentId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "products_slug_key" ON "products"("slug");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "attributes_name_key" ON "attributes"("name");
-
--- CreateIndex
-CREATE UNIQUE INDEX "attributes_options_attributeId_value_key" ON "attributes_options"("attributeId", "value");
+CREATE UNIQUE INDEX "attributes_code_key" ON "attributes"("code");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "products_variants_code_key" ON "products_variants"("code");
 
 -- CreateIndex
+CREATE INDEX "product_color_images_productId_color_idx" ON "product_color_images"("productId", "color");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "product_color_images_productId_color_imagePath_key" ON "product_color_images"("productId", "color", "imagePath");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "variants_attributes_productVariantId_attributeOptionId_key" ON "variants_attributes"("productVariantId", "attributeOptionId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "highlights_key_key" ON "highlights"("key");
-
--- CreateIndex
-CREATE UNIQUE INDEX "product_highlights_productId_highlightId_key" ON "product_highlights"("productId", "highlightId");
+CREATE UNIQUE INDEX "specifications_key_key" ON "specifications"("key");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "wishlist_userId_productVariantId_key" ON "wishlist"("userId", "productVariantId");
@@ -418,6 +608,33 @@ CREATE UNIQUE INDEX "vouchers_code_key" ON "vouchers"("code");
 -- CreateIndex
 CREATE UNIQUE INDEX "voucher_user_voucherId_userId_key" ON "voucher_user"("voucherId", "userId");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "promotions_name_key" ON "promotions"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "blogs_slug_key" ON "blogs"("slug");
+
+-- CreateIndex
+CREATE INDEX "comments_targetType_targetId_idx" ON "comments"("targetType", "targetId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "pages_slug_key" ON "pages"("slug");
+
+-- CreateIndex
+CREATE INDEX "image_media_type_position_idx" ON "image_media"("type", "position");
+
+-- CreateIndex
+CREATE INDEX "image_media_isActive_idx" ON "image_media"("isActive");
+
+-- CreateIndex
+CREATE INDEX "_blogsTocomments_B_index" ON "_blogsTocomments"("B");
+
+-- AddForeignKey
+ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
 -- AddForeignKey
 ALTER TABLE "user_addresses" ADD CONSTRAINT "user_addresses_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
@@ -425,19 +642,25 @@ ALTER TABLE "user_addresses" ADD CONSTRAINT "user_addresses_userId_fkey" FOREIGN
 ALTER TABLE "categories" ADD CONSTRAINT "categories_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "categories"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_categories" ADD CONSTRAINT "product_categories_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "product_categories" ADD CONSTRAINT "product_categories_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "products" ADD CONSTRAINT "products_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "brands"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "products" ADD CONSTRAINT "products_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "attributes_options" ADD CONSTRAINT "attributes_options_attributeId_fkey" FOREIGN KEY ("attributeId") REFERENCES "attributes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "category_variant_attributes" ADD CONSTRAINT "category_variant_attributes_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "category_variant_attributes" ADD CONSTRAINT "category_variant_attributes_attributeId_fkey" FOREIGN KEY ("attributeId") REFERENCES "attributes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "products_variants" ADD CONSTRAINT "products_variants_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "product_color_images" ADD CONSTRAINT "product_color_images_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "variants_attributes" ADD CONSTRAINT "variants_attributes_productVariantId_fkey" FOREIGN KEY ("productVariantId") REFERENCES "products_variants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -446,16 +669,16 @@ ALTER TABLE "variants_attributes" ADD CONSTRAINT "variants_attributes_productVar
 ALTER TABLE "variants_attributes" ADD CONSTRAINT "variants_attributes_attributeOptionId_fkey" FOREIGN KEY ("attributeOptionId") REFERENCES "attributes_options"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_variant_images" ADD CONSTRAINT "product_variant_images_productVariantId_fkey" FOREIGN KEY ("productVariantId") REFERENCES "products_variants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "category_specifications" ADD CONSTRAINT "category_specifications_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "categories"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventory" ADD CONSTRAINT "inventory_variantId_fkey" FOREIGN KEY ("variantId") REFERENCES "products_variants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "category_specifications" ADD CONSTRAINT "category_specifications_specificationId_fkey" FOREIGN KEY ("specificationId") REFERENCES "specifications"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_highlights" ADD CONSTRAINT "product_highlights_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_specifications" ADD CONSTRAINT "product_specifications_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_highlights" ADD CONSTRAINT "product_highlights_highlightId_fkey" FOREIGN KEY ("highlightId") REFERENCES "highlights"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_specifications" ADD CONSTRAINT "product_specifications_specificationId_fkey" FOREIGN KEY ("specificationId") REFERENCES "specifications"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "wishlist" ADD CONSTRAINT "wishlist_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -479,9 +702,6 @@ ALTER TABLE "orders" ADD CONSTRAINT "orders_paymentMethodId_fkey" FOREIGN KEY ("
 ALTER TABLE "orders" ADD CONSTRAINT "orders_voucherId_fkey" FOREIGN KEY ("voucherId") REFERENCES "vouchers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "orders" ADD CONSTRAINT "orders_shippingAddressId_fkey" FOREIGN KEY ("shippingAddressId") REFERENCES "user_addresses"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "order_items" ADD CONSTRAINT "order_items_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -494,10 +714,10 @@ ALTER TABLE "reviews" ADD CONSTRAINT "reviews_userId_fkey" FOREIGN KEY ("userId"
 ALTER TABLE "reviews" ADD CONSTRAINT "reviews_orderItemId_fkey" FOREIGN KEY ("orderItemId") REFERENCES "order_items"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "voucher_actions" ADD CONSTRAINT "voucher_actions_voucherId_fkey" FOREIGN KEY ("voucherId") REFERENCES "vouchers"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "payment_transactions" ADD CONSTRAINT "payment_transactions_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "voucher_actions" ADD CONSTRAINT "voucher_actions_giftProductVariantId_fkey" FOREIGN KEY ("giftProductVariantId") REFERENCES "products_variants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "payment_transactions" ADD CONSTRAINT "payment_transactions_paymentMethodId_fkey" FOREIGN KEY ("paymentMethodId") REFERENCES "payment_methods"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "voucher_targets" ADD CONSTRAINT "voucher_targets_voucherId_fkey" FOREIGN KEY ("voucherId") REFERENCES "vouchers"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -516,3 +736,24 @@ ALTER TABLE "voucher_usages" ADD CONSTRAINT "voucher_usages_userId_fkey" FOREIGN
 
 -- AddForeignKey
 ALTER TABLE "voucher_usages" ADD CONSTRAINT "voucher_usages_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "promotion_rules" ADD CONSTRAINT "promotion_rules_promotionId_fkey" FOREIGN KEY ("promotionId") REFERENCES "promotions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "promotion_targets" ADD CONSTRAINT "promotion_targets_promotionId_fkey" FOREIGN KEY ("promotionId") REFERENCES "promotions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "blogs" ADD CONSTRAINT "blogs_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "comments" ADD CONSTRAINT "comments_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "comments" ADD CONSTRAINT "comments_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "comments"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_blogsTocomments" ADD CONSTRAINT "_blogsTocomments_A_fkey" FOREIGN KEY ("A") REFERENCES "blogs"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_blogsTocomments" ADD CONSTRAINT "_blogsTocomments_B_fkey" FOREIGN KEY ("B") REFERENCES "comments"("id") ON DELETE CASCADE ON UPDATE CASCADE;

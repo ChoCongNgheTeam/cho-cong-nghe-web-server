@@ -6,6 +6,10 @@ import { generateUniqueSlug } from "@/utils/generate-unique-slug";
 import prisma from "@/config/db";
 import buildCategoryTree from "@/utils/build-category-tree";
 
+// =====================
+// === EXISTING CODE ===
+// =====================
+
 export const getRootCategories = async () => {
   return categoryRepository.findRootCategories(true);
 };
@@ -22,13 +26,11 @@ export const getFeaturedCategories = async (limit?: number) => {
   }));
 };
 
-// 2. Lấy category tree cho menu
 export const getCategoryTree = async () => {
   const categories = await categoryRepository.findAllCategoriesForTree(true);
   return buildCategoryTree(categories);
 };
 
-// Lấy category theo slug (public)
 export const getCategoryBySlug = async (slug: string) => {
   const category = await categoryRepository.findBySlug(slug);
   if (!category) {
@@ -39,19 +41,15 @@ export const getCategoryBySlug = async (slug: string) => {
 
 // === ADMIN SERVICES ===
 
-// Lấy tất cả categories (admin)
 export const getAllCategories = async () => {
   return categoryRepository.findAll(false);
 };
 
-// Lấy root categories với số lượng sub (admin)
 export const getRootCategoriesForAdmin = async () => {
   return categoryRepository.findRootCategories(false);
 };
 
-// Lấy category detail với children (admin)
 export const getCategoryDetail = async (id: string) => {
-  // admin → lấy cả inactive
   const categories = await categoryRepository.findAllCategoriesForTree(false);
 
   const current = categories.find((c) => c.id === id);
@@ -72,11 +70,9 @@ export const getCategoryDetail = async (id: string) => {
   };
 };
 
-// Tạo category
 export const createCategory = async (input: CreateCategoryInput) => {
   const { name, parentId, position, ...rest } = input;
 
-  // Validate parent nếu có
   if (parentId) {
     const parent = await categoryRepository.findById(parentId);
     if (!parent) {
@@ -84,19 +80,16 @@ export const createCategory = async (input: CreateCategoryInput) => {
     }
   }
 
-  // Check duplicate name trong cùng parent
   const exists = await categoryRepository.existsByNameInParent(name, parentId || null);
   if (exists) {
     throw new DuplicateError(`Tên danh mục "${name}" đã tồn tại trong cùng cấp`);
   }
 
-  // Tính position nếu không được cung cấp
   let finalPosition = position;
   if (finalPosition === undefined) {
     finalPosition = await categoryRepository.countSiblings(parentId || null);
   }
 
-  // Generate slug
   const slug = await generateUniqueSlug(prisma.categories, name);
 
   try {
@@ -115,7 +108,6 @@ export const createCategory = async (input: CreateCategoryInput) => {
   }
 };
 
-// Update category
 export const updateCategory = async (id: string, input: UpdateCategoryInput) => {
   const { name, parentId, ...rest } = input;
 
@@ -124,13 +116,11 @@ export const updateCategory = async (id: string, input: UpdateCategoryInput) => 
     throw new NotFoundError("Danh mục");
   }
 
-  // Validate parent nếu có
   if (parentId !== undefined) {
     if (parentId === id) {
       throw new BadRequestError("Danh mục không thể là cha của chính nó");
     }
 
-    // CHỈ kiểm tra khi parentId THAY ĐỔI
     const isChangingParent = parentId !== category.parentId;
 
     if (isChangingParent && parentId) {
@@ -146,7 +136,6 @@ export const updateCategory = async (id: string, input: UpdateCategoryInput) => 
     }
   }
 
-  // Check duplicate name nếu có thay đổi
   if (name) {
     const newParentId = parentId !== undefined ? parentId : category.parentId;
     const exists = await categoryRepository.existsByNameInParent(name, newParentId, id);
@@ -155,7 +144,6 @@ export const updateCategory = async (id: string, input: UpdateCategoryInput) => 
     }
   }
 
-  // Generate new slug nếu name thay đổi
   let slug = category.slug;
   if (name && name !== category.name) {
     slug = await generateUniqueSlug(prisma.categories, name);
@@ -175,14 +163,12 @@ export const updateCategory = async (id: string, input: UpdateCategoryInput) => 
   }
 };
 
-// Delete category
 export const deleteCategory = async (id: string) => {
   const category = await categoryRepository.findById(id);
   if (!category) {
     throw new NotFoundError("Danh mục");
   }
 
-  // Check có children không
   const hasChildren = await categoryRepository.hasChildren(id);
   if (hasChildren) {
     throw new BadRequestError(
@@ -190,7 +176,6 @@ export const deleteCategory = async (id: string) => {
     );
   }
 
-  // Check có products không
   const hasProducts = await categoryRepository.hasProducts(id);
   if (hasProducts) {
     throw new BadRequestError(
@@ -201,7 +186,6 @@ export const deleteCategory = async (id: string) => {
   return categoryRepository.remove(id);
 };
 
-// Reorder category
 export const reorderCategory = async (categoryId: string, newPosition: number) => {
   const category = await categoryRepository.findById(categoryId);
   if (!category) {
@@ -214,7 +198,6 @@ export const reorderCategory = async (categoryId: string, newPosition: number) =
     throw new BadRequestError("Vị trí không hợp lệ");
   }
 
-  // Reorder logic
   const updates = siblings
     .filter((s) => s.id !== categoryId)
     .map((sibling, index) => {
@@ -235,4 +218,74 @@ export const reorderCategory = async (categoryId: string, newPosition: number) =
   await prisma.$transaction(updates);
 
   return { message: "Sắp xếp thành công" };
+};
+
+export const getCategoryTemplate = async (categoryId: string) => {
+  const category = await categoryRepository.findById(categoryId);
+  if (!category) {
+    throw new NotFoundError("Danh mục");
+  }
+
+  const [attributes, specifications] = await Promise.all([
+    categoryRepository.getCategoryVariantAttributes(categoryId),
+    categoryRepository.getCategorySpecifications(categoryId),
+  ]);
+
+  // Lấy options cho mỗi attribute
+  const attributesWithOptions = await Promise.all(
+    attributes.map(async (attr) => {
+      const options = await categoryRepository.getAttributeOptions(attr.id);
+      return {
+        ...attr,
+        options,
+      };
+    }),
+  );
+
+  return {
+    category: {
+      id: category.id,
+      name: category.name,
+      slug: category.slug,
+    },
+    template: {
+      attributes: attributesWithOptions,
+      specifications,
+    },
+  };
+};
+
+/**
+ * Lấy tất cả attributes (cho dropdown custom)
+ */
+export const getAllAttributes = async () => {
+  return categoryRepository.getAllAttributes();
+};
+
+/**
+ * Lấy options cho attribute
+ */
+export const getAttributeOptions = async (attributeId: string) => {
+  const attribute = await prisma.attributes.findUnique({
+    where: { id: attributeId },
+    select: { id: true, code: true, name: true },
+  });
+
+  if (!attribute) {
+    throw new NotFoundError("Attribute");
+  }
+
+  const options = await categoryRepository.getAttributeOptions(attributeId);
+
+  return {
+    attribute,
+    options,
+  };
+};
+
+/**
+ * Lấy tất cả specifications (cho dropdown custom)
+ */
+export const getAllSpecifications = async () => {
+  return categoryRepository.getAllSpecifications();
 };

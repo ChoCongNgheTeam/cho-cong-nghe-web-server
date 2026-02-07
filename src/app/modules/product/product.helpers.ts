@@ -1,5 +1,6 @@
 import fs from "fs";
 import { uploadImage, deleteImage } from "@/services/cloudinary.service";
+import { RawVariant } from "./product.types";
 
 // Cleanup temporary uploaded files
 export const cleanupTempFiles = (files: Express.Multer.File[]) => {
@@ -131,3 +132,20 @@ export const extractPublicId = (url: string): string | null => {
   const matches = url.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
   return matches?.[1] || null;
 };
+
+export const normalizeVariant = (variant: any): RawVariant => ({
+  ...variant,
+  code: variant.code ?? "",
+  variantAttributes: variant.variantAttributes.map((va: any) => ({
+    attributeOption: {
+      id: va.attributeOption.id,
+      value: va.attributeOption.value,
+      label: va.attributeOption.label,
+      attribute: {
+        id: va.attributeOption.attribute.id,
+        code: va.attributeOption.attribute.code,
+        name: va.attributeOption.attribute.name,
+      },
+    },
+  })),
+});

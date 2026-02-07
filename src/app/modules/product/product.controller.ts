@@ -76,20 +76,9 @@ export const getProductVariantHandler = async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
     const userId = (req as any).user?.id;
+    const options = req.query as Record<string, string>;
 
-    const options: Record<string, string> = {};
-
-    for (const [key, value] of Object.entries(req.query)) {
-      if (typeof value === "string" && value) {
-        options[key] = value;
-      }
-    }
-
-    const result = await getProductVariantWithPricing(
-      slug,
-      Object.keys(options).length ? options : undefined,
-      userId,
-    );
+    const result = await getProductVariantWithPricing(slug, options, userId);
 
     res.json({
       success: true,

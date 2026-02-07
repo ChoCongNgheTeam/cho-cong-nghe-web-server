@@ -108,6 +108,7 @@ model users {
   fullName     String?
   phone        String?
   gender       Gender?
+  dateOfBirth  DateTime?   
   role         UserRole @default(CUSTOMER)
   isActive     Boolean  @default(true)
   avatarImage  String?
@@ -208,6 +209,7 @@ model categories {
   children               categories[]              @relation("CategoryHierarchy")
   products               products[]
   categorySpecifications category_specifications[]
+  variantAttributes category_variant_attributes[]
 
   @@unique([parentId, position])
   @@unique([name, parentId]) 
@@ -274,18 +276,39 @@ model products {
 //   allowedInCategories category_attributes[]
 // }
 
+model attributes {
+  id        String @id @default(uuid())
+  code      String @unique // color, storage, inch
+  name      String         // Màu sắc, Bộ nhớ, Kích thước
+  createdAt DateTime @default(now())
+
+  options attributes_options[]
+  categories category_variant_attributes[]
+}
+
+
 model attributes_options {
   id          String   @id @default(uuid()) @db.Uuid
-  type        String
+  attributeId String
   value       String
   label       String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
 
-  variantAttrs variants_attributes[]
+  attribute attributes @relation(fields: [attributeId], references: [id])
+  variantAttributes variants_attributes[]
 
-  @@unique([type, value])
+  @@unique([attributeId, value])
 }
+
+model category_variant_attributes {
+  categoryId  String @db.Uuid
+  attributeId String
+
+  category    categories @relation(fields: [categoryId], references: [id])
+  attribute   attributes @relation(fields: [attributeId], references: [id])
+
+  @@id([categoryId, attributeId])
+}
+
 
 model products_variants {
   id        String   @id @default(uuid()) @db.Uuid

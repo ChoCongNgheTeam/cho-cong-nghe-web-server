@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import {
   seedBrands,
   seedCategories,
-  seedAttributeOptions,
+  seedAttributesAndOptions,
   seedSpecifications,
   seedProductSpecifications,
   seedProductHighlights,
@@ -17,6 +17,7 @@ import {
   seedBlogs,
   seedComments,
   seedImageMedia,
+  seedCategoryVariantAttributes,
 } from "./seeds";
 
 const prisma = new PrismaClient();
@@ -34,7 +35,10 @@ async function main() {
 
   console.log("Seeding attribute options and specifications...");
 
-  await seedAttributeOptions(prisma);
+  await seedAttributesAndOptions(prisma);
+
+  await seedCategoryVariantAttributes(prisma);
+
   await seedSpecifications(prisma);
 
   const products = await seedProducts(prisma, {
