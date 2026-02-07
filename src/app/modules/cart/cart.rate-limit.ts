@@ -1,5 +1,6 @@
 import rateLimit from "express-rate-limit";
 import { Request } from "express";
+import { ipKeyGenerator } from "express-rate-limit";
 
 /**
  * Tạo key duy nhất cho mỗi user/session
@@ -7,8 +8,11 @@ import { Request } from "express";
  */
 const createRateLimitKey = (req: Request): string => {
   if (req.user?.id) return `user:${req.user.id}`;
-  return `ip:${req.ip || "unknown"}`;
+
+  // chuẩn hóa IPv6 an toàn theo express-rate-limit
+  return `ip:${ipKeyGenerator(req)}`;
 };
+
 
 /**
  * Kiểm tra xem có nên bỏ qua rate limit không
