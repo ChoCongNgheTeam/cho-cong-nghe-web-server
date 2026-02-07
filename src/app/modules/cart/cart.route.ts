@@ -13,7 +13,8 @@ import {
 import {
   addToCartLimiter,
   generalCartLimiter,
-} from "./cart.rate-limit";
+  getCartLimiter,
+} from "../../../utils/rateLimiter";
 
 const router = Router();
 
@@ -29,6 +30,7 @@ router.use(generalCartLimiter);
 // Nên KHÔNG gắn optionalAuthMiddleware để tránh rủi ro 401
 router.post(
   "/validate-item",
+  addToCartLimiter,
   validate(validateItemSchema, "body"),
   c.validateItemHandler
 );
@@ -39,6 +41,7 @@ router.post(
 router.post(
   "/get",
   optionalAuthMiddleware, // <--- Chỉ áp dụng riêng cho route này
+  getCartLimiter,
   validate(validateLocalCartSchema, "body"),
   c.getCartHandler
 );
