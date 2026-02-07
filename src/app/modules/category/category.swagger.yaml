@@ -1,13 +1,22 @@
 paths:
   # ==================== PUBLIC ENDPOINTS ====================
+
   /categories/roots:
     get:
-      summary: Lấy root categories cho home page
+      summary: Lấy danh sách danh mục gốc (root categories)
       tags: [Categories - Public]
-      description: Lấy danh sách các danh mục gốc (không có parent) để hiển thị trên trang chủ
+      description: Trả về các danh mục cấp 1 (parentId = null) để hiển thị ở trang chủ hoặc menu chính
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+          description: Giới hạn số lượng trả về (optional)
       responses:
         "200":
-          description: Lấy danh sách root categories thành công
+          description: Thành công
           content:
             application/json:
               schema:
@@ -19,40 +28,46 @@ paths:
                       $ref: "#/components/schemas/Category"
                   message:
                     type: string
-              example:
-                data:
-                  - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                    name: "Điện thoại"
-                    slug: "dien-thoai"
-                    description: "Các sản phẩm điện thoại di động"
-                    imagePath: "https://example.com/phone.jpg"
-                    position: 0
-                    isActive: true
-                    parentId: null
-                    createdAt: "2025-12-23T10:00:00.000Z"
-                    updatedAt: "2025-12-23T10:00:00.000Z"
-                  - id: "b2c3d4e5-f6g7-8901-bcde-fg2345678901"
-                    name: "Laptop"
-                    slug: "laptop"
-                    description: "Máy tính xách tay"
-                    imagePath: "https://example.com/laptop.jpg"
-                    position: 1
-                    isActive: true
-                    parentId: null
-                    createdAt: "2025-12-23T10:00:00.000Z"
-                    updatedAt: "2025-12-23T10:00:00.000Z"
-                message: "Lấy danh sách root categories thành công"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /categories/featured:
+    get:
+      summary: Lấy danh mục nổi bật (featured)
+      tags: [Categories - Public]
+      description: Trả về các danh mục được đánh dấu isFeatured = true
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 6
+          description: Số lượng danh mục trả về (mặc định 6)
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Category"
+                  message:
+                    type: string
         "500":
           $ref: "#/components/responses/ServerError"
 
   /categories/tree:
     get:
-      summary: Lấy category tree cho menu (nested structure)
+      summary: Lấy toàn bộ cây danh mục (nested)
       tags: [Categories - Public]
-      description: Lấy cây danh mục đầy đủ với cấu trúc lồng nhau để hiển thị menu
+      description: Trả về cấu trúc cây danh mục đầy đủ (dùng cho menu đa cấp)
       responses:
         "200":
-          description: Lấy category tree thành công
+          description: Thành công
           content:
             application/json:
               schema:
@@ -64,49 +79,23 @@ paths:
                       $ref: "#/components/schemas/CategoryTree"
                   message:
                     type: string
-              example:
-                data:
-                  - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                    name: "Điện thoại"
-                    slug: "dien-thoai"
-                    imagePath: "https://example.com/phone.jpg"
-                    position: 0
-                    isActive: true
-                    children:
-                      - id: "c3d4e5f6-g7h8-9012-cdef-gh3456789012"
-                        name: "iPhone"
-                        slug: "iphone"
-                        imagePath: "https://example.com/iphone.jpg"
-                        position: 0
-                        isActive: true
-                        children: []
-                      - id: "d4e5f6g7-h8i9-0123-defg-hi4567890123"
-                        name: "Samsung"
-                        slug: "samsung"
-                        imagePath: "https://example.com/samsung.jpg"
-                        position: 1
-                        isActive: true
-                        children: []
-                message: "Lấy category tree thành công"
         "500":
           $ref: "#/components/responses/ServerError"
 
   /categories/slug/{slug}:
     get:
-      summary: Lấy category theo slug (có children)
+      summary: Lấy thông tin danh mục theo slug
       tags: [Categories - Public]
-      description: Lấy thông tin chi tiết category theo slug kèm danh sách children
+      description: Trả về chi tiết danh mục + danh sách con trực tiếp (children)
       parameters:
         - in: path
           name: slug
           required: true
           schema:
             type: string
-          description: Slug của category
-          example: "dien-thoai"
       responses:
         "200":
-          description: Lấy category thành công
+          description: Thành công
           content:
             application/json:
               schema:
@@ -116,47 +105,23 @@ paths:
                     $ref: "#/components/schemas/CategoryWithChildren"
                   message:
                     type: string
-              example:
-                data:
-                  id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                  name: "Điện thoại"
-                  slug: "dien-thoai"
-                  description: "Các sản phẩm điện thoại di động"
-                  imagePath: "https://example.com/phone.jpg"
-                  position: 0
-                  isActive: true
-                  parentId: null
-                  createdAt: "2025-12-23T10:00:00.000Z"
-                  updatedAt: "2025-12-23T10:00:00.000Z"
-                  children:
-                    - id: "c3d4e5f6-g7h8-9012-cdef-gh3456789012"
-                      name: "iPhone"
-                      slug: "iphone"
-                      position: 0
-                      isActive: true
-                message: "Lấy category thành công"
         "404":
-          description: Không tìm thấy category
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                message: "Không tìm thấy category với slug: dien-thoai"
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/ServerError"
 
   # ==================== ADMIN ENDPOINTS ====================
+
   /categories/admin/all:
     get:
-      summary: Lấy tất cả categories (Admin only - flat list với _count)
+      summary: Lấy tất cả danh mục (flat list)
       tags: [Categories - Admin]
       security:
         - bearerAuth: []
-      description: Lấy danh sách tất cả categories dạng flat list, có số lượng sản phẩm và subcategories
+      description: Danh sách phẳng, có thêm _count (số sản phẩm & số con)
       responses:
         "200":
-          description: Lấy danh sách categories thành công
+          description: Thành công
           content:
             application/json:
               schema:
@@ -170,36 +135,6 @@ paths:
                     type: integer
                   message:
                     type: string
-              example:
-                data:
-                  - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                    name: "Điện thoại"
-                    slug: "dien-thoai"
-                    description: "Các sản phẩm điện thoại di động"
-                    imagePath: "https://example.com/phone.jpg"
-                    position: 0
-                    isActive: true
-                    parentId: null
-                    createdAt: "2025-12-23T10:00:00.000Z"
-                    updatedAt: "2025-12-23T10:00:00.000Z"
-                    _count:
-                      products: 150
-                      children: 5
-                  - id: "c3d4e5f6-g7h8-9012-cdef-gh3456789012"
-                    name: "iPhone"
-                    slug: "iphone"
-                    description: "Điện thoại iPhone"
-                    imagePath: "https://example.com/iphone.jpg"
-                    position: 0
-                    isActive: true
-                    parentId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                    createdAt: "2025-12-23T10:00:00.000Z"
-                    updatedAt: "2025-12-23T10:00:00.000Z"
-                    _count:
-                      products: 45
-                      children: 0
-                total: 2
-                message: "Lấy tất cả categories thành công"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
@@ -209,14 +144,14 @@ paths:
 
   /categories/admin/roots:
     get:
-      summary: Lấy root categories cho admin (Admin only - có số lượng sub)
+      summary: Lấy danh mục gốc cho admin
       tags: [Categories - Admin]
       security:
         - bearerAuth: []
-      description: Lấy danh sách root categories cho admin, có số lượng subcategories
+      description: Chỉ lấy root categories, có _count children & products
       responses:
         "200":
-          description: Lấy root categories thành công
+          description: Thành công
           content:
             application/json:
               schema:
@@ -228,17 +163,6 @@ paths:
                       $ref: "#/components/schemas/CategoryWithCount"
                   message:
                     type: string
-              example:
-                data:
-                  - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                    name: "Điện thoại"
-                    slug: "dien-thoai"
-                    position: 0
-                    isActive: true
-                    _count:
-                      children: 5
-                      products: 150
-                message: "Lấy root categories thành công"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
@@ -248,11 +172,10 @@ paths:
 
   /categories/admin/{id}:
     get:
-      summary: Lấy category detail với children (Admin only)
+      summary: Chi tiết 1 danh mục (admin)
       tags: [Categories - Admin]
       security:
         - bearerAuth: []
-      description: Lấy thông tin chi tiết category kèm danh sách children (khi click vào root category)
       parameters:
         - in: path
           name: id
@@ -260,11 +183,10 @@ paths:
           schema:
             type: string
             format: uuid
-          description: ID của category
-          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      description: Trả về thông tin chi tiết + children (nếu có)
       responses:
         "200":
-          description: Lấy category detail thành công
+          description: Thành công
           content:
             application/json:
               schema:
@@ -274,42 +196,17 @@ paths:
                     $ref: "#/components/schemas/CategoryWithChildren"
                   message:
                     type: string
-              example:
-                data:
-                  id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                  name: "Điện thoại"
-                  slug: "dien-thoai"
-                  description: "Các sản phẩm điện thoại di động"
-                  imagePath: "https://example.com/phone.jpg"
-                  position: 0
-                  isActive: true
-                  parentId: null
-                  createdAt: "2025-12-23T10:00:00.000Z"
-                  updatedAt: "2025-12-23T10:00:00.000Z"
-                  children:
-                    - id: "c3d4e5f6-g7h8-9012-cdef-gh3456789012"
-                      name: "iPhone"
-                      slug: "iphone"
-                      position: 0
-                      isActive: true
-                message: "Lấy category detail thành công"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
           $ref: "#/components/responses/ForbiddenError"
         "404":
-          description: Không tìm thấy category
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                message: "Không tìm thấy category"
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/ServerError"
 
     patch:
-      summary: Cập nhật category (Admin only)
+      summary: Cập nhật danh mục
       tags: [Categories - Admin]
       security:
         - bearerAuth: []
@@ -320,48 +217,15 @@ paths:
           schema:
             type: string
             format: uuid
-          description: ID của category
-          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  minLength: 2
-                  maxLength: 100
-                  description: Tên danh mục
-                parentId:
-                  type: string
-                  format: uuid
-                  nullable: true
-                  description: ID của category cha (null nếu là root)
-                description:
-                  type: string
-                  maxLength: 500
-                  description: Mô tả danh mục
-                imagePath:
-                  type: string
-                  format: uri
-                  description: URL hình ảnh danh mục
-                position:
-                  type: integer
-                  minimum: 0
-                  description: Vị trí sắp xếp
-                isActive:
-                  type: boolean
-                  description: Trạng thái hoạt động
-            example:
-              name: "Điện thoại thông minh"
-              description: "Các sản phẩm smartphone cao cấp"
-              imagePath: "https://example.com/smartphone.jpg"
-              isActive: true
+              $ref: "#/components/schemas/UpdateCategoryRequest"
       responses:
         "200":
-          description: Cập nhật category thành công
+          description: Cập nhật thành công
           content:
             application/json:
               schema:
@@ -371,19 +235,6 @@ paths:
                     $ref: "#/components/schemas/Category"
                   message:
                     type: string
-              example:
-                data:
-                  id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                  name: "Điện thoại thông minh"
-                  slug: "dien-thoai-thong-minh"
-                  description: "Các sản phẩm smartphone cao cấp"
-                  imagePath: "https://example.com/smartphone.jpg"
-                  position: 0
-                  isActive: true
-                  parentId: null
-                  createdAt: "2025-12-23T10:00:00.000Z"
-                  updatedAt: "2025-12-23T15:00:00.000Z"
-                message: "Cập nhật category thành công"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
@@ -391,30 +242,17 @@ paths:
         "403":
           $ref: "#/components/responses/ForbiddenError"
         "404":
-          description: Không tìm thấy category
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                message: "Không tìm thấy category"
+          $ref: "#/components/responses/NotFound"
         "409":
-          description: Xung đột dữ liệu (tên trùng, không thể set parent)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                message: "Tên category đã tồn tại"
+          description: Xung đột (tên trùng, parent không hợp lệ,...)
         "500":
           $ref: "#/components/responses/ServerError"
 
     delete:
-      summary: Xóa category (Admin only)
+      summary: Xóa danh mục
       tags: [Categories - Admin]
       security:
         - bearerAuth: []
-      description: Xóa category (chỉ xóa được nếu không có sản phẩm và subcategories)
       parameters:
         - in: path
           name: id
@@ -422,37 +260,24 @@ paths:
           schema:
             type: string
             format: uuid
-          description: ID của category
-          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      description: Chỉ xóa được khi không còn sản phẩm và không còn danh mục con
       responses:
         "204":
-          description: Xóa category thành công (không có nội dung trả về)
+          description: Xóa thành công
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
           $ref: "#/components/responses/ForbiddenError"
         "404":
-          description: Không tìm thấy category
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                message: "Không tìm thấy category"
+          $ref: "#/components/responses/NotFound"
         "409":
-          description: Không thể xóa (có sản phẩm hoặc subcategories)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                message: "Không thể xóa category vì còn 5 subcategories"
+          description: Không thể xóa (còn sản phẩm hoặc con)
         "500":
           $ref: "#/components/responses/ServerError"
 
   /categories/admin:
     post:
-      summary: Tạo category mới (Admin only)
+      summary: Tạo danh mục mới
       tags: [Categories - Admin]
       security:
         - bearerAuth: []
@@ -461,44 +286,10 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - name
-              properties:
-                name:
-                  type: string
-                  minLength: 2
-                  maxLength: 100
-                  description: Tên danh mục
-                parentId:
-                  type: string
-                  format: uuid
-                  nullable: true
-                  description: ID của category cha (bỏ trống nếu là root)
-                description:
-                  type: string
-                  maxLength: 500
-                  description: Mô tả danh mục
-                imagePath:
-                  type: string
-                  format: uri
-                  description: URL hình ảnh danh mục
-                position:
-                  type: integer
-                  minimum: 0
-                  description: Vị trí sắp xếp (tự động nếu không truyền)
-                isActive:
-                  type: boolean
-                  default: true
-                  description: Trạng thái hoạt động
-            example:
-              name: "Tablet"
-              description: "Máy tính bảng"
-              imagePath: "https://example.com/tablet.jpg"
-              isActive: true
+              $ref: "#/components/schemas/CreateCategoryRequest"
       responses:
         "201":
-          description: Tạo category thành công
+          description: Tạo thành công
           content:
             application/json:
               schema:
@@ -508,19 +299,6 @@ paths:
                     $ref: "#/components/schemas/Category"
                   message:
                     type: string
-              example:
-                data:
-                  id: "e5f6g7h8-i9j0-1234-efgh-ij5678901234"
-                  name: "Tablet"
-                  slug: "tablet"
-                  description: "Máy tính bảng"
-                  imagePath: "https://example.com/tablet.jpg"
-                  position: 2
-                  isActive: true
-                  parentId: null
-                  createdAt: "2025-12-23T16:00:00.000Z"
-                  updatedAt: "2025-12-23T16:00:00.000Z"
-                message: "Tạo category thành công"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
@@ -528,47 +306,25 @@ paths:
         "403":
           $ref: "#/components/responses/ForbiddenError"
         "409":
-          description: Tên category đã tồn tại
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                message: "Tên category đã tồn tại"
+          description: Tên đã tồn tại
         "500":
           $ref: "#/components/responses/ServerError"
 
   /categories/admin/reorder:
     post:
-      summary: Sắp xếp lại position của category (Admin only)
+      summary: Sắp xếp lại thứ tự danh mục (drag & drop)
       tags: [Categories - Admin]
       security:
         - bearerAuth: []
-      description: Thay đổi vị trí hiển thị của category (dùng cho drag & drop)
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - categoryId
-                - newPosition
-              properties:
-                categoryId:
-                  type: string
-                  format: uuid
-                  description: ID của category cần di chuyển
-                newPosition:
-                  type: integer
-                  minimum: 0
-                  description: Vị trí mới (bắt đầu từ 0)
-            example:
-              categoryId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-              newPosition: 3
+              $ref: "#/components/schemas/ReorderCategoryRequest"
       responses:
         "200":
-          description: Sắp xếp lại position thành công
+          description: Sắp xếp thành công
           content:
             application/json:
               schema:
@@ -576,8 +332,6 @@ paths:
                 properties:
                   message:
                     type: string
-              example:
-                message: "Sắp xếp lại position thành công"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
@@ -585,13 +339,171 @@ paths:
         "403":
           $ref: "#/components/responses/ForbiddenError"
         "404":
-          description: Không tìm thấy category
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  # ==================== TEMPLATE & ATTRIBUTE APIs ====================
+
+  /categories/{categoryId}/template:
+    get:
+      summary: Lấy template thuộc tính của danh mục
+      description: Trả về danh sách attributes + specifications áp dụng cho danh mục này
+      tags: [Categories - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: categoryId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Thành công
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                message: "Không tìm thấy category"
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      attributes:
+                        type: array
+                        items:
+                          type: object
+                          # bạn có thể định nghĩa chi tiết hơn nếu cần
+                      specifications:
+                        type: array
+                        items:
+                          type: object
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /categories/attributes/all:
+    get:
+      summary: Lấy tất cả attributes có trong hệ thống
+      description: Dùng để hiển thị dropdown khi thêm attribute tùy chỉnh cho category
+      tags: [Categories - Admin, Attributes]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        type:
+                          type: string
+                          enum: [text, number, select, multiselect, boolean, date]
+                        isRequired:
+                          type: boolean
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /categories/attributes/{attributeId}/options:
+    get:
+      summary: Lấy danh sách options của một attribute
+      description: Dùng cho attribute loại select/multiselect
+      tags: [Categories - Admin, Attributes]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: attributeId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        value:
+                          type: string
+                        label:
+                          type: string
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /categories/specifications/all:
+    get:
+      summary: Lấy tất cả specifications có trong hệ thống
+      description: Dùng để hiển thị dropdown khi thêm specification tùy chỉnh
+      tags: [Categories - Admin, Specifications]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        unit:
+                          type: string
+                          nullable: true
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
         "500":
           $ref: "#/components/responses/ServerError"
 
