@@ -6,8 +6,15 @@
   - Added the required column `wardId` to the `user_addresses` table without a default value. This is not possible if the table is not empty.
 
 */
--- Delete existing data from user_addresses to allow schema changes
-DELETE FROM "user_addresses";
+-- AlterEnum
+ALTER TYPE "AddressType" ADD VALUE 'OTHER';
+
+-- AlterTable
+ALTER TABLE "user_addresses" DROP COLUMN "districtId",
+DROP COLUMN "provinceId",
+ADD COLUMN     "provinceId" UUID NOT NULL,
+DROP COLUMN "wardId",
+ADD COLUMN     "wardId" UUID NOT NULL;
 
 -- CreateTable
 CREATE TABLE "provinces" (
@@ -35,13 +42,6 @@ CREATE TABLE "wards" (
 
     CONSTRAINT "wards_pkey" PRIMARY KEY ("id")
 );
-
--- AlterTable
-ALTER TABLE "user_addresses" DROP COLUMN "districtId",
-DROP COLUMN "provinceId",
-ADD COLUMN     "provinceId" UUID NOT NULL,
-DROP COLUMN "wardId",
-ADD COLUMN     "wardId" UUID NOT NULL;
 
 -- CreateIndex
 CREATE UNIQUE INDEX "provinces_code_key" ON "provinces"("code");
