@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import prisma from "@/config/db";
+import { ListCategoriesQuery } from "./category.validation";
 
 const selectCategory = {
   id: true,
@@ -7,6 +8,7 @@ const selectCategory = {
   slug: true,
   parentId: true,
   imageUrl: true,
+  imagePath: true,
   position: true,
   isFeatured: true,
   isActive: true,
@@ -15,27 +17,101 @@ const selectCategory = {
 type CreateCategoryData = Prisma.categoriesCreateInput;
 type UpdateCategoryData = Prisma.categoriesUpdateInput;
 
-// =====================
-// === EXISTING CODE ===
-// =====================
+const buildCategoryWhere = (
+  query: ListCategoriesQuery,
+  onlyActive: boolean,
+): Prisma.categoriesWhereInput => {
+  const where: Prisma.categoriesWhereInput = {};
 
-// Lấy tất cả categories
+  if (onlyActive) {
+    where.isActive = true;
+  } else if (query.isActive !== undefined) {
+    where.isActive = query.isActive;
+  }
+
+  if (query.search) {
+    where.OR = [
+      { name: { contains: query.search, mode: "insensitive" } },
+      { description: { contains: query.search, mode: "insensitive" } },
+    ];
+  }
+
+  if (query.isFeatured !== undefined) {
+    where.isFeatured = query.isFeatured;
+  }
+
+  if (query.parentId !== undefined) {
+    where.parentId = query.parentId;
+  }
+
+  return where;
+};
+
+const buildCategoryOrderBy = (
+  query: ListCategoriesQuery,
+): Prisma.categoriesOrderByWithRelationInput[] => {
+  const orderBy: Prisma.categoriesOrderByWithRelationInput[] = [];
+
+  if (query.sortBy === "createdAt") {
+    orderBy.push({ createdAt: query.sortOrder });
+  } else if (query.sortBy === "name") {
+    orderBy.push({ name: query.sortOrder });
+  } else {
+    orderBy.push({ position: query.sortOrder });
+  }
+
+  return orderBy;
+};
+
+export const findAllPublic = async (query: ListCategoriesQuery) => {
+  const where = buildCategoryWhere(query, true);
+  const orderBy = buildCategoryOrderBy(query);
+
+  return await prisma.categories.findMany({
+    where,
+    orderBy,
+    select: {
+      ...selectCategory,
+      description: true,
+      _count: {
+        select: { children: true },
+      },
+    },
+  });
+};
+
+export const findAllAdmin = async (query: ListCategoriesQuery) => {
+  const where = buildCategoryWhere(query, false);
+  const orderBy = buildCategoryOrderBy(query);
+
+  return await prisma.categories.findMany({
+    where,
+    orderBy,
+    select: {
+      ...selectCategory,
+      description: true,
+      createdAt: true,
+      updatedAt: true,
+      _count: {
+        select: { children: true },
+      },
+    },
+  });
+};
+
 export const findAll = async (onlyActive: boolean = false) => {
   return prisma.categories.findMany({
     where: onlyActive ? { isActive: true } : undefined,
     select: {
       ...selectCategory,
       _count: {
-        select: {
-          children: true,
-        },
+        select: { children: true },
       },
     },
     orderBy: { position: "asc" },
   });
 };
 
-// Lấy root categories (không có parent)
 export const findRootCategories = async (onlyActive: boolean = true) => {
   return prisma.categories.findMany({
     where: {
@@ -45,9 +121,7 @@ export const findRootCategories = async (onlyActive: boolean = true) => {
     select: {
       ...selectCategory,
       _count: {
-        select: {
-          children: true,
-        },
+        select: { children: true },
       },
     },
     orderBy: { position: "asc" },
@@ -84,7 +158,6 @@ export const findAllCategoriesForTree = async (onlyActive: boolean = true) => {
   });
 };
 
-// Lấy category theo ID (simple)
 export const findById = async (id: string) => {
   return prisma.categories.findUnique({
     where: { id },
@@ -92,12 +165,12 @@ export const findById = async (id: string) => {
   });
 };
 
-// Lấy category theo slug
 export const findBySlug = async (slug: string) => {
   return prisma.categories.findUnique({
     where: { slug },
     select: {
       ...selectCategory,
+      description: true,
       children: {
         select: selectCategory,
         where: { isActive: true },
@@ -107,7 +180,6 @@ export const findBySlug = async (slug: string) => {
   });
 };
 
-// Tạo category
 export const create = async (data: CreateCategoryData) => {
   return prisma.categories.create({
     data,
@@ -115,7 +187,6 @@ export const create = async (data: CreateCategoryData) => {
   });
 };
 
-// Update category
 export const update = async (id: string, data: UpdateCategoryData) => {
   return prisma.categories.update({
     where: { id },
@@ -124,21 +195,18 @@ export const update = async (id: string, data: UpdateCategoryData) => {
   });
 };
 
-// Xóa category
 export const remove = async (id: string) => {
   return prisma.categories.delete({
     where: { id },
   });
 };
 
-// Đếm số categories cùng parent
 export const countSiblings = async (parentId: string | null) => {
   return prisma.categories.count({
     where: { parentId },
   });
 };
 
-// Check category có children không
 export const hasChildren = async (id: string): Promise<boolean> => {
   const count = await prisma.categories.count({
     where: { parentId: id },
@@ -146,7 +214,6 @@ export const hasChildren = async (id: string): Promise<boolean> => {
   return count > 0;
 };
 
-// Check category có products không
 export const hasProducts = async (id: string): Promise<boolean> => {
   const count = await prisma.products.count({
     where: { categoryId: id },
@@ -154,7 +221,6 @@ export const hasProducts = async (id: string): Promise<boolean> => {
   return count > 0;
 };
 
-// Lấy siblings (categories cùng parent)
 export const findSiblings = async (parentId: string | null) => {
   return prisma.categories.findMany({
     where: { parentId },
@@ -163,7 +229,6 @@ export const findSiblings = async (parentId: string | null) => {
   });
 };
 
-// Check name đã tồn tại chưa (trong cùng parent)
 export const existsByNameInParent = async (
   name: string,
   parentId: string | null,
@@ -184,9 +249,6 @@ type CategoryNode = {
   parentId: string | null;
 };
 
-/**
- * Lấy category hierarchy (từ con → cha → ông)
- */
 async function getCategoryHierarchy(categoryId: string): Promise<string[]> {
   const result: string[] = [];
   let currentId: string | null = categoryId;
@@ -209,9 +271,6 @@ async function getCategoryHierarchy(categoryId: string): Promise<string[]> {
   return result;
 }
 
-/**
- * Lấy variant attributes cho category (kế thừa từ hierarchy)
- */
 export const getCategoryVariantAttributes = async (categoryId: string) => {
   const categoryIds = await getCategoryHierarchy(categoryId);
 
@@ -231,7 +290,6 @@ export const getCategoryVariantAttributes = async (categoryId: string) => {
     },
   });
 
-  // Deduplicate: Ưu tiên category con
   const attributesMap = new Map<string, any>();
 
   for (const ca of categoryAttributes.reverse()) {
@@ -248,9 +306,6 @@ export const getCategoryVariantAttributes = async (categoryId: string) => {
   return Array.from(attributesMap.values());
 };
 
-/**
- * Lấy options cho một attribute
- */
 export const getAttributeOptions = async (attributeId: string) => {
   return prisma.attributes_options.findMany({
     where: { attributeId },
@@ -263,9 +318,6 @@ export const getAttributeOptions = async (attributeId: string) => {
   });
 };
 
-/**
- * Lấy specifications cho category (kế thừa từ hierarchy, grouped)
- */
 export const getCategorySpecifications = async (categoryId: string) => {
   const categoryIds = await getCategoryHierarchy(categoryId);
 
@@ -291,7 +343,6 @@ export const getCategorySpecifications = async (categoryId: string) => {
     orderBy: [{ groupName: "asc" }, { sortOrder: "asc" }],
   });
 
-  // Deduplicate: Ưu tiên category con
   const specsMap = new Map<string, any>();
 
   for (const cs of categorySpecs.reverse()) {
@@ -310,7 +361,6 @@ export const getCategorySpecifications = async (categoryId: string) => {
     }
   }
 
-  // Group theo groupName
   const grouped: Record<string, any[]> = {};
 
   for (const spec of Array.from(specsMap.values())) {
@@ -320,16 +370,12 @@ export const getCategorySpecifications = async (categoryId: string) => {
     grouped[spec.groupName].push(spec);
   }
 
-  // Convert to array
   return Object.entries(grouped).map(([groupName, items]) => ({
     groupName,
     items: items.sort((a, b) => a.sortOrder - b.sortOrder),
   }));
 };
 
-/**
- * Lấy tất cả attributes (cho dropdown custom)
- */
 export const getAllAttributes = async () => {
   return prisma.attributes.findMany({
     select: {
@@ -341,9 +387,6 @@ export const getAllAttributes = async () => {
   });
 };
 
-/**
- * Lấy tất cả specifications (cho dropdown custom)
- */
 export const getAllSpecifications = async () => {
   return prisma.specifications.findMany({
     select: {

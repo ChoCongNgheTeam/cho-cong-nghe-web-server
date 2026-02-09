@@ -1,14 +1,22 @@
 import * as categoryRepository from "./category.repository";
-import { CreateCategoryInput, UpdateCategoryInput } from "./category.validation";
+import {
+  CreateCategoryInput,
+  UpdateCategoryInput,
+  ListCategoriesQuery,
+} from "./category.validation";
 import { Prisma } from "@prisma/client";
-import { DuplicateError, NotFoundError, BadRequestError } from "@/utils/errors";
 import { generateUniqueSlug } from "@/utils/generate-unique-slug";
+import { deleteOldCategoryImage } from "./category.helpers";
 import prisma from "@/config/db";
 import buildCategoryTree from "@/utils/build-category-tree";
 
-// =====================
-// === EXISTING CODE ===
-// =====================
+export const getCategoriesPublic = async (query: ListCategoriesQuery) => {
+  return await categoryRepository.findAllPublic(query);
+};
+
+export const getCategoriesAdmin = async (query: ListCategoriesQuery) => {
+  return await categoryRepository.findAllAdmin(query);
+};
 
 export const getRootCategories = async () => {
   return categoryRepository.findRootCategories(true);
@@ -34,12 +42,12 @@ export const getCategoryTree = async () => {
 export const getCategoryBySlug = async (slug: string) => {
   const category = await categoryRepository.findBySlug(slug);
   if (!category) {
-    throw new NotFoundError("Danh mục");
+    const error: any = new Error("Không tìm thấy danh mục");
+    error.statusCode = 404;
+    throw error;
   }
   return category;
 };
-
-// === ADMIN SERVICES ===
 
 export const getAllCategories = async () => {
   return categoryRepository.findAll(false);
@@ -54,7 +62,9 @@ export const getCategoryDetail = async (id: string) => {
 
   const current = categories.find((c) => c.id === id);
   if (!current) {
-    throw new NotFoundError("Danh mục");
+    const error: any = new Error("Không tìm thấy danh mục");
+    error.statusCode = 404;
+    throw error;
   }
 
   const childrenTree = buildCategoryTree(categories, id);
@@ -76,13 +86,17 @@ export const createCategory = async (input: CreateCategoryInput) => {
   if (parentId) {
     const parent = await categoryRepository.findById(parentId);
     if (!parent) {
-      throw new NotFoundError("Danh mục cha");
+      const error: any = new Error("Không tìm thấy danh mục cha");
+      error.statusCode = 404;
+      throw error;
     }
   }
 
   const exists = await categoryRepository.existsByNameInParent(name, parentId || null);
   if (exists) {
-    throw new DuplicateError(`Tên danh mục "${name}" đã tồn tại trong cùng cấp`);
+    const error: any = new Error(`Tên danh mục "${name}" đã tồn tại trong cùng cấp`);
+    error.statusCode = 400;
+    throw error;
   }
 
   let finalPosition = position;
@@ -102,7 +116,9 @@ export const createCategory = async (input: CreateCategoryInput) => {
     });
   } catch (error: any) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      throw new DuplicateError("Slug danh mục");
+      const err: any = new Error("Slug danh mục đã tồn tại");
+      err.statusCode = 400;
+      throw err;
     }
     throw error;
   }
@@ -113,12 +129,16 @@ export const updateCategory = async (id: string, input: UpdateCategoryInput) => 
 
   const category = await categoryRepository.findById(id);
   if (!category) {
-    throw new NotFoundError("Danh mục");
+    const error: any = new Error("Không tìm thấy danh mục");
+    error.statusCode = 404;
+    throw error;
   }
 
   if (parentId !== undefined) {
     if (parentId === id) {
-      throw new BadRequestError("Danh mục không thể là cha của chính nó");
+      const error: any = new Error("Danh mục không thể là cha của chính nó");
+      error.statusCode = 400;
+      throw error;
     }
 
     const isChangingParent = parentId !== category.parentId;
@@ -126,12 +146,18 @@ export const updateCategory = async (id: string, input: UpdateCategoryInput) => 
     if (isChangingParent && parentId) {
       const parent = await categoryRepository.findById(parentId);
       if (!parent) {
-        throw new NotFoundError("Danh mục cha");
+        const error: any = new Error("Không tìm thấy danh mục cha");
+        error.statusCode = 404;
+        throw error;
       }
 
       const hasChildren = await categoryRepository.hasChildren(id);
       if (hasChildren) {
-        throw new BadRequestError("Không thể chuyển danh mục có danh mục con thành danh mục con");
+        const error: any = new Error(
+          "Không thể chuyển danh mục có danh mục con thành danh mục con",
+        );
+        error.statusCode = 400;
+        throw error;
       }
     }
   }
@@ -140,13 +166,25 @@ export const updateCategory = async (id: string, input: UpdateCategoryInput) => 
     const newParentId = parentId !== undefined ? parentId : category.parentId;
     const exists = await categoryRepository.existsByNameInParent(name, newParentId, id);
     if (exists) {
-      throw new DuplicateError(`Tên danh mục "${name}" đã tồn tại trong cùng cấp`);
+      const error: any = new Error(`Tên danh mục "${name}" đã tồn tại trong cùng cấp`);
+      error.statusCode = 400;
+      throw error;
     }
   }
 
   let slug = category.slug;
   if (name && name !== category.name) {
     slug = await generateUniqueSlug(prisma.categories, name);
+  }
+
+  if (input.imagePath && category.imagePath) {
+    await deleteOldCategoryImage(category.imagePath);
+  }
+
+  if (input.removeImage && category.imagePath) {
+    await deleteOldCategoryImage(category.imagePath);
+    (rest as any).imagePath = null;
+    (rest as any).imageUrl = null;
   }
 
   try {
@@ -157,7 +195,9 @@ export const updateCategory = async (id: string, input: UpdateCategoryInput) => 
     });
   } catch (error: any) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      throw new DuplicateError("Slug danh mục");
+      const err: any = new Error("Slug danh mục đã tồn tại");
+      err.statusCode = 400;
+      throw err;
     }
     throw error;
   }
@@ -166,21 +206,31 @@ export const updateCategory = async (id: string, input: UpdateCategoryInput) => 
 export const deleteCategory = async (id: string) => {
   const category = await categoryRepository.findById(id);
   if (!category) {
-    throw new NotFoundError("Danh mục");
+    const error: any = new Error("Không tìm thấy danh mục");
+    error.statusCode = 404;
+    throw error;
   }
 
   const hasChildren = await categoryRepository.hasChildren(id);
   if (hasChildren) {
-    throw new BadRequestError(
+    const error: any = new Error(
       "Không thể xóa danh mục có danh mục con. Vui lòng xóa danh mục con trước.",
     );
+    error.statusCode = 400;
+    throw error;
   }
 
   const hasProducts = await categoryRepository.hasProducts(id);
   if (hasProducts) {
-    throw new BadRequestError(
+    const error: any = new Error(
       "Không thể xóa danh mục đang có sản phẩm. Vui lòng chuyển sản phẩm sang danh mục khác trước.",
     );
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (category.imagePath) {
+    await deleteOldCategoryImage(category.imagePath);
   }
 
   return categoryRepository.remove(id);
@@ -189,13 +239,17 @@ export const deleteCategory = async (id: string) => {
 export const reorderCategory = async (categoryId: string, newPosition: number) => {
   const category = await categoryRepository.findById(categoryId);
   if (!category) {
-    throw new NotFoundError("Danh mục");
+    const error: any = new Error("Không tìm thấy danh mục");
+    error.statusCode = 404;
+    throw error;
   }
 
   const siblings = await categoryRepository.findSiblings(category.parentId);
 
   if (newPosition < 0 || newPosition >= siblings.length) {
-    throw new BadRequestError("Vị trí không hợp lệ");
+    const error: any = new Error("Vị trí không hợp lệ");
+    error.statusCode = 400;
+    throw error;
   }
 
   const updates = siblings
@@ -223,7 +277,9 @@ export const reorderCategory = async (categoryId: string, newPosition: number) =
 export const getCategoryTemplate = async (categoryId: string) => {
   const category = await categoryRepository.findById(categoryId);
   if (!category) {
-    throw new NotFoundError("Danh mục");
+    const error: any = new Error("Không tìm thấy danh mục");
+    error.statusCode = 404;
+    throw error;
   }
 
   const [attributes, specifications] = await Promise.all([
@@ -231,7 +287,6 @@ export const getCategoryTemplate = async (categoryId: string) => {
     categoryRepository.getCategorySpecifications(categoryId),
   ]);
 
-  // Lấy options cho mỗi attribute
   const attributesWithOptions = await Promise.all(
     attributes.map(async (attr) => {
       const options = await categoryRepository.getAttributeOptions(attr.id);
@@ -255,16 +310,10 @@ export const getCategoryTemplate = async (categoryId: string) => {
   };
 };
 
-/**
- * Lấy tất cả attributes (cho dropdown custom)
- */
 export const getAllAttributes = async () => {
   return categoryRepository.getAllAttributes();
 };
 
-/**
- * Lấy options cho attribute
- */
 export const getAttributeOptions = async (attributeId: string) => {
   const attribute = await prisma.attributes.findUnique({
     where: { id: attributeId },
@@ -272,7 +321,9 @@ export const getAttributeOptions = async (attributeId: string) => {
   });
 
   if (!attribute) {
-    throw new NotFoundError("Attribute");
+    const error: any = new Error("Không tìm thấy attribute");
+    error.statusCode = 404;
+    throw error;
   }
 
   const options = await categoryRepository.getAttributeOptions(attributeId);
@@ -283,9 +334,6 @@ export const getAttributeOptions = async (attributeId: string) => {
   };
 };
 
-/**
- * Lấy tất cả specifications (cho dropdown custom)
- */
 export const getAllSpecifications = async () => {
   return categoryRepository.getAllSpecifications();
 };
