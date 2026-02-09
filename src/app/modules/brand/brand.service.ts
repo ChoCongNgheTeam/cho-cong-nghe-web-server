@@ -1,175 +1,129 @@
-import { CreateBrandInput, UpdateBrandInput } from "./brand.validation";
+import { CreateBrandInput, UpdateBrandInput, ListBrandsQuery } from "./brand.validation";
 import { brandRepository } from "./brand.repository";
-import { generateUniqueBrandSlug } from "./brand.helper";
-import { DuplicateError, NotFoundError, BadRequestError } from "@/utils/errors";
-import { deleteImage } from "@/services/cloudinary.service";
+import { generateUniqueBrandSlug, deleteOldBrandImage } from "./brand.helpers";
 
 export class BrandService {
-  // Lấy tất cả brands (admin)
-  async getAllBrands() {
-    return await brandRepository.getAllBrands();
+  async getBrandsPublic(query: ListBrandsQuery) {
+    return await brandRepository.findAllPublic(query);
   }
 
-  // Lấy brands active (public)
+  async getBrandsAdmin(query: ListBrandsQuery) {
+    return await brandRepository.findAllAdmin(query);
+  }
+
   async getActiveBrands() {
     return await brandRepository.getActiveBrands();
   }
 
-  // Lấy featured brands
   async getFeaturedBrands(limit?: number) {
     return await brandRepository.getFeaturedBrands(limit);
   }
 
-  // Lấy brand theo slug
   async getBrandBySlug(slug: string) {
     const brand = await brandRepository.getBrandBySlug(slug);
 
     if (!brand) {
-      throw new NotFoundError("thương hiệu");
+      const error: any = new Error("Không tìm thấy thương hiệu");
+      error.statusCode = 404;
+      throw error;
     }
 
     return brand;
   }
 
-  // Lấy brand detail (admin)
   async getBrandDetail(id: string) {
     const brand = await brandRepository.getBrandById(id);
 
     if (!brand) {
-      throw new NotFoundError("thương hiệu");
+      const error: any = new Error("Không tìm thấy thương hiệu");
+      error.statusCode = 404;
+      throw error;
     }
 
     return brand;
   }
 
-  // Tạo brand mới
-  async createBrand(
-    data: CreateBrandInput,
-    uploadedImage?: { imagePath: string; imageUrl: string },
-  ) {
-    // Kiểm tra tên đã tồn tại
+  async createBrand(data: CreateBrandInput) {
     const nameExists = await brandRepository.checkNameExists(data.name);
     if (nameExists) {
-      throw new DuplicateError("Tên thương hiệu");
+      const error: any = new Error("Tên thương hiệu đã tồn tại");
+      error.statusCode = 400;
+      throw error;
     }
 
-    // Tạo slug unique
     const slug = await generateUniqueBrandSlug(data.name, (slug) =>
       brandRepository.checkSlugExists(slug),
     );
 
-    // Tạo brand
     const brand = await brandRepository.createBrand({
       ...data,
       slug,
-      imagePath: uploadedImage?.imagePath,
-      imageUrl: uploadedImage?.imageUrl,
     });
 
     return brand;
   }
 
-  // Cập nhật brand
-  async updateBrand(
-    id: string,
-    data: UpdateBrandInput & { removeImage?: boolean },
-    uploadedImage?: { imagePath: string; imageUrl: string },
-  ) {
-    // Kiểm tra brand có tồn tại
+  async updateBrand(id: string, data: UpdateBrandInput) {
     const existingBrand = await brandRepository.getBrandById(id);
     if (!existingBrand) {
-      throw new NotFoundError("thương hiệu");
+      const error: any = new Error("Không tìm thấy thương hiệu");
+      error.statusCode = 404;
+      throw error;
     }
 
-    // Nếu có thay đổi tên
-    let newSlug: string | undefined;
+    const updateData: any = { ...data };
+
     if (data.name && data.name !== existingBrand.name) {
-      // Kiểm tra tên mới có bị trùng không
       const nameExists = await brandRepository.checkNameExists(data.name, id);
       if (nameExists) {
-        throw new DuplicateError("Tên thương hiệu");
+        const error: any = new Error("Tên thương hiệu đã tồn tại");
+        error.statusCode = 400;
+        throw error;
       }
 
-      // Tạo slug mới
-      newSlug = await generateUniqueBrandSlug(
+      updateData.slug = await generateUniqueBrandSlug(
         data.name,
         (slug) => brandRepository.checkSlugExists(slug, id),
         existingBrand.slug,
       );
     }
 
-    // Xử lý image
-    let imageData: any = {};
-
-    // Nếu có upload image mới
-    if (uploadedImage) {
-      // Xóa image cũ nếu có
-      if (existingBrand.imagePath) {
-        try {
-          await deleteImage(existingBrand.imagePath);
-        } catch (error) {
-          console.error("Error deleting old image:", error);
-        }
-      }
-
-      imageData = {
-        imagePath: uploadedImage.imagePath,
-        imageUrl: uploadedImage.imageUrl,
-      };
-    }
-    // Nếu yêu cầu xóa image
-    else if (data.removeImage && existingBrand.imagePath) {
-      try {
-        await deleteImage(existingBrand.imagePath);
-      } catch (error) {
-        console.error("Error deleting image:", error);
-      }
-
-      imageData = {
-        imagePath: null,
-        imageUrl: null,
-      };
+    if (data.imagePath && existingBrand.imagePath) {
+      await deleteOldBrandImage(existingBrand.imagePath);
     }
 
-    // Update brand
-    const updatedBrand = await brandRepository.updateBrand(id, {
-      ...data,
-      ...(newSlug && { slug: newSlug }),
-      ...imageData,
-    });
+    if (data.removeImage && existingBrand.imagePath) {
+      await deleteOldBrandImage(existingBrand.imagePath);
+      updateData.imagePath = null;
+      updateData.imageUrl = null;
+    }
 
-    return updatedBrand;
+    const brand = await brandRepository.updateBrand(id, updateData);
+    return brand;
   }
 
-  // Xóa brand
   async deleteBrand(id: string) {
-    // Kiểm tra brand có tồn tại
     const brand = await brandRepository.getBrandById(id);
     if (!brand) {
-      throw new NotFoundError("thương hiệu");
+      const error: any = new Error("Không tìm thấy thương hiệu");
+      error.statusCode = 404;
+      throw error;
     }
 
-    // Kiểm tra brand có sản phẩm nào không
     const productCount = await brandRepository.countProductsByBrandId(id);
     if (productCount > 0) {
-      throw new BadRequestError(
+      const error: any = new Error(
         `Không thể xóa thương hiệu này vì đang có ${productCount} sản phẩm liên kết`,
       );
+      error.statusCode = 400;
+      throw error;
     }
 
-    // Xóa image trên cloudinary nếu có
     if (brand.imagePath) {
-      try {
-        await deleteImage(brand.imagePath);
-      } catch (error) {
-        console.error("Error deleting image:", error);
-      }
+      await deleteOldBrandImage(brand.imagePath);
     }
 
-    // Xóa brand
     await brandRepository.deleteBrand(id);
-
-    return { message: "Xóa thương hiệu thành công" };
   }
 }
 

@@ -51,6 +51,7 @@ router.post(
   authMiddleware,
   requireRole("ADMIN"),
   blogUpload.single("imageUrl"),
+  validate(createBlogSchema, "body"),
   // parseJsonFields,
   createBlogHandler,
 );
@@ -60,6 +61,7 @@ router.patch(
   authMiddleware,
   requireRole("ADMIN"),
   blogUpload.single("imageUrl"),
+  validate(updateBlogSchema, "body"),
   // parseJsonFields,
   validate(blogParamsSchema, "params"),
   updateBlogHandler,

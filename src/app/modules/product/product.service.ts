@@ -14,7 +14,7 @@ import {
   transformProductVariantResponse,
 } from "./product.transformers";
 import { RawVariant, ReviewStats } from "./product.types";
-import { buildCategoryPath } from "../category/category.helper";
+import { buildCategoryPath } from "../category/category.helpers";
 import prisma from "prisma/client";
 import { getProductIdsFromPromotions } from "./product.repository";
 import { normalizeVariant } from "./product.helpers";

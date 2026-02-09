@@ -1,6 +1,5 @@
 import slugify from "slugify";
-import fs from "fs";
-import { uploadImage } from "@/services/cloudinary.service";
+import { uploadImage, deleteImage } from "@/services/cloudinary.service";
 
 export const generateBrandSlug = (name: string): string => {
   return slugify(name, {
@@ -17,7 +16,6 @@ export const generateUniqueBrandSlug = async (
 ): Promise<string> => {
   const baseSlug = generateBrandSlug(name);
 
-  // Nếu đang update và slug không đổi thì giữ nguyên
   if (existingSlug && existingSlug === baseSlug) {
     return baseSlug;
   }
@@ -33,20 +31,9 @@ export const generateUniqueBrandSlug = async (
   return slug;
 };
 
-// Cleanup temporary uploaded files
-export const cleanupTempFiles = (files: Express.Multer.File[]) => {
-  files.forEach((file) => {
-    if (fs.existsSync(file.path)) {
-      fs.unlinkSync(file.path);
-    }
-  });
-};
-
-// Parse multipart form data
 export const parseMultipartData = (body: any): any => {
   let data = { ...body };
 
-  // Parse JSON string if there's a 'data' field
   if (body.data && typeof body.data === "string") {
     try {
       const parsedData = JSON.parse(body.data);
@@ -57,22 +44,35 @@ export const parseMultipartData = (body: any): any => {
     }
   }
 
-  // Boolean fields đã được parse ở middleware, không cần parse lại ở đây
+  const booleanFields = ["isFeatured", "isActive", "removeImage"];
+  booleanFields.forEach((field) => {
+    if (data[field] !== undefined) {
+      if (typeof data[field] === "string") {
+        data[field] = data[field].toLowerCase() === "true";
+      }
+    }
+  });
 
   return data;
 };
 
-// Upload brand image
-export const uploadBrandImage = async (
-  file: Express.Multer.File,
-): Promise<{
-  imagePath: string;
-  imageUrl: string;
-}> => {
+export const uploadBrandImage = async (file: Express.Multer.File) => {
+  if (!file) return null;
+
   const result = await uploadImage(file.path, "brands");
 
   return {
-    imagePath: result.publicId,
-    imageUrl: result.url,
+    publicId: result.publicId,
+    url: result.url,
   };
+};
+
+export const deleteOldBrandImage = async (imagePath?: string) => {
+  if (imagePath) {
+    try {
+      await deleteImage(imagePath);
+    } catch (error) {
+      console.error("Error deleting old brand image:", error);
+    }
+  }
 };

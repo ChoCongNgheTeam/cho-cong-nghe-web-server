@@ -1,83 +1,78 @@
 import { Router } from "express";
 import { validate } from "@/app/middlewares/validate.middleware";
+import { authMiddleware } from "@/app/middlewares/auth.middleware";
+import { requireRole } from "@/app/middlewares/role.middleware";
+import { brandUpload } from "@/app/middlewares/upload/brandUpload";
 import {
+  getBrandsPublicHandler,
+  getBrandsAdminHandler,
   getActiveBrandsHandler,
   getFeaturedBrandsHandler,
   getBrandBySlugHandler,
-  getAllBrandsHandler,
   getBrandDetailHandler,
   createBrandHandler,
   updateBrandHandler,
   deleteBrandHandler,
 } from "./brand.controller";
-import { createBrandSchema, updateBrandSchema } from "./brand.validation";
-import { authMiddleware } from "@/app/middlewares/auth.middleware";
-import { requireRole } from "@/app/middlewares/role.middleware";
-import { upload } from "@/app/middlewares/upload.middleware";
-import { Request, Response, NextFunction } from "express";
+import {
+  createBrandSchema,
+  updateBrandSchema,
+  brandParamsSchema,
+  brandSlugParamsSchema,
+  featuredBrandsQuerySchema,
+  listBrandsQuerySchema,
+} from "./brand.validation";
 
 const router = Router();
 
-// Middleware để parse multipart data trước khi validate
-const parseMultipartForValidation = (req: Request, res: Response, next: NextFunction) => {
-  if (req.body) {
-    // Parse boolean fields
-    if (req.body.isFeatured !== undefined) {
-      req.body.isFeatured = req.body.isFeatured === "true" || req.body.isFeatured === true;
-    }
-    if (req.body.isActive !== undefined) {
-      req.body.isActive = req.body.isActive === "true" || req.body.isActive === true;
-    }
-    if (req.body.removeImage !== undefined) {
-      req.body.removeImage = req.body.removeImage === "true" || req.body.removeImage === true;
-    }
-  }
-  next();
-};
+// Public
+router.get("/", validate(listBrandsQuerySchema, "query"), getBrandsPublicHandler);
+router.get("/active", getActiveBrandsHandler);
+router.get("/featured", validate(featuredBrandsQuerySchema, "query"), getFeaturedBrandsHandler);
+router.get("/slug/:slug", validate(brandSlugParamsSchema, "params"), getBrandBySlugHandler);
 
-// Public routes
+// Admin
+router.get(
+  "/admin/all",
+  authMiddleware,
+  requireRole("ADMIN"),
+  validate(listBrandsQuerySchema, "query"),
+  getBrandsAdminHandler,
+);
 
-// Lấy tất cả brands active
-router.get("/", getActiveBrandsHandler);
+router.get(
+  "/admin/:id",
+  authMiddleware,
+  requireRole("ADMIN"),
+  validate(brandParamsSchema, "params"),
+  getBrandDetailHandler,
+);
 
-// Lấy featured brands cho home
-// Query params: ?limit=6 (optional)
-router.get("/featured", getFeaturedBrandsHandler);
-
-// Lấy brand theo slug
-router.get("/slug/:slug", getBrandBySlugHandler);
-
-// Admin routes
-
-// Lấy tất cả brands (bao gồm inactive)
-router.get("/admin/all", authMiddleware, requireRole("ADMIN"), getAllBrandsHandler);
-
-// Lấy chi tiết brand
-router.get("/admin/:id", authMiddleware, requireRole("ADMIN"), getBrandDetailHandler);
-
-// Tạo brand mới (với upload image)
 router.post(
   "/admin",
   authMiddleware,
   requireRole("ADMIN"),
-  upload.single("image"),
-  parseMultipartForValidation,
-  validate(createBrandSchema),
+  brandUpload.single("imageUrl"),
+  validate(createBrandSchema, "body"),
   createBrandHandler,
 );
 
-// Cập nhật brand (với upload image)
 router.patch(
   "/admin/:id",
   authMiddleware,
   requireRole("ADMIN"),
-  upload.single("image"),
-  parseMultipartForValidation,
-  validate(updateBrandSchema),
+  brandUpload.single("imageUrl"),
+  validate(brandParamsSchema, "params"),
+  validate(updateBrandSchema, "body"),
   updateBrandHandler,
 );
 
-// Xóa brand
-router.delete("/admin/:id", authMiddleware, requireRole("ADMIN"), deleteBrandHandler);
+router.delete(
+  "/admin/:id",
+  authMiddleware,
+  requireRole("ADMIN"),
+  validate(brandParamsSchema, "params"),
+  deleteBrandHandler,
+);
 
 export default router;
