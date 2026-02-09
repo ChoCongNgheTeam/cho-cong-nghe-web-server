@@ -5,7 +5,7 @@ CREATE TYPE "Gender" AS ENUM ('MALE', 'FEMALE', 'OTHER');
 CREATE TYPE "UserRole" AS ENUM ('CUSTOMER', 'ADMIN', 'STAFF');
 
 -- CreateEnum
-CREATE TYPE "AddressType" AS ENUM ('HOME', 'OFFICE');
+CREATE TYPE "AddressType" AS ENUM ('HOME', 'OFFICE', 'OTHER');
 
 -- CreateEnum
 CREATE TYPE "OrderStatus" AS ENUM ('PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED');
@@ -55,6 +55,7 @@ CREATE TABLE "users" (
     "fullName" TEXT,
     "phone" TEXT,
     "gender" "Gender",
+    "dateOfBirth" TIMESTAMP(3),
     "role" "UserRole" NOT NULL DEFAULT 'CUSTOMER',
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "avatarImage" TEXT,
@@ -91,14 +92,40 @@ CREATE TABLE "refresh_tokens" (
 );
 
 -- CreateTable
+CREATE TABLE "provinces" (
+    "id" UUID NOT NULL,
+    "code" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "fullName" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "provinces_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "wards" (
+    "id" UUID NOT NULL,
+    "code" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "fullName" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "provinceId" UUID NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "wards_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "user_addresses" (
     "id" UUID NOT NULL,
     "userId" UUID NOT NULL,
     "contactName" TEXT NOT NULL,
     "phone" TEXT NOT NULL,
-    "provinceId" INTEGER NOT NULL,
-    "districtId" INTEGER NOT NULL,
-    "wardId" INTEGER,
+    "provinceId" UUID NOT NULL,
+    "wardId" UUID NOT NULL,
     "detailAddress" TEXT NOT NULL,
     "type" "AddressType",
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
@@ -555,6 +582,24 @@ CREATE UNIQUE INDEX "refresh_tokens_token_key" ON "refresh_tokens"("token");
 CREATE INDEX "refresh_tokens_userId_idx" ON "refresh_tokens"("userId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "provinces_code_key" ON "provinces"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "wards_code_key" ON "wards"("code");
+
+-- CreateIndex
+CREATE INDEX "wards_provinceId_idx" ON "wards"("provinceId");
+
+-- CreateIndex
+CREATE INDEX "user_addresses_userId_idx" ON "user_addresses"("userId");
+
+-- CreateIndex
+CREATE INDEX "user_addresses_provinceId_idx" ON "user_addresses"("provinceId");
+
+-- CreateIndex
+CREATE INDEX "user_addresses_wardId_idx" ON "user_addresses"("wardId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "user_addresses_userId_detailAddress_phone_key" ON "user_addresses"("userId", "detailAddress", "phone");
 
 -- CreateIndex
@@ -577,6 +622,9 @@ CREATE UNIQUE INDEX "products_slug_key" ON "products"("slug");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "attributes_code_key" ON "attributes"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "attributes_options_attributeId_value_key" ON "attributes_options"("attributeId", "value");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "products_variants_code_key" ON "products_variants"("code");
@@ -636,7 +684,16 @@ ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_userId
 ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "wards" ADD CONSTRAINT "wards_provinceId_fkey" FOREIGN KEY ("provinceId") REFERENCES "provinces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "user_addresses" ADD CONSTRAINT "user_addresses_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_addresses" ADD CONSTRAINT "user_addresses_provinceId_fkey" FOREIGN KEY ("provinceId") REFERENCES "provinces"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_addresses" ADD CONSTRAINT "user_addresses_wardId_fkey" FOREIGN KEY ("wardId") REFERENCES "wards"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "categories" ADD CONSTRAINT "categories_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "categories"("id") ON DELETE SET NULL ON UPDATE CASCADE;
