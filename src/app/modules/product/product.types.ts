@@ -163,8 +163,8 @@ export interface ProductDetail {
   brand: Brand;
   category: Category;
   availableOptions: AvailableOption[];
-  highlights: Highlight[];
-  highlightGroups: HighlightSpecificationGroup[];
+  // highlights: Highlight[];
+  // highlightGroups: HighlightSpecificationGroup[];
   priceRange: PriceRange;
   warranty?: string;
   stockStatus: "in_stock" | "low_stock" | "out_of_stock" | "pre_order";

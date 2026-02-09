@@ -2,6 +2,9 @@ import { Router } from "express";
 import { validate } from "@/app/middlewares/validate.middleware";
 import { authMiddleware } from "@/app/middlewares/auth.middleware";
 import { requireRole } from "@/app/middlewares/role.middleware";
+// import { upload } from "@/app/middlewares/upload.middleware";
+import { blogUpload } from "@/app/middlewares/upload/blogUpload";
+// import { parseJsonFields } from "@/app/middlewares/parse-json-fields.middleware";
 import {
   getBlogsPublicHandler,
   getBlogBySlugHandler,
@@ -23,13 +26,10 @@ import {
 const router = Router();
 
 // Public
-
 router.get("/", validate(listBlogsSchema, "query"), getBlogsPublicHandler);
-
 router.get("/slug/:slug", validate(blogBySlugParamsSchema, "params"), getBlogBySlugHandler);
 
 // Admin
-
 router.get(
   "/admin/all",
   authMiddleware,
@@ -50,7 +50,8 @@ router.post(
   "/admin",
   authMiddleware,
   requireRole("ADMIN"),
-  validate(createBlogSchema, "body"),
+  blogUpload.single("imageUrl"),
+  // parseJsonFields,
   createBlogHandler,
 );
 
@@ -58,8 +59,9 @@ router.patch(
   "/admin/:id",
   authMiddleware,
   requireRole("ADMIN"),
+  blogUpload.single("imageUrl"),
+  // parseJsonFields,
   validate(blogParamsSchema, "params"),
-  validate(updateBlogSchema, "body"),
   updateBlogHandler,
 );
 

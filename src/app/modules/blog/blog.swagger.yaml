@@ -1,0 +1,526 @@
+openapi: 3.0.0
+info:
+  title: Blog API
+  version: 1.0.0
+  description: API quản lý blog
+
+servers:
+  - url: /api/v1/blogs
+    description: Blog API endpoints
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Nhập JWT token (không cần thêm 'Bearer ' ở đầu)"
+
+  schemas:
+    BlogStatus:
+      type: string
+      enum: [DRAFT, PUBLISHED, ARCHIVED]
+
+    Author:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+        avatarImage:
+          type: string
+
+    BlogCard:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        slug:
+          type: string
+        thumbnail:
+          type: string
+        excerpt:
+          type: string
+        viewCount:
+          type: integer
+        status:
+          $ref: "#/components/schemas/BlogStatus"
+        author:
+          $ref: "#/components/schemas/Author"
+        createdAt:
+          type: string
+          format: date-time
+        publishedAt:
+          type: string
+          format: date-time
+        commentsCount:
+          type: integer
+
+    BlogDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        slug:
+          type: string
+        content:
+          type: string
+        thumbnail:
+          type: string
+        viewCount:
+          type: integer
+        status:
+          $ref: "#/components/schemas/BlogStatus"
+        author:
+          $ref: "#/components/schemas/Author"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        publishedAt:
+          type: string
+          format: date-time
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+
+tags:
+  - name: Public - Blogs
+    description: API công khai cho blogs
+  - name: Admin - Blogs
+    description: API quản trị blogs
+
+paths:
+  /:
+    get:
+      tags:
+        - Public - Blogs
+      summary: Lấy danh sách blogs công khai
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 12
+            maximum: 50
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/BlogStatus"
+        - in: query
+          name: authorId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, publishedAt, viewCount, title]
+            default: publishedAt
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BlogCard"
+                  pagination:
+                    $ref: "#/components/schemas/PaginationMeta"
+                  message:
+                    type: string
+        "500":
+          description: Lỗi server
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /slug/{slug}:
+    get:
+      tags:
+        - Public - Blogs
+      summary: Lấy chi tiết blog theo slug
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/BlogDetail"
+                  message:
+                    type: string
+        "404":
+          description: Không tìm thấy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Lỗi server
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/all:
+    get:
+      tags:
+        - Admin - Blogs
+      summary: Lấy danh sách tất cả blogs (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 12
+            maximum: 50
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/BlogStatus"
+        - in: query
+          name: authorId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, publishedAt, viewCount, title]
+            default: publishedAt
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BlogCard"
+                  pagination:
+                    $ref: "#/components/schemas/PaginationMeta"
+                  message:
+                    type: string
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "500":
+          description: Lỗi server
+
+  /admin/{id}:
+    get:
+      tags:
+        - Admin - Blogs
+      summary: Lấy chi tiết blog theo ID (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/BlogDetail"
+                  message:
+                    type: string
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "404":
+          description: Không tìm thấy
+        "500":
+          description: Lỗi server
+
+    patch:
+      tags:
+        - Admin - Blogs
+      summary: Cập nhật blog (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                imageUrl:
+                  type: string
+                  format: binary
+                  description: Ảnh thumbnail (tùy chọn)
+                title:
+                  type: string
+                  minLength: 10
+                  maxLength: 200
+                content:
+                  type: string
+                  minLength: 100
+                status:
+                  $ref: "#/components/schemas/BlogStatus"
+                publishedAt:
+                  type: string
+                  format: date-time
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/BlogDetail"
+                  message:
+                    type: string
+        "400":
+          description: Dữ liệu không hợp lệ
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "404":
+          description: Không tìm thấy
+        "500":
+          description: Lỗi server
+
+    delete:
+      tags:
+        - Admin - Blogs
+      summary: Xóa blog (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Xóa thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "404":
+          description: Không tìm thấy
+        "500":
+          description: Lỗi server
+
+  /admin:
+    post:
+      tags:
+        - Admin - Blogs
+      summary: Tạo blog mới (Admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - title
+                - content
+              properties:
+                imageUrl:
+                  type: string
+                  format: binary
+                  description: Ảnh thumbnail (tùy chọn)
+                title:
+                  type: string
+                  minLength: 10
+                  maxLength: 200
+                content:
+                  type: string
+                  minLength: 100
+                status:
+                  $ref: "#/components/schemas/BlogStatus"
+                  default: DRAFT
+                publishedAt:
+                  type: string
+                  format: date-time
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/BlogDetail"
+                  message:
+                    type: string
+        "400":
+          description: Dữ liệu không hợp lệ
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "500":
+          description: Lỗi server
+
+  /admin/bulk/status:
+    patch:
+      tags:
+        - Admin - Blogs
+      summary: Cập nhật trạng thái hàng loạt (Admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - blogIds
+                - status
+              properties:
+                blogIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                status:
+                  $ref: "#/components/schemas/BlogStatus"
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Dữ liệu không hợp lệ
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "500":
+          description: Lỗi server

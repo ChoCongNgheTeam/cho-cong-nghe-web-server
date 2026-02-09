@@ -3,10 +3,6 @@ import { Prisma } from "@prisma/client";
 import { ListBlogsQuery } from "./blog.validation";
 import { BlogStatus } from "./blog.types";
 
-// =====================
-// === SELECTORS ===
-// =====================
-
 const selectAuthor = {
   id: true,
   fullName: true,
@@ -34,7 +30,7 @@ const selectBlogDetail = {
   title: true,
   slug: true,
   content: true,
-  thumbnail: true,
+  imageUrl: true,
   viewCount: true,
   status: true,
   createdAt: true,
@@ -55,6 +51,8 @@ const buildBlogWhere = (query: ListBlogsQuery, onlyPublished: boolean): Prisma.b
   // Only published blogs for public
   if (onlyPublished) {
     where.status = BlogStatus.PUBLISHED;
+  } else if (query.status) {
+    where.status = query.status;
   }
 
   // Search
@@ -133,10 +131,6 @@ export const findBySlug = async (slug: string) => {
     select: selectBlogDetail,
   });
 };
-
-// =====================
-// === MUTATIONS ===
-// =====================
 
 export const create = async (authorId: string, data: any) => {
   return prisma.blogs.create({

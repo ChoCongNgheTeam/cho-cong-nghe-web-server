@@ -24,36 +24,12 @@ const storage = multer.diskStorage({
   },
 });
 
-// Lọc file
-// const fileFilter = (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
-//   const allowedMimes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-
-//   const allowedExts = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
-
-//   const ext = path.extname(file.originalname).toLowerCase();
-//   const mime = file.mimetype;
-
-//   if (allowedExts.includes(ext) && allowedMimes.includes(mime)) {
-//     cb(null, true);
-//   } else {
-//     cb(new Error("Chỉ chấp nhận ảnh jpg, jpeg, png, gif, webp"));
-//   }
-// };
-
 const fileFilter = (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
-  // console.log("📎 File received:", {
-  //   fieldname: file.fieldname,
-  //   originalname: file.originalname,
-  //   mimetype: file.mimetype,
-  // });
-
-  // ✅ Cho phép JSON fields cụ thể
   const jsonFields = ["variants", "specifications"];
   if (jsonFields.includes(file.fieldname) && file.mimetype === "application/json") {
     return cb(null, true);
   }
 
-  // ✅ Skip file rỗng hoặc không phải ảnh
   if (!file.originalname || file.originalname.trim() === "") {
     return cb(null, false);
   }

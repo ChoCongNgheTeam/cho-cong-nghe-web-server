@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import * as blogService from "./blog.service";
 import { ListBlogsQuery } from "./blog.validation";
 import { BlogStatus } from "./blog.types";
+import { parseMultipartData, uploadThumbnail } from "./blog.helpers";
+import { cleanupFile } from "@/services/file-cleanup.service";
 
 type ValidatedQuery<T> = Request & {
   query: T;
@@ -30,9 +32,6 @@ export const getBlogsPublicHandler = async (req: ValidatedQuery<ListBlogsQuery>,
   }
 };
 
-/**
- * Get blog by slug (public)
- */
 export const getBlogBySlugHandler = async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
@@ -52,13 +51,6 @@ export const getBlogBySlugHandler = async (req: Request, res: Response) => {
   }
 };
 
-// =====================
-// === ADMIN HANDLERS ===
-// =====================
-
-/**
- * Get all blogs (admin - includes drafts)
- */
 export const getBlogsAdminHandler = async (req: ValidatedQuery<ListBlogsQuery>, res: Response) => {
   try {
     const result = await blogService.getBlogsAdmin(req.query);
@@ -82,9 +74,6 @@ export const getBlogsAdminHandler = async (req: ValidatedQuery<ListBlogsQuery>, 
   }
 };
 
-/**
- * Get blog by ID (admin)
- */
 export const getBlogDetailHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -104,13 +93,29 @@ export const getBlogDetailHandler = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Create blog (admin/author)
- */
 export const createBlogHandler = async (req: Request, res: Response) => {
+  const file = req.file;
+
+  // console.log(file);
+
   try {
+    const parsedBody = parseMultipartData(req.body);
     const authorId = (req as any).user.id;
-    const blog = await blogService.createBlog(authorId, req.body);
+
+    let thumbnail = null;
+    if (file) {
+      thumbnail = await uploadThumbnail(file);
+    }
+
+    // console.log(thumbnail);
+
+    const blog = await blogService.createBlog(authorId, {
+      ...parsedBody,
+      imageUrl: thumbnail?.url,
+      imagePath: thumbnail?.publicId,
+    });
+
+    cleanupFile(file);
 
     res.status(201).json({
       success: true,
@@ -118,6 +123,8 @@ export const createBlogHandler = async (req: Request, res: Response) => {
       message: "Tạo bài viết thành công",
     });
   } catch (error: any) {
+    cleanupFile(file);
+
     if (error.name === "ZodError") {
       return res.status(400).json({
         success: false,
@@ -133,13 +140,29 @@ export const createBlogHandler = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Update blog (admin/author)
- */
 export const updateBlogHandler = async (req: Request, res: Response) => {
+  const file = req.file;
+
   try {
     const { id } = req.params;
-    const blog = await blogService.updateBlog(id, req.body);
+    const parsedBody = parseMultipartData(req.body);
+
+    let thumbnail = null;
+    if (file) {
+      thumbnail = await uploadThumbnail(file);
+    }
+
+    const updateData = {
+      ...parsedBody,
+      ...(thumbnail && {
+        imageUrl: thumbnail.url,
+        imagePath: thumbnail.publicId,
+      }),
+    };
+
+    const blog = await blogService.updateBlog(id, updateData);
+
+    cleanupFile(file);
 
     res.json({
       success: true,
@@ -147,6 +170,8 @@ export const updateBlogHandler = async (req: Request, res: Response) => {
       message: "Cập nhật bài viết thành công",
     });
   } catch (error: any) {
+    cleanupFile(file);
+
     if (error.name === "ZodError") {
       return res.status(400).json({
         success: false,
@@ -163,9 +188,6 @@ export const updateBlogHandler = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Delete blog (admin)
- */
 export const deleteBlogHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -184,9 +206,6 @@ export const deleteBlogHandler = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Bulk update blog status (admin)
- */
 export const bulkUpdateBlogStatusHandler = async (req: Request, res: Response) => {
   try {
     const { blogIds, status } = req.body;

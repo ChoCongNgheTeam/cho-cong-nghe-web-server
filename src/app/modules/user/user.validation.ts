@@ -18,8 +18,7 @@ export const createUserSchema = z.object({
 
   email: z.email("Email không hợp lệ"),
 
-  dateOfBirth: z.date().optional(),
-
+  dateOfBirth: z.string().datetime().optional(),
   password: passwordRule,
 
   fullName: z
@@ -53,7 +52,7 @@ export const updateUserSchema = z
 
     email: z.email("Email không hợp lệ").optional(),
 
-    dateOfBirth: z.date().optional(),
+    dateOfBirth: z.string().datetime().optional(),
 
     password: passwordRule.optional(),
 

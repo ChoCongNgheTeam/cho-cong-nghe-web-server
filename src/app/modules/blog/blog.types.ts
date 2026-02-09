@@ -27,7 +27,7 @@ export interface BlogCard {
   id: string;
   title: string;
   slug: string;
-  imageUrl?: string;
+  thumbnail?: string;
   excerpt: string; // First 200 chars of content
   viewCount: number;
   status: BlogStatus;
