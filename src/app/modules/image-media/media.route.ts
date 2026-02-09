@@ -27,6 +27,8 @@ import {
 
 const router = Router();
 
+// Lần sau Thêm param linh hoạt hơn, hiện tại chưa tốt cho admin
+
 // Public
 router.get("/all", getAllActiveMediaHandler);
 router.get("/type/:type", validate(mediaTypeParamsSchema, "params"), getMediaByTypeHandler);
