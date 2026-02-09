@@ -130,7 +130,7 @@ tags:
     description: API quản trị blogs
 
 paths:
-  /:
+  blogs/:
     get:
       tags:
         - Public - Blogs
@@ -197,7 +197,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  /slug/{slug}:
+  blogs/slug/{slug}:
     get:
       tags:
         - Public - Blogs
@@ -235,7 +235,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  /admin/all:
+  blogs/admin/all:
     get:
       tags:
         - Admin - Blogs
@@ -304,7 +304,7 @@ paths:
         "500":
           description: Lỗi server
 
-  /admin/{id}:
+  blogs/admin/{id}:
     get:
       tags:
         - Admin - Blogs
@@ -430,7 +430,7 @@ paths:
         "500":
           description: Lỗi server
 
-  /admin:
+  blogs/admin:
     post:
       tags:
         - Admin - Blogs
@@ -486,7 +486,7 @@ paths:
         "500":
           description: Lỗi server
 
-  /admin/bulk/status:
+  blogs/admin/bulk/status:
     patch:
       tags:
         - Admin - Blogs
