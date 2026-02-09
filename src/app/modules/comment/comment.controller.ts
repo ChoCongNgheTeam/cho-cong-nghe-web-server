@@ -6,13 +6,6 @@ type ValidatedQuery<T> = Request & {
   query: T;
 };
 
-// =====================
-// === PUBLIC HANDLERS ===
-// =====================
-
-/**
- * Get approved comments (public)
- */
 export const getCommentsPublicHandler = async (
   req: ValidatedQuery<ListCommentsQuery>,
   res: Response,
@@ -39,9 +32,6 @@ export const getCommentsPublicHandler = async (
   }
 };
 
-/**
- * Get replies for a comment (public)
- */
 export const getCommentRepliesHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -61,9 +51,6 @@ export const getCommentRepliesHandler = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Create comment (authenticated user)
- */
 export const createCommentHandler = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
@@ -91,9 +78,6 @@ export const createCommentHandler = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Delete own comment (authenticated user)
- */
 export const deleteOwnCommentHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -114,13 +98,6 @@ export const deleteOwnCommentHandler = async (req: Request, res: Response) => {
   }
 };
 
-// =====================
-// === ADMIN HANDLERS ===
-// =====================
-
-/**
- * Get all comments (admin - includes not approved)
- */
 export const getCommentsAdminHandler = async (
   req: ValidatedQuery<ListCommentsQuery>,
   res: Response,
@@ -147,9 +124,6 @@ export const getCommentsAdminHandler = async (
   }
 };
 
-/**
- * Get comment by ID (admin)
- */
 export const getCommentDetailHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -169,9 +143,6 @@ export const getCommentDetailHandler = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Update comment (admin)
- */
 export const updateCommentHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -199,9 +170,6 @@ export const updateCommentHandler = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Approve/Reject comment (admin)
- */
 export const approveCommentHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -223,9 +191,6 @@ export const approveCommentHandler = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Delete comment (admin)
- */
 export const deleteCommentHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -244,9 +209,6 @@ export const deleteCommentHandler = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Bulk approve/reject comments (admin)
- */
 export const bulkApproveCommentsHandler = async (req: Request, res: Response) => {
   try {
     const { commentIds, isApproved } = req.body;

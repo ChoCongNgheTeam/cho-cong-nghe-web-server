@@ -24,36 +24,12 @@ import {
 
 const router = Router();
 
-// =====================
-// === PUBLIC ROUTES ===
-// =====================
-
-/**
- * Get approved comments (with filters)
- * GET /api/comments?targetType=BLOG&targetId=xxx
- */
+// Public
 router.get("/", validate(listCommentsSchema, "query"), getCommentsPublicHandler);
-
-/**
- * Get replies for a comment
- * GET /api/comments/:id/replies
- */
 router.get("/:id/replies", validate(commentParamsSchema, "params"), getCommentRepliesHandler);
 
-// =====================
-// === AUTHENTICATED ROUTES ===
-// =====================
-
-/**
- * Create comment
- * POST /api/comments
- */
+// Authenticated
 router.post("/", authMiddleware, validate(createCommentSchema, "body"), createCommentHandler);
-
-/**
- * Delete own comment
- * DELETE /api/comments/:id
- */
 router.delete(
   "/:id",
   authMiddleware,
@@ -61,14 +37,7 @@ router.delete(
   deleteOwnCommentHandler,
 );
 
-// =====================
-// === ADMIN ROUTES ===
-// =====================
-
-/**
- * Get all comments (admin - includes not approved)
- * GET /api/comments/admin/all
- */
+// Admin
 router.get(
   "/admin/all",
   authMiddleware,
@@ -77,10 +46,6 @@ router.get(
   getCommentsAdminHandler,
 );
 
-/**
- * Get comment by ID (admin)
- * GET /api/comments/admin/:id
- */
 router.get(
   "/admin/:id",
   authMiddleware,
@@ -89,36 +54,24 @@ router.get(
   getCommentDetailHandler,
 );
 
-/**
- * Update comment (admin)
- * PATCH /api/comments/admin/:id
- */
 router.patch(
   "/admin/:id",
   authMiddleware,
   requireRole("ADMIN"),
-  validate(commentParamsSchema, "params"),
   validate(updateCommentSchema, "body"),
+  validate(commentParamsSchema, "params"),
   updateCommentHandler,
 );
 
-/**
- * Approve/Reject comment (admin)
- * PATCH /api/comments/admin/:id/approve
- */
 router.patch(
   "/admin/:id/approve",
   authMiddleware,
   requireRole("ADMIN"),
-  validate(commentParamsSchema, "params"),
   validate(approveCommentSchema, "body"),
+  validate(commentParamsSchema, "params"),
   approveCommentHandler,
 );
 
-/**
- * Delete comment (admin)
- * DELETE /api/comments/admin/:id
- */
 router.delete(
   "/admin/:id",
   authMiddleware,
@@ -127,10 +80,6 @@ router.delete(
   deleteCommentHandler,
 );
 
-/**
- * Bulk approve/reject comments (admin)
- * PATCH /api/comments/admin/bulk/approve
- */
 router.patch(
   "/admin/bulk/approve",
   authMiddleware,
