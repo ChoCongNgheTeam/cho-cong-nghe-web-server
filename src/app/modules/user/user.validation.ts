@@ -1,11 +1,11 @@
-import { z } from "zod";
+import { date, z } from "zod";
 
 const passwordRule = z
   .string()
   .min(6, "Mật khẩu phải ít nhất 6 ký tự")
   .regex(
     /^(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]+$/,
-    "Mật khẩu phải có chữ hoa, số và không chứa ký tự có dấu"
+    "Mật khẩu phải có chữ hoa, số và không chứa ký tự có dấu",
   );
 
 export const createUserSchema = z.object({
@@ -17,6 +17,8 @@ export const createUserSchema = z.object({
     .regex(/^[a-zA-Z0-9_]+$/, "Tên đăng nhập không hợp lệ"),
 
   email: z.email("Email không hợp lệ"),
+
+  dateOfBirth: z.date().optional(),
 
   password: passwordRule,
 
@@ -50,6 +52,8 @@ export const updateUserSchema = z
       .optional(),
 
     email: z.email("Email không hợp lệ").optional(),
+
+    dateOfBirth: z.date().optional(),
 
     password: passwordRule.optional(),
 

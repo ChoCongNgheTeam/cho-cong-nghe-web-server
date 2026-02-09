@@ -65,6 +65,8 @@ const buildBlogWhere = (query: ListBlogsQuery, onlyPublished: boolean): Prisma.b
     ];
   }
 
+  console.log(query.search);
+
   // Status filter
   if (query.status) {
     where.status = query.status;

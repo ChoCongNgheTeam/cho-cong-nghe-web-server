@@ -14,7 +14,6 @@ import {
   deletePasswordResetToken,
   deleteRefreshToken,
   createRefreshToken,
-  findValidRefreshToken,
   revokeAllRefreshTokensByUser,
   revokeRefreshTokenById,
   findValidRefreshTokenWithUser,

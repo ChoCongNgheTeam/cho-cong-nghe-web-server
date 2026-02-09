@@ -22,30 +22,14 @@ import {
 
 const router = Router();
 
-// =====================
-// === PUBLIC ROUTES ===
-// =====================
+// Public
 
-/**
- * Get published blogs
- * GET /api/blogs
- */
 router.get("/", validate(listBlogsSchema, "query"), getBlogsPublicHandler);
 
-/**
- * Get blog by slug
- * GET /api/blogs/slug/:slug
- */
 router.get("/slug/:slug", validate(blogBySlugParamsSchema, "params"), getBlogBySlugHandler);
 
-// =====================
-// === ADMIN ROUTES ===
-// =====================
+// Admin
 
-/**
- * Get all blogs (admin - includes drafts)
- * GET /api/blogs/admin/all
- */
 router.get(
   "/admin/all",
   authMiddleware,
@@ -54,10 +38,6 @@ router.get(
   getBlogsAdminHandler,
 );
 
-/**
- * Get blog by ID (admin)
- * GET /api/blogs/admin/:id
- */
 router.get(
   "/admin/:id",
   authMiddleware,
@@ -66,10 +46,6 @@ router.get(
   getBlogDetailHandler,
 );
 
-/**
- * Create blog
- * POST /api/blogs/admin
- */
 router.post(
   "/admin",
   authMiddleware,
@@ -78,10 +54,6 @@ router.post(
   createBlogHandler,
 );
 
-/**
- * Update blog
- * PATCH /api/blogs/admin/:id
- */
 router.patch(
   "/admin/:id",
   authMiddleware,
@@ -91,10 +63,6 @@ router.patch(
   updateBlogHandler,
 );
 
-/**
- * Delete blog
- * DELETE /api/blogs/admin/:id
- */
 router.delete(
   "/admin/:id",
   authMiddleware,
@@ -103,10 +71,6 @@ router.delete(
   deleteBlogHandler,
 );
 
-/**
- * Bulk update blog status
- * PATCH /api/blogs/admin/bulk/status
- */
 router.patch(
   "/admin/bulk/status",
   authMiddleware,

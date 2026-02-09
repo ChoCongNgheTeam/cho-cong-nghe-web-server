@@ -7,13 +7,6 @@ type ValidatedQuery<T> = Request & {
   query: T;
 };
 
-// =====================
-// === PUBLIC HANDLERS ===
-// =====================
-
-/**
- * Get published blogs (public)
- */
 export const getBlogsPublicHandler = async (req: ValidatedQuery<ListBlogsQuery>, res: Response) => {
   try {
     const result = await blogService.getBlogsPublic(req.query);
