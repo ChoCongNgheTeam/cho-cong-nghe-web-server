@@ -270,6 +270,7 @@ model products {
   description   String?
   slug          String   @unique
   viewsCount    BigInt   @default(0)
+  totalSoldCount  Int      @default(0)
   ratingAverage Decimal  @default("0.00") @db.Decimal(3, 2)
   ratingCount   Int      @default(0)
   isActive      Boolean  @default(true)
@@ -283,6 +284,9 @@ model products {
   img                   product_color_images[]
   variants              products_variants[]
   productSpecifications product_specifications[]
+
+  @@index([isActive, totalSoldCount])
+
 }
 
 // model category_attributes {

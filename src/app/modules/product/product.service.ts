@@ -115,7 +115,7 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
     throw error;
   }
 
-  console.log(options);
+  // console.log(options);
 
   const variant = await repo.findVariantByOptions(product.id, options || {});
   if (!variant || !variant.isActive) {
@@ -357,7 +357,7 @@ export const getFlashSaleProducts = async (
 //   }));
 // };
 
-export const getCategoriesWithSaleProducts = async (date: Date = new Date()) => {
+export const getCategoriesWithSaleProducts = async (date: Date = new Date(), limit = 5) => {
   const [products, saleProductIds] = await Promise.all([
     repo.getProductsForCategoryRanking(date),
     getProductIdsFromPromotions(date),
@@ -438,7 +438,8 @@ export const getCategoriesWithSaleProducts = async (date: Date = new Date()) => 
         score,
       };
     })
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
 };
 
 /**
@@ -546,6 +547,8 @@ export const getFeaturedProducts = async (limit: number = 12) => {
 
 export const getBestSellingProducts = async (limit: number = 12) => {
   const products = await repo.findBestSellingProducts(limit);
+
+  console.log(products);
 
   return products.map((product) => {
     const defaultVariant = product.variants?.[0];

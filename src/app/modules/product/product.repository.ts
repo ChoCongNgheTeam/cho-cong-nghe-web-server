@@ -1376,35 +1376,63 @@ export const findFeaturedProducts = async (limit: number = 12) => {
   });
 };
 
+// export const findBestSellingProducts = async (limit: number = 12) => {
+//   // Get products with highest sold count from variants
+//   const products = await prisma.products.findMany({
+//     where: { isActive: true },
+//     select: {
+//       ...selectProductCard,
+//       variants: {
+//         select: {
+//           id: true,
+//           price: true,
+//           quantity: true,
+//           soldCount: true,
+//         },
+//       },
+//     },
+//     orderBy: { viewsCount: "desc" },
+//     // take: limit * 3, // Get more to sort by soldCount
+//   });
+
+//   console.log(products);
+
+//   // Calculate total soldCount for each product
+//   const productsWithSoldCount = products.map((p) => ({
+//     ...p,
+//     totalSoldCount: p.variants.reduce((sum, v) => sum + v.soldCount, 0),
+//   }));
+
+//   // Sort by total soldCount and take top N
+//   return productsWithSoldCount.sort((a, b) => b.totalSoldCount - a.totalSoldCount).slice(0, limit);
+// };
 export const findBestSellingProducts = async (limit: number = 12) => {
-  // Get products with highest sold count from variants
-  const products = await prisma.products.findMany({
-    where: { isActive: true },
+  return prisma.products.findMany({
+    where: {
+      isActive: true,
+      variants: {
+        some: { isActive: true },
+      },
+    },
+    orderBy: {
+      totalSoldCount: "desc",
+    },
+    take: limit,
     select: {
       ...selectProductCard,
+      totalSoldCount: true,
       variants: {
+        where: { isActive: true },
+        orderBy: { isDefault: "desc" },
+        take: 1,
         select: {
           id: true,
           price: true,
           quantity: true,
-          soldCount: true,
         },
       },
     },
-    orderBy: { viewsCount: "desc" },
-    take: limit * 3, // Get more to sort by soldCount
   });
-
-  // console.log(products);
-
-  // Calculate total soldCount for each product
-  const productsWithSoldCount = products.map((p) => ({
-    ...p,
-    totalSoldCount: p.variants.reduce((sum, v) => sum + v.soldCount, 0),
-  }));
-
-  // Sort by total soldCount and take top N
-  return productsWithSoldCount.sort((a, b) => b.totalSoldCount - a.totalSoldCount).slice(0, limit);
 };
 
 export const findProductsByIds = async (ids: string[]) => {

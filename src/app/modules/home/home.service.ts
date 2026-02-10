@@ -34,7 +34,7 @@ export const getHomePageData = async (userId?: string): Promise<HomeResponse> =>
 
     getFlashSaleProductsWithPricing(today, { limit: 12 }, userId),
 
-    productService.getCategoriesWithSaleProducts(today),
+    productService.getCategoriesWithSaleProducts(today, 5),
 
     getFeaturedProductsWithPricing(12, userId),
 
@@ -42,7 +42,7 @@ export const getHomePageData = async (userId?: string): Promise<HomeResponse> =>
 
     blogService.getBlogsPublic({
       page: 1,
-      limit: 6,
+      limit: 7,
       sortBy: "publishedAt",
       sortOrder: "desc",
     }),
