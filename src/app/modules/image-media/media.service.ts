@@ -77,7 +77,7 @@ export const createMedia = async (input: CreateMediaInput) => {
 export const updateMedia = async (id: string, input: UpdateMediaInput) => {
   const existingMedia = await getMediaById(id);
 
-  if (input.imagePath && existingMedia.thumbnail) {
+  if (input.imagePath && existingMedia.imageUrl) {
     const oldImagePath = (existingMedia as any).imagePath;
     await deleteOldMediaImage(oldImagePath);
   }
@@ -89,7 +89,7 @@ export const updateMedia = async (id: string, input: UpdateMediaInput) => {
 export const deleteMedia = async (id: string) => {
   const media = await getMediaById(id);
 
-  if (media.thumbnail) {
+  if (media.imageUrl) {
     const imagePath = (media as any).imagePath;
     await deleteOldMediaImage(imagePath);
   }

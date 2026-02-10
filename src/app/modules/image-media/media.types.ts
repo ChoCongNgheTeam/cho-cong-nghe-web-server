@@ -1,26 +1,26 @@
-// import { $Enums } from "@prisma/client";
+import { MediaType, MediaPosition } from "@prisma/client";
 
-// export type MediaType = $Enums.MediaType;
+export { MediaType, MediaPosition };
 
-export enum MediaType {
-  SLIDER = "SLIDER",
-  BANNER = "BANNER",
-}
+// export enum MediaType {
+//   SLIDER = "SLIDER",
+//   BANNER = "BANNER",
+// }
 
-export enum MediaPosition {
-  HOME_TOP = "HOME_TOP",
-  BELOW_SLIDER = "BELOW_SLIDER",
-  HOME_SECTION_1 = "HOME_SECTION_1",
-  HOME_SECTION_2 = "HOME_SECTION_2",
-}
+// export enum MediaPosition {
+//   HOME_TOP = "HOME_TOP",
+//   BELOW_SLIDER = "BELOW_SLIDER",
+//   HOME_SECTION_1 = "HOME_SECTION_1",
+//   HOME_SECTION_2 = "HOME_SECTION_2",
+// }
 
 export interface Media {
   id: string;
   type: MediaType;
   position: MediaPosition;
-  title?: string;
-  thumbnail?: string;
-  linkUrl?: string;
+  title: string | null;
+  imageUrl: string | null;
+  linkUrl: string | null;
   order: number;
   isActive: boolean;
   createdAt: Date;
