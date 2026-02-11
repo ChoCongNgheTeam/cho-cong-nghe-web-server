@@ -1,119 +1,98 @@
-import { PrismaClient, AddressType } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
+// Đảm bảo đường dẫn này đúng với tên file chứa dữ liệu của bạn
+import { provincesData, wardsData, userAddressesData } from "../seed-data/users-addresses"; 
 
-interface SeedUserAddressesParams {
-  users: { admin: any; customers: any[] };
-}
+// SỬA Ở ĐÂY: Đổi 'any[]' thành 'any' để nhận được object { admin, staff... }
+export async function seedUserAddresses(prisma: PrismaClient, context?: { users: any }) {
+  console.log("🌱 Seeding Locations & Addresses...");
 
-export async function seedUserAddresses(prisma: PrismaClient, { users }: SeedUserAddressesParams) {
-  console.log(" 🌱 Seeding user addresses...");
-
-  // 1. Lấy dữ liệu Tỉnh/Phường mẫu từ Database để đảm bảo Foreign Key hợp lệ (UUID)
-  // Lấy tỉnh đầu tiên tìm thấy
-  const validProvince = await prisma.provinces.findFirst();
-  
-  if (!validProvince) {
-    console.warn("⚠️ Không tìm thấy bảng Provinces. Vui lòng seed Provinces trước.");
-    return;
+  // --- 1. SEED PROVINCES ---
+  for (const province of provincesData) {
+    await prisma.provinces.upsert({
+      where: { code: province.code },
+      update: {},
+      create: province,
+    });
   }
+  console.log(`✅ Seeded ${provincesData.length} provinces`);
 
-  // Lấy một phường thuộc tỉnh đó
-  const validWard = await prisma.wards.findFirst({
-    where: { provinceId: validProvince.id }
-  });
+  // --- 2. SEED WARDS ---
+  let wardsCount = 0;
+  for (const ward of wardsData) {
+    const province = await prisma.provinces.findUnique({
+      where: { code: ward.provinceCode },
+    });
 
-  if (!validWard) {
-    console.warn("⚠️ Không tìm thấy bảng Wards. Vui lòng seed Wards trước.");
-    return;
-  }
-
-  // 2. Định nghĩa dữ liệu mẫu (Sử dụng UUID thật vừa lấy được)
-  const addressData = [
-    {
-      userEmail: "customer1@example.com",
-      addresses: [
-        {
-          contactName: "Nguyễn Văn A",
-          phone: "0901234567",
-          provinceId: validProvince.id, // Dùng UUID thật
-          wardId: validWard.id,         // Dùng UUID thật
-          detailAddress: "123 Đường Láng, Đống Đa",
-          type: AddressType.HOME,
-          isDefault: true,
-        },
-        {
-          contactName: "Công ty ABC",
-          phone: "0281234567",
-          provinceId: validProvince.id, 
-          wardId: validWard.id,
-          detailAddress: "456 Nguyễn Trãi, Quận 5",
-          type: AddressType.OFFICE,
-          isDefault: false,
-        },
-      ],
-    },
-    {
-      userEmail: "customer2@example.com",
-      addresses: [
-        {
-          contactName: "Trần Thị B",
-          phone: "0909876543",
-          provinceId: validProvince.id,
-          wardId: validWard.id,
-          detailAddress: "789 Lê Duẩn",
-          type: AddressType.HOME,
-          isDefault: true,
-        },
-      ],
-    },
-  ];
-
-  let createdCount = 0;
-
-  for (const item of addressData) {
-    // Tìm user tương ứng trong danh sách đã seed trước đó
-    const user = users.customers.find((u: any) => u.email === item.userEmail);
-    
-    // Nếu không tìm thấy user (do file seed user chưa tạo email này), bỏ qua để tránh lỗi
-    if (!user) {
-        console.warn(`⚠️ Skipping address for missing user: ${item.userEmail}`);
-        continue;
-    }
-
-    for (const addr of item.addresses) {
-      await prisma.user_addresses.upsert({
-        where: {
-          // Unique constraint composite: userId + detailAddress + phone
-          userId_detailAddress_phone: {
-            userId: user.id,
-            detailAddress: addr.detailAddress,
-            phone: addr.phone,
-          },
-        },
-        update: {
-          contactName: addr.contactName,
-          phone: addr.phone,
-          provinceId: addr.provinceId,
-          // districtId: addr.districtId, // ĐÃ XÓA
-          wardId: addr.wardId,
-          detailAddress: addr.detailAddress,
-          type: addr.type,
-          isDefault: addr.isDefault,
-        },
+    if (province) {
+      await prisma.wards.upsert({
+        where: { code: ward.code },
+        update: {},
         create: {
-          userId: user.id,
-          contactName: addr.contactName,
-          phone: addr.phone,
-          provinceId: addr.provinceId,
-          // districtId: addr.districtId, // ĐÃ XÓA
-          wardId: addr.wardId,
-          detailAddress: addr.detailAddress,
-          type: addr.type,
-          isDefault: addr.isDefault,
+          code: ward.code,
+          name: ward.name,
+          fullName: ward.fullName,
+          type: ward.type,
+          provinceId: province.id,
         },
       });
-      createdCount++;
+      wardsCount++;
+    }
+  }
+  console.log(`✅ Seeded ${wardsCount} wards`);
+
+  // --- 3. SEED USER ADDRESSES ---
+  
+  // LOGIC MỚI: Xử lý linh hoạt dù users là Array hay Object
+  let user;
+  if (context?.users) {
+    if (Array.isArray(context.users) && context.users.length > 0) {
+      // Trường hợp là Array
+      user = context.users[0];
+    } else if (typeof context.users === 'object') {
+      // Trường hợp là Object { admin, staff, customer... }
+      // Ưu tiên lấy customer hoặc admin, nếu không thì lấy user đầu tiên tìm thấy
+      user = context.users.customer || context.users.admin || context.users.staff || Object.values(context.users)[0];
     }
   }
 
-  console.log(`✅ Seeded ${createdCount} user addresses`);
+  // Fallback: Nếu không truyền hoặc không tìm thấy trong context thì query DB
+  if (!user) {
+    user = await prisma.users.findFirst(); 
+  }
+
+  if (!user) {
+    console.warn("⚠️ Không tìm thấy User nào để seed địa chỉ. Hãy seed User trước!");
+    return;
+  }
+
+  for (const address of userAddressesData) {
+    const province = await prisma.provinces.findUnique({ where: { code: address.provinceCode } });
+    const ward = await prisma.wards.findUnique({ where: { code: address.wardCode } });
+
+    if (province && ward) {
+      const exists = await prisma.user_addresses.findFirst({
+        where: {
+          userId: user.id,
+          detailAddress: address.detailAddress,
+        }
+      });
+
+      if (!exists) {
+        await prisma.user_addresses.create({
+          data: {
+            userId: user.id,
+            contactName: address.contactName,
+            phone: address.phone,
+            provinceId: province.id,
+            wardId: ward.id,
+            detailAddress: address.detailAddress,
+            type: address.type,
+            isDefault: address.isDefault,
+          },
+        });
+        console.log(`   -> Created address for user: ${user.email || user.id} at ${address.provinceCode}`);
+      }
+    }
+  }
+  console.log("✅ Seeded user addresses successfully");
 }
