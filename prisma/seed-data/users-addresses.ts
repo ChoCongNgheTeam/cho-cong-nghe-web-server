@@ -3516,6 +3516,7 @@ export const userAddressesData = [
     type: AddressType.OFFICE,
     isDefault: false,
     provinceCode: "29", // Hồ Chí Minh
-    wardCode: "29001",  // Phường Trung Tâm HCM
+    wardCode: "29001",  // Phường Saigon
   },
+
 ];
