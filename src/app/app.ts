@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "@/config/swagger";
 import { cleanupRefreshTokens } from "./modules/auth/auth.service";
+import { globalErrorHandler } from "./middlewares/error.middleware";
 
 const app = express();
 
@@ -33,5 +34,8 @@ app.use(cookieParser());
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use("/api/v1", routes);
+
+// BẮT LỖI TẬP TRUNG (PHẢI ĐẶT Ở ĐÂY, SAU CÁC ROUTES)
+app.use(globalErrorHandler);
 
 export default app;
