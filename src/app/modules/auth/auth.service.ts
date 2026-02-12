@@ -3,7 +3,22 @@ import jwt from "jsonwebtoken";
 import { jwtConfig } from "src/config/jwt";
 import { RegisterInput, LoginInput, ResetPasswordInput } from "./auth.validation";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "@/services/token.service";
-import { findByEmailOrUserName, findByUserName, findByEmail, createUser, updatePassword, createPasswordResetToken, findPasswordResetToken, deletePasswordResetToken, deleteRefreshToken, createRefreshToken, revokeAllRefreshTokensByUser, revokeRefreshTokenById, findValidRefreshTokenWithUser, cleanupRevokedExpiredRefreshTokens } from "./auth.repository";
+import {
+  findByEmailOrUserName,
+  findByUserName,
+  findByEmail,
+  createUser,
+  updatePassword,
+  createPasswordResetToken,
+  findPasswordResetToken,
+  deletePasswordResetToken,
+  deleteRefreshToken,
+  createRefreshToken,
+  revokeAllRefreshTokensByUser,
+  revokeRefreshTokenById,
+  findValidRefreshTokenWithUser,
+  cleanupRevokedExpiredRefreshTokens,
+} from "./auth.repository";
 
 import { sendResetPasswordEmail } from "@/services/email.service";
 
@@ -58,12 +73,21 @@ export const login = async (input: LoginInput, meta?: { userAgent?: string; ip?:
 
   const refreshTokenTTL = rememberMe ? jwtConfig.refreshToken.ttl.long : jwtConfig.refreshToken.ttl.short;
 
+  // absolute lifetime policy
+  const absoluteTTL = rememberMe
+    ? 30 * 24 * 60 * 60 * 1000 // 30 ngày
+    : 7 * 24 * 60 * 60 * 1000; // 7 ngày
+
+  const now = Date.now();
+
   const refreshToken = signRefreshToken({ userId: user.id }, refreshTokenTTL);
 
   await createRefreshToken({
     userId: user.id,
     token: refreshToken,
-    expiresAt: new Date(Date.now() + refreshTokenTTL),
+    expiresAt: new Date(now + refreshTokenTTL),
+    absoluteExpiresAt: new Date(now + absoluteTTL),
+    ttlType: rememberMe ? "long" : "short",
     userAgent: meta?.userAgent,
     ip: meta?.ip,
   });
@@ -169,6 +193,12 @@ export const refreshTokenRotation = async (refreshToken: string) => {
     throw new Error("Refresh token không hợp lệ hoặc đã bị thu hồi");
   }
 
+  //  absolute expiry check
+  if (Date.now() > tokenInDb.absoluteExpiresAt.getTime()) {
+    await revokeAllRefreshTokensByUser(decoded.userId);
+    throw new Error("Session đã hết hạn, vui lòng đăng nhập lại");
+  }
+
   await revokeRefreshTokenById(tokenInDb.id);
 
   const accessToken = signAccessToken({
@@ -178,13 +208,19 @@ export const refreshTokenRotation = async (refreshToken: string) => {
 
   const accessTokenTTL = jwtConfig.accessToken.ttl;
 
-  const refreshTokenTTL = jwtConfig.refreshToken.ttl.long;
+  const refreshTokenTTL = tokenInDb.ttlType === "long" ? jwtConfig.refreshToken.ttl.long : jwtConfig.refreshToken.ttl.short;
+
   const newRefreshToken = signRefreshToken({ userId: decoded.userId }, refreshTokenTTL);
 
   await createRefreshToken({
     userId: decoded.userId,
     token: newRefreshToken,
     expiresAt: new Date(Date.now() + refreshTokenTTL),
+
+    // giữ nguyên absolute deadline
+    absoluteExpiresAt: tokenInDb.absoluteExpiresAt,
+
+    ttlType: tokenInDb.ttlType,
   });
 
   return {

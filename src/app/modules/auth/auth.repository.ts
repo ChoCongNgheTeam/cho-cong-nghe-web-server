@@ -90,13 +90,7 @@ export const deleteRefreshToken = async (token: string) => {
   });
 };
 
-export const createRefreshToken = async (data: {
-  userId: string;
-  token: string;
-  expiresAt: Date;
-  userAgent?: string;
-  ip?: string;
-}) => {
+export const createRefreshToken = async (data: { userId: string; token: string; expiresAt: Date; absoluteExpiresAt: Date; ttlType: "short" | "long"; userAgent?: string; ip?: string }) => {
   return prisma.refresh_tokens.create({ data });
 };
 

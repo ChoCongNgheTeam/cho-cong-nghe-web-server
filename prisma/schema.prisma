@@ -148,11 +148,18 @@ model password_reset_tokens {
   @@index([userId])
 }
 
+enum RefreshTokenTTLType {
+  short
+  long
+}
+
 model refresh_tokens {
   id        String    @id @default(uuid()) @db.Uuid
   userId    String    @db.Uuid
   token     String    @unique
   expiresAt DateTime
+  absoluteExpiresAt DateTime
+  ttlType   RefreshTokenTTLType
   revokedAt DateTime?
   createdAt DateTime  @default(now())
 
