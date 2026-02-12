@@ -13,6 +13,7 @@ import categoryRoutes from "@/app/modules/category/category.route";
 import brandRoutes from "@/app/modules/brand/brand.route";
 import productRoutes from "@/app/modules/product/product.route";
 import reviewRoutes from "@/app/modules/review/review.route";
+import campaign from "@/app/modules/campaign/campaign.route";
 
 // ===== Commerce =====
 import cartRoutes from "@/app/modules/cart/cart.route";
@@ -47,6 +48,7 @@ router.use("/categories", categoryRoutes);
 router.use("/brands", brandRoutes);
 router.use("/products", productRoutes);
 router.use("/reviews", reviewRoutes);
+router.use("/campaigns", campaign);
 
 // ===== Commerce =====
 router.use("/cart", cartRoutes);
@@ -54,7 +56,7 @@ router.use("/orders", orderRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/promotions", promotionRoutes);
 router.use("/vouchers", voucherRoutes);
-router.use("/checkout", checkoutRouter)
+router.use("/checkout", checkoutRouter);
 
 // ===== Content =====
 router.use("/blogs", blogRouters);

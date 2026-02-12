@@ -548,7 +548,7 @@ export const getFeaturedProducts = async (limit: number = 12) => {
 export const getBestSellingProducts = async (limit: number = 12) => {
   const products = await repo.findBestSellingProducts(limit);
 
-  console.log(products);
+  // console.log(products);
 
   return products.map((product) => {
     const defaultVariant = product.variants?.[0];

@@ -3,22 +3,7 @@ import jwt from "jsonwebtoken";
 import { jwtConfig } from "src/config/jwt";
 import { RegisterInput, LoginInput, ResetPasswordInput } from "./auth.validation";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "@/services/token.service";
-import {
-  findByEmailOrUserName,
-  findByUserName,
-  findByEmail,
-  createUser,
-  updatePassword,
-  createPasswordResetToken,
-  findPasswordResetToken,
-  deletePasswordResetToken,
-  deleteRefreshToken,
-  createRefreshToken,
-  revokeAllRefreshTokensByUser,
-  revokeRefreshTokenById,
-  findValidRefreshTokenWithUser,
-  cleanupRevokedExpiredRefreshTokens,
-} from "./auth.repository";
+import { findByEmailOrUserName, findByUserName, findByEmail, createUser, updatePassword, createPasswordResetToken, findPasswordResetToken, deletePasswordResetToken, deleteRefreshToken, createRefreshToken, revokeAllRefreshTokensByUser, revokeRefreshTokenById, findValidRefreshTokenWithUser, cleanupRevokedExpiredRefreshTokens } from "./auth.repository";
 
 import { sendResetPasswordEmail } from "@/services/email.service";
 
@@ -71,9 +56,7 @@ export const login = async (input: LoginInput, meta?: { userAgent?: string; ip?:
 
   const accessTokenTTL = jwtConfig.accessToken.ttl;
 
-  const refreshTokenTTL = rememberMe
-    ? jwtConfig.refreshToken.ttl.long
-    : jwtConfig.refreshToken.ttl.short;
+  const refreshTokenTTL = rememberMe ? jwtConfig.refreshToken.ttl.long : jwtConfig.refreshToken.ttl.short;
 
   const refreshToken = signRefreshToken({ userId: user.id }, refreshTokenTTL);
 
@@ -113,18 +96,14 @@ export const forgotPassword = async (email: string, req: Request) => {
     return { message: "Nếu email tồn tại, link reset đã được gửi" };
   }
 
-  const resetToken = jwt.sign(
-    { userId: user.id },
-    jwtConfig.resetToken.secret,
-    { expiresIn: jwtConfig.resetToken.expiresIn / 1000 }, // ms → s
-  );
+  const resetToken = jwt.sign({ userId: user.id }, jwtConfig.resetToken.secret, { expiresIn: jwtConfig.resetToken.expiresIn });
 
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
   // Lưu vào DB (one-time token)
   await createPasswordResetToken(user.id, resetToken, expiresAt);
 
-  const resetLink = `${process.env.FRONTEND_URL}/auth/reset-password?token=${resetToken}`;
+  const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
 
   await sendResetPasswordEmail(user.email, resetLink);
 
@@ -159,11 +138,7 @@ export const resetPassword = async (input: ResetPasswordInput) => {
   return { message: "Đặt lại mật khẩu thành công" };
 };
 
-export const changePassword = async (
-  userId: string,
-  currentPassword: string,
-  newPassword: string,
-) => {
+export const changePassword = async (userId: string, currentPassword: string, newPassword: string) => {
   // Lấy user kèm passwordHash
   const user = await prisma.users.findUnique({
     where: { id: userId },

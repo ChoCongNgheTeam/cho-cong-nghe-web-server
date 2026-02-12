@@ -1,4 +1,4 @@
-import { MediaType, MediaPosition } from "@prisma/client";
+import { MediaType, MediaPosition, CampaignType } from "@prisma/client";
 
 export interface HomeSlider {
   id: string;
@@ -20,19 +20,6 @@ export interface HomeBanner {
   order: number;
 }
 
-export interface CategoryWithSaleCount {
-  id: string;
-  name: string;
-  slug: string;
-  imageUrl: string | null;
-  totalProducts: number;
-  saleProducts: number;
-  newProducts: number;
-  totalViews: number;
-  totalSold: number;
-  score: number;
-}
-
 export interface FeaturedCategory {
   id: string;
   name: string;
@@ -40,6 +27,37 @@ export interface FeaturedCategory {
   imageUrl: string | null;
   position: number;
 }
+
+// ============ NEW: Campaign Types ============
+
+export interface CampaignCategory {
+  id: string;
+  position: number;
+  imagePath: string;
+  imageUrl: string | null;
+  title: string | null;
+  description: string | null;
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+    imageUrl: string | null;
+    imagePath: string | null;
+  };
+}
+
+export interface HomeCampaign {
+  id: string;
+  name: string;
+  slug: string;
+  type: CampaignType;
+  description: string | null;
+  startDate: Date | null;
+  endDate: Date | null;
+  categories: CampaignCategory[];
+}
+
+// ============ Home Response ============
 
 export interface HomeResponse {
   sliders: HomeSlider[];
@@ -51,7 +69,8 @@ export interface HomeResponse {
     date: Date;
   };
   bannersSection1: HomeBanner[];
-  categoryRanking: CategoryWithSaleCount[];
+  // NEW: Replace categoryRanking with activeCampaigns
+  activeCampaigns: HomeCampaign[];
   featuredProducts: any[];
   bestSellingProducts: any[];
   blogs: {

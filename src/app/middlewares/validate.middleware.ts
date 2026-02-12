@@ -6,8 +6,9 @@ type RequestPart = "body" | "query" | "params";
 export const validate =
   (schema: ZodSchema, source: RequestPart = "body") =>
   (req: Request, res: Response, next: NextFunction) => {
-    const dataToValidate = req[source];
+    const dataToValidate = req[source] ?? {};
     const result = schema.safeParse(dataToValidate);
+    // console.log(result);
 
     if (!result.success) {
       const flattened = result.error.flatten((issue) => issue.message);

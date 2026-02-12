@@ -57,13 +57,10 @@ const buildBlogWhere = (query: ListBlogsQuery, onlyPublished: boolean): Prisma.b
 
   // Search
   if (query.search) {
-    where.OR = [
-      { title: { contains: query.search, mode: "insensitive" } },
-      { content: { contains: query.search, mode: "insensitive" } },
-    ];
+    where.OR = [{ title: { contains: query.search, mode: "insensitive" } }, { content: { contains: query.search, mode: "insensitive" } }];
   }
 
-  console.log(query.search);
+  // console.log(query.search);
 
   // Status filter
   if (query.status) {

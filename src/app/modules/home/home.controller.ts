@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import * as homeService from "./home.service";
-import { getRecentlyViewedSection } from "./home.service";
 
 export const getHomePageHandler = async (req: Request, res: Response) => {
   try {
@@ -74,19 +73,64 @@ export const getBestSellingSectionHandler = async (req: Request, res: Response) 
   }
 };
 
+/**
+ * Get Recently Viewed section
+ * POST /api/home/recently-viewed
+ * Body: { productIds: ["uuid1", "uuid2", ...] }
+ */
 export const getRecentlyViewedSectionHandler = async (req: Request, res: Response) => {
-  const userId = req.user?.id;
-  const { productIds } = req.body;
+  try {
+    const userId = (req as any).user?.id;
+    const { productIds } = req.body;
 
-  if (!Array.isArray(productIds) || productIds.length === 0) {
-    return res.json({
-      products: [],
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        message: "Danh sách sản phẩm rỗng",
+      });
+    }
+
+    const products = await homeService.getRecentlyViewedSection(productIds, userId);
+
+    res.json({
+      success: true,
+      data: products,
+      message: "Lấy sản phẩm đã xem thành công",
+    });
+  } catch (error: any) {
+    console.error("Error in getRecentlyViewedSectionHandler:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Lỗi server",
     });
   }
+};
 
-  const products = await getRecentlyViewedSection(productIds, userId);
+/**
+ * NEW: Get Active Campaigns section only
+ * GET /api/home/campaigns
+ *
+ * Returns active campaigns that are:
+ * - Currently valid (within date range)
+ * - Have categories attached
+ * - Type: CAMPAIGN, SEASONAL, or EVENT
+ */
+export const getActiveCampaignsSectionHandler = async (req: Request, res: Response) => {
+  try {
+    const campaigns = await homeService.getActiveCampaignsSection();
 
-  return res.json({
-    products,
-  });
+    res.json({
+      success: true,
+      data: campaigns,
+      total: campaigns.length,
+      message: "Lấy danh sách chiến dịch thành công",
+    });
+  } catch (error: any) {
+    console.error("Error in getActiveCampaignsSectionHandler:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Lỗi server",
+    });
+  }
 };

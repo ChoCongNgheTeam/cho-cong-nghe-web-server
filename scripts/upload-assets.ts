@@ -23,10 +23,7 @@ const ASSETS_DIR = path.join(process.cwd(), "assets");
 // ==========================
 // Generic upload function
 // ==========================
-async function uploadImages<T extends { id: string; imagePath: string | null }>(
-  items: T[],
-  updateFn: (id: string, imageUrl: string) => Promise<unknown>,
-) {
+async function uploadImages<T extends { id: string; imagePath: string | null }>(items: T[], updateFn: (id: string, imageUrl: string) => Promise<unknown>) {
   let notFoundCount = 0;
 
   for (const item of items) {
@@ -99,17 +96,31 @@ async function uploadAssets() {
   );
 
   // -------- Categories --------
-  const categories = await prisma.categories.findMany({
+  const categoriesDefault = await prisma.categories.findMany({
     where: {
       imagePath: { not: null },
       imageUrl: null,
     },
   });
 
-  await uploadImages(categories, (id, url) =>
+  await uploadImages(categoriesDefault, (id, url) =>
     prisma.categories.update({
       where: { id },
       data: { imageUrl: url },
+    }),
+  );
+
+  const categoriesTrend = await prisma.categories.findMany({
+    where: {
+      trendImagePath: { not: null },
+      trendImageUrl: null,
+    },
+  });
+
+  await uploadImages(categoriesTrend, (id, url) =>
+    prisma.categories.update({
+      where: { id },
+      data: { trendImageUrl: url },
     }),
   );
 
