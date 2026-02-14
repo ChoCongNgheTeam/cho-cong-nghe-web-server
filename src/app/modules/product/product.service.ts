@@ -1,18 +1,7 @@
 import { slugify } from "transliteration";
 import * as repo from "./product.repository";
-import {
-  CreateProductInput,
-  UpdateProductInput,
-  ListProductsQuery,
-  ReviewsQuery,
-} from "./product.validation";
-import {
-  transformProductCard,
-  transformProductDetail,
-  transformProductSpecifications,
-  transformProductHighlights,
-  transformProductVariantResponse,
-} from "./product.transformers";
+import { CreateProductInput, UpdateProductInput, ListProductsQuery, ReviewsQuery } from "./product.validation";
+import { transformProductCard, transformProductDetail, transformProductSpecifications, transformProductHighlights, transformProductVariantResponse } from "./product.transformers";
 import { RawVariant, ReviewStats } from "./product.types";
 import { buildCategoryPath } from "../category/category.helpers";
 import prisma from "prisma/client";
@@ -82,10 +71,7 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
 
   const highlights = transformProductHighlights(product);
 
-  const { groups: highlightGroups } = await repo.findHighlightSpecificationGroups(
-    product.id,
-    product.categoryId,
-  );
+  const { groups: highlightGroups } = await repo.findHighlightSpecificationGroups(product.id, product.categoryId);
 
   // Check if user can review
   let canReview = false;
@@ -309,10 +295,7 @@ export const deleteProduct = async (id: string) => {
   return repo.remove(id);
 };
 
-export const getFlashSaleProducts = async (
-  date: Date = new Date(),
-  options: { limit?: number; categoryId?: string } = {},
-) => {
+export const getFlashSaleProducts = async (date: Date = new Date(), options: { limit?: number; categoryId?: string } = {}) => {
   const products = await repo.findProductsOnSaleByDate(date, options);
 
   // console.log(products);
@@ -358,10 +341,7 @@ export const getFlashSaleProducts = async (
 // };
 
 export const getCategoriesWithSaleProducts = async (date: Date = new Date(), limit = 5) => {
-  const [products, saleProductIds] = await Promise.all([
-    repo.getProductsForCategoryRanking(date),
-    getProductIdsFromPromotions(date),
-  ]);
+  const [products, saleProductIds] = await Promise.all([repo.getProductsForCategoryRanking(date), getProductIdsFromPromotions(date)]);
 
   const map = new Map<
     string,
@@ -425,12 +405,7 @@ export const getCategoriesWithSaleProducts = async (date: Date = new Date(), lim
     .map((cat) => {
       const stat = map.get(cat.id)!;
 
-      const score =
-        stat.saleProducts * 5 +
-        stat.newProducts * 3 +
-        stat.totalSold * 0.1 +
-        stat.totalViews * 0.01 +
-        stat.totalProducts;
+      const score = stat.saleProducts * 5 + stat.newProducts * 3 + stat.totalSold * 0.1 + stat.totalViews * 0.01 + stat.totalProducts;
 
       return {
         ...cat,
