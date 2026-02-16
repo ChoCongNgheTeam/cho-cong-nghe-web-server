@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { optionalAuthMiddleware } from "@/app/middlewares/auth.middleware";
+import { authMiddleware } from "@/app/middlewares/auth.middleware";
 import { getHomePageHandler, getFlashSaleSectionHandler, getBestSellingSectionHandler, getRecentlyViewedSectionHandler, getActiveCampaignsSectionHandler } from "./home.controller";
 
 const router = Router();
@@ -20,7 +20,7 @@ const router = Router();
  *
  * Supports optional authentication for personalized pricing
  */
-router.get("/", optionalAuthMiddleware, getHomePageHandler);
+router.get("/", authMiddleware(), getHomePageHandler);
 
 /**
  * Get Flash Sale section only
@@ -29,7 +29,7 @@ router.get("/", optionalAuthMiddleware, getHomePageHandler);
  * Query params:
  * - date (optional): ISO date string for specific flash sale date
  */
-router.get("/flash-sale", optionalAuthMiddleware, getFlashSaleSectionHandler);
+router.get("/flash-sale", authMiddleware(), getFlashSaleSectionHandler);
 
 /**
  * Get Best Selling section only
@@ -38,7 +38,7 @@ router.get("/flash-sale", optionalAuthMiddleware, getFlashSaleSectionHandler);
  * Query params:
  * - limit (optional): Number of products to return (default: 12)
  */
-router.get("/best-selling", optionalAuthMiddleware, getBestSellingSectionHandler);
+router.get("/best-selling", authMiddleware(), getBestSellingSectionHandler);
 
 /**
  * NEW: Get Active Campaigns section only
@@ -58,6 +58,6 @@ router.get("/campaigns", getActiveCampaignsSectionHandler);
  *   "productIds": ["uuid1", "uuid2", "uuid3"]
  * }
  */
-router.post("/recently-viewed", optionalAuthMiddleware, getRecentlyViewedSectionHandler);
+router.post("/recently-viewed", authMiddleware(), getRecentlyViewedSectionHandler);
 
 export default router;

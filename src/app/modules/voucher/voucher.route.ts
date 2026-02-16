@@ -17,15 +17,7 @@ import {
   deleteVoucherHandler,
   assignVoucherToUsersHandler,
 } from "./voucher.controller";
-import {
-  listVouchersSchema,
-  voucherCodeParamsSchema,
-  voucherParamsSchema,
-  validateVoucherSchema,
-  createVoucherSchema,
-  updateVoucherSchema,
-  assignVoucherToUsersSchema,
-} from "./voucher.validation";
+import { listVouchersSchema, voucherCodeParamsSchema, voucherParamsSchema, validateVoucherSchema, createVoucherSchema, updateVoucherSchema, assignVoucherToUsersSchema } from "./voucher.validation";
 
 const router = Router();
 
@@ -38,71 +30,29 @@ router.get("/", validate(listVouchersSchema, "query"), getVouchersPublicHandler)
 router.get("/code/:code", validate(voucherCodeParamsSchema, "params"), getVoucherByCodeHandler);
 
 // Validate voucher
-router.post(
-  "/validate",
-  authMiddleware,
-  validate(validateVoucherSchema, "body"),
-  validateVoucherHandler,
-);
+router.post("/validate", authMiddleware(), validate(validateVoucherSchema, "body"), validateVoucherHandler);
 
 // Get user's vouchers
-router.get("/my-vouchers", authMiddleware, getUserVouchersHandler);
+router.get("/my-vouchers", authMiddleware(), getUserVouchersHandler);
 
 // Admin
 
 // Get all vouchers (admin)
-router.get(
-  "/admin/all",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(listVouchersSchema, "query"),
-  getVouchersAdminHandler,
-);
+router.get("/admin/all", authMiddleware(), requireRole("ADMIN"), validate(listVouchersSchema, "query"), getVouchersAdminHandler);
 
 // Assign voucher to users
-router.post(
-  "/admin/assign",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(assignVoucherToUsersSchema, "body"),
-  assignVoucherToUsersHandler,
-);
+router.post("/admin/assign", authMiddleware(), requireRole("ADMIN"), validate(assignVoucherToUsersSchema, "body"), assignVoucherToUsersHandler);
 
 // Get voucher by ID (admin)
-router.get(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(voucherParamsSchema, "params"),
-  getVoucherByIdHandler,
-);
+router.get("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(voucherParamsSchema, "params"), getVoucherByIdHandler);
 
 // Create voucher
-router.post(
-  "/admin",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(createVoucherSchema, "body"),
-  createVoucherHandler,
-);
+router.post("/admin", authMiddleware(), requireRole("ADMIN"), validate(createVoucherSchema, "body"), createVoucherHandler);
 
 // Update voucher
-router.patch(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(voucherParamsSchema, "params"),
-  validate(updateVoucherSchema, "body"),
-  updateVoucherHandler,
-);
+router.patch("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(voucherParamsSchema, "params"), validate(updateVoucherSchema, "body"), updateVoucherHandler);
 
 // Delete voucher
-router.delete(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(voucherParamsSchema, "params"),
-  deleteVoucherHandler,
-);
+router.delete("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(voucherParamsSchema, "params"), deleteVoucherHandler);
 
 export default router;

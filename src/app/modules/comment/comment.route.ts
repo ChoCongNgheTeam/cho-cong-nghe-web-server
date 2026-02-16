@@ -14,13 +14,7 @@ import {
   deleteCommentHandler,
   bulkApproveCommentsHandler,
 } from "./comment.controller";
-import {
-  listCommentsSchema,
-  commentParamsSchema,
-  createCommentSchema,
-  updateCommentSchema,
-  approveCommentSchema,
-} from "./comment.validation";
+import { listCommentsSchema, commentParamsSchema, createCommentSchema, updateCommentSchema, approveCommentSchema } from "./comment.validation";
 
 const router = Router();
 
@@ -29,62 +23,20 @@ router.get("/", validate(listCommentsSchema, "query"), getCommentsPublicHandler)
 router.get("/:id/replies", validate(commentParamsSchema, "params"), getCommentRepliesHandler);
 
 // Authenticated
-router.post("/", authMiddleware, validate(createCommentSchema, "body"), createCommentHandler);
-router.delete(
-  "/:id",
-  authMiddleware,
-  validate(commentParamsSchema, "params"),
-  deleteOwnCommentHandler,
-);
+router.post("/", authMiddleware(), validate(createCommentSchema, "body"), createCommentHandler);
+router.delete("/:id", authMiddleware(), validate(commentParamsSchema, "params"), deleteOwnCommentHandler);
 
 // Admin
-router.get(
-  "/admin/all",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(listCommentsSchema, "query"),
-  getCommentsAdminHandler,
-);
+router.get("/admin/all", authMiddleware(), requireRole("ADMIN"), validate(listCommentsSchema, "query"), getCommentsAdminHandler);
 
-router.get(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(commentParamsSchema, "params"),
-  getCommentDetailHandler,
-);
+router.get("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(commentParamsSchema, "params"), getCommentDetailHandler);
 
-router.patch(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(updateCommentSchema, "body"),
-  validate(commentParamsSchema, "params"),
-  updateCommentHandler,
-);
+router.patch("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(updateCommentSchema, "body"), validate(commentParamsSchema, "params"), updateCommentHandler);
 
-router.patch(
-  "/admin/:id/approve",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(approveCommentSchema, "body"),
-  validate(commentParamsSchema, "params"),
-  approveCommentHandler,
-);
+router.patch("/admin/:id/approve", authMiddleware(), requireRole("ADMIN"), validate(approveCommentSchema, "body"), validate(commentParamsSchema, "params"), approveCommentHandler);
 
-router.delete(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(commentParamsSchema, "params"),
-  deleteCommentHandler,
-);
+router.delete("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(commentParamsSchema, "params"), deleteCommentHandler);
 
-router.patch(
-  "/admin/bulk/approve",
-  authMiddleware,
-  requireRole("ADMIN"),
-  bulkApproveCommentsHandler,
-);
+router.patch("/admin/bulk/approve", authMiddleware(), requireRole("ADMIN"), bulkApproveCommentsHandler);
 
 export default router;

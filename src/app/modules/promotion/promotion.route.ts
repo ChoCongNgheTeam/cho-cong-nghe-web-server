@@ -17,12 +17,7 @@ import {
   updatePromotionHandler,
   deletePromotionHandler,
 } from "./promotion.controller";
-import {
-  listPromotionsSchema,
-  promotionParamsSchema,
-  createPromotionSchema,
-  updatePromotionSchema,
-} from "./promotion.validation";
+import { listPromotionsSchema, promotionParamsSchema, createPromotionSchema, updatePromotionSchema } from "./promotion.validation";
 
 const router = Router();
 
@@ -46,49 +41,18 @@ router.get("/brand/:brandId", getPromotionsByBrandHandler);
 // Admin
 
 // Get all promotions (admin)
-router.get(
-  "/admin/all",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(listPromotionsSchema, "query"),
-  getPromotionsAdminHandler,
-);
+router.get("/admin/all", authMiddleware(), requireRole("ADMIN"), validate(listPromotionsSchema, "query"), getPromotionsAdminHandler);
 
 // Get promotion by ID (admin)
-router.get(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(promotionParamsSchema, "params"),
-  getPromotionByIdHandler,
-);
+router.get("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(promotionParamsSchema, "params"), getPromotionByIdHandler);
 
 // Create promotion
-router.post(
-  "/admin",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(createPromotionSchema, "body"),
-  createPromotionHandler,
-);
+router.post("/admin", authMiddleware(), requireRole("ADMIN"), validate(createPromotionSchema, "body"), createPromotionHandler);
 
 // Update promotion
-router.patch(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(promotionParamsSchema, "params"),
-  validate(updatePromotionSchema, "body"),
-  updatePromotionHandler,
-);
+router.patch("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(promotionParamsSchema, "params"), validate(updatePromotionSchema, "body"), updatePromotionHandler);
 
 // Delete promotion
-router.delete(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(promotionParamsSchema, "params"),
-  deletePromotionHandler,
-);
+router.delete("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(promotionParamsSchema, "params"), deletePromotionHandler);
 
 export default router;

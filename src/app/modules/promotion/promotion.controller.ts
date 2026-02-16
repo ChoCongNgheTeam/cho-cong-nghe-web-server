@@ -10,10 +10,7 @@ type ValidatedQuery<T> = Request & {
 // === PUBLIC HANDLERS ===
 // =====================
 
-export const getPromotionsPublicHandler = async (
-  req: ValidatedQuery<ListPromotionsQuery>,
-  res: Response,
-) => {
+export const getPromotionsPublicHandler = async (req: ValidatedQuery<ListPromotionsQuery>, res: Response) => {
   try {
     const result = await promotionService.getPromotions(req.query);
 
@@ -111,10 +108,7 @@ export const getPromotionsByBrandHandler = async (req: Request, res: Response) =
 // === ADMIN HANDLERS ===
 // =====================
 
-export const getPromotionsAdminHandler = async (
-  req: ValidatedQuery<ListPromotionsQuery>,
-  res: Response,
-) => {
+export const getPromotionsAdminHandler = async (req: ValidatedQuery<ListPromotionsQuery>, res: Response) => {
   try {
     const result = await promotionService.getPromotions(req.query);
 

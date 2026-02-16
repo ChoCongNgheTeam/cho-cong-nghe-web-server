@@ -360,7 +360,7 @@ const findAll = async (query: ListProductsQuery, onlyActive: boolean) => {
     orderBy = [{ totalSoldCount: "desc" }, { ratingAverage: "desc" }, { createdAt: "desc" }, { id: "asc" }];
   }
 
-  console.log(orderBy);
+  // console.log(orderBy);
 
   const [data, total] = await Promise.all([
     prisma.products.findMany({

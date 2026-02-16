@@ -15,13 +15,7 @@ import {
   deleteBlogHandler,
   bulkUpdateBlogStatusHandler,
 } from "./blog.controller";
-import {
-  listBlogsSchema,
-  blogBySlugParamsSchema,
-  blogParamsSchema,
-  createBlogSchema,
-  updateBlogSchema,
-} from "./blog.validation";
+import { listBlogsSchema, blogBySlugParamsSchema, blogParamsSchema, createBlogSchema, updateBlogSchema } from "./blog.validation";
 
 const router = Router();
 
@@ -30,25 +24,13 @@ router.get("/", validate(listBlogsSchema, "query"), getBlogsPublicHandler);
 router.get("/slug/:slug", validate(blogBySlugParamsSchema, "params"), getBlogBySlugHandler);
 
 // Admin
-router.get(
-  "/admin/all",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(listBlogsSchema, "query"),
-  getBlogsAdminHandler,
-);
+router.get("/admin/all", authMiddleware(), requireRole("ADMIN"), validate(listBlogsSchema, "query"), getBlogsAdminHandler);
 
-router.get(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(blogParamsSchema, "params"),
-  getBlogDetailHandler,
-);
+router.get("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(blogParamsSchema, "params"), getBlogDetailHandler);
 
 router.post(
   "/admin",
-  authMiddleware,
+  authMiddleware(),
   requireRole("ADMIN"),
   blogUpload.single("imageUrl"),
   validate(createBlogSchema, "body"),
@@ -58,7 +40,7 @@ router.post(
 
 router.patch(
   "/admin/:id",
-  authMiddleware,
+  authMiddleware(),
   requireRole("ADMIN"),
   blogUpload.single("imageUrl"),
   validate(updateBlogSchema, "body"),
@@ -67,19 +49,8 @@ router.patch(
   updateBlogHandler,
 );
 
-router.delete(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(blogParamsSchema, "params"),
-  deleteBlogHandler,
-);
+router.delete("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(blogParamsSchema, "params"), deleteBlogHandler);
 
-router.patch(
-  "/admin/bulk/status",
-  authMiddleware,
-  requireRole("ADMIN"),
-  bulkUpdateBlogStatusHandler,
-);
+router.patch("/admin/bulk/status", authMiddleware(), requireRole("ADMIN"), bulkUpdateBlogStatusHandler);
 
 export default router;

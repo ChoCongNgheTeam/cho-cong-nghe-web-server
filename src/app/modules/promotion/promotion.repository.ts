@@ -67,10 +67,7 @@ const buildPromotionWhere = (query: ListPromotionsQuery): Prisma.promotionsWhere
   const where: Prisma.promotionsWhereInput = {};
 
   if (query.search) {
-    where.OR = [
-      { name: { contains: query.search, mode: "insensitive" } },
-      { description: { contains: query.search, mode: "insensitive" } },
-    ];
+    where.OR = [{ name: { contains: query.search, mode: "insensitive" } }, { description: { contains: query.search, mode: "insensitive" } }];
   }
 
   if (query.isActive !== undefined) {
@@ -118,6 +115,34 @@ export const findAll = async (query: ListPromotionsQuery) => {
     totalPages: Math.ceil(total / limit),
   };
 };
+
+// export const findAll = async (query: ListPromotionsQuery) => {
+//   let { page = 1, limit = 10, sortBy, sortOrder } = query;
+
+//   page = Number(page);
+//   limit = Number(limit);
+
+//   const where = buildPromotionWhere(query);
+
+//   const [data, total] = await Promise.all([
+//     prisma.promotions.findMany({
+//       where,
+//       select: selectPromotionCard,
+//       ...(sortBy && sortOrder && { orderBy: { [sortBy]: sortOrder } }),
+//       ...(limit && { take: limit }),
+//       ...(page && limit && { skip: (page - 1) * limit }),
+//     }),
+//     prisma.promotions.count({ where }),
+//   ]);
+
+//   return {
+//     data,
+//     page,
+//     limit,
+//     total,
+//     totalPages: Math.ceil(total / limit),
+//   };
+// };
 
 export const findById = (id: string) =>
   prisma.promotions.findUnique({

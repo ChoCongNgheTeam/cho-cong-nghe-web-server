@@ -14,14 +14,7 @@ import {
   updateBrandHandler,
   deleteBrandHandler,
 } from "./brand.controller";
-import {
-  createBrandSchema,
-  updateBrandSchema,
-  brandParamsSchema,
-  brandSlugParamsSchema,
-  featuredBrandsQuerySchema,
-  listBrandsQuerySchema,
-} from "./brand.validation";
+import { createBrandSchema, updateBrandSchema, brandParamsSchema, brandSlugParamsSchema, featuredBrandsQuerySchema, listBrandsQuerySchema } from "./brand.validation";
 
 const router = Router();
 
@@ -32,47 +25,14 @@ router.get("/featured", validate(featuredBrandsQuerySchema, "query"), getFeature
 router.get("/slug/:slug", validate(brandSlugParamsSchema, "params"), getBrandBySlugHandler);
 
 // Admin
-router.get(
-  "/admin/all",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(listBrandsQuerySchema, "query"),
-  getBrandsAdminHandler,
-);
+router.get("/admin/all", authMiddleware(), requireRole("ADMIN"), validate(listBrandsQuerySchema, "query"), getBrandsAdminHandler);
 
-router.get(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(brandParamsSchema, "params"),
-  getBrandDetailHandler,
-);
+router.get("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(brandParamsSchema, "params"), getBrandDetailHandler);
 
-router.post(
-  "/admin",
-  authMiddleware,
-  requireRole("ADMIN"),
-  brandUpload.single("imageUrl"),
-  validate(createBrandSchema, "body"),
-  createBrandHandler,
-);
+router.post("/admin", authMiddleware(), requireRole("ADMIN"), brandUpload.single("imageUrl"), validate(createBrandSchema, "body"), createBrandHandler);
 
-router.patch(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  brandUpload.single("imageUrl"),
-  validate(brandParamsSchema, "params"),
-  validate(updateBrandSchema, "body"),
-  updateBrandHandler,
-);
+router.patch("/admin/:id", authMiddleware(), requireRole("ADMIN"), brandUpload.single("imageUrl"), validate(brandParamsSchema, "params"), validate(updateBrandSchema, "body"), updateBrandHandler);
 
-router.delete(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(brandParamsSchema, "params"),
-  deleteBrandHandler,
-);
+router.delete("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(brandParamsSchema, "params"), deleteBrandHandler);
 
 export default router;

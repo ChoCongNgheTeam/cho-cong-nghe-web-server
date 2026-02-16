@@ -42,21 +42,21 @@ router.get("/slug/:slug", validate(campaignSlugParamsSchema, "params"), getCampa
 
 // ==================== ADMIN - CAMPAIGN CRUD ====================
 
-router.get("/admin/all", authMiddleware, requireRole("ADMIN"), validate(listCampaignsQuerySchema, "query"), getCampaignsAdminHandler);
+router.get("/admin/all", authMiddleware(), requireRole("ADMIN"), validate(listCampaignsQuerySchema, "query"), getCampaignsAdminHandler);
 
-router.get("/admin/:id", authMiddleware, requireRole("ADMIN"), validate(campaignParamsSchema, "params"), getCampaignDetailHandler);
+router.get("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(campaignParamsSchema, "params"), getCampaignDetailHandler);
 
-router.post("/admin", authMiddleware, requireRole("ADMIN"), validate(createCampaignSchema, "body"), createCampaignHandler);
+router.post("/admin", authMiddleware(), requireRole("ADMIN"), validate(createCampaignSchema, "body"), createCampaignHandler);
 
-router.patch("/admin/:id", authMiddleware, requireRole("ADMIN"), validate(campaignParamsSchema, "params"), validate(updateCampaignSchema, "body"), updateCampaignHandler);
+router.patch("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(campaignParamsSchema, "params"), validate(updateCampaignSchema, "body"), updateCampaignHandler);
 
-router.delete("/admin/:id", authMiddleware, requireRole("ADMIN"), validate(campaignParamsSchema, "params"), deleteCampaignHandler);
+router.delete("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(campaignParamsSchema, "params"), deleteCampaignHandler);
 
 // ==================== ADMIN - CAMPAIGN CATEGORIES ====================
 
 router.post(
   "/admin/:campaignId/categories",
-  authMiddleware,
+  authMiddleware(),
   requireRole("ADMIN"),
   campaignUpload.array("images", 20),
   parseMultipart({
@@ -69,11 +69,11 @@ router.post(
   addCategoriesToCampaignHandler,
 );
 
-router.get("/admin/:campaignId/categories/:categoryId", authMiddleware, requireRole("ADMIN"), validate(campaignCategoryParamsSchema, "params"), getCampaignCategoryHandler);
+router.get("/admin/:campaignId/categories/:categoryId", authMiddleware(), requireRole("ADMIN"), validate(campaignCategoryParamsSchema, "params"), getCampaignCategoryHandler);
 
 router.patch(
   "/admin/:campaignId/categories/:categoryId",
-  authMiddleware,
+  authMiddleware(),
   requireRole("ADMIN"),
   campaignUpload.single("image"),
   parseMultipart({
@@ -87,6 +87,6 @@ router.patch(
   updateCampaignCategoryHandler,
 );
 
-router.delete("/admin/:campaignId/categories/:categoryId", authMiddleware, requireRole("ADMIN"), validate(campaignCategoryParamsSchema, "params"), removeCategoryFromCampaignHandler);
+router.delete("/admin/:campaignId/categories/:categoryId", authMiddleware(), requireRole("ADMIN"), validate(campaignCategoryParamsSchema, "params"), removeCategoryFromCampaignHandler);
 
 export default router;
