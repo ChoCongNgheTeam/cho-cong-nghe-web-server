@@ -3,6 +3,7 @@ export class AppError extends Error {
     public message: string,
     public statusCode: number,
     public code?: string,
+    public errors?: Record<string, any>,
   ) {
     super(message);
     this.name = this.constructor.name;

@@ -1,24 +1,13 @@
 import { Request, Response } from "express";
-import {
-  register,
-  login,
-  forgotPassword,
-  resetPassword,
-  changePassword,
-  logout,
-  refreshTokenRotation,
-} from "./auth.service";
+import { register, login, forgotPassword, resetPassword, changePassword, logout, refreshTokenRotation } from "./auth.service";
 
 export const registerHandler = async (req: Request, res: Response) => {
-  try {
-    const user = await register(req.body);
-    res.status(201).json({
-      data: user,
-      message: "Đăng ký thành công",
-    });
-  } catch (error: any) {
-    res.status(409).json({ message: error.message });
-  }
+  const user = await register(req.body);
+
+  res.status(201).json({
+    data: user,
+    message: "Đăng ký thành công",
+  });
 };
 
 export const loginHandler = async (req: Request, res: Response) => {
@@ -26,10 +15,7 @@ export const loginHandler = async (req: Request, res: Response) => {
   const ip = req.ip;
 
   try {
-    const { accessToken, accessTokenTTL, refreshToken, refreshTokenTTL, user } = await login(
-      req.body,
-      { userAgent, ip },
-    );
+    const { accessToken, accessTokenTTL, refreshToken, refreshTokenTTL, user } = await login(req.body, { userAgent, ip });
 
     // refresh token
     res.cookie("refreshToken", refreshToken, {
@@ -64,8 +50,7 @@ export const refreshTokenHandler = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "No refresh token" });
     }
 
-    const { accessToken, accessTokenTTL, refreshToken, refreshTokenTTL } =
-      await refreshTokenRotation(token);
+    const { accessToken, accessTokenTTL, refreshToken, refreshTokenTTL } = await refreshTokenRotation(token);
 
     // refresh token
     res.cookie("refreshToken", refreshToken, {

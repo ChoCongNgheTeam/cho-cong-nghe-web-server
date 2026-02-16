@@ -2,13 +2,13 @@ import { Router } from "express";
 import { validate } from "@/app/middlewares/validate.middleware";
 import { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema } from "./auth.validation";
 import { registerHandler, loginHandler, forgotPasswordHandler, logoutHandler, resetPasswordHandler, changePasswordHandler, refreshTokenHandler } from "./auth.controller";
-
 import { authMiddleware } from "@/app/middlewares/auth.middleware";
 import { forgotPasswordLimiter, loginLimiter, refreshTokenLimiter } from "@/utils/rateLimiter";
+import { asyncHandler } from "@/utils/async-handler";
 
 const router = Router();
 
-router.post("/register", validate(registerSchema), registerHandler);
+router.post("/register", validate(registerSchema), asyncHandler(registerHandler));
 
 router.post("/login", loginLimiter, validate(loginSchema), loginHandler);
 

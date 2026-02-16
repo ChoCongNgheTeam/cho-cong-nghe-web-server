@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "@/config/swagger";
 import { cleanupRefreshTokens } from "./modules/auth/auth.service";
+import { errorMiddleware } from "./middlewares/error.middleware";
 
 const app = express();
 
@@ -33,5 +34,7 @@ app.use(cookieParser());
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use("/api/v1", routes);
+
+app.use(errorMiddleware);
 
 export default app;

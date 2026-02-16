@@ -1,6 +1,8 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { jwtConfig } from "src/config/jwt";
+import { DuplicateError } from "@/errors";
+import { handlePrismaError } from "@/utils/handle-prisma-error";
 import { RegisterInput, LoginInput, ResetPasswordInput } from "./auth.validation";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "@/services/token.service";
 import {
@@ -33,21 +35,26 @@ export const register = async (input: RegisterInput) => {
 
   const existedUser = await findByEmailOrUserName(email, rest.userName);
 
+  /* logic validation */
   if (existedUser) {
-    if (existedUser.email === email || existedUser.userName === rest.userName) {
-      throw new Error("Email hoặc tên đăng nhập đã được sử dụng");
-    }
+    if (existedUser.email === email) throw new DuplicateError("Email");
+
+    if (existedUser.userName === rest.userName) throw new DuplicateError("Tên đăng nhập");
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  return createUser({
-    email,
-    passwordHash,
-    role: "CUSTOMER",
-    avatarImage: "./images/avatar.png",
-    ...rest,
-  });
+  try {
+    return await createUser({
+      email,
+      passwordHash,
+      role: "CUSTOMER",
+      avatarImage: "./images/avatar.png",
+      ...rest,
+    });
+  } catch (err) {
+    handlePrismaError(err);
+  }
 };
 
 export const login = async (input: LoginInput, meta?: { userAgent?: string; ip?: string }) => {
