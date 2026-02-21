@@ -2,10 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { verifyAccessToken } from "src/services/token.service";
 
 const extractAccessToken = (req: Request) => {
-  if (req.cookies?.accessToken) return req.cookies.accessToken;
-
   const authHeader = req.headers.authorization;
-  // Check Swagger
   if (authHeader?.startsWith("Bearer ")) {
     return authHeader.slice(7);
   }
@@ -31,11 +28,14 @@ export const authMiddleware = (required = true) => {
       };
 
       next();
-    } catch (err) {
-      if (required) {
-        return res.status(401).json({ message: "Token không hợp lệ" });
+    } catch (err: any) {
+      if (!required) return next();
+
+      if (err.name === "TokenExpiredError") {
+        return res.status(401).json({ code: "TOKEN_EXPIRED" });
       }
-      next();
+
+      return res.status(401).json({ code: "TOKEN_INVALID" });
     }
   };
 };

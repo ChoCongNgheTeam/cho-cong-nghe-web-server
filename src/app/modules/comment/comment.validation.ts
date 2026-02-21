@@ -20,10 +20,7 @@ export const commentParamsSchema = z.object({
 });
 
 export const createCommentSchema = z.object({
-  content: z
-    .string()
-    .min(1, "Nội dung không được để trống")
-    .max(1000, "Nội dung tối đa 1000 ký tự"),
+  content: z.string().min(1, "Nội dung không được để trống").max(1000, "Nội dung tối đa 1000 ký tự"),
   targetType: z.nativeEnum(CommentTargetType),
   targetId: z.string().uuid("Target ID không hợp lệ"),
   parentId: z.string().uuid("Parent ID không hợp lệ").optional(),
@@ -35,6 +32,11 @@ export const updateCommentSchema = z.object({
 });
 
 export const approveCommentSchema = z.object({
+  isApproved: z.boolean(),
+});
+
+export const bulkApproveSchema = z.object({
+  commentIds: z.array(z.string().uuid()).min(1, "Cần ít nhất 1 comment ID"),
   isApproved: z.boolean(),
 });
 

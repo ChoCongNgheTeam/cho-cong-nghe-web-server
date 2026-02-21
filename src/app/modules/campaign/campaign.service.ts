@@ -2,189 +2,123 @@ import { CampaignType } from "@prisma/client";
 import { CreateCampaignInput, UpdateCampaignInput, ListCampaignsQuery, CampaignCategoryInput, UpdateCampaignCategoryInput } from "./campaign.validation";
 import { campaignRepository } from "./campaign.repository";
 import { generateUniqueCampaignSlug, deleteCampaignCategoryImage } from "./campaign.helpers";
+import { NotFoundError, BadRequestError } from "@/errors";
 
 export class CampaignService {
-  // Campaign CRUD operations
   async getCampaignsPublic(query: ListCampaignsQuery) {
-    return await campaignRepository.findAllPublic(query);
+    return campaignRepository.findAllPublic(query);
   }
 
   async getCampaignsAdmin(query: ListCampaignsQuery) {
-    return await campaignRepository.findAllAdmin(query);
+    return campaignRepository.findAllAdmin(query);
   }
 
   async getActiveCampaigns(type?: CampaignType) {
-    return await campaignRepository.getActiveCampaigns(type);
+    return campaignRepository.getActiveCampaigns(type);
   }
 
   async getCampaignBySlug(slug: string) {
     const campaign = await campaignRepository.getCampaignBySlug(slug);
-
-    if (!campaign) {
-      const error: any = new Error("Không tìm thấy chiến dịch");
-      error.statusCode = 404;
-      throw error;
-    }
-
+    if (!campaign) throw new NotFoundError("Chiến dịch");
     return campaign;
   }
 
   async getCampaignDetail(id: string) {
     const campaign = await campaignRepository.getCampaignById(id);
-
-    if (!campaign) {
-      const error: any = new Error("Không tìm thấy chiến dịch");
-      error.statusCode = 404;
-      throw error;
-    }
-
+    if (!campaign) throw new NotFoundError("Chiến dịch");
     return campaign;
   }
 
   async createCampaign(data: CreateCampaignInput) {
-    // Validate dates
     if (data.startDate && data.endDate && data.startDate > data.endDate) {
-      const error: any = new Error("Ngày bắt đầu phải trước ngày kết thúc");
-      error.statusCode = 400;
-      throw error;
+      throw new BadRequestError("Ngày bắt đầu phải trước ngày kết thúc");
     }
 
     const nameExists = await campaignRepository.checkNameExists(data.name);
-    if (nameExists) {
-      const error: any = new Error("Tên chiến dịch đã tồn tại");
-      error.statusCode = 400;
-      throw error;
-    }
+    if (nameExists) throw new BadRequestError("Tên chiến dịch đã tồn tại");
 
-    const slug = await generateUniqueCampaignSlug(data.name, (slug) => campaignRepository.checkSlugExists(slug));
+    const slug = await generateUniqueCampaignSlug(data.name, (s) => campaignRepository.checkSlugExists(s));
 
-    const campaign = await campaignRepository.createCampaign({
-      ...data,
-      slug,
-    });
-
-    return campaign;
+    return campaignRepository.createCampaign({ ...data, slug });
   }
 
   async updateCampaign(id: string, data: UpdateCampaignInput) {
-    const existingCampaign = await campaignRepository.getCampaignById(id);
-    if (!existingCampaign) {
-      const error: any = new Error("Không tìm thấy chiến dịch");
-      error.statusCode = 404;
-      throw error;
-    }
+    const existing = await campaignRepository.getCampaignById(id);
+    if (!existing) throw new NotFoundError("Chiến dịch");
 
-    // Validate dates
-    const startDate = data.startDate !== undefined ? data.startDate : existingCampaign.startDate;
-    const endDate = data.endDate !== undefined ? data.endDate : existingCampaign.endDate;
+    const startDate = data.startDate ?? existing.startDate;
+    const endDate = data.endDate ?? existing.endDate;
 
     if (startDate && endDate && startDate > endDate) {
-      const error: any = new Error("Ngày bắt đầu phải trước ngày kết thúc");
-      error.statusCode = 400;
-      throw error;
+      throw new BadRequestError("Ngày bắt đầu phải trước ngày kết thúc");
     }
 
     const updateData: any = { ...data };
 
-    if (data.name && data.name !== existingCampaign.name) {
+    if (data.name && data.name !== existing.name) {
       const nameExists = await campaignRepository.checkNameExists(data.name, id);
-      if (nameExists) {
-        const error: any = new Error("Tên chiến dịch đã tồn tại");
-        error.statusCode = 400;
-        throw error;
-      }
+      if (nameExists) throw new BadRequestError("Tên chiến dịch đã tồn tại");
 
-      updateData.slug = await generateUniqueCampaignSlug(data.name, (slug) => campaignRepository.checkSlugExists(slug, id), existingCampaign.slug);
+      updateData.slug = await generateUniqueCampaignSlug(data.name, (s) => campaignRepository.checkSlugExists(s, id), existing.slug);
     }
 
-    const campaign = await campaignRepository.updateCampaign(id, updateData);
-    return campaign;
+    return campaignRepository.updateCampaign(id, updateData);
   }
 
   async deleteCampaign(id: string) {
     const campaign = await campaignRepository.getCampaignById(id);
-    if (!campaign) {
-      const error: any = new Error("Không tìm thấy chiến dịch");
-      error.statusCode = 404;
-      throw error;
-    }
+    if (!campaign) throw new NotFoundError("Chiến dịch");
 
-    // Delete all category images before deleting campaign
-    if (campaign.categories && campaign.categories.length > 0) {
-      for (const categoryRelation of campaign.categories) {
-        if (categoryRelation.imagePath) {
-          await deleteCampaignCategoryImage(categoryRelation.imagePath);
-        }
+    if (campaign.categories?.length > 0) {
+      for (const cat of campaign.categories) {
+        if (cat.imagePath) await deleteCampaignCategoryImage(cat.imagePath);
       }
     }
 
     await campaignRepository.deleteCampaign(id);
   }
 
-  // Campaign Category operations
   async addCategoriesToCampaign(campaignId: string, categories: CampaignCategoryInput[]) {
     const campaign = await campaignRepository.getCampaignById(campaignId);
-    if (!campaign) {
-      const error: any = new Error("Không tìm thấy chiến dịch");
-      error.statusCode = 404;
-      throw error;
-    }
+    if (!campaign) throw new NotFoundError("Chiến dịch");
 
-    // Check if categories exist
     for (const category of categories) {
       const categoryExists = await campaignRepository.checkCategoryExists(category.categoryId);
       if (!categoryExists) {
-        const error: any = new Error(`Không tìm thấy danh mục với ID: ${category.categoryId}`);
-        error.statusCode = 404;
-        throw error;
+        throw new NotFoundError(`Danh mục với ID: ${category.categoryId}`);
       }
 
-      // Check if category already in campaign
       const alreadyInCampaign = await campaignRepository.checkCategoryInCampaign(campaignId, category.categoryId);
       if (alreadyInCampaign) {
-        const error: any = new Error(`Danh mục ${category.categoryId} đã có trong chiến dịch`);
-        error.statusCode = 400;
-        throw error;
+        throw new BadRequestError(`Danh mục ${category.categoryId} đã có trong chiến dịch`);
       }
     }
 
-    return await campaignRepository.addCampaignCategories(campaignId, categories);
+    return campaignRepository.addCampaignCategories(campaignId, categories);
   }
 
   async updateCampaignCategory(campaignId: string, categoryId: string, data: UpdateCampaignCategoryInput) {
     const campaignCategory = await campaignRepository.getCampaignCategory(campaignId, categoryId);
-    if (!campaignCategory) {
-      const error: any = new Error("Không tìm thấy danh mục trong chiến dịch");
-      error.statusCode = 404;
-      throw error;
-    }
+    if (!campaignCategory) throw new NotFoundError("Danh mục trong chiến dịch");
 
     const updateData: any = { ...data };
 
-    // Handle image removal
     if (data.removeImage && campaignCategory.imagePath) {
       await deleteCampaignCategoryImage(campaignCategory.imagePath);
       updateData.imagePath = "";
       updateData.imageUrl = null;
     } else if (data.imagePath && campaignCategory.imagePath && data.imagePath !== campaignCategory.imagePath) {
-      // Delete old image if new image is uploaded
       await deleteCampaignCategoryImage(campaignCategory.imagePath);
     }
 
     await campaignRepository.updateCampaignCategory(campaignId, categoryId, updateData);
-
-    return await campaignRepository.getCampaignCategory(campaignId, categoryId);
+    return campaignRepository.getCampaignCategory(campaignId, categoryId);
   }
 
   async removeCategoryFromCampaign(campaignId: string, categoryId: string) {
     const campaignCategory = await campaignRepository.getCampaignCategory(campaignId, categoryId);
-    if (!campaignCategory) {
-      const error: any = new Error("Không tìm thấy danh mục trong chiến dịch");
-      error.statusCode = 404;
-      throw error;
-    }
+    if (!campaignCategory) throw new NotFoundError("Danh mục trong chiến dịch");
 
-    // Delete category image
     if (campaignCategory.imagePath) {
       await deleteCampaignCategoryImage(campaignCategory.imagePath);
     }
@@ -194,13 +128,7 @@ export class CampaignService {
 
   async getCampaignCategory(campaignId: string, categoryId: string) {
     const campaignCategory = await campaignRepository.getCampaignCategory(campaignId, categoryId);
-
-    if (!campaignCategory) {
-      const error: any = new Error("Không tìm thấy danh mục trong chiến dịch");
-      error.statusCode = 404;
-      throw error;
-    }
-
+    if (!campaignCategory) throw new NotFoundError("Danh mục trong chiến dịch");
     return campaignCategory;
   }
 }

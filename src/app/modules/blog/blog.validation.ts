@@ -20,16 +20,11 @@ export const blogBySlugParamsSchema = z.object({
 });
 
 export const createBlogSchema = z.object({
-  title: z
-    .string()
-    .min(10, "Tiêu đề phải có ít nhất 10 ký tự")
-    .max(200, "Tiêu đề tối đa 200 ký tự"),
+  title: z.string().min(10, "Tiêu đề phải có ít nhất 10 ký tự").max(200, "Tiêu đề tối đa 200 ký tự"),
   content: z.string().min(100, "Nội dung phải có ít nhất 100 ký tự"),
   imageUrl: z.string().url().optional(),
   imagePath: z.string().optional(),
-  status: z
-    .enum(Object.values(BlogStatus) as [BlogStatus, ...BlogStatus[]])
-    .default(BlogStatus.DRAFT),
+  status: z.enum(Object.values(BlogStatus) as [BlogStatus, ...BlogStatus[]]).default(BlogStatus.DRAFT),
   publishedAt: z.coerce.date().optional(),
 });
 
@@ -40,6 +35,11 @@ export const updateBlogSchema = z.object({
   imagePath: z.string().optional(),
   status: z.enum(Object.values(BlogStatus) as [BlogStatus, ...BlogStatus[]]).optional(),
   publishedAt: z.coerce.date().optional(),
+});
+
+export const bulkUpdateStatusSchema = z.object({
+  blogIds: z.array(z.string().uuid()).min(1, "Cần ít nhất 1 blog ID"),
+  status: z.nativeEnum(BlogStatus),
 });
 
 export type ListBlogsQuery = z.infer<typeof listBlogsSchema>;

@@ -15,24 +15,26 @@ import {
   deleteBrandHandler,
 } from "./brand.controller";
 import { createBrandSchema, updateBrandSchema, brandParamsSchema, brandSlugParamsSchema, featuredBrandsQuerySchema, listBrandsQuerySchema } from "./brand.validation";
+import { asyncHandler } from "@/utils/async-handler";
 
 const router = Router();
 
+const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
+
 // Public
-router.get("/", validate(listBrandsQuerySchema, "query"), getBrandsPublicHandler);
-router.get("/active", getActiveBrandsHandler);
-router.get("/featured", validate(featuredBrandsQuerySchema, "query"), getFeaturedBrandsHandler);
-router.get("/slug/:slug", validate(brandSlugParamsSchema, "params"), getBrandBySlugHandler);
+router.get("/", validate(listBrandsQuerySchema, "query"), asyncHandler(getBrandsPublicHandler));
+router.get("/active", asyncHandler(getActiveBrandsHandler));
+router.get("/featured", validate(featuredBrandsQuerySchema, "query"), asyncHandler(getFeaturedBrandsHandler));
+router.get("/slug/:slug", validate(brandSlugParamsSchema, "params"), asyncHandler(getBrandBySlugHandler));
 
 // Admin
-router.get("/admin/all", authMiddleware(), requireRole("ADMIN"), validate(listBrandsQuerySchema, "query"), getBrandsAdminHandler);
+router.get("/admin/all", ...adminAuth, validate(listBrandsQuerySchema, "query"), asyncHandler(getBrandsAdminHandler));
+router.get("/admin/:id", ...adminAuth, validate(brandParamsSchema, "params"), asyncHandler(getBrandDetailHandler));
 
-router.get("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(brandParamsSchema, "params"), getBrandDetailHandler);
+router.post("/admin", ...adminAuth, brandUpload.single("imageUrl"), validate(createBrandSchema, "body"), asyncHandler(createBrandHandler));
 
-router.post("/admin", authMiddleware(), requireRole("ADMIN"), brandUpload.single("imageUrl"), validate(createBrandSchema, "body"), createBrandHandler);
+router.patch("/admin/:id", ...adminAuth, brandUpload.single("imageUrl"), validate(brandParamsSchema, "params"), validate(updateBrandSchema, "body"), asyncHandler(updateBrandHandler));
 
-router.patch("/admin/:id", authMiddleware(), requireRole("ADMIN"), brandUpload.single("imageUrl"), validate(brandParamsSchema, "params"), validate(updateBrandSchema, "body"), updateBrandHandler);
-
-router.delete("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(brandParamsSchema, "params"), deleteBrandHandler);
+router.delete("/admin/:id", ...adminAuth, validate(brandParamsSchema, "params"), asyncHandler(deleteBrandHandler));
 
 export default router;

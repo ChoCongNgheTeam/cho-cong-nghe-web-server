@@ -16,28 +16,26 @@ import {
   reorderMediaHandler,
 } from "./media.controller";
 import { createMediaSchema, updateMediaSchema, reorderMediaSchema, mediaParamsSchema, mediaTypeParamsSchema, mediaPositionParamsSchema, mediaFilterSchema } from "./media.validation";
+import { asyncHandler } from "@/utils/async-handler";
 
 const router = Router();
 
-// Lần sau Thêm param linh hoạt hơn, hiện tại chưa tốt cho admin
+const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
 
-// Public
-router.get("/all", getAllActiveMediaHandler);
-router.get("/type/:type", validate(mediaTypeParamsSchema, "params"), getMediaByTypeHandler);
-router.get("/position/:position", validate(mediaPositionParamsSchema, "params"), getMediaByPositionHandler);
-router.get("/filter", validate(mediaFilterSchema, "query"), getMediaByTypeAndPositionHandler);
+// Public — tĩnh trước
+router.get("/all", asyncHandler(getAllActiveMediaHandler));
+router.get("/filter", validate(mediaFilterSchema, "query"), asyncHandler(getMediaByTypeAndPositionHandler));
+router.get("/type/:type", validate(mediaTypeParamsSchema, "params"), asyncHandler(getMediaByTypeHandler));
+router.get("/position/:position", validate(mediaPositionParamsSchema, "params"), asyncHandler(getMediaByPositionHandler));
 
-// Admin
-router.get("/admin/all", authMiddleware(), requireRole("ADMIN"), getAllMediaHandler);
+// Admin — tĩnh trước
+router.get("/admin/all", ...adminAuth, asyncHandler(getAllMediaHandler));
+router.post("/admin/reorder", ...adminAuth, validate(reorderMediaSchema, "body"), asyncHandler(reorderMediaHandler));
+router.post("/admin", ...adminAuth, mediaUpload.single("imageUrl"), validate(createMediaSchema, "body"), asyncHandler(createMediaHandler));
 
-router.get("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(mediaParamsSchema, "params"), getMediaDetailHandler);
-
-router.post("/admin", authMiddleware(), requireRole("ADMIN"), mediaUpload.single("imageUrl"), validate(createMediaSchema, "body"), createMediaHandler);
-
-router.patch("/admin/:id", authMiddleware(), requireRole("ADMIN"), mediaUpload.single("imageUrl"), validate(updateMediaSchema, "body"), validate(mediaParamsSchema, "params"), updateMediaHandler);
-
-router.delete("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(mediaParamsSchema, "params"), deleteMediaHandler);
-
-router.post("/admin/reorder", authMiddleware(), requireRole("ADMIN"), validate(reorderMediaSchema, "body"), reorderMediaHandler);
+// Admin — động sau
+router.get("/admin/:id", ...adminAuth, validate(mediaParamsSchema, "params"), asyncHandler(getMediaDetailHandler));
+router.patch("/admin/:id", ...adminAuth, mediaUpload.single("imageUrl"), validate(mediaParamsSchema, "params"), validate(updateMediaSchema, "body"), asyncHandler(updateMediaHandler));
+router.delete("/admin/:id", ...adminAuth, validate(mediaParamsSchema, "params"), asyncHandler(deleteMediaHandler));
 
 export default router;

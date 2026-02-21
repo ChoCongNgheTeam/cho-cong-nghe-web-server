@@ -3,6 +3,7 @@ import { transformMedia, transformMediaList } from "./media.transformers";
 import { CreateMediaInput, UpdateMediaInput, ReorderMediaInput } from "./media.validation";
 import { MediaType, MediaPosition } from "./media.types";
 import { deleteOldMediaImage } from "./media.helpers";
+import { NotFoundError, BadRequestError } from "@/errors";
 import prisma from "@/config/db";
 
 export const getMediaByType = async (type: MediaType) => {
@@ -24,18 +25,14 @@ export const getAllActiveMedia = async () => {
   const media = await repo.findAll(true);
   const transformedMedia = transformMediaList(media);
 
-  const grouped = transformedMedia.reduce(
+  return transformedMedia.reduce(
     (acc, item) => {
-      if (!acc[item.position]) {
-        acc[item.position] = [];
-      }
+      if (!acc[item.position]) acc[item.position] = [];
       acc[item.position].push(item);
       return acc;
     },
     {} as Record<string, typeof transformedMedia>,
   );
-
-  return grouped;
 };
 
 export const getAllMedia = async () => {
@@ -45,32 +42,15 @@ export const getAllMedia = async () => {
 
 export const getMediaById = async (id: string) => {
   const media = await repo.findById(id);
-
-  if (!media) {
-    const error: any = new Error("Không tìm thấy media");
-    error.statusCode = 404;
-    throw error;
-  }
-
+  if (!media) throw new NotFoundError("Media");
   return transformMedia(media);
 };
 
 export const createMedia = async (input: CreateMediaInput) => {
   const { type, position, order, ...rest } = input;
+  const finalOrder = order ?? (await repo.getMaxOrder(type, position)) + 1;
 
-  let finalOrder = order;
-  if (finalOrder === undefined) {
-    const maxOrder = await repo.getMaxOrder(type, position);
-    finalOrder = maxOrder + 1;
-  }
-
-  const media = await repo.create({
-    type,
-    position,
-    order: finalOrder,
-    ...rest,
-  });
-
+  const media = await repo.create({ type, position, order: finalOrder, ...rest });
   return transformMedia(media);
 };
 
@@ -78,8 +58,7 @@ export const updateMedia = async (id: string, input: UpdateMediaInput) => {
   const existingMedia = await getMediaById(id);
 
   if (input.imagePath && existingMedia.imageUrl) {
-    const oldImagePath = (existingMedia as any).imagePath;
-    await deleteOldMediaImage(oldImagePath);
+    await deleteOldMediaImage((existingMedia as any).imagePath);
   }
 
   const media = await repo.update(id, input);
@@ -90,8 +69,7 @@ export const deleteMedia = async (id: string) => {
   const media = await getMediaById(id);
 
   if (media.imageUrl) {
-    const imagePath = (media as any).imagePath;
-    await deleteOldMediaImage(imagePath);
+    await deleteOldMediaImage((media as any).imagePath);
   }
 
   return repo.remove(id);
@@ -101,38 +79,23 @@ export const reorderMedia = async (input: ReorderMediaInput) => {
   const { mediaId, newOrder } = input;
 
   const media = await repo.findById(mediaId);
-  if (!media) {
-    const error: any = new Error("Không tìm thấy media");
-    error.statusCode = 404;
-    throw error;
-  }
+  if (!media) throw new NotFoundError("Media");
 
   const siblings = await repo.findSiblings(media.type, media.position);
 
   if (newOrder < 0 || newOrder >= siblings.length) {
-    const error: any = new Error("Vị trí không hợp lệ");
-    error.statusCode = 400;
-    throw error;
+    throw new BadRequestError("Vị trí không hợp lệ");
   }
 
   const updates = siblings
     .filter((s) => s.id !== mediaId)
     .map((sibling, index) => {
       const pos = index >= newOrder ? index + 1 : index;
-      return prisma.image_media.update({
-        where: { id: sibling.id },
-        data: { order: pos },
-      });
+      return prisma.image_media.update({ where: { id: sibling.id }, data: { order: pos } });
     });
 
-  updates.push(
-    prisma.image_media.update({
-      where: { id: mediaId },
-      data: { order: newOrder },
-    }),
-  );
+  updates.push(prisma.image_media.update({ where: { id: mediaId }, data: { order: newOrder } }));
 
   await prisma.$transaction(updates);
-
   return { message: "Sắp xếp thành công" };
 };

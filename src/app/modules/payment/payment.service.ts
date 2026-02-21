@@ -1,11 +1,7 @@
-import { NotFoundError, BadRequestError } from "@/utils/errors";
+import { NotFoundError, BadRequestError } from "@/errors";
 import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
-import {
-  findPaymentMethodById,
-  createPaymentTransaction,
-  findTransactionByOrderId,
-} from "./payment.repository";
+import { findPaymentMethodById, createPaymentTransaction, findTransactionByOrderId } from "./payment.repository";
 import { webhookPayloadSchema } from "./payment.validation";
 
 export const getActivePaymentMethods = async () => {
@@ -65,8 +61,7 @@ export const handlePaymentWebhook = async (rawPayload: any) => {
   });
 
   // 5. Cập nhật order paymentStatus
-  const newPaymentStatus =
-    status === "COMPLETED" ? "PAID" : status === "REFUNDED" ? "REFUNDED" : "UNPAID";
+  const newPaymentStatus = status === "COMPLETED" ? "PAID" : status === "REFUNDED" ? "REFUNDED" : "UNPAID";
 
   await prisma.orders.update({
     where: { id: orderId },

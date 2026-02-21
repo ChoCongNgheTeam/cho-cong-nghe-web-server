@@ -1,20 +1,13 @@
 import { Request, Response } from "express";
-import {
-  prepareCheckoutData,
-  createOrderFromCheckout,
-  validateCartItems,
-} from "./checkout.service";
-import { BadRequestError, NotFoundError } from "@/utils/errors";
+import { prepareCheckoutData, createOrderFromCheckout, validateCartItems } from "./checkout.service";
+import { BadRequestError, NotFoundError } from "@/errors";
 
 /**
  * GET /checkout/validate
  * Validate current cart before checkout
  * 🔥 FIXED: Added try-catch error handling
  */
-export const validateCheckoutHandler = async (
-  req: Request,
-  res: Response
-) => {
+export const validateCheckoutHandler = async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -29,16 +22,14 @@ export const validateCheckoutHandler = async (
         items: validation.items,
         errors: validation.errors,
       },
-      message: validation.isValid
-        ? "Cart is valid"
-        : "Cart has errors, please check",
+      message: validation.isValid ? "Cart is valid" : "Cart has errors, please check",
     });
   } catch (error) {
     console.error("Validate checkout error:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to validate cart",
-      error: error instanceof Error ? error.message : "Unknown error"
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -85,14 +76,14 @@ export const checkoutHandler = async (req: Request, res: Response) => {
     if (error instanceof BadRequestError) {
       return res.status(400).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
     }
 
     if (error instanceof NotFoundError) {
       return res.status(404).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
     }
 
@@ -100,7 +91,7 @@ export const checkoutHandler = async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       message: "Failed to create order",
-      error: error instanceof Error ? error.message : "Unknown error"
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -143,14 +134,14 @@ export const checkoutPreviewHandler = async (req: Request, res: Response) => {
     if (error instanceof BadRequestError) {
       return res.status(400).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
     }
 
     if (error instanceof NotFoundError) {
       return res.status(404).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
     }
 
@@ -158,7 +149,7 @@ export const checkoutPreviewHandler = async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       message: "Failed to get checkout preview",
-      error: error instanceof Error ? error.message : "Unknown error"
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };

@@ -5,151 +5,33 @@ import { parseMultipartData, uploadMediaImage } from "./media.helpers";
 import { cleanupFile } from "@/services/file-cleanup.service";
 
 export const getMediaByTypeHandler = async (req: Request, res: Response) => {
-  try {
-    const { type } = req.params;
-
-    if (!Object.values(MediaType).includes(type as MediaType)) {
-      return res.status(400).json({
-        success: false,
-        message: "Type không hợp lệ",
-      });
-    }
-
-    const media = await mediaService.getMediaByType(type as MediaType);
-
-    res.json({
-      success: true,
-      data: media,
-      total: media.length,
-      message: "Lấy media thành công",
-    });
-  } catch (error: any) {
-    const status = error.statusCode || 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  const media = await mediaService.getMediaByType(req.params.type as MediaType);
+  res.json({ data: media, total: media.length, message: "Lấy media thành công" });
 };
 
 export const getMediaByPositionHandler = async (req: Request, res: Response) => {
-  try {
-    const { position } = req.params;
-
-    if (!Object.values(MediaPosition).includes(position as MediaPosition)) {
-      return res.status(400).json({
-        success: false,
-        message: "Position không hợp lệ",
-      });
-    }
-
-    const media = await mediaService.getMediaByPosition(position as MediaPosition);
-
-    res.json({
-      success: true,
-      data: media,
-      total: media.length,
-      message: "Lấy media thành công",
-    });
-  } catch (error: any) {
-    const status = error.statusCode || 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  const media = await mediaService.getMediaByPosition(req.params.position as MediaPosition);
+  res.json({ data: media, total: media.length, message: "Lấy media thành công" });
 };
 
 export const getMediaByTypeAndPositionHandler = async (req: Request, res: Response) => {
-  try {
-    const { type, position } = req.query;
-
-    if (!type || !Object.values(MediaType).includes(type as MediaType)) {
-      return res.status(400).json({
-        success: false,
-        message: "Type không hợp lệ",
-      });
-    }
-
-    if (!position || !Object.values(MediaPosition).includes(position as MediaPosition)) {
-      return res.status(400).json({
-        success: false,
-        message: "Position không hợp lệ",
-      });
-    }
-
-    const media = await mediaService.getMediaByTypeAndPosition(
-      type as MediaType,
-      position as MediaPosition,
-    );
-
-    res.json({
-      success: true,
-      data: media,
-      total: media.length,
-      message: "Lấy media thành công",
-    });
-  } catch (error: any) {
-    const status = error.statusCode || 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  const media = await mediaService.getMediaByTypeAndPosition(req.query.type as MediaType, req.query.position as MediaPosition);
+  res.json({ data: media, total: media.length, message: "Lấy media thành công" });
 };
 
 export const getAllActiveMediaHandler = async (req: Request, res: Response) => {
-  try {
-    const grouped = await mediaService.getAllActiveMedia();
-
-    res.json({
-      success: true,
-      data: grouped,
-      message: "Lấy tất cả media thành công",
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  const grouped = await mediaService.getAllActiveMedia();
+  res.json({ data: grouped, message: "Lấy tất cả media thành công" });
 };
 
 export const getAllMediaHandler = async (req: Request, res: Response) => {
-  try {
-    const media = await mediaService.getAllMedia();
-
-    res.json({
-      success: true,
-      data: media,
-      total: media.length,
-      message: "Lấy danh sách media thành công",
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  const media = await mediaService.getAllMedia();
+  res.json({ data: media, total: media.length, message: "Lấy danh sách media thành công" });
 };
 
 export const getMediaDetailHandler = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const media = await mediaService.getMediaById(id);
-
-    res.json({
-      success: true,
-      data: media,
-      message: "Lấy chi tiết media thành công",
-    });
-  } catch (error: any) {
-    const status = error.statusCode || 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  const media = await mediaService.getMediaById(req.params.id);
+  res.json({ data: media, message: "Lấy chi tiết media thành công" });
 };
 
 export const createMediaHandler = async (req: Request, res: Response) => {
@@ -157,11 +39,7 @@ export const createMediaHandler = async (req: Request, res: Response) => {
 
   try {
     const parsedBody = parseMultipartData(req.body);
-
-    let image = null;
-    if (file) {
-      image = await uploadMediaImage(file);
-    }
+    const image = file ? await uploadMediaImage(file) : null;
 
     const media = await mediaService.createMedia({
       ...parsedBody,
@@ -169,29 +47,9 @@ export const createMediaHandler = async (req: Request, res: Response) => {
       imagePath: image?.publicId,
     });
 
+    res.status(201).json({ data: media, message: "Tạo media thành công" });
+  } finally {
     cleanupFile(file);
-
-    res.status(201).json({
-      success: true,
-      data: media,
-      message: "Tạo media thành công",
-    });
-  } catch (error: any) {
-    cleanupFile(file);
-
-    if (error.name === "ZodError") {
-      return res.status(400).json({
-        success: false,
-        message: "Dữ liệu không hợp lệ",
-        errors: error.errors,
-      });
-    }
-
-    const status = error.statusCode || 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
   }
 };
 
@@ -199,81 +57,26 @@ export const updateMediaHandler = async (req: Request, res: Response) => {
   const file = req.file;
 
   try {
-    const { id } = req.params;
     const parsedBody = parseMultipartData(req.body);
+    const image = file ? await uploadMediaImage(file) : null;
 
-    let image = null;
-    if (file) {
-      image = await uploadMediaImage(file);
-    }
-
-    const updateData = {
+    const media = await mediaService.updateMedia(req.params.id, {
       ...parsedBody,
-      ...(image && {
-        imageUrl: image.url,
-        imagePath: image.publicId,
-      }),
-    };
-
-    const media = await mediaService.updateMedia(id, updateData);
-
-    cleanupFile(file);
-
-    res.json({
-      success: true,
-      data: media,
-      message: "Cập nhật media thành công",
+      ...(image && { imageUrl: image.url, imagePath: image.publicId }),
     });
-  } catch (error: any) {
+
+    res.json({ data: media, message: "Cập nhật media thành công" });
+  } finally {
     cleanupFile(file);
-
-    if (error.name === "ZodError") {
-      return res.status(400).json({
-        success: false,
-        message: "Dữ liệu không hợp lệ",
-        errors: error.errors,
-      });
-    }
-
-    const status = error.statusCode || 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
   }
 };
 
 export const deleteMediaHandler = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    await mediaService.deleteMedia(id);
-
-    res.json({
-      success: true,
-      message: "Xóa media thành công",
-    });
-  } catch (error: any) {
-    const status = error.statusCode || 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  await mediaService.deleteMedia(req.params.id);
+  res.json({ message: "Xóa media thành công" });
 };
 
 export const reorderMediaHandler = async (req: Request, res: Response) => {
-  try {
-    const result = await mediaService.reorderMedia(req.body);
-
-    res.json({
-      success: true,
-      message: result.message,
-    });
-  } catch (error: any) {
-    const status = error.statusCode || 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  const result = await mediaService.reorderMedia(req.body);
+  res.json({ message: result.message });
 };

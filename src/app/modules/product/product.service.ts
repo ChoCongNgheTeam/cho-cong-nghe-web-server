@@ -7,31 +7,19 @@ import { buildCategoryPath } from "../category/category.helpers";
 import prisma from "prisma/client";
 import { getProductIdsFromPromotions } from "./product.repository";
 import { normalizeVariant } from "./product.helpers";
+import { NotFoundError, BadRequestError } from "@/errors";
 
-// =====================
-// === PUBLIC SERVICES ===
-// =====================
+// ── Public ────────────────────────────────────────────────────────────────────
 
 export const getProductsPublic = async (query: ListProductsQuery) => {
   const result = await repo.findAllPublic(query);
-  // console.log(result);
-
-  // const productIds = result.data.map((p) => p.id);
-  // const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
-  // console.log(variantOptionsMap);
 
   return {
     ...result,
     data: result.data.map((product) => {
       const defaultVariant = product.variants?.[0];
-      // const variantOptions = variantOptionsMap.get(product.id) ?? [];
-
       return {
-        card: {
-          ...transformProductCard(product),
-          // variantOptions,
-        },
-
+        card: { ...transformProductCard(product) },
         pricingContext: defaultVariant
           ? {
               productId: product.id,
@@ -48,20 +36,11 @@ export const getProductsPublic = async (query: ListProductsQuery) => {
 
 export const getProductBySlug = async (slug: string, userId?: string) => {
   const product = await repo.findBySlug(slug);
-  if (!product || !product.isActive) {
-    const error: any = new Error("Không tìm thấy sản phẩm");
-    error.statusCode = 404;
-    throw error;
-  }
+  if (!product || !product.isActive) throw new NotFoundError("Sản phẩm");
 
   const reviewStats = await repo.getReviewStats(product.id);
 
-  // Tăng view count async
-  repo
-    .update(product.id, {
-      viewsCount: BigInt(product.viewsCount) + BigInt(1),
-    })
-    .catch(console.error);
+  repo.update(product.id, { viewsCount: BigInt(product.viewsCount) + BigInt(1) }).catch(console.error);
 
   const productDetail = transformProductDetail(product, {
     average: Number(product.ratingAverage) || 0,
@@ -70,10 +49,8 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
   });
 
   const highlights = transformProductHighlights(product);
-
   const { groups: highlightGroups } = await repo.findHighlightSpecificationGroups(product.id, product.categoryId);
 
-  // Check if user can review
   let canReview = false;
   let orderItemId: string | null = null;
 
@@ -95,23 +72,12 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
 
 export const getProductVariant = async (slug: string, options?: Record<string, string>) => {
   const product = await repo.findBySlug(slug);
-  if (!product || !product.isActive) {
-    const error: any = new Error("Không tìm thấy sản phẩm");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  // console.log(options);
+  if (!product || !product.isActive) throw new NotFoundError("Sản phẩm");
 
   const variant = await repo.findVariantByOptions(product.id, options || {});
-  if (!variant || !variant.isActive) {
-    const error: any = new Error("Không tìm thấy variant");
-    error.statusCode = 404;
-    throw error;
-  }
+  if (!variant || !variant.isActive) throw new NotFoundError("Variant");
 
   const normalizedVariant = normalizeVariant(variant);
-
   const variantResponse = transformProductVariantResponse(product, normalizedVariant);
 
   return {
@@ -128,32 +94,17 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
 
 export const getProductSpecificationsBySlug = async (slug: string) => {
   const product = await repo.findSpecificationsBySlug(slug);
-
-  // console.log(product);
-
-  if (!product || !product.isActive) {
-    const error: any = new Error("Không tìm thấy thông số sản phẩm");
-    error.statusCode = 404;
-    throw error;
-  }
+  if (!product || !product.isActive) throw new NotFoundError("Thông số sản phẩm");
 
   const { specifications } = transformProductSpecifications(product);
-
   return { specifications };
 };
 
 export const getProductGallery = async (slug: string) => {
   const product = await repo.findBySlug(slug);
-  if (!product || !product.isActive) {
-    const error: any = new Error("Không tìm thấy sản phẩm");
-    error.statusCode = 404;
-    throw error;
-  }
+  if (!product || !product.isActive) throw new NotFoundError("Sản phẩm");
 
-  // Get all color images for this product
   const colorImages = await repo.findColorImagesByProductId(product.id);
-
-  // Group by color and return
   return colorImages.map((img) => ({
     id: img.id,
     color: img.color,
@@ -163,28 +114,16 @@ export const getProductGallery = async (slug: string) => {
   }));
 };
 
-export const getRelatedProducts = async (slug: string, limit: number = 8) => {
+export const getRelatedProducts = async (slug: string, limit = 8) => {
   const product = await repo.findBySlug(slug);
-  if (!product) {
-    const error: any = new Error("Không tìm thấy sản phẩm");
-    error.statusCode = 404;
-    throw error;
-  }
+  if (!product) throw new NotFoundError("Sản phẩm");
 
   const related = await repo.findRelatedProducts(product.id, limit);
 
-  // const productIds = related.map((p) => p.id);
-  // const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
-
   return related.map((p) => {
     const defaultVariant = p.variants?.[0];
-    // const variantOptions = variantOptionsMap.get(p.id) ?? [];
-
     return {
-      card: {
-        ...transformProductCard(p),
-        // variantOptions,
-      },
+      card: { ...transformProductCard(p) },
       pricingContext: defaultVariant
         ? {
             productId: p.id,
@@ -200,42 +139,20 @@ export const getRelatedProducts = async (slug: string, limit: number = 8) => {
 
 export const getProductReviews = async (slug: string, query: ReviewsQuery) => {
   const product = await repo.findBySlug(slug);
-  if (!product) {
-    const error: any = new Error("Không tìm thấy sản phẩm");
-    error.statusCode = 404;
-    throw error;
-  }
-
+  if (!product) throw new NotFoundError("Sản phẩm");
   return repo.findProductReviews(product.id, query);
 };
 
-// =====================
-// === ADMIN SERVICES ===
-// =====================
+// ── Admin ─────────────────────────────────────────────────────────────────────
 
-/**
- * Admin list - NO pricing needed (admin sees base prices only)
- */
 export const getProductsAdmin = async (query: ListProductsQuery) => {
   const result = await repo.findAllAdmin(query);
-
-  return {
-    ...result,
-    data: result.data.map(transformProductCard),
-  };
+  return { ...result, data: result.data.map(transformProductCard) };
 };
 
-/**
- * Admin detail - NO pricing needed (admin sees base prices only)
- */
 export const getProductById = async (id: string) => {
   const product = await repo.findById(id);
-
-  if (!product) {
-    const error: any = new Error("Không tìm thấy sản phẩm");
-    error.statusCode = 404;
-    throw error;
-  }
+  if (!product) throw new NotFoundError("Sản phẩm");
 
   const reviewStats = await repo.getReviewStats(product.id);
   const stats: ReviewStats = {
@@ -249,41 +166,25 @@ export const getProductById = async (id: string) => {
 
 export const createProduct = async (input: CreateProductInput) => {
   const defaultCount = input.variants.filter((v) => v.isDefault).length;
-  if (defaultCount !== 1) {
-    const error: any = new Error("Phải có đúng 1 biến thể mặc định");
-    error.statusCode = 400;
-    throw error;
-  }
+  if (defaultCount !== 1) throw new BadRequestError("Phải có đúng 1 biến thể mặc định");
 
   const slug = slugify(input.name).toLowerCase();
-
-  const product = await repo.create({
-    ...input,
-    slug,
-  });
-
+  const product = await repo.create({ ...input, slug });
   return transformProductDetail(product);
 };
 
 export const updateProduct = async (id: string, input: UpdateProductInput) => {
-  // Check product exists
   await getProductById(id);
 
   const updateData: any = { ...input };
 
-  // Update slug if name changed
   if (input.name) {
     updateData.slug = slugify(input.name).toLowerCase();
   }
 
-  // Validate default variant if variants are updated
   if (input.variants) {
     const defaultCount = input.variants.filter((v) => v.isDefault).length;
-    if (defaultCount > 1) {
-      const error: any = new Error("Chỉ được có tối đa 1 biến thể mặc định");
-      error.statusCode = 400;
-      throw error;
-    }
+    if (defaultCount > 1) throw new BadRequestError("Chỉ được có tối đa 1 biến thể mặc định");
   }
 
   const product = await repo.update(id, updateData);
@@ -295,19 +196,16 @@ export const deleteProduct = async (id: string) => {
   return repo.remove(id);
 };
 
+// ── Promotion / Sale ──────────────────────────────────────────────────────────
+
 export const getFlashSaleProducts = async (date: Date = new Date(), options: { limit?: number; categoryId?: string } = {}) => {
   const products = await repo.findProductsOnSaleByDate(date, options);
-
-  // console.log(products);
 
   return {
     data: products.map((product) => {
       const defaultVariant = product.variants?.[0];
-
       return {
-        card: {
-          ...transformProductCard(product),
-        },
+        card: { ...transformProductCard(product) },
         pricingContext: defaultVariant
           ? {
               productId: product.id,
@@ -324,36 +222,10 @@ export const getFlashSaleProducts = async (date: Date = new Date(), options: { l
   };
 };
 
-// export const getCategoriesWithSaleProducts = async (date: Date = new Date()) => {
-//   const categories = await repo.findCategoriesWithSaleProducts(date);
-
-//   // Get sale products count for each category
-//   const countMap = await repo.getSaleProductsCountByCategories(date);
-
-//   return categories.map((category) => ({
-//     id: category.id,
-//     name: category.name,
-//     slug: category.slug,
-//     imageUrl: category.imageUrl,
-//     totalProducts: category._count.products,
-//     saleProductsCount: countMap.get(category.id) || 0,
-//   }));
-// };
-
 export const getCategoriesWithSaleProducts = async (date: Date = new Date(), limit = 5) => {
   const [products, saleProductIds] = await Promise.all([repo.getProductsForCategoryRanking(date), getProductIdsFromPromotions(date)]);
 
-  const map = new Map<
-    string,
-    {
-      totalProducts: number;
-      saleProducts: number;
-      newProducts: number;
-      totalViews: number;
-      totalSold: number;
-    }
-  >();
-
+  const map = new Map<string, { totalProducts: number; saleProducts: number; newProducts: number; totalViews: number; totalSold: number }>();
   const NEW_DAYS = 15;
   const now = Date.now();
 
@@ -361,89 +233,42 @@ export const getCategoriesWithSaleProducts = async (date: Date = new Date(), lim
     const categoryId = product.category.parent?.id ?? product.category.id;
 
     if (!map.has(categoryId)) {
-      map.set(categoryId, {
-        totalProducts: 0,
-        saleProducts: 0,
-        newProducts: 0,
-        totalViews: 0,
-        totalSold: 0,
-      });
+      map.set(categoryId, { totalProducts: 0, saleProducts: 0, newProducts: 0, totalViews: 0, totalSold: 0 });
     }
 
     const data = map.get(categoryId)!;
-
     data.totalProducts += 1;
     data.totalViews += Number(product.viewsCount);
+    data.totalSold += product.variants.reduce((sum, v) => sum + v.soldCount, 0);
 
-    const sold = product.variants.reduce((sum, v) => sum + v.soldCount, 0);
-    data.totalSold += sold;
-
-    if (saleProductIds.has(product.id)) {
-      data.saleProducts += 1;
-    }
-
-    if (now - product.createdAt.getTime() < NEW_DAYS * 24 * 60 * 60 * 1000) {
-      data.newProducts += 1;
-    }
+    if (saleProductIds.has(product.id)) data.saleProducts += 1;
+    if (now - product.createdAt.getTime() < NEW_DAYS * 24 * 60 * 60 * 1000) data.newProducts += 1;
   }
 
-  // Lấy category info
   const categories = await prisma.categories.findMany({
-    where: {
-      id: { in: Array.from(map.keys()) },
-      isActive: true,
-    },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      imageUrl: true,
-    },
+    where: { id: { in: Array.from(map.keys()) }, isActive: true },
+    select: { id: true, name: true, slug: true, imageUrl: true },
   });
 
   return categories
     .map((cat) => {
       const stat = map.get(cat.id)!;
-
       const score = stat.saleProducts * 5 + stat.newProducts * 3 + stat.totalSold * 0.1 + stat.totalViews * 0.01 + stat.totalProducts;
-
-      return {
-        ...cat,
-        ...stat,
-        score,
-      };
+      return { ...cat, ...stat, score };
     })
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 };
 
-/**
- * 3. Get featured products by categories
- * For Home: Sections sản phẩm featured theo category
- */
-
-export const getFeaturedProductsByCategories = async (
-  options: {
-    limit?: number;
-    categoriesLimit?: number;
-  } = {},
-) => {
+export const getFeaturedProductsByCategories = async (options: { limit?: number; categoriesLimit?: number } = {}) => {
   const results = await repo.findFeaturedProductsByCategories(options);
-
-  // Lấy productIds để query variant options
-  // const allProductIds = results.flatMap((r) => r.products.map((p) => p.id));
-  // const variantOptionsMap = await repo.getProductVariantOptionsMap(allProductIds);
 
   return results.map((result) => ({
     category: result.category,
     products: result.products.map((product) => {
       const defaultVariant = product.variants?.[0];
-      // const variantOptions = variantOptionsMap.get(product.id) ?? [];
-
       return {
-        card: {
-          ...transformProductCard(product),
-        },
+        card: { ...transformProductCard(product) },
         pricingContext: defaultVariant
           ? {
               productId: product.id,
@@ -458,14 +283,9 @@ export const getFeaturedProductsByCategories = async (
     total: result.products.length,
   }));
 };
-/**
- * 4. Get upcoming promotions
- * For Home: Preview các đợt sale sắp tới
- */
-export const getUpcomingPromotions = async (limit: number = 5) => {
-  const currentDate = new Date();
-  const promotions = await repo.findUpcomingPromotions(currentDate, limit);
 
+export const getUpcomingPromotions = async (limit = 5) => {
+  const promotions = await repo.findUpcomingPromotions(new Date(), limit);
   return promotions.map((promo) => ({
     id: promo.id,
     name: promo.name,
@@ -477,18 +297,9 @@ export const getUpcomingPromotions = async (limit: number = 5) => {
   }));
 };
 
-/**
- * 5. Get products by promotion (for preview)
- * For Home: Xem trước sản phẩm của promotion sắp tới
- */
-export const getProductsByPromotion = async (promotionId: string, limit: number = 20) => {
+export const getProductsByPromotion = async (promotionId: string, limit = 20) => {
   const result = await repo.findProductsByPromotionId(promotionId, limit);
-
-  if (!result) {
-    const error: any = new Error("Không tìm thấy promotion");
-    error.statusCode = 404;
-    throw error;
-  }
+  if (!result) throw new NotFoundError("Promotion");
 
   return {
     promotion: result.promotion,
@@ -497,16 +308,12 @@ export const getProductsByPromotion = async (promotionId: string, limit: number 
   };
 };
 
-export const getFeaturedProducts = async (limit: number = 12) => {
+export const getFeaturedProducts = async (limit = 12) => {
   const products = await repo.findFeaturedProducts(limit);
-
   return products.map((product) => {
     const defaultVariant = product.variants?.[0];
-
     return {
-      card: {
-        ...transformProductCard(product),
-      },
+      card: { ...transformProductCard(product) },
       pricingContext: defaultVariant
         ? {
             productId: product.id,
@@ -520,18 +327,12 @@ export const getFeaturedProducts = async (limit: number = 12) => {
   });
 };
 
-export const getBestSellingProducts = async (limit: number = 12) => {
+export const getBestSellingProducts = async (limit = 12) => {
   const products = await repo.findBestSellingProducts(limit);
-
-  // console.log(products);
-
   return products.map((product) => {
     const defaultVariant = product.variants?.[0];
-
     return {
-      card: {
-        ...transformProductCard(product),
-      },
+      card: { ...transformProductCard(product) },
       pricingContext: defaultVariant
         ? {
             productId: product.id,
@@ -547,14 +348,10 @@ export const getBestSellingProducts = async (limit: number = 12) => {
 
 export const getRecentlyViewedProducts = async (productIds: string[]) => {
   const products = await repo.findProductsByIds(productIds);
-
   return products.map((product) => {
     const defaultVariant = product.variants?.[0];
-
     return {
-      card: {
-        ...transformProductCard(product),
-      },
+      card: { ...transformProductCard(product) },
       pricingContext: defaultVariant
         ? {
             productId: product.id,
@@ -568,25 +365,12 @@ export const getRecentlyViewedProducts = async (productIds: string[]) => {
   });
 };
 
-/**
- * 7. Get new arrival products
- * For Home: Sản phẩm mới về
- */
-export const getNewArrivalProducts = async (daysAgo: number = 30, limit: number = 12) => {
+export const getNewArrivalProducts = async (daysAgo = 30, limit = 12) => {
   const products = await repo.findNewArrivalProducts(daysAgo, limit);
-
-  // const productIds = products.map((p) => p.id);
-  // const variantOptionsMap = await repo.getProductVariantOptionsMap(productIds);
-
   return products.map((product) => {
     const defaultVariant = product.variants?.[0];
-    // const variantOptions = variantOptionsMap.get(product.id) ?? [];
-
     return {
-      card: {
-        ...transformProductCard(product),
-        // variantOptions,
-      },
+      card: { ...transformProductCard(product) },
       pricingContext: defaultVariant
         ? {
             productId: product.id,
@@ -600,26 +384,13 @@ export const getNewArrivalProducts = async (daysAgo: number = 30, limit: number 
   });
 };
 
-/**
- * 8. Get sale schedule (for Flash Sale timeline)
- * For Home: Lịch sale theo ngày
- */
 export const getSaleSchedule = async (startDate: Date, endDate: Date) => {
-  // Get all promotions in date range
   const allPromotions = await prisma.promotions.findMany({
     where: {
       isActive: true,
       OR: [
-        // Promotions that start before endDate and end after startDate
         {
-          AND: [
-            {
-              OR: [{ startDate: null }, { startDate: { lte: endDate } }],
-            },
-            {
-              OR: [{ endDate: null }, { endDate: { gte: startDate } }],
-            },
-          ],
+          AND: [{ OR: [{ startDate: null }, { startDate: { lte: endDate } }] }, { OR: [{ endDate: null }, { endDate: { gte: startDate } }] }],
         },
       ],
     },
@@ -630,17 +401,12 @@ export const getSaleSchedule = async (startDate: Date, endDate: Date) => {
       startDate: true,
       endDate: true,
       priority: true,
-      _count: {
-        select: {
-          targets: true,
-        },
-      },
+      _count: { select: { targets: true } },
     },
     orderBy: [{ priority: "desc" }, { startDate: "asc" }],
   });
 
-  // Group promotions by date
-  const schedule: Map<string, any[]> = new Map();
+  const schedule = new Map<string, any[]>();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -652,11 +418,8 @@ export const getSaleSchedule = async (startDate: Date, endDate: Date) => {
     const lastDate = new Date(Math.min(promoEnd.getTime(), endDate.getTime()));
 
     while (currentDate <= lastDate) {
-      const dateKey = currentDate.toISOString().split("T")[0]; // YYYY-MM-DD
-
-      if (!schedule.has(dateKey)) {
-        schedule.set(dateKey, []);
-      }
+      const dateKey = currentDate.toISOString().split("T")[0];
+      if (!schedule.has(dateKey)) schedule.set(dateKey, []);
 
       const existing = schedule.get(dateKey)!;
       if (!existing.some((p) => p.id === promo.id)) {
@@ -679,12 +442,10 @@ export const getSaleSchedule = async (startDate: Date, endDate: Date) => {
     }
   });
 
-  // Convert map to array and sort by date
   return Array.from(schedule.entries())
     .map(([date, promotions]) => {
       const dateObj = new Date(date);
       dateObj.setHours(0, 0, 0, 0);
-
       return {
         date,
         promotions: promotions.sort((a, b) => b.priority - a.priority),
@@ -694,14 +455,8 @@ export const getSaleSchedule = async (startDate: Date, endDate: Date) => {
     .sort((a, b) => a.date.localeCompare(b.date));
 };
 
-/**
- * 9. Get active promotions
- * For Home: Danh sách promotions đang active hôm nay
- */
 export const getActivePromotions = async () => {
-  const today = new Date();
-  const promotions = await repo.findActivePromotions(today);
-
+  const promotions = await repo.findActivePromotions(new Date());
   return promotions.map((promo) => ({
     id: promo.id,
     name: promo.name,

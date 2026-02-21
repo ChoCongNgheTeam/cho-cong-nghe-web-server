@@ -29,64 +29,49 @@ import {
   updateCampaignCategorySchema,
   campaignCategoryParamsSchema,
 } from "./campaign.validation";
+import { asyncHandler } from "@/utils/async-handler";
 
 const router = Router();
 
-// ==================== PUBLIC ROUTES ====================
+const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
 
-router.get("/", validate(listCampaignsQuerySchema, "query"), getCampaignsPublicHandler);
+// Public
+router.get("/", validate(listCampaignsQuerySchema, "query"), asyncHandler(getCampaignsPublicHandler));
+router.get("/active", validate(activeCampaignsQuerySchema, "query"), asyncHandler(getActiveCampaignsHandler));
+router.get("/slug/:slug", validate(campaignSlugParamsSchema, "params"), asyncHandler(getCampaignBySlugHandler));
 
-router.get("/active", validate(activeCampaignsQuerySchema, "query"), getActiveCampaignsHandler);
+// Admin — Campaign CRUD
+router.get("/admin/all", ...adminAuth, validate(listCampaignsQuerySchema, "query"), asyncHandler(getCampaignsAdminHandler));
+router.post("/admin", ...adminAuth, validate(createCampaignSchema, "body"), asyncHandler(createCampaignHandler));
 
-router.get("/slug/:slug", validate(campaignSlugParamsSchema, "params"), getCampaignBySlugHandler);
+// động sau
+router.get("/admin/:id", ...adminAuth, validate(campaignParamsSchema, "params"), asyncHandler(getCampaignDetailHandler));
+router.patch("/admin/:id", ...adminAuth, validate(campaignParamsSchema, "params"), validate(updateCampaignSchema, "body"), asyncHandler(updateCampaignHandler));
+router.delete("/admin/:id", ...adminAuth, validate(campaignParamsSchema, "params"), asyncHandler(deleteCampaignHandler));
 
-// ==================== ADMIN - CAMPAIGN CRUD ====================
-
-router.get("/admin/all", authMiddleware(), requireRole("ADMIN"), validate(listCampaignsQuerySchema, "query"), getCampaignsAdminHandler);
-
-router.get("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(campaignParamsSchema, "params"), getCampaignDetailHandler);
-
-router.post("/admin", authMiddleware(), requireRole("ADMIN"), validate(createCampaignSchema, "body"), createCampaignHandler);
-
-router.patch("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(campaignParamsSchema, "params"), validate(updateCampaignSchema, "body"), updateCampaignHandler);
-
-router.delete("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(campaignParamsSchema, "params"), deleteCampaignHandler);
-
-// ==================== ADMIN - CAMPAIGN CATEGORIES ====================
-
+// Admin — Campaign Categories
 router.post(
   "/admin/:campaignId/categories",
-  authMiddleware(),
-  requireRole("ADMIN"),
+  ...adminAuth,
   campaignUpload.array("images", 20),
-  parseMultipart({
-    fields: {
-      categories: "json",
-    },
-  }),
+  parseMultipart({ fields: { categories: "json" } }),
   validate(campaignParamsSchema, "params"),
   validate(addCampaignCategorySchema, "body"),
-  addCategoriesToCampaignHandler,
+  asyncHandler(addCategoriesToCampaignHandler),
 );
 
-router.get("/admin/:campaignId/categories/:categoryId", authMiddleware(), requireRole("ADMIN"), validate(campaignCategoryParamsSchema, "params"), getCampaignCategoryHandler);
+router.get("/admin/:campaignId/categories/:categoryId", ...adminAuth, validate(campaignCategoryParamsSchema, "params"), asyncHandler(getCampaignCategoryHandler));
 
 router.patch(
   "/admin/:campaignId/categories/:categoryId",
-  authMiddleware(),
-  requireRole("ADMIN"),
+  ...adminAuth,
   campaignUpload.single("image"),
-  parseMultipart({
-    fields: {
-      position: "number",
-      removeImage: "boolean",
-    },
-  }),
+  parseMultipart({ fields: { position: "number", removeImage: "boolean" } }),
   validate(campaignCategoryParamsSchema, "params"),
   validate(updateCampaignCategorySchema, "body"),
-  updateCampaignCategoryHandler,
+  asyncHandler(updateCampaignCategoryHandler),
 );
 
-router.delete("/admin/:campaignId/categories/:categoryId", authMiddleware(), requireRole("ADMIN"), validate(campaignCategoryParamsSchema, "params"), removeCategoryFromCampaignHandler);
+router.delete("/admin/:campaignId/categories/:categoryId", ...adminAuth, validate(campaignCategoryParamsSchema, "params"), asyncHandler(removeCategoryFromCampaignHandler));
 
 export default router;

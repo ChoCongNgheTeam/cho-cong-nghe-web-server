@@ -2,221 +2,63 @@ import { Request, Response } from "express";
 import * as promotionService from "./promotion.service";
 import { ListPromotionsQuery } from "./promotion.validation";
 
-type ValidatedQuery<T> = Request & {
-  query: T;
-};
+const paginatedResponse = (result: any, message: string) => ({
+  data: result.data,
+  pagination: {
+    page: result.page,
+    limit: result.limit,
+    total: result.total,
+    totalPages: result.totalPages,
+  },
+  message,
+});
 
-// =====================
-// === PUBLIC HANDLERS ===
-// =====================
-
-export const getPromotionsPublicHandler = async (req: ValidatedQuery<ListPromotionsQuery>, res: Response) => {
-  try {
-    const result = await promotionService.getPromotions(req.query);
-
-    res.json({
-      success: true,
-      data: result.data,
-      pagination: {
-        page: result.page,
-        limit: result.limit,
-        total: result.total,
-        totalPages: result.totalPages,
-      },
-      message: "Lấy danh sách khuyến mãi thành công",
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+export const getPromotionsPublicHandler = async (req: Request, res: Response) => {
+  const result = await promotionService.getPromotions(req.query as unknown as ListPromotionsQuery);
+  res.json(paginatedResponse(result, "Lấy danh sách khuyến mãi thành công"));
 };
 
 export const getActivePromotionsHandler = async (req: Request, res: Response) => {
-  try {
-    const promotions = await promotionService.getActivePromotions();
-
-    res.json({
-      success: true,
-      data: promotions,
-      message: "Lấy danh sách khuyến mãi đang hoạt động thành công",
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  const promotions = await promotionService.getActivePromotions();
+  res.json({ data: promotions, message: "Lấy danh sách khuyến mãi đang hoạt động thành công" });
 };
 
 export const getPromotionsByProductHandler = async (req: Request, res: Response) => {
-  try {
-    const { productId } = req.params;
-    const promotions = await promotionService.getActivePromotionsForProduct(productId);
-
-    res.json({
-      success: true,
-      data: promotions,
-      message: "Lấy khuyến mãi cho sản phẩm thành công",
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  const promotions = await promotionService.getActivePromotionsForProduct(req.params.productId);
+  res.json({ data: promotions, message: "Lấy khuyến mãi cho sản phẩm thành công" });
 };
 
 export const getPromotionsByCategoryHandler = async (req: Request, res: Response) => {
-  try {
-    const { categoryId } = req.params;
-    const promotions = await promotionService.getActivePromotionsForCategory(categoryId);
-
-    res.json({
-      success: true,
-      data: promotions,
-      message: "Lấy khuyến mãi cho danh mục thành công",
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  const promotions = await promotionService.getActivePromotionsForCategory(req.params.categoryId);
+  res.json({ data: promotions, message: "Lấy khuyến mãi cho danh mục thành công" });
 };
 
 export const getPromotionsByBrandHandler = async (req: Request, res: Response) => {
-  try {
-    const { brandId } = req.params;
-    const promotions = await promotionService.getActivePromotionsForBrand(brandId);
-
-    res.json({
-      success: true,
-      data: promotions,
-      message: "Lấy khuyến mãi cho thương hiệu thành công",
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  const promotions = await promotionService.getActivePromotionsForBrand(req.params.brandId);
+  res.json({ data: promotions, message: "Lấy khuyến mãi cho thương hiệu thành công" });
 };
 
-// =====================
-// === ADMIN HANDLERS ===
-// =====================
-
-export const getPromotionsAdminHandler = async (req: ValidatedQuery<ListPromotionsQuery>, res: Response) => {
-  try {
-    const result = await promotionService.getPromotions(req.query);
-
-    res.json({
-      success: true,
-      data: result.data,
-      pagination: {
-        page: result.page,
-        limit: result.limit,
-        total: result.total,
-        totalPages: result.totalPages,
-      },
-      message: "Lấy danh sách khuyến mãi thành công",
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+export const getPromotionsAdminHandler = async (req: Request, res: Response) => {
+  const result = await promotionService.getPromotions(req.query as unknown as ListPromotionsQuery);
+  res.json(paginatedResponse(result, "Lấy danh sách khuyến mãi thành công"));
 };
 
 export const getPromotionByIdHandler = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const promotion = await promotionService.getPromotionById(id);
-
-    res.json({
-      success: true,
-      data: promotion,
-      message: "Lấy chi tiết khuyến mãi thành công",
-    });
-  } catch (error: any) {
-    const status = error.statusCode || 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  const promotion = await promotionService.getPromotionById(req.params.id);
+  res.json({ data: promotion, message: "Lấy chi tiết khuyến mãi thành công" });
 };
 
 export const createPromotionHandler = async (req: Request, res: Response) => {
-  try {
-    const promotion = await promotionService.createPromotion(req.body);
-
-    res.status(201).json({
-      success: true,
-      data: promotion,
-      message: "Tạo khuyến mãi thành công",
-    });
-  } catch (error: any) {
-    if (error.name === "ZodError") {
-      return res.status(400).json({
-        success: false,
-        message: "Dữ liệu không hợp lệ",
-        errors: error.errors,
-      });
-    }
-
-    const status = error.statusCode || 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  const promotion = await promotionService.createPromotion(req.body);
+  res.status(201).json({ data: promotion, message: "Tạo khuyến mãi thành công" });
 };
 
 export const updatePromotionHandler = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const promotion = await promotionService.updatePromotion(id, req.body);
-
-    res.json({
-      success: true,
-      data: promotion,
-      message: "Cập nhật khuyến mãi thành công",
-    });
-  } catch (error: any) {
-    if (error.name === "ZodError") {
-      return res.status(400).json({
-        success: false,
-        message: "Dữ liệu không hợp lệ",
-        errors: error.errors,
-      });
-    }
-
-    const status = error.statusCode || 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  const promotion = await promotionService.updatePromotion(req.params.id, req.body);
+  res.json({ data: promotion, message: "Cập nhật khuyến mãi thành công" });
 };
 
 export const deletePromotionHandler = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    await promotionService.deletePromotion(id);
-
-    res.json({
-      success: true,
-      message: "Xóa khuyến mãi thành công",
-    });
-  } catch (error: any) {
-    const status = error.statusCode || 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  await promotionService.deletePromotion(req.params.id);
+  res.json({ message: "Xóa khuyến mãi thành công" });
 };

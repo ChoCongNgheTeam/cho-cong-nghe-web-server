@@ -33,45 +33,41 @@ import {
   listCategoriesQuerySchema,
   featuredCategoriesQuerySchema,
 } from "./category.validation";
+import { asyncHandler } from "@/utils/async-handler";
 
 const router = Router();
 
+const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
+
 // Public
-router.get("/", validate(listCategoriesQuerySchema, "query"), getCategoriesPublicHandler);
-router.get("/roots", getRootCategoriesHandler);
-router.get("/featured", validate(featuredCategoriesQuerySchema, "query"), getFeaturedCategoriesHandler);
-router.get("/tree", getCategoryTreeHandler);
-router.get("/slug/:slug", validate(categorySlugParamsSchema, "params"), getCategoryBySlugHandler);
+router.get("/", validate(listCategoriesQuerySchema, "query"), asyncHandler(getCategoriesPublicHandler));
+
+// Tĩnh trước, động sau — tránh conflict với /:id hay /:categoryId
+router.get("/roots", asyncHandler(getRootCategoriesHandler));
+router.get("/featured", validate(featuredCategoriesQuerySchema, "query"), asyncHandler(getFeaturedCategoriesHandler));
+router.get("/tree", asyncHandler(getCategoryTreeHandler));
+router.get("/slug/:slug", validate(categorySlugParamsSchema, "params"), asyncHandler(getCategoryBySlugHandler));
 
 // Admin
-router.get("/admin/all", authMiddleware(), requireRole("ADMIN"), validate(listCategoriesQuerySchema, "query"), getCategoriesAdminHandler);
+router.get("/admin/all", ...adminAuth, validate(listCategoriesQuerySchema, "query"), asyncHandler(getCategoriesAdminHandler));
+router.get("/admin/roots", ...adminAuth, asyncHandler(getRootCategoriesForAdminHandler));
 
-router.get("/admin/roots", authMiddleware(), requireRole("ADMIN"), getRootCategoriesForAdminHandler);
+router.post("/admin/reorder", ...adminAuth, validate(reorderCategorySchema, "body"), asyncHandler(reorderCategoryHandler));
 
-router.get("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(categoryParamsSchema, "params"), getCategoryDetailHandler);
+router.get("/attributes/all", ...adminAuth, asyncHandler(getAllAttributesHandler));
+router.get("/attributes/:attributeId/options", ...adminAuth, validate(attributeIdParamSchema, "params"), asyncHandler(getAttributeOptionsHandler));
 
-router.post("/admin", authMiddleware(), requireRole("ADMIN"), categoryUpload.single("imageUrl"), validate(createCategorySchema, "body"), createCategoryHandler);
+router.get("/specifications/all", ...adminAuth, asyncHandler(getAllSpecificationsHandler));
 
-router.patch(
-  "/admin/:id",
-  authMiddleware(),
-  requireRole("ADMIN"),
-  categoryUpload.single("imageUrl"),
-  validate(categoryParamsSchema, "params"),
-  validate(updateCategorySchema, "body"),
-  updateCategoryHandler,
-);
+// Admin — động
+router.get("/admin/:id", ...adminAuth, validate(categoryParamsSchema, "params"), asyncHandler(getCategoryDetailHandler));
 
-router.delete("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(categoryParamsSchema, "params"), deleteCategoryHandler);
+router.post("/admin", ...adminAuth, categoryUpload.single("imageUrl"), validate(createCategorySchema, "body"), asyncHandler(createCategoryHandler));
 
-router.post("/admin/reorder", authMiddleware(), requireRole("ADMIN"), validate(reorderCategorySchema, "body"), reorderCategoryHandler);
+router.patch("/admin/:id", ...adminAuth, categoryUpload.single("imageUrl"), validate(categoryParamsSchema, "params"), validate(updateCategorySchema, "body"), asyncHandler(updateCategoryHandler));
 
-router.get("/:categoryId/template", authMiddleware(), requireRole("ADMIN"), validate(categoryIdParamSchema, "params"), getCategoryTemplateHandler);
+router.delete("/admin/:id", ...adminAuth, validate(categoryParamsSchema, "params"), asyncHandler(deleteCategoryHandler));
 
-router.get("/attributes/all", authMiddleware(), requireRole("ADMIN"), getAllAttributesHandler);
-
-router.get("/attributes/:attributeId/options", authMiddleware(), requireRole("ADMIN"), validate(attributeIdParamSchema, "params"), getAttributeOptionsHandler);
-
-router.get("/specifications/all", authMiddleware(), requireRole("ADMIN"), getAllSpecificationsHandler);
+router.get("/:categoryId/template", ...adminAuth, validate(categoryIdParamSchema, "params"), asyncHandler(getCategoryTemplateHandler));
 
 export default router;

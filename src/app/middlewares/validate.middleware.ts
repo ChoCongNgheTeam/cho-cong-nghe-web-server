@@ -24,12 +24,15 @@ export const validate =
       });
     }
 
-    // store validated data safely
-    (req as any)[`validated${capitalize(source)}`] = result.data;
+    if (source === "query" || source === "params") {
+      Object.defineProperty(req, source, {
+        value: result.data,
+        writable: true,
+        configurable: true,
+      });
+    } else {
+      (req as any)[source] = result.data; // body vẫn ghi bình thường
+    }
 
     next();
   };
-
-function capitalize(str: string) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
