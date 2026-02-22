@@ -1,83 +1,40 @@
 import { Router } from "express";
 import { validate } from "@/app/middlewares/validate.middleware";
+import { authMiddleware } from "@/app/middlewares/auth.middleware";
+import { requireRole } from "@/app/middlewares/role.middleware";
+import { brandUpload } from "@/app/middlewares/upload/brandUpload";
 import {
+  getBrandsPublicHandler,
+  getBrandsAdminHandler,
   getActiveBrandsHandler,
   getFeaturedBrandsHandler,
   getBrandBySlugHandler,
-  getAllBrandsHandler,
   getBrandDetailHandler,
   createBrandHandler,
   updateBrandHandler,
   deleteBrandHandler,
 } from "./brand.controller";
-import { createBrandSchema, updateBrandSchema } from "./brand.validation";
-import { authMiddleware } from "@/app/middlewares/auth.middleware";
-import { requireRole } from "@/app/middlewares/role.middleware";
-import { upload } from "@/app/middlewares/upload.middleware";
-import { Request, Response, NextFunction } from "express";
+import { createBrandSchema, updateBrandSchema, brandParamsSchema, brandSlugParamsSchema, featuredBrandsQuerySchema, listBrandsQuerySchema } from "./brand.validation";
+import { asyncHandler } from "@/utils/async-handler";
 
 const router = Router();
 
-// Middleware để parse multipart data trước khi validate
-const parseMultipartForValidation = (req: Request, res: Response, next: NextFunction) => {
-  if (req.body) {
-    // Parse boolean fields
-    if (req.body.isFeatured !== undefined) {
-      req.body.isFeatured = req.body.isFeatured === "true" || req.body.isFeatured === true;
-    }
-    if (req.body.isActive !== undefined) {
-      req.body.isActive = req.body.isActive === "true" || req.body.isActive === true;
-    }
-    if (req.body.removeImage !== undefined) {
-      req.body.removeImage = req.body.removeImage === "true" || req.body.removeImage === true;
-    }
-  }
-  next();
-};
+const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
 
-// Public routes
+// Public
+router.get("/", validate(listBrandsQuerySchema, "query"), asyncHandler(getBrandsPublicHandler));
+router.get("/active", asyncHandler(getActiveBrandsHandler));
+router.get("/featured", validate(featuredBrandsQuerySchema, "query"), asyncHandler(getFeaturedBrandsHandler));
+router.get("/slug/:slug", validate(brandSlugParamsSchema, "params"), asyncHandler(getBrandBySlugHandler));
 
-// Lấy tất cả brands active
-router.get("/", getActiveBrandsHandler);
+// Admin
+router.get("/admin/all", ...adminAuth, validate(listBrandsQuerySchema, "query"), asyncHandler(getBrandsAdminHandler));
+router.get("/admin/:id", ...adminAuth, validate(brandParamsSchema, "params"), asyncHandler(getBrandDetailHandler));
 
-// Lấy featured brands cho home
-// Query params: ?limit=6 (optional)
-router.get("/featured", getFeaturedBrandsHandler);
+router.post("/admin", ...adminAuth, brandUpload.single("imageUrl"), validate(createBrandSchema, "body"), asyncHandler(createBrandHandler));
 
-// Lấy brand theo slug
-router.get("/slug/:slug", getBrandBySlugHandler);
+router.patch("/admin/:id", ...adminAuth, brandUpload.single("imageUrl"), validate(brandParamsSchema, "params"), validate(updateBrandSchema, "body"), asyncHandler(updateBrandHandler));
 
-// Admin routes
-
-// Lấy tất cả brands (bao gồm inactive)
-router.get("/admin/all", authMiddleware, requireRole("ADMIN"), getAllBrandsHandler);
-
-// Lấy chi tiết brand
-router.get("/admin/:id", authMiddleware, requireRole("ADMIN"), getBrandDetailHandler);
-
-// Tạo brand mới (với upload image)
-router.post(
-  "/admin",
-  authMiddleware,
-  requireRole("ADMIN"),
-  upload.single("image"),
-  parseMultipartForValidation,
-  validate(createBrandSchema),
-  createBrandHandler,
-);
-
-// Cập nhật brand (với upload image)
-router.patch(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  upload.single("image"),
-  parseMultipartForValidation,
-  validate(updateBrandSchema),
-  updateBrandHandler,
-);
-
-// Xóa brand
-router.delete("/admin/:id", authMiddleware, requireRole("ADMIN"), deleteBrandHandler);
+router.delete("/admin/:id", ...adminAuth, validate(brandParamsSchema, "params"), asyncHandler(deleteBrandHandler));
 
 export default router;

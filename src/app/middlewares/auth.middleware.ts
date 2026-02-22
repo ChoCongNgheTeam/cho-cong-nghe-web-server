@@ -1,80 +1,41 @@
 import { Request, Response, NextFunction } from "express";
-import prisma from "src/config/db";
 import { verifyAccessToken } from "src/services/token.service";
 
-export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    // Lấy token từ cookie hoặc Authorization header
-    let accessToken = req.cookies?.accessToken;
-
-    // Nếu không có trong cookie, thử lấy từ Authorization header (Bearer scheme)
-    if (!accessToken) {
-      const authHeader = req.headers.authorization;
-      if (authHeader?.startsWith("Bearer ")) {
-        accessToken = authHeader.substring(7); // Lấy phần sau "Bearer "
-      }
-    }
-
-    if (!accessToken) {
-      return res.status(401).json({ message: "Chưa đăng nhập" });
-    }
-
-    const decoded = verifyAccessToken(accessToken);
-
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      select: { id: true, role: true, isActive: true },
-    });
-
-    if (!user) {
-      return res.status(401).json({ message: "Người dùng không tồn tại" });
-    }
-
-    if (!user.isActive) {
-      return res.status(401).json({ message: "Tài khoản đã bị khóa" });
-    }
-
-    req.user = {
-      id: user.id,
-      role: user.role,
-    };
-
-    next();
-  } catch {
-    return res.status(401).json({ message: "Access token không hợp lệ hoặc hết hạn" });
+const extractAccessToken = (req: Request) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    return authHeader.slice(7);
   }
+  return null;
 };
 
-export const optionalAuthMiddleware = async (req: Request, _res: Response, next: NextFunction) => {
-  // Lấy token từ cookie hoặc Authorization header
-  let accessToken = req.cookies?.accessToken;
+export const authMiddleware = (required = true) => {
+  // optional auth: false
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const token = extractAccessToken(req);
 
-  if (!accessToken) {
-    const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith("Bearer ")) {
-      accessToken = authHeader.substring(7);
+    if (!token) {
+      if (required) return res.status(401).json({ message: "Chưa đăng nhập" });
+      return next();
     }
-  }
 
-  if (!accessToken) return next();
+    try {
+      const decoded = verifyAccessToken(token);
 
-  try {
-    const decoded = verifyAccessToken(accessToken);
+      req.user = {
+        id: decoded.userId,
+        role: decoded.role,
+      };
 
-    const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      select: { id: true, role: true, isActive: true },
-    });
+      next();
+    } catch (err: any) {
+      if (!required) return next();
 
-    if (!user || !user.isActive) return next();
+      if (err.name === "TokenExpiredError") {
+        return res.status(401).json({ code: "TOKEN_EXPIRED" });
+      }
 
-    req.user = {
-      id: user.id,
-      role: user.role,
-    };
-  } catch {
-    // token sai / hết hạn → coi như chưa login
-  }
-
-  next();
+      return res.status(401).json({ code: "TOKEN_INVALID" });
+    }
+  };
 };

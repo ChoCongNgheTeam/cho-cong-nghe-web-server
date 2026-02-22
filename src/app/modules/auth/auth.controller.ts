@@ -1,153 +1,82 @@
 import { Request, Response } from "express";
-import {
-  register,
-  login,
-  forgotPassword,
-  resetPassword,
-  changePassword,
-  logout,
-  refreshTokenRotation,
-} from "./auth.service";
+import { register, login, forgotPassword, resetPassword, changePassword, logout, refreshTokenRotation } from "./auth.service";
+
+const REFRESH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "strict" as const,
+};
+
+const setRefreshTokenCookie = (res: Response, token: string, maxAge: number) => {
+  res.cookie("refreshToken", token, {
+    ...REFRESH_COOKIE_OPTIONS,
+    maxAge,
+  });
+};
 
 export const registerHandler = async (req: Request, res: Response) => {
-  try {
-    const user = await register(req.body);
-    res.status(201).json({
-      data: user,
-      message: "Đăng ký thành công",
-    });
-  } catch (error: any) {
-    res.status(409).json({ message: error.message });
-  }
+  const user = await register(req.body);
+  res.status(201).json({ data: user, message: "Đăng ký thành công" });
 };
 
 export const loginHandler = async (req: Request, res: Response) => {
-  const userAgent = req.headers["user-agent"];
-  const ip = req.ip;
+  const { accessToken, accessTokenTTL, refreshToken, refreshTokenTTL, user } = await login(req.body, {
+    userAgent: req.headers["user-agent"],
+    ip: req.ip,
+  });
 
-  try {
-    const { accessToken, accessTokenTTL, refreshToken, refreshTokenTTL, user } = await login(
-      req.body,
-      { userAgent, ip },
-    );
+  setRefreshTokenCookie(res, refreshToken, refreshTokenTTL);
 
-    // refresh token
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: refreshTokenTTL,
-    });
-
-    // access token
-    res.cookie("accessToken", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: accessTokenTTL,
-    });
-
-    res.json({
-      user,
-      message: "Đăng nhập thành công",
-    });
-  } catch (error: any) {
-    res.status(401).json({ message: error.message });
-  }
+  res.json({
+    user,
+    accessToken, // FE lưu vào memory (biến JS / React state)
+    accessTokenTTL,
+    message: "Đăng nhập thành công",
+  });
 };
 
 export const refreshTokenHandler = async (req: Request, res: Response) => {
-  try {
-    const token = req.cookies.refreshToken;
+  const token = req.cookies.refreshToken;
 
-    if (!token) {
-      return res.status(401).json({ message: "No refresh token" });
-    }
-
-    const { accessToken, accessTokenTTL, refreshToken, refreshTokenTTL } =
-      await refreshTokenRotation(token);
-
-    // refresh token
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: refreshTokenTTL,
-    });
-
-    // access token
-    res.cookie("accessToken", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: accessTokenTTL,
-    });
-
-    return res.status(200).json({ message: "Token refreshed" });
-  } catch (err: any) {
-    return res.status(401).json({ message: err.message });
+  if (!token) {
+    return res.status(401).json({ message: "No refresh token" });
   }
+
+  const { accessToken, accessTokenTTL, refreshToken, refreshTokenTTL } = await refreshTokenRotation(token);
+
+  setRefreshTokenCookie(res, refreshToken, refreshTokenTTL);
+
+  return res.json({
+    accessToken, // FE cập nhật lại memory
+    accessTokenTTL,
+    message: "Token refreshed",
+  });
 };
 
 export const logoutHandler = async (req: Request, res: Response) => {
-  const refreshToken = req.cookies.refreshToken;
+  const { refreshToken } = req.cookies;
 
   if (refreshToken) {
     await logout(refreshToken);
   }
 
-  res.clearCookie("refreshToken", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-  });
-
-  res.clearCookie("accessToken", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-  });
+  res.clearCookie("refreshToken", REFRESH_COOKIE_OPTIONS);
 
   return res.json({ message: "Đăng xuất thành công" });
 };
 
 export const forgotPasswordHandler = async (req: Request, res: Response) => {
-  try {
-    const { email } = req.body;
-    const result = await forgotPassword(email, req);
-    res.json(result);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
+  const result = await forgotPassword(req.body.email, req);
+  res.json(result);
 };
 
 export const resetPasswordHandler = async (req: Request, res: Response) => {
-  try {
-    const result = await resetPassword(req.body);
-    res.json(result);
-  } catch (error: any) {
-    res.status(400).json({ message: error.message });
-  }
+  const result = await resetPassword(req.body);
+  res.json(result);
 };
 
 export const changePasswordHandler = async (req: Request, res: Response) => {
-  try {
-    // req.user chắc chắn tồn tại vì đã qua authMiddleware
-    const userId = req.user!.id;
-
-    const { currentPassword, newPassword } = req.body;
-
-    await changePassword(userId, currentPassword, newPassword);
-
-    return res.json({
-      message: "Đổi mật khẩu thành công",
-    });
-  } catch (error: any) {
-    // Xử lý lỗi cụ thể để frontend dễ phân biệt
-    if (error.message === "Mật khẩu hiện tại không đúng") {
-      return res.status(400).json({ message: error.message });
-    }
-
-    return res.status(500).json({ message: "Đã có lỗi xảy ra khi đổi mật khẩu" });
-  }
+  const { currentPassword, newPassword } = req.body;
+  await changePassword(req.user!.id, currentPassword, newPassword);
+  res.json({ message: "Đổi mật khẩu thành công" });
 };

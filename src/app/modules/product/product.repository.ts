@@ -205,23 +205,38 @@ async function getCategoryHierarchy(categoryId: string): Promise<string[]> {
   return result;
 }
 
-const buildProductWhere = (
-  query: ListProductsQuery,
-  onlyActive: boolean,
-): Prisma.productsWhereInput => {
+export const getDescendantCategoryIds = async (slug: string) => {
+  const result = await prisma.$queryRaw<{ id: string }[]>`
+    WITH RECURSIVE subcategories AS (
+      SELECT id
+      FROM categories
+      WHERE slug = ${slug}
+
+      UNION ALL
+
+      SELECT c.id
+      FROM categories c
+      JOIN subcategories sc ON c."parentId" = sc.id
+    )
+    SELECT id FROM subcategories;
+  `;
+
+  return result.map((r) => r.id);
+};
+
+const buildProductWhere = async (query: ListProductsQuery, onlyActive: boolean): Promise<Prisma.productsWhereInput> => {
   const where: Prisma.productsWhereInput = {};
 
   if (onlyActive) where.isActive = true;
 
   if (query.search) {
-    where.OR = [
-      { name: { contains: query.search, mode: "insensitive" } },
-      { description: { contains: query.search, mode: "insensitive" } },
-    ];
+    where.OR = [{ name: { contains: query.search, mode: "insensitive" } }, { description: { contains: query.search, mode: "insensitive" } }];
   }
 
   if (query.category) {
-    where.category = { slug: query.category };
+    const ids = await getDescendantCategoryIds(query.category);
+
+    where.categoryId = { in: ids };
   }
 
   if (query.categoryId) {
@@ -329,9 +344,9 @@ const findAll = async (query: ListProductsQuery, onlyActive: boolean) => {
   const { page, limit, sortBy, sortOrder } = query;
   const skip = (page - 1) * limit;
 
-  const where = buildProductWhere(query, onlyActive);
+  const where = await buildProductWhere(query, onlyActive);
 
-  let orderBy: any = { [sortBy]: sortOrder };
+  let orderBy: any;
 
   if (sortBy === "price") {
     orderBy = {
@@ -339,7 +354,13 @@ const findAll = async (query: ListProductsQuery, onlyActive: boolean) => {
         _count: sortOrder,
       },
     };
+  } else if (sortBy) {
+    orderBy = { [sortBy]: sortOrder };
+  } else {
+    orderBy = [{ totalSoldCount: "desc" }, { ratingAverage: "desc" }, { createdAt: "desc" }, { id: "asc" }];
   }
+
+  // console.log(orderBy);
 
   const [data, total] = await Promise.all([
     prisma.products.findMany({
@@ -452,9 +473,7 @@ export const findHighlightSpecificationGroups = async (
   const specValueMap = new Map(productSpecs.map((ps) => [ps.specificationId, ps.value]));
 
   // 4. Lấy SET các specIds có isHighlight = true
-  const highlightSpecIds = new Set(
-    productSpecs.filter((ps) => ps.isHighlight).map((ps) => ps.specificationId),
-  );
+  const highlightSpecIds = new Set(productSpecs.filter((ps) => ps.isHighlight).map((ps) => ps.specificationId));
 
   if (highlightSpecIds.size === 0) {
     return { groups: [], productSpecs: specValueMap };
@@ -1106,9 +1125,7 @@ export const findCategoriesWithSaleProducts = async (date: Date) => {
   });
 
   // Xác định category hiển thị (CHA nếu có)
-  const displayCategoryIds = Array.from(
-    new Set(products.map((p) => p.category.parent?.id ?? p.category.id)),
-  );
+  const displayCategoryIds = Array.from(new Set(products.map((p) => p.category.parent?.id ?? p.category.id)));
 
   // Lấy thông tin category CHA để render
   return prisma.categories.findMany({
@@ -1376,35 +1393,63 @@ export const findFeaturedProducts = async (limit: number = 12) => {
   });
 };
 
+// export const findBestSellingProducts = async (limit: number = 12) => {
+//   // Get products with highest sold count from variants
+//   const products = await prisma.products.findMany({
+//     where: { isActive: true },
+//     select: {
+//       ...selectProductCard,
+//       variants: {
+//         select: {
+//           id: true,
+//           price: true,
+//           quantity: true,
+//           soldCount: true,
+//         },
+//       },
+//     },
+//     orderBy: { viewsCount: "desc" },
+//     // take: limit * 3, // Get more to sort by soldCount
+//   });
+
+//   console.log(products);
+
+//   // Calculate total soldCount for each product
+//   const productsWithSoldCount = products.map((p) => ({
+//     ...p,
+//     totalSoldCount: p.variants.reduce((sum, v) => sum + v.soldCount, 0),
+//   }));
+
+//   // Sort by total soldCount and take top N
+//   return productsWithSoldCount.sort((a, b) => b.totalSoldCount - a.totalSoldCount).slice(0, limit);
+// };
 export const findBestSellingProducts = async (limit: number = 12) => {
-  // Get products with highest sold count from variants
-  const products = await prisma.products.findMany({
-    where: { isActive: true },
+  return prisma.products.findMany({
+    where: {
+      isActive: true,
+      variants: {
+        some: { isActive: true },
+      },
+    },
+    orderBy: {
+      totalSoldCount: "desc",
+    },
+    take: limit,
     select: {
       ...selectProductCard,
+      totalSoldCount: true,
       variants: {
+        where: { isActive: true },
+        orderBy: { isDefault: "desc" },
+        take: 1,
         select: {
           id: true,
           price: true,
           quantity: true,
-          soldCount: true,
         },
       },
     },
-    orderBy: { viewsCount: "desc" },
-    take: limit * 3, // Get more to sort by soldCount
   });
-
-  // console.log(products);
-
-  // Calculate total soldCount for each product
-  const productsWithSoldCount = products.map((p) => ({
-    ...p,
-    totalSoldCount: p.variants.reduce((sum, v) => sum + v.soldCount, 0),
-  }));
-
-  // Sort by total soldCount and take top N
-  return productsWithSoldCount.sort((a, b) => b.totalSoldCount - a.totalSoldCount).slice(0, limit);
 };
 
 export const findProductsByIds = async (ids: string[]) => {
@@ -1434,9 +1479,7 @@ export const findProductsByIds = async (ids: string[]) => {
   // giữ đúng thứ tự user đã xem
   const map = new Map(products.map((p) => [p.id, p]));
 
-  return ids
-    .map((id) => map.get(id))
-    .filter((p): p is (typeof products)[number] => p !== undefined);
+  return ids.map((id) => map.get(id)).filter((p): p is (typeof products)[number] => p !== undefined);
 };
 
 /**

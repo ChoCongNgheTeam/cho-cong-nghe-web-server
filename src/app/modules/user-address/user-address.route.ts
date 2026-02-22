@@ -60,7 +60,7 @@ router.post(
 // ==================== ADDRESS ROUTES (PROTECTED) ====================
 
 // Tất cả các route address yêu cầu đăng nhập
-router.use(authMiddleware);
+router.use(authMiddleware(true));
 
 /**
  * Lấy tất cả địa chỉ của user

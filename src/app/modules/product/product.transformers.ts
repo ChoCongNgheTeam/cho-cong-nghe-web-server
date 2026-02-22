@@ -156,23 +156,15 @@ export const calculateOverallStockStatus = (
 };
 
 export const transformProductCard = (product: any): ProductCard => {
-  const defaultVariant = product.variants[0];
+  const defaultVariant = product.variants?.[0];
+
+  if (!defaultVariant) {
+    throw new Error(`Product ${product.id} has no active variant but was sent to ProductCard`);
+  }
 
   const firstColorImage = product.img?.[0];
   const thumbnail = firstColorImage?.imageUrl || "";
-  const inStock = defaultVariant?.quantity > 0;
-
-  const highlights =
-    product.productSpecifications.map((spec: any) => ({
-      key: spec.specification.key,
-      name: spec.specification.name,
-      icon: spec.specification.icon,
-      value: spec.value,
-    })) || [];
-
-  const isNew = product.createdAt
-    ? Date.now() - new Date(product.createdAt).getTime() < 6 * 24 * 60 * 60 * 1000
-    : false;
+  const inStock = defaultVariant.quantity > 0;
 
   return {
     id: product.id,
@@ -185,8 +177,15 @@ export const transformProductCard = (product: any): ProductCard => {
       count: product.ratingCount || 0,
     },
     isFeatured: product.isFeatured,
-    isNew,
-    highlights,
+    isNew: product.createdAt
+      ? Date.now() - new Date(product.createdAt).getTime() < 6 * 24 * 60 * 60 * 1000
+      : false,
+    highlights: product.productSpecifications.map((spec: any) => ({
+      key: spec.specification.key,
+      name: spec.specification.name,
+      icon: spec.specification.icon,
+      value: spec.value,
+    })),
     inStock,
   };
 };

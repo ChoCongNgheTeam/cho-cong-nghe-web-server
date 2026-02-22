@@ -1,5 +1,8 @@
 import { Router } from "express";
 import { validate } from "@/app/middlewares/validate.middleware";
+import { authMiddleware } from "@/app/middlewares/auth.middleware";
+import { requireRole } from "@/app/middlewares/role.middleware";
+import { mediaUpload } from "@/app/middlewares/upload/mediaUpload";
 import {
   getMediaByTypeHandler,
   getMediaByPositionHandler,
@@ -12,77 +15,27 @@ import {
   deleteMediaHandler,
   reorderMediaHandler,
 } from "./media.controller";
-import {
-  createMediaSchema,
-  updateMediaSchema,
-  reorderMediaSchema,
-  getMediaByTypeSchema,
-  getMediaByPositionSchema,
-  getMediaByTypeAndPositionSchema,
-} from "./media.validation";
-import { authMiddleware } from "@/app/middlewares/auth.middleware";
-import { requireRole } from "@/app/middlewares/role.middleware";
+import { createMediaSchema, updateMediaSchema, reorderMediaSchema, mediaParamsSchema, mediaTypeParamsSchema, mediaPositionParamsSchema, mediaFilterSchema } from "./media.validation";
+import { asyncHandler } from "@/utils/async-handler";
 
 const router = Router();
 
-// === PUBLIC ROUTES ===
+const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
 
-// Lấy tất cả media active (grouped by position) - cho Home orchestrator
-// GET /api/media/all
-router.get("/all", getAllActiveMediaHandler);
+// Public — tĩnh trước
+router.get("/all", asyncHandler(getAllActiveMediaHandler));
+router.get("/filter", validate(mediaFilterSchema, "query"), asyncHandler(getMediaByTypeAndPositionHandler));
+router.get("/type/:type", validate(mediaTypeParamsSchema, "params"), asyncHandler(getMediaByTypeHandler));
+router.get("/position/:position", validate(mediaPositionParamsSchema, "params"), asyncHandler(getMediaByPositionHandler));
 
-// Lấy media theo type (SLIDER hoặc BANNER)
-// GET /api/media/type/:type
-router.get("/type/:type", getMediaByTypeHandler);
+// Admin — tĩnh trước
+router.get("/admin/all", ...adminAuth, asyncHandler(getAllMediaHandler));
+router.post("/admin/reorder", ...adminAuth, validate(reorderMediaSchema, "body"), asyncHandler(reorderMediaHandler));
+router.post("/admin", ...adminAuth, mediaUpload.single("imageUrl"), validate(createMediaSchema, "body"), asyncHandler(createMediaHandler));
 
-// Lấy media theo position (HOME_TOP, BELOW_SLIDER, ...)
-// GET /api/media/position/:position
-router.get("/position/:position", getMediaByPositionHandler);
-
-// Lấy media theo type + position (query params)
-// GET /api/media/filter?type=SLIDER&position=HOME_TOP
-router.get(
-  "/filter",
-  // validate(getMediaByTypeAndPositionSchema), // Uncomment nếu muốn validate query
-  getMediaByTypeAndPositionHandler,
-);
-
-// === ADMIN ROUTES ===
-
-// Lấy tất cả media (admin)
-router.get("/admin/all", authMiddleware, requireRole("ADMIN"), getAllMediaHandler);
-
-// Lấy media detail (admin)
-router.get("/admin/:id", authMiddleware, requireRole("ADMIN"), getMediaDetailHandler);
-
-// Tạo media
-router.post(
-  "/admin",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(createMediaSchema),
-  createMediaHandler,
-);
-
-// Update media
-router.patch(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(updateMediaSchema),
-  updateMediaHandler,
-);
-
-// Delete media
-router.delete("/admin/:id", authMiddleware, requireRole("ADMIN"), deleteMediaHandler);
-
-// Reorder media
-router.post(
-  "/admin/reorder",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(reorderMediaSchema),
-  reorderMediaHandler,
-);
+// Admin — động sau
+router.get("/admin/:id", ...adminAuth, validate(mediaParamsSchema, "params"), asyncHandler(getMediaDetailHandler));
+router.patch("/admin/:id", ...adminAuth, mediaUpload.single("imageUrl"), validate(mediaParamsSchema, "params"), validate(updateMediaSchema, "body"), asyncHandler(updateMediaHandler));
+router.delete("/admin/:id", ...adminAuth, validate(mediaParamsSchema, "params"), asyncHandler(deleteMediaHandler));
 
 export default router;

@@ -34,18 +34,21 @@ export const validateItemSchema = z.object({
 
 // Schema cho localStorage cart item
 const localStorageCartItemSchema = z.object({
+  // 2 trường BẮT BUỘC để BE xử lý logic
   productVariantId: z.string().uuid("ID variant không hợp lệ"),
-  productId: z.string().uuid("ID sản phẩm không hợp lệ"),
-  productName: z.string().min(1, "Tên sản phẩm không được rỗng"),
-  productSlug: z.string().min(1, "Slug không được rỗng"),
-  brandName: z.string().min(1, "Tên thương hiệu không được rỗng"),
+  quantity: z.coerce.number().int("Số lượng phải là số nguyên").positive("Số lượng phải > 0").max(100, "Tối đa 100"),
+  
+  // Các trường còn lại FE có thể gửi để map data nhưng KHÔNG BẮT BUỘC
+  productId: z.string().uuid().optional(),
+  productName: z.string().optional(),
+  productSlug: z.string().optional(),
+  brandName: z.string().optional(),
   variantCode: z.string().optional(),
-  image: z.string().url().optional().or(z.literal("")),
+  image: z.string().optional(),
   color: z.string().optional(),
   colorValue: z.string().optional(),
-  quantity: z.number().int().positive().max(100),
-  unitPrice: z.number().positive(),
-  addedAt: z.number().optional(),
+  unitPrice: z.coerce.number().positive().optional(),
+  addedAt: z.coerce.number().optional(),
 });
 
 // Schema cho sync cart từ localStorage

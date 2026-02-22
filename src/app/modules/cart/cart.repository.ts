@@ -27,13 +27,18 @@ const selectCartItem = {
           },
         },
       },
-      variantAttributes: {
+     variantAttributes: {
         select: {
           attributeOption: {
             select: {
-              type: true,
               label: true,
               value: true,
+              attribute: {   
+                select: {
+                  name: true,
+                  code: true,
+                },
+              },
             },
           },
         },
@@ -142,9 +147,12 @@ export const transformToCartResponse = (
       ? item.unitPrice
       : Number(item.unitPrice.toString());
 
+  // Tìm màu sắc dựa vào name hoặc code
   const colorAttribute = item.productVariant.variantAttributes.find(
-    (attr: any) =>
-      ["color", "màu"].includes((attr.attributeOption.type || "").toLowerCase())
+    (attr: any) => {
+      const typeOrName = (attr.attributeOption.attribute?.code || attr.attributeOption.attribute?.name || "").toLowerCase();
+      return ["color", "màu", "màu sắc"].includes(typeOrName);
+    }
   );
 
   return {

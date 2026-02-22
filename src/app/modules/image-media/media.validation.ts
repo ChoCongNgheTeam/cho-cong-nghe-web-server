@@ -1,70 +1,54 @@
 import { z } from "zod";
+import { MediaType, MediaPosition } from "./media.types";
 
-// Enum values
-export const MediaTypeEnum = z.enum(["SLIDER", "BANNER"]);
-export const MediaPositionEnum = z.enum([
-  "HOME_TOP",
-  "BELOW_SLIDER",
-  "HOME_SECTION_1",
-  "HOME_SECTION_2",
-]);
+export const mediaTypeSchema = z.nativeEnum(MediaType);
+export const mediaPositionSchema = z.nativeEnum(MediaPosition);
 
 export const createMediaSchema = z.object({
-  type: MediaTypeEnum,
-
-  position: MediaPositionEnum,
-
+  type: mediaTypeSchema,
+  position: mediaPositionSchema,
   title: z.string().trim().max(200, "Tiêu đề tối đa 200 ký tự").optional().or(z.literal("")),
-
-  imagePath: z.string("URL hình ảnh không hợp lệ").optional().or(z.literal("")),
-
-  linkUrl: z.string("URL hình ảnh không hợp lệ").optional().or(z.literal("")),
-
-  order: z.number().int().min(0, "Order phải >= 0").optional(),
-
-  isActive: z.boolean().optional().default(true),
+  imagePath: z.string().optional().or(z.literal("")),
+  imageUrl: z.string().url("URL không hợp lệ").optional().or(z.literal("")),
+  linkUrl: z.string().optional().or(z.literal("")),
+  order: z.coerce.number().int().min(0, "Order phải >= 0").optional(),
+  isActive: z.coerce.boolean().optional().default(true),
 });
 
-export const updateMediaSchema = z
-  .object({
-    type: MediaTypeEnum.optional(),
-
-    position: MediaPositionEnum.optional(),
-
-    title: z.string().trim().max(200, "Tiêu đề tối đa 200 ký tự").optional().or(z.literal("")),
-
-    imagePath: z.string("URL hình ảnh không hợp lệ").optional().or(z.literal("")),
-
-    linkUrl: z.string("URL hình ảnh không hợp lệ").optional().or(z.literal("")),
-
-    order: z.number().int().min(0, "Order phải >= 0").optional(),
-
-    isActive: z.boolean().optional(),
-  })
-  .strict();
+export const updateMediaSchema = z.object({
+  type: mediaTypeSchema.optional(),
+  position: mediaPositionSchema.optional(),
+  title: z.string().trim().max(200, "Tiêu đề tối đa 200 ký tự").optional().or(z.literal("")),
+  imagePath: z.string().optional().or(z.literal("")),
+  imageUrl: z.string().url("URL không hợp lệ").optional().or(z.literal("")),
+  linkUrl: z.string().optional().or(z.literal("")),
+  order: z.coerce.number().int().min(0, "Order phải >= 0").optional(),
+  isActive: z.coerce.boolean().optional(),
+});
 
 export const reorderMediaSchema = z.object({
-  mediaId: z.uuid("Media ID không hợp lệ"),
-  newOrder: z.number().int().min(0, "Order phải >= 0"),
+  mediaId: z.string().uuid("Media ID không hợp lệ"),
+  newOrder: z.coerce.number().int().min(0, "Order phải >= 0"),
 });
 
-// Query validation
-export const getMediaByTypeSchema = z.object({
-  type: MediaTypeEnum,
+export const mediaParamsSchema = z.object({
+  id: z.string().uuid({ message: "ID media không hợp lệ" }),
 });
 
-export const getMediaByPositionSchema = z.object({
-  position: MediaPositionEnum,
+export const mediaTypeParamsSchema = z.object({
+  type: mediaTypeSchema,
 });
 
-export const getMediaByTypeAndPositionSchema = z.object({
-  type: MediaTypeEnum,
-  position: MediaPositionEnum,
+export const mediaPositionParamsSchema = z.object({
+  position: mediaPositionSchema,
+});
+
+export const mediaFilterSchema = z.object({
+  type: mediaTypeSchema,
+  position: mediaPositionSchema,
 });
 
 export type CreateMediaInput = z.infer<typeof createMediaSchema>;
 export type UpdateMediaInput = z.infer<typeof updateMediaSchema>;
 export type ReorderMediaInput = z.infer<typeof reorderMediaSchema>;
-export type GetMediaByTypeInput = z.infer<typeof getMediaByTypeSchema>;
-export type GetMediaByPositionInput = z.infer<typeof getMediaByPositionSchema>;
-export type GetMediaByTypeAndPositionInput = z.infer<typeof getMediaByTypeAndPositionSchema>;
+export { MediaType, MediaPosition };

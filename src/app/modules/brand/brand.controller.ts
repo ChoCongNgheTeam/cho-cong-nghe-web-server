@@ -1,179 +1,81 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import { brandService } from "./brand.service";
-import { parseMultipartData, uploadBrandImage, cleanupTempFiles } from "./brand.helper";
+import { parseMultipartData, uploadBrandImage } from "./brand.helpers";
+import { cleanupFile } from "@/services/file-cleanup.service";
+import { ListBrandsQuery } from "./brand.validation";
 
-export const getActiveBrandsHandler = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const brands = await brandService.getActiveBrands();
-
-    res.status(200).json({
-      success: true,
-      data: brands,
-    });
-  } catch (error) {
-    next(error);
-  }
+export const getBrandsPublicHandler = async (req: Request, res: Response) => {
+  const brands = await brandService.getBrandsPublic(req.query as unknown as ListBrandsQuery);
+  res.json({ data: brands, message: "Lấy danh sách thương hiệu thành công" });
 };
 
-export const getFeaturedBrandsHandler = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const limit = req.query.limit ? parseInt(req.query.limit as string) : 6;
-
-    const brands = await brandService.getFeaturedBrands(limit);
-
-    res.status(200).json({
-      success: true,
-      data: brands,
-    });
-  } catch (error) {
-    next(error);
-  }
+export const getBrandsAdminHandler = async (req: Request, res: Response) => {
+  const brands = await brandService.getBrandsAdmin(req.query as unknown as ListBrandsQuery);
+  res.json({ data: brands, message: "Lấy danh sách thương hiệu thành công" });
 };
 
-export const getBrandBySlugHandler = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { slug } = req.params;
-
-    const brand = await brandService.getBrandBySlug(slug);
-
-    res.status(200).json({
-      success: true,
-      data: brand,
-    });
-  } catch (error) {
-    next(error);
-  }
+export const getActiveBrandsHandler = async (req: Request, res: Response) => {
+  const brands = await brandService.getActiveBrands();
+  res.json({ data: brands, message: "Lấy danh sách thương hiệu thành công" });
 };
 
-export const getAllBrandsHandler = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const brands = await brandService.getAllBrands();
-
-    res.status(200).json({
-      success: true,
-      data: brands,
-    });
-  } catch (error) {
-    next(error);
-  }
+export const getFeaturedBrandsHandler = async (req: Request, res: Response) => {
+  const limit = req.query.limit ? parseInt(req.query.limit as string) : 6;
+  const brands = await brandService.getFeaturedBrands(limit);
+  res.json({ data: brands, message: "Lấy danh sách thương hiệu nổi bật thành công" });
 };
 
-export const getBrandDetailHandler = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-
-    const brand = await brandService.getBrandDetail(id);
-
-    res.status(200).json({
-      success: true,
-      data: brand,
-    });
-  } catch (error) {
-    next(error);
-  }
+export const getBrandBySlugHandler = async (req: Request, res: Response) => {
+  const brand = await brandService.getBrandBySlug(req.params.slug);
+  res.json({ data: brand, message: "Lấy chi tiết thương hiệu thành công" });
 };
 
-export const createBrandHandler = async (req: Request, res: Response, next: NextFunction) => {
+export const getBrandDetailHandler = async (req: Request, res: Response) => {
+  const brand = await brandService.getBrandDetail(req.params.id);
+  res.json({ data: brand, message: "Lấy chi tiết thương hiệu thành công" });
+};
+
+export const createBrandHandler = async (req: Request, res: Response) => {
   const file = req.file;
 
   try {
-    // Parse data từ form-data
     const parsedBody = parseMultipartData(req.body);
+    const uploadedImage = file ? await uploadBrandImage(file) : null;
 
-    // Upload image nếu có
-    let uploadedImage;
-    if (file) {
-      uploadedImage = await uploadBrandImage(file);
-    }
-
-    // Create brand
-    const brand = await brandService.createBrand(parsedBody, uploadedImage);
-
-    // Cleanup temp file
-    if (file) {
-      cleanupTempFiles([file]);
-    }
-
-    res.status(201).json({
-      success: true,
-      message: "Tạo thương hiệu thành công",
-      data: brand,
+    const brand = await brandService.createBrand({
+      ...parsedBody,
+      imageUrl: uploadedImage?.url,
+      imagePath: uploadedImage?.publicId,
     });
-  } catch (error: any) {
-    // Cleanup temp file on error
-    if (file) {
-      cleanupTempFiles([file]);
-    }
 
-    if (error.name === "ZodError") {
-      return res.status(400).json({
-        success: false,
-        message: "Dữ liệu không hợp lệ",
-        errors: error.errors,
-      });
-    }
-
-    next(error);
+    res.status(201).json({ data: brand, message: "Tạo thương hiệu thành công" });
+  } finally {
+    cleanupFile(file);
   }
 };
 
-export const updateBrandHandler = async (req: Request, res: Response, next: NextFunction) => {
+export const updateBrandHandler = async (req: Request, res: Response) => {
   const file = req.file;
 
   try {
-    const { id } = req.params;
-
-    // Parse data từ form-data
     const parsedBody = parseMultipartData(req.body);
+    const uploadedImage = file ? await uploadBrandImage(file) : null;
 
-    // Upload image nếu có
-    let uploadedImage;
-    if (file) {
-      uploadedImage = await uploadBrandImage(file);
-    }
-
-    // Update brand
-    const brand = await brandService.updateBrand(id, parsedBody, uploadedImage);
-
-    // Cleanup temp file
-    if (file) {
-      cleanupTempFiles([file]);
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Cập nhật thương hiệu thành công",
-      data: brand,
+    const brand = await brandService.updateBrand(req.params.id, {
+      ...parsedBody,
+      ...(uploadedImage && {
+        imageUrl: uploadedImage.url,
+        imagePath: uploadedImage.publicId,
+      }),
     });
-  } catch (error: any) {
-    // Cleanup temp file on error
-    if (file) {
-      cleanupTempFiles([file]);
-    }
 
-    if (error.name === "ZodError") {
-      return res.status(400).json({
-        success: false,
-        message: "Dữ liệu không hợp lệ",
-        errors: error.errors,
-      });
-    }
-
-    next(error);
+    res.json({ data: brand, message: "Cập nhật thương hiệu thành công" });
+  } finally {
+    cleanupFile(file);
   }
 };
 
-export const deleteBrandHandler = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-
-    const result = await brandService.deleteBrand(id);
-
-    res.status(200).json({
-      success: true,
-      message: result.message,
-    });
-  } catch (error) {
-    next(error);
-  }
+export const deleteBrandHandler = async (req: Request, res: Response) => {
+  await brandService.deleteBrand(req.params.id);
+  res.json({ message: "Xóa thương hiệu thành công" });
 };

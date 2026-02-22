@@ -1,93 +1,44 @@
 import * as repo from "./voucher.repository";
-import {
-  CreateVoucherInput,
-  UpdateVoucherInput,
-  ListVouchersQuery,
-  ValidateVoucherInput,
-  AssignVoucherToUsersInput,
-} from "./voucher.validation";
-import {
-  transformVoucherCard,
-  transformVoucherDetail,
-  transformUserVoucher,
-  calculateDiscount,
-  hasVoucherStarted,
-  isVoucherExpired,
-} from "./voucher.transformers";
+import { CreateVoucherInput, UpdateVoucherInput, ListVouchersQuery, ValidateVoucherInput, AssignVoucherToUsersInput } from "./voucher.validation";
+import { transformVoucherCard, transformVoucherDetail, transformUserVoucher, calculateDiscount, hasVoucherStarted, isVoucherExpired } from "./voucher.transformers";
 import { VoucherValidationResult } from "./voucher.types";
 import { DiscountType } from "@prisma/client";
-
-// =====================
-// === PUBLIC SERVICES ===
-// =====================
+import { NotFoundError, BadRequestError } from "@/errors";
 
 export const getVouchers = async (query: ListVouchersQuery) => {
   const result = await repo.findAll(query);
-
-  return {
-    ...result,
-    data: result.data.map(transformVoucherCard),
-  };
+  return { ...result, data: result.data.map(transformVoucherCard) };
 };
 
 export const getVoucherByCode = async (code: string) => {
   const voucher = await repo.findByCode(code);
-
-  if (!voucher) {
-    const error: any = new Error("Không tìm thấy voucher");
-    error.statusCode = 404;
-    throw error;
-  }
-
+  if (!voucher) throw new NotFoundError("Voucher");
   return transformVoucherDetail(voucher);
 };
 
 export const getUserVouchers = async (userId: string) => {
   const vouchers = await repo.findUserVouchers(userId);
-
   return vouchers.map((v) => transformUserVoucher(v, v.userVoucherData));
 };
 
-export const validateVoucher = async (
-  input: ValidateVoucherInput,
-): Promise<VoucherValidationResult> => {
+// validateVoucher trả về VoucherValidationResult thay vì throw
+// vì đây là business validation có nhiều trường hợp isValid: false hợp lệ
+export const validateVoucher = async (input: ValidateVoucherInput): Promise<VoucherValidationResult> => {
   const { code, orderTotal, userId } = input;
 
-  // Find voucher
   const voucher = await repo.findByCode(code);
+  if (!voucher) return { isValid: false, message: "Mã voucher không tồn tại" };
 
-  if (!voucher) {
-    return {
-      isValid: false,
-      message: "Mã voucher không tồn tại",
-    };
-  }
+  if (!voucher.isActive) return { isValid: false, message: "Mã voucher đã bị vô hiệu hóa" };
 
-  // Check if voucher is active
-  if (!voucher.isActive) {
-    return {
-      isValid: false,
-      message: "Mã voucher đã bị vô hiệu hóa",
-    };
-  }
-
-  // Check if voucher has started
   if (!hasVoucherStarted(voucher.startDate)) {
-    return {
-      isValid: false,
-      message: "Mã voucher chưa có hiệu lực",
-    };
+    return { isValid: false, message: "Mã voucher chưa có hiệu lực" };
   }
 
-  // Check if voucher is expired
   if (isVoucherExpired(voucher.endDate)) {
-    return {
-      isValid: false,
-      message: "Mã voucher đã hết hạn",
-    };
+    return { isValid: false, message: "Mã voucher đã hết hạn" };
   }
 
-  // Check minimum order value
   if (orderTotal < Number(voucher.minOrderValue)) {
     return {
       isValid: false,
@@ -95,92 +46,47 @@ export const validateVoucher = async (
     };
   }
 
-  // Check max uses
   if (voucher.maxUses && voucher.usesCount >= voucher.maxUses) {
-    return {
-      isValid: false,
-      message: "Mã voucher đã hết lượt sử dụng",
-    };
+    return { isValid: false, message: "Mã voucher đã hết lượt sử dụng" };
   }
 
-  // Check user-specific usage if userId provided
   if (userId) {
     const userVoucher = await repo.findUserVoucherUsage(userId, voucher.id);
 
     if (userVoucher) {
       if (userVoucher.usedCount >= userVoucher.maxUses) {
-        return {
-          isValid: false,
-          message: "Bạn đã hết lượt sử dụng voucher này",
-        };
+        return { isValid: false, message: "Bạn đã hết lượt sử dụng voucher này" };
       }
     } else if (voucher.maxUsesPerUser) {
-      // If voucher has maxUsesPerUser but user hasn't been assigned, deny
-      return {
-        isValid: false,
-        message: "Voucher này không dành cho bạn",
-      };
+      return { isValid: false, message: "Voucher này không dành cho bạn" };
     }
   }
 
-  // Calculate discount
-  const discount = calculateDiscount(
-    voucher.discountType as DiscountType,
-    Number(voucher.discountValue),
-    orderTotal,
-  );
+  const discount = calculateDiscount(voucher.discountType as DiscountType, Number(voucher.discountValue), orderTotal);
 
-  return {
-    isValid: true,
-    discount,
-    voucher: transformVoucherDetail(voucher),
-  };
+  return { isValid: true, discount, voucher: transformVoucherDetail(voucher) };
 };
-
-// =====================
-// === ADMIN SERVICES ===
-// =====================
 
 export const getVoucherById = async (id: string) => {
   const voucher = await repo.findById(id);
-
-  if (!voucher) {
-    const error: any = new Error("Không tìm thấy voucher");
-    error.statusCode = 404;
-    throw error;
-  }
-
+  if (!voucher) throw new NotFoundError("Voucher");
   return transformVoucherDetail(voucher);
 };
 
 export const createVoucher = async (input: CreateVoucherInput) => {
-  // Check if code already exists
   const exists = await repo.checkVoucherCode(input.code);
-  if (exists) {
-    const error: any = new Error("Mã voucher đã tồn tại");
-    error.statusCode = 400;
-    throw error;
-  }
+  if (exists) throw new BadRequestError("Mã voucher đã tồn tại");
 
   const voucher = await repo.create(input);
   return transformVoucherDetail(voucher);
 };
 
 export const updateVoucher = async (id: string, input: UpdateVoucherInput) => {
-  // Check voucher exists
-  await getVoucherById(id);
+  const existing = await getVoucherById(id);
 
-  // If updating code, check if new code exists
-  if (input.code) {
-    const currentVoucher = await repo.findById(id);
-    if (currentVoucher && input.code !== currentVoucher.code) {
-      const exists = await repo.checkVoucherCode(input.code);
-      if (exists) {
-        const error: any = new Error("Mã voucher đã tồn tại");
-        error.statusCode = 400;
-        throw error;
-      }
-    }
+  if (input.code && input.code !== existing.code) {
+    const exists = await repo.checkVoucherCode(input.code);
+    if (exists) throw new BadRequestError("Mã voucher đã tồn tại");
   }
 
   const voucher = await repo.update(id, input);
@@ -193,12 +99,6 @@ export const deleteVoucher = async (id: string) => {
 };
 
 export const assignVoucherToUsers = async (input: AssignVoucherToUsersInput) => {
-  const { voucherId, userIds, maxUsesPerUser } = input;
-
-  // Check voucher exists
-  await getVoucherById(voucherId);
-
-  const result = await repo.assignToUsers(voucherId, userIds, maxUsesPerUser);
-
-  return result;
+  await getVoucherById(input.voucherId);
+  return repo.assignToUsers(input.voucherId, input.userIds, input.maxUsesPerUser);
 };

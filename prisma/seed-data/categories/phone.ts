@@ -44,8 +44,7 @@ export const phoneCategoryData = [
   },
   {
     name: "iPhone 16 Series",
-    description:
-      "Trải nghiệm đỉnh cao với camera cải tiến và bộ vi xử lý Apple Silicon thế hệ mới.",
+    description: "Trải nghiệm đỉnh cao với camera cải tiến và bộ vi xử lý Apple Silicon thế hệ mới.",
     imagePath: "categories/iphone-16.webp",
     parentName: "Apple (iPhone)",
   },
@@ -77,8 +76,7 @@ export const phoneCategoryData = [
   },
   {
     name: "Xiaomi Series",
-    description:
-      "Dòng smartphone cao cấp nhất của Xiaomi với camera Leica và công nghệ tiên phong.",
+    description: "Dòng smartphone cao cấp nhất của Xiaomi với camera Leica và công nghệ tiên phong.",
     imagePath: "categories/xiaomi-series.webp",
     parentName: "Xiaomi",
   },
@@ -115,8 +113,7 @@ export const phoneCategoryData = [
   },
   {
     name: "Galaxy A Series",
-    description:
-      "Smartphone dành cho giới trẻ với thiết kế hiện đại và nhiều tính năng vượt tầm giá.",
+    description: "Smartphone dành cho giới trẻ với thiết kế hiện đại và nhiều tính năng vượt tầm giá.",
     imagePath: "categories/galaxy-a-series.webp",
     parentName: "Samsung",
   },
@@ -128,8 +125,7 @@ export const phoneCategoryData = [
   },
   {
     name: "Galaxy XCover",
-    description:
-      "Dòng điện thoại siêu bền bỉ, chống va đập dành cho môi trường làm việc khắc nghiệt.",
+    description: "Dòng điện thoại siêu bền bỉ, chống va đập dành cho môi trường làm việc khắc nghiệt.",
     imagePath: "categories/galaxy-xcover.webp",
     parentName: "Samsung",
   },

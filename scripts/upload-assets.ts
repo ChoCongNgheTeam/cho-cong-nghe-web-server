@@ -23,10 +23,7 @@ const ASSETS_DIR = path.join(process.cwd(), "assets");
 // ==========================
 // Generic upload function
 // ==========================
-async function uploadImages<T extends { id: string; imagePath: string | null }>(
-  items: T[],
-  updateFn: (id: string, imageUrl: string) => Promise<unknown>,
-) {
+async function uploadImages<T extends { id: string; imagePath: string | null }>(items: T[], updateFn: (id: string, imageUrl: string) => Promise<unknown>) {
   let notFoundCount = 0;
 
   for (const item of items) {
@@ -99,6 +96,20 @@ async function uploadAssets() {
   );
 
   // -------- Categories --------
+  const categoriesDefault = await prisma.categories.findMany({
+    where: {
+      imagePath: { not: null },
+      imageUrl: null,
+    },
+  });
+
+  await uploadImages(categoriesDefault, (id, url) =>
+    prisma.categories.update({
+      where: { id },
+      data: { imageUrl: url },
+    }),
+  );
+
   const categories = await prisma.categories.findMany({
     where: {
       imagePath: { not: null },
@@ -138,6 +149,20 @@ async function uploadAssets() {
 
   await uploadImages(blogs, (id, url) =>
     prisma.blogs.update({
+      where: { id },
+      data: { imageUrl: url },
+    }),
+  );
+
+  // -------- Campaigns --------
+  const campaigns = await prisma.campaign_categories.findMany({
+    where: {
+      imageUrl: null,
+    },
+  });
+
+  await uploadImages(campaigns, (id, url) =>
+    prisma.campaign_categories.update({
       where: { id },
       data: { imageUrl: url },
     }),

@@ -4,31 +4,19 @@ import { addToCartSchema, updateCartItemSchema } from "./cart.validation";
 
 /**
  * GET CART
- * - User: Lấy từ DB
- * - Guest: Nhận items từ body (FE gửi localStorage lên), validate và trả về data chuẩn
+ * - Lấy giỏ hàng từ DB cho User đã đăng nhập.
+ * - Guest tự quản lý tại localStorage, không gọi API này.
  */
 export const getCartHandler = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    // 1. Logged-in User
-    if (userId) {
-      const cart = await cartService.getCart(userId);
-      return res.json({
-        data: cart,
-        message: "Lấy giỏ hàng thành công",
-      });
-    }
-
-    // 2. Guest User - Validate localStorage items
-    const { items } = req.body; 
-    const validatedCart = await cartService.validateLocalStorageCart(items || []);
-    
+    const cart = await cartService.getCart(userId);
     return res.json({
-      data: validatedCart,
-      message: "Lấy giỏ hàng (Guest) thành công",
+      data: cart,
+      message: "Lấy giỏ hàng thành công",
     });
-
   } catch (error: any) {
     res.status(500).json({ message: error.message || "Lỗi server" });
   }
@@ -36,24 +24,28 @@ export const getCartHandler = async (req: Request, res: Response) => {
 
 /**
  * SYNC CART (Chỉ gọi khi vừa Login)
+ * - Xử lý Soft Validate: Nếu thiếu hàng thì tự chỉnh số lượng và báo warning
  */
 export const syncCartHandler = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ message: "Vui lòng đăng nhập" });
-    }
+    if (!userId) return res.status(401).json({ message: "Vui lòng đăng nhập" });
 
-    const { items } = req.body; // Items từ localStorage
+    const { items } = req.body; 
     if (!Array.isArray(items) || items.length === 0) {
-      return res.json({ message: "Không có sản phẩm để đồng bộ" });
+      return res.json({ message: "Không có sản phẩm để đồng bộ", success: true });
     }
 
     const result = await cartService.syncLocalStorageToDatabase(userId, items);
+    const hasWarnings = result.warnings.length > 0;
     
     res.json({
       data: result,
-      message: `Đồng bộ thành công: ${result.synced} sản phẩm`,
+      message: hasWarnings 
+        ? "Giỏ hàng đã được cập nhật theo tồn kho hiện tại" 
+        : `Đồng bộ thành công: ${result.synced} sản phẩm`,
+      hasWarnings: hasWarnings,
+      warnings: result.warnings,
       success: true,
     });
   } catch (error: any) {
@@ -63,16 +55,11 @@ export const syncCartHandler = async (req: Request, res: Response) => {
 
 /**
  * ADD TO CART (User Only)
- * Guest thêm vào localStorage ở FE, không gọi API này.
  */
 export const addToCartHandler = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ 
-        message: "Vui lòng đăng nhập để lưu giỏ hàng server. Khách vui lòng lưu tại trình duyệt." 
-      });
-    }
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const input = addToCartSchema.parse(req.body);
     const cartItem = await cartService.addToCart(userId, input);
@@ -87,33 +74,22 @@ export const addToCartHandler = async (req: Request, res: Response) => {
 };
 
 /**
- * VALIDATE ITEM (Cho Guest check giá/tồn kho trước khi thêm vào localStorage)
- */
-/**
- * VALIDATE ITEM (Cho Guest check giá/tồn kho trước khi thêm vào localStorage)
+ * VALIDATE ITEM (Cho FE check tồn kho/giá qua cơ chế Debounce)
  */
 export const validateItemHandler = async (req: Request, res: Response) => {
   try {
-    console.log("🔍 validateItemHandler called");
-    console.log("📍 req.user:", req.user);
-    console.log("📦 req.body:", req.body);
-    
     const { productVariantId, quantity } = req.body;
     
-    // Gọi service check tồn kho và lấy thông tin variant
     const check = await cartService.validateCartItem(productVariantId, quantity);
     
     if (!check.isValid) {
       return res.status(400).json({ message: check.errors?.join(", ") });
     }
 
-    // Lấy thông tin màu sắc từ kết quả check của service
     const colorLabel = check.colorAttr?.attributeOption.label;
     const colorValue = check.colorAttr?.attributeOption.value;
 
-    // Trả về full info để FE lưu vào localStorage
     const responseData = {
-      
       productVariantId: check.variant.id,
       productId: check.variant.product.id,
       productName: check.variant.product.name,
@@ -121,26 +97,19 @@ export const validateItemHandler = async (req: Request, res: Response) => {
       brandName: check.variant.product.brand.name,
       variantCode: check.variant.code || undefined,
       image: check.variant.product.img[0]?.imageUrl || undefined,
-      
-      // --- THÊM PHẦN NÀY ĐỂ HIỆN MÀU ---
-      color: colorLabel,       // Ví dụ: "Xanh"
-      colorValue: colorValue,  // Ví dụ: "#0000FF"
-      // ---------------------------------
-
+      color: colorLabel,
+      colorValue: colorValue,
       quantity: quantity,
       unitPrice: Number(check.variant.price),
       totalPrice: quantity * Number(check.variant.price),
       availableQuantity: check.availableQuantity,
-      
     };
 
-    console.log("✅ validateItemHandler success");
     res.json({
       data: responseData,
       message: "Sản phẩm hợp lệ",
     });
   } catch (error: any) {
-    console.error("❌ validateItemHandler error:", error.message);
     res.status(404).json({ message: error.message });
   }
 };

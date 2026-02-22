@@ -3,10 +3,6 @@ import { Prisma } from "@prisma/client";
 import { ListCommentsQuery } from "./comment.validation";
 import { CommentTargetType } from "./comment.types";
 
-// =====================
-// === SELECTORS ===
-// =====================
-
 const selectUser = {
   id: true,
   fullName: true,
@@ -28,37 +24,26 @@ const selectComment = {
   },
 };
 
-// =====================
-// === QUERY BUILDERS ===
-// =====================
-
 const buildCommentWhere = (
   query: ListCommentsQuery,
   onlyApproved: boolean,
 ): Prisma.commentsWhereInput => {
   const where: Prisma.commentsWhereInput = {};
 
-  // Only approved comments for public
   if (onlyApproved) {
     where.isApproved = true;
-  }
-
-  // Filter by approval status
-  if (query.isApproved !== undefined) {
+  } else if (query.isApproved !== undefined) {
     where.isApproved = query.isApproved;
   }
 
-  // Filter by target type
   if (query.targetType) {
     where.targetType = query.targetType;
   }
 
-  // Filter by target ID
   if (query.targetId) {
     where.targetId = query.targetId;
   }
 
-  // Filter by parent ID
   if (query.parentId !== undefined) {
     where.parentId = query.parentId;
   }
@@ -66,20 +51,10 @@ const buildCommentWhere = (
   return where;
 };
 
-// =====================
-// === QUERIES ===
-// =====================
-
-/**
- * Find comments (public - only approved)
- */
 export const findAllPublic = async (query: ListCommentsQuery) => {
   return findAll(query, true);
 };
 
-/**
- * Find comments (admin - all)
- */
 export const findAllAdmin = async (query: ListCommentsQuery) => {
   return findAll(query, false);
 };
@@ -89,7 +64,6 @@ const findAll = async (query: ListCommentsQuery, onlyApproved: boolean) => {
   const skip = (page - 1) * limit;
 
   const where = buildCommentWhere(query, onlyApproved);
-
   const orderBy: Prisma.commentsOrderByWithRelationInput = { [sortBy]: sortOrder };
 
   const [data, total] = await Promise.all([
@@ -112,9 +86,6 @@ const findAll = async (query: ListCommentsQuery, onlyApproved: boolean) => {
   };
 };
 
-/**
- * Find comment by ID
- */
 export const findById = async (id: string) => {
   return prisma.comments.findUnique({
     where: { id },
@@ -122,9 +93,6 @@ export const findById = async (id: string) => {
   });
 };
 
-/**
- * Find comments by target (for orchestrator)
- */
 export const findByTarget = async (
   targetType: CommentTargetType,
   targetId: string,
@@ -136,13 +104,12 @@ export const findByTarget = async (
   } = {},
 ) => {
   const { page = 1, limit = 20, onlyApproved = true, includeReplies = true } = options;
-
   const skip = (page - 1) * limit;
 
   const where: Prisma.commentsWhereInput = {
     targetType,
     targetId,
-    parentId: null, // Only top-level comments
+    parentId: null,
     ...(onlyApproved && { isApproved: true }),
   };
 
@@ -175,9 +142,6 @@ export const findByTarget = async (
   };
 };
 
-/**
- * Get comments count by multiple targets (for orchestrator)
- */
 export const getCommentsCountByTargets = async (
   targetType: CommentTargetType,
   targetIds: string[],
@@ -203,9 +167,6 @@ export const getCommentsCountByTargets = async (
   return map;
 };
 
-/**
- * Get replies for a comment
- */
 export const findReplies = async (parentId: string, onlyApproved: boolean = true) => {
   return prisma.comments.findMany({
     where: {
@@ -217,9 +178,6 @@ export const findReplies = async (parentId: string, onlyApproved: boolean = true
   });
 };
 
-/**
- * Get replies count for multiple comments
- */
 export const getRepliesCountByParentIds = async (
   parentIds: string[],
   onlyApproved: boolean = true,
@@ -245,10 +203,6 @@ export const getRepliesCountByParentIds = async (
   return map;
 };
 
-// =====================
-// === MUTATIONS ===
-// =====================
-
 export const create = async (userId: string, data: any) => {
   return prisma.comments.create({
     data: {
@@ -257,7 +211,7 @@ export const create = async (userId: string, data: any) => {
       targetType: data.targetType,
       targetId: data.targetId,
       parentId: data.parentId,
-      isApproved: false, // Default to not approved
+      isApproved: false,
     },
     select: selectComment,
   });
@@ -272,12 +226,10 @@ export const update = async (id: string, data: any) => {
 };
 
 export const remove = async (id: string) => {
-  // Delete all replies first (cascade)
   await prisma.comments.deleteMany({
     where: { parentId: id },
   });
 
-  // Delete the comment
   return prisma.comments.delete({
     where: { id },
   });
@@ -290,13 +242,6 @@ export const bulkApprove = async (commentIds: string[], isApproved: boolean) => 
   });
 };
 
-// =====================
-// === VALIDATION ===
-// =====================
-
-/**
- * Check if parent comment exists and is valid
- */
 export const validateParentComment = async (
   parentId: string,
   targetType: CommentTargetType,
@@ -313,12 +258,10 @@ export const validateParentComment = async (
 
   if (!parent) return false;
 
-  // Parent must be for the same target
   if (parent.targetType !== targetType || parent.targetId !== targetId) {
     return false;
   }
 
-  // Parent must be a top-level comment (no nested replies beyond 1 level)
   if (parent.parentId !== null) {
     return false;
   }
@@ -326,9 +269,6 @@ export const validateParentComment = async (
   return true;
 };
 
-/**
- * Check if target exists (blog, product, page)
- */
 export const validateTarget = async (
   targetType: CommentTargetType,
   targetId: string,
@@ -348,7 +288,6 @@ export const validateTarget = async (
       });
       return !!product;
 
-    // Add more cases for other target types
     default:
       return false;
   }

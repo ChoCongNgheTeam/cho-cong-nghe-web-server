@@ -1,145 +1,101 @@
-import * as mediaRepository from "./media.repository";
+import * as repo from "./media.repository";
+import { transformMedia, transformMediaList } from "./media.transformers";
 import { CreateMediaInput, UpdateMediaInput, ReorderMediaInput } from "./media.validation";
-import { NotFoundError, BadRequestError } from "@/utils/errors";
-import { MediaType, MediaPosition } from "@prisma/client";
+import { MediaType, MediaPosition } from "./media.types";
+import { deleteOldMediaImage } from "./media.helpers";
+import { NotFoundError, BadRequestError } from "@/errors";
 import prisma from "@/config/db";
 
-// === PUBLIC SERVICES ===
-
-// Lấy media theo type (SLIDER hoặc BANNER)
 export const getMediaByType = async (type: MediaType) => {
-  return mediaRepository.findByType(type, true);
+  const media = await repo.findByType(type, true);
+  return transformMediaList(media);
 };
 
-// Lấy media theo position (HOME_TOP, BELOW_SLIDER, ...)
-// Orchestrator sẽ dùng hàm này để lấy data cho từng section
 export const getMediaByPosition = async (position: MediaPosition) => {
-  return mediaRepository.findByPosition(position, true);
+  const media = await repo.findByPosition(position, true);
+  return transformMediaList(media);
 };
 
-// Lấy media theo type + position (query cụ thể hơn)
 export const getMediaByTypeAndPosition = async (type: MediaType, position: MediaPosition) => {
-  return mediaRepository.findByTypeAndPosition(type, position, true);
+  const media = await repo.findByTypeAndPosition(type, position, true);
+  return transformMediaList(media);
 };
 
 export const getAllActiveMedia = async () => {
-  const media = await mediaRepository.findAll(true);
+  const media = await repo.findAll(true);
+  const transformedMedia = transformMediaList(media);
 
-  // Group by position để orchestrator dễ xử lý
-  const grouped = media.reduce(
+  return transformedMedia.reduce(
     (acc, item) => {
-      if (!acc[item.position]) {
-        acc[item.position] = [];
-      }
+      if (!acc[item.position]) acc[item.position] = [];
       acc[item.position].push(item);
       return acc;
     },
-    {} as Record<string, typeof media>,
+    {} as Record<string, typeof transformedMedia>,
   );
-
-  return grouped;
 };
 
-// === ADMIN SERVICES ===
-
-// Lấy tất cả media (admin)
 export const getAllMedia = async () => {
-  return mediaRepository.findAll(false);
+  const media = await repo.findAll(false);
+  return transformMediaList(media);
 };
 
-// Lấy media detail (admin)
-export const getMediaDetail = async (id: string) => {
-  const media = await mediaRepository.findById(id);
-  if (!media) {
-    throw new NotFoundError("Media");
-  }
-  return media;
+export const getMediaById = async (id: string) => {
+  const media = await repo.findById(id);
+  if (!media) throw new NotFoundError("Media");
+  return transformMedia(media);
 };
 
-// Tạo media
 export const createMedia = async (input: CreateMediaInput) => {
   const { type, position, order, ...rest } = input;
+  const finalOrder = order ?? (await repo.getMaxOrder(type, position)) + 1;
 
-  // Tính order nếu không được cung cấp
-  let finalOrder = order;
-  if (finalOrder === undefined) {
-    const maxOrder = await mediaRepository.getMaxOrder(
-      type as MediaType,
-      position as MediaPosition,
-    );
-    finalOrder = maxOrder + 1;
-  }
-
-  return mediaRepository.create({
-    type: type as MediaType,
-    position: position as MediaPosition,
-    order: finalOrder,
-    ...rest,
-  });
+  const media = await repo.create({ type, position, order: finalOrder, ...rest });
+  return transformMedia(media);
 };
 
-// Update media
 export const updateMedia = async (id: string, input: UpdateMediaInput) => {
-  const media = await mediaRepository.findById(id);
-  if (!media) {
-    throw new NotFoundError("Media");
+  const existingMedia = await getMediaById(id);
+
+  if (input.imagePath && existingMedia.imageUrl) {
+    await deleteOldMediaImage((existingMedia as any).imagePath);
   }
 
-  return mediaRepository.update(id, {
-    ...(input.type && { type: input.type as MediaType }),
-    ...(input.position && { position: input.position as MediaPosition }),
-    ...(input.title !== undefined && { title: input.title }),
-    ...(input.imagePath !== undefined && { imagePath: input.imagePath }),
-    ...(input.linkUrl !== undefined && { linkUrl: input.linkUrl }),
-    ...(input.order !== undefined && { order: input.order }),
-    ...(input.isActive !== undefined && { isActive: input.isActive }),
-  });
+  const media = await repo.update(id, input);
+  return transformMedia(media);
 };
 
-// Delete media
 export const deleteMedia = async (id: string) => {
-  const media = await mediaRepository.findById(id);
-  if (!media) {
-    throw new NotFoundError("Media");
+  const media = await getMediaById(id);
+
+  if (media.imageUrl) {
+    await deleteOldMediaImage((media as any).imagePath);
   }
 
-  return mediaRepository.remove(id);
+  return repo.remove(id);
 };
 
-// Reorder media (sắp xếp lại order trong cùng type + position)
 export const reorderMedia = async (input: ReorderMediaInput) => {
   const { mediaId, newOrder } = input;
 
-  const media = await mediaRepository.findById(mediaId);
-  if (!media) {
-    throw new NotFoundError("Media");
-  }
+  const media = await repo.findById(mediaId);
+  if (!media) throw new NotFoundError("Media");
 
-  const siblings = await mediaRepository.findSiblings(media.type, media.position);
+  const siblings = await repo.findSiblings(media.type, media.position);
 
   if (newOrder < 0 || newOrder >= siblings.length) {
     throw new BadRequestError("Vị trí không hợp lệ");
   }
 
-  // Reorder logic
   const updates = siblings
     .filter((s) => s.id !== mediaId)
     .map((sibling, index) => {
       const pos = index >= newOrder ? index + 1 : index;
-      return prisma.image_media.update({
-        where: { id: sibling.id },
-        data: { order: pos },
-      });
+      return prisma.image_media.update({ where: { id: sibling.id }, data: { order: pos } });
     });
 
-  updates.push(
-    prisma.image_media.update({
-      where: { id: mediaId },
-      data: { order: newOrder },
-    }),
-  );
+  updates.push(prisma.image_media.update({ where: { id: mediaId }, data: { order: newOrder } }));
 
   await prisma.$transaction(updates);
-
   return { message: "Sắp xếp thành công" };
 };

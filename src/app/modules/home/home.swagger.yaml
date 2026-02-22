@@ -1,231 +1,284 @@
-openapi: 3.0.3
-info:
-  title: Home Page API
-  description: |
-    API cho phần trang chủ (Home), bao gồm dữ liệu tổng hợp và các section riêng lẻ.
-    Hầu hết các endpoint hỗ trợ **optional authentication** (JWT) để hiển thị giá cá nhân hóa
-    (nếu người dùng đã đăng nhập).
-  version: 1.0.0
-
-servers:
-  - url: /api
-    description: API base path
+tags:
+  - name: Home
+    description: Home page data aggregation endpoints
 
 components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: "Nhập JWT token (không cần thêm 'Bearer ' ở đầu)"
-
   schemas:
-    FlashSaleSection:
-      type: object
-      properties:
-        title:
-          type: string
-          example: "Flash Sale Hôm Nay"
-        endTime:
-          type: string
-          format: date-time
-        products:
-          type: array
-          items:
-            $ref: "#/components/schemas/ProductItem"
-      required:
-        - products
-
-    ProductSection:
-      type: object
-      properties:
-        title:
-          type: string
-        products:
-          type: array
-          items:
-            $ref: "#/components/schemas/ProductItem"
-      required:
-        - products
-
-    ProductItem:
+    HomeCampaignCategory:
       type: object
       properties:
         id:
           type: string
+          format: uuid
+        position:
+          type: integer
+        imagePath:
+          type: string
+        imageUrl:
+          type: string
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        category:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            slug:
+              type: string
+            imageUrl:
+              type: string
+              nullable: true
+            imagePath:
+              type: string
+              nullable: true
+
+    HomeCampaign:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
         name:
           type: string
         slug:
           type: string
-        price:
-          type: number
-        originalPrice:
-          type: number
-          nullable: true
-        discountPercent:
-          type: integer
-          nullable: true
-        thumbnail:
+        type:
           type: string
-          format: uri
-        rating:
-          type: number
-        reviewCount:
-          type: integer
-      required:
-        - id
-        - name
-        - price
-        - thumbnail
+          enum: [CAMPAIGN, SEASONAL, EVENT]
+        description:
+          type: string
+          nullable: true
+        startDate:
+          type: string
+          format: date-time
+          nullable: true
+        endDate:
+          type: string
+          format: date-time
+          nullable: true
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/HomeCampaignCategory"
 
-  responses:
-    Unauthorized:
-      description: Không có quyền truy cập (token không hợp lệ hoặc hết hạn)
-      content:
-        application/json:
-          schema:
+    HomeResponse:
+      type: object
+      properties:
+        sliders:
+          type: array
+          items:
             type: object
-            properties:
-              message:
-                type: string
-                example: "Unauthorized"
-
-    InternalServerError:
-      description: Lỗi server
-      content:
-        application/json:
-          schema:
+        featuredCategories:
+          type: array
+          items:
             type: object
-            properties:
-              message:
-                type: string
-              error:
-                type: string
+        bannersTop:
+          type: array
+          items:
+            type: object
+        flashSaleProducts:
+          type: object
+          properties:
+            products:
+              type: array
+            total:
+              type: integer
+            date:
+              type: string
+              format: date-time
+        bannersSection1:
+          type: array
+          items:
+            type: object
+        activeCampaigns:
+          type: array
+          items:
+            $ref: "#/components/schemas/HomeCampaign"
+        featuredProducts:
+          type: array
+        bestSellingProducts:
+          type: array
+        blogs:
+          type: object
 
 paths:
-  /home:
+  /api/home:
     get:
-      summary: Lấy toàn bộ dữ liệu trang chủ trong một request
-      description: |
-        Trả về hầu hết các khối dữ liệu cần thiết để render trang chủ: ...
-      operationId: getHomePage
-      security:
-        - bearerAuth: [] # optional
       tags:
         - Home
+      summary: Get complete home page data
+      description: |
+        Returns all data needed for home page in a single request:
+        - Sliders (HOME_TOP position)
+        - Featured Categories (isFeatured = true)
+        - Banners (BELOW_SLIDER, HOME_SECTION_1 positions)
+        - Flash Sale Products (current date)
+        - Active Campaigns with categories (CAMPAIGN, SEASONAL, EVENT types)
+        - Featured Products (isFeatured = true)
+        - Best Selling Products (top 12 by sold count)
+        - Latest Blogs (newest 7 published)
+      parameters:
+        - in: header
+          name: Authorization
+          schema:
+            type: string
+          required: false
+          description: Optional Bearer token for personalized pricing
       responses:
-        "200":
-          description: Dữ liệu trang chủ thành công
+        200:
+          description: Success
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  sliders:
-                    type: array
-                    items: { type: object }
-                  banners:
-                    type: array
-                    items: { type: object }
-                  featuredCategories:
-                    type: array
-                    items: { type: object }
-                  flashSale:
-                    $ref: "#/components/schemas/FlashSaleSection"
-                  bestSelling:
-                    $ref: "#/components/schemas/ProductSection"
-                  latestBlogs:
-                    type: array
-                    items: { type: object }
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/HomeResponse"
+                  message:
+                    type: string
+        500:
+          description: Server error
 
-  /home/flash-sale:
+  /api/home/flash-sale:
     get:
-      summary: Lấy riêng section Flash Sale
-      operationId: getFlashSaleSection
-      security:
-        - bearerAuth: []
       tags:
         - Home
+      summary: Get flash sale section only
       parameters:
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 10
-            minimum: 1
-            maximum: 50
-      responses:
-        "200":
-          description: Dữ liệu flash sale
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/FlashSaleSection"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-
-  /home/best-selling:
-    get:
-      summary: Lấy riêng section Best Selling Products
-      operationId: getBestSellingSection
-      security:
-        - bearerAuth: []
-      tags:
-        - Home
-      parameters:
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 10
-        - name: period
-          in: query
+        - in: query
+          name: date
           schema:
             type: string
-            enum: [day, week, month]
-            default: week
+            format: date
+          description: Specific date for flash sale (default today)
+        - in: header
+          name: Authorization
+          schema:
+            type: string
+          required: false
       responses:
-        "200":
-          description: Dữ liệu sản phẩm bán chạy
+        200:
+          description: Success
+
+  /api/home/best-selling:
+    get:
+      tags:
+        - Home
+      summary: Get best selling products section only
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 12
+          description: Number of products to return
+        - in: header
+          name: Authorization
+          schema:
+            type: string
+          required: false
+      responses:
+        200:
+          description: Success
+
+  /api/home/campaigns:
+    get:
+      tags:
+        - Home
+      summary: Get active campaigns section only
+      description: |
+        Returns active campaigns for home page display.
+
+        Campaigns are filtered by:
+        - isActive = true
+        - Type is CAMPAIGN, SEASONAL, or EVENT (not RANKING)
+        - Within valid date range (startDate <= today <= endDate)
+        - Has at least one category attached
+
+        Use this endpoint to:
+        - Lazy load campaigns section
+        - Refresh campaigns without reloading entire page
+        - Check for new campaigns dynamically
+      responses:
+        200:
+          description: Success
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ProductSection"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/HomeCampaign"
+                  total:
+                    type: integer
+                  message:
+                    type: string
+              example:
+                success: true
+                data:
+                  - id: "550e8400-e29b-41d4-a716-446655440000"
+                    name: "Siêu Sale Mùa Hè 2026 - Làm Mát Cả Nhà"
+                    slug: "sieu-sale-mua-he-2026"
+                    type: "SEASONAL"
+                    description: "Khuyến mãi lớn mùa hè"
+                    startDate: "2026-06-01T00:00:00Z"
+                    endDate: "2026-08-31T23:59:59Z"
+                    categories:
+                      - id: "cat-1"
+                        position: 0
+                        title: "Điều hòa giảm 30%"
+                        description: "Siêu tiết kiệm điện"
+                        imageUrl: "https://cloudinary.com/..."
+                        category:
+                          id: "uuid"
+                          name: "Điều hòa"
+                          slug: "dieu-hoa"
+                  - id: "550e8400-e29b-41d4-a716-446655440001"
+                    name: "Proactive Summer Care 2026"
+                    slug: "proactive-summer-care-2026"
+                    type: "CAMPAIGN"
+                    description: "Bảo dưỡng trước mùa nóng"
+                    startDate: "2026-05-01T00:00:00Z"
+                    endDate: "2026-07-31T23:59:59Z"
+                    categories:
+                      - id: "cat-2"
+                        position: 0
+                        title: "Dịch vụ bảo dưỡng"
+                        imageUrl: "https://cloudinary.com/..."
+                total: 2
+                message: "Lấy danh sách chiến dịch thành công"
+        500:
+          description: Server error
 
-  /home/recently-viewed:
+  /api/home/recently-viewed:
     post:
-      summary: Lấy danh sách sản phẩm đã xem gần đây
-      operationId: getRecentlyViewedSection
-      security:
-        - bearerAuth: []
       tags:
         - Home
+      summary: Get recently viewed products section
       requestBody:
-        required: false
         content:
           application/json:
             schema:
               type: object
               properties:
-                limit:
-                  type: integer
-                  default: 10
                 productIds:
                   type: array
                   items:
                     type: string
+                    format: uuid
       responses:
-        "200":
-          description: Danh sách sản phẩm đã xem gần đây
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProductSection"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
+        200:
+          description: Success

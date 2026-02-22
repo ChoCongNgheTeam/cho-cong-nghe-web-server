@@ -2,6 +2,7 @@ import { Router } from "express";
 import { validate } from "@/app/middlewares/validate.middleware";
 import { authMiddleware } from "@/app/middlewares/auth.middleware";
 import { requireRole } from "@/app/middlewares/role.middleware";
+import { blogUpload } from "@/app/middlewares/upload/blogUpload";
 import {
   getBlogsPublicHandler,
   getBlogBySlugHandler,
@@ -12,106 +13,27 @@ import {
   deleteBlogHandler,
   bulkUpdateBlogStatusHandler,
 } from "./blog.controller";
-import {
-  listBlogsSchema,
-  blogBySlugParamsSchema,
-  blogParamsSchema,
-  createBlogSchema,
-  updateBlogSchema,
-} from "./blog.validation";
+import { listBlogsSchema, blogBySlugParamsSchema, blogParamsSchema, createBlogSchema, updateBlogSchema, bulkUpdateStatusSchema } from "./blog.validation";
+import { asyncHandler } from "@/utils/async-handler";
 
 const router = Router();
 
-// =====================
-// === PUBLIC ROUTES ===
-// =====================
+const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
 
-/**
- * Get published blogs
- * GET /api/blogs
- */
-router.get("/", validate(listBlogsSchema, "query"), getBlogsPublicHandler);
+// Public
+router.get("/", validate(listBlogsSchema, "query"), asyncHandler(getBlogsPublicHandler));
+router.get("/slug/:slug", validate(blogBySlugParamsSchema, "params"), asyncHandler(getBlogBySlugHandler));
 
-/**
- * Get blog by slug
- * GET /api/blogs/slug/:slug
- */
-router.get("/slug/:slug", validate(blogBySlugParamsSchema, "params"), getBlogBySlugHandler);
+// Admin
+router.get("/admin/all", ...adminAuth, validate(listBlogsSchema, "query"), asyncHandler(getBlogsAdminHandler));
+router.get("/admin/:id", ...adminAuth, validate(blogParamsSchema, "params"), asyncHandler(getBlogDetailHandler));
 
-// =====================
-// === ADMIN ROUTES ===
-// =====================
+router.post("/admin", ...adminAuth, blogUpload.single("imageUrl"), validate(createBlogSchema, "body"), asyncHandler(createBlogHandler));
 
-/**
- * Get all blogs (admin - includes drafts)
- * GET /api/blogs/admin/all
- */
-router.get(
-  "/admin/all",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(listBlogsSchema, "query"),
-  getBlogsAdminHandler,
-);
+router.patch("/admin/bulk/status", ...adminAuth, validate(bulkUpdateStatusSchema, "body"), asyncHandler(bulkUpdateBlogStatusHandler));
 
-/**
- * Get blog by ID (admin)
- * GET /api/blogs/admin/:id
- */
-router.get(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(blogParamsSchema, "params"),
-  getBlogDetailHandler,
-);
+router.patch("/admin/:id", ...adminAuth, blogUpload.single("imageUrl"), validate(updateBlogSchema, "body"), validate(blogParamsSchema, "params"), asyncHandler(updateBlogHandler));
 
-/**
- * Create blog
- * POST /api/blogs/admin
- */
-router.post(
-  "/admin",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(createBlogSchema, "body"),
-  createBlogHandler,
-);
-
-/**
- * Update blog
- * PATCH /api/blogs/admin/:id
- */
-router.patch(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(blogParamsSchema, "params"),
-  validate(updateBlogSchema, "body"),
-  updateBlogHandler,
-);
-
-/**
- * Delete blog
- * DELETE /api/blogs/admin/:id
- */
-router.delete(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(blogParamsSchema, "params"),
-  deleteBlogHandler,
-);
-
-/**
- * Bulk update blog status
- * PATCH /api/blogs/admin/bulk/status
- */
-router.patch(
-  "/admin/bulk/status",
-  authMiddleware,
-  requireRole("ADMIN"),
-  bulkUpdateBlogStatusHandler,
-);
+router.delete("/admin/:id", ...adminAuth, validate(blogParamsSchema, "params"), asyncHandler(deleteBlogHandler));
 
 export default router;

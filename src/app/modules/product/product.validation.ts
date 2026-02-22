@@ -29,9 +29,7 @@ export const listProductsSchema = z.object({
   inStock: z.coerce.boolean().optional(),
 
   // Sort
-  sortBy: z
-    .enum(["createdAt", "name", "price", "viewsCount", "ratingAverage", "soldCount"])
-    .default("createdAt"),
+  sortBy: z.enum(["createdAt", "name", "price", "viewsCount", "ratingAverage", "soldCount"]).default("createdAt"),
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
 });
 
@@ -63,7 +61,7 @@ export const variantQuerySchema = z
 // =====================
 
 export const productParamsSchema = z.object({
-  id: z.string().uuid({ message: "ID sản phẩm không hợp lệ" }),
+  id: z.uuid({ message: "ID sản phẩm không hợp lệ" }),
 });
 
 export const productBySlugParamsSchema = z.object({

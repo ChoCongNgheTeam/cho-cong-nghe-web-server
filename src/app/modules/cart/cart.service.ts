@@ -2,10 +2,9 @@ import * as repo from "./cart.repository";
 import {
   AddToCartInput,
   UpdateCartItemInput,
-  CartResponse,
   CartSummary,
   LocalStorageCartItem,
-  ValidatedLocalStorageCart,
+  SyncCartResult
 } from "./cart.types";
 import prisma from "@/config/db";
 
@@ -27,7 +26,7 @@ export const getCart = async (userId: string): Promise<CartSummary> => {
 };
 
 /**
- * 2. Helper: Validate chi tiết 1 variant (Dùng chung cho cả Guest và User check)
+ * 2. Helper: Validate chi tiết 1 variant
  */
 export const validateCartItem = async (
   productVariantId: string,
@@ -55,9 +54,14 @@ export const validateCartItem = async (
         select: {
           attributeOption: {
             select: {
-              type: true,
               label: true,
               value: true,
+              attribute: {   
+                select: {
+                  name: true,
+                  code: true, 
+                }
+              }
             },
           },
         },
@@ -78,11 +82,10 @@ export const validateCartItem = async (
     errors.push(`Chỉ còn ${available} sản phẩm`);
   }
 
-  // Tìm màu sắc
-  const colorAttr = variant.variantAttributes.find(
-    (attr: any) =>
-      ["color", "màu"].includes((attr.attributeOption.type || "").toLowerCase())
-  );
+  const colorAttr = variant.variantAttributes.find((attr: any) => {
+    const attrName = (attr.attributeOption.attribute?.code || attr.attributeOption.attribute?.name || "").toLowerCase();
+    return ["color", "màu", "màu sắc"].includes(attrName);
+  });
 
   return {
     variant,
@@ -95,113 +98,73 @@ export const validateCartItem = async (
 };
 
 /**
- * 3. GUEST: Validate toàn bộ localStorage cart
- * FE gửi lên danh sách ID + Qty, BE trả về full info + giá mới nhất
- */
-export const validateLocalStorageCart = async (
-  items: LocalStorageCartItem[]
-): Promise<ValidatedLocalStorageCart> => {
-  if (!Array.isArray(items) || items.length === 0) {
-    return {
-      validItems: [],
-      totalItems: 0,
-      totalQuantity: 0,
-      subtotal: 0,
-      hasErrors: false,
-    };
-  }
-
-  const validItems: CartResponse[] = [];
-  const invalidItems: Array<{ productVariantId: string; productName: string; reason: string }> = [];
-
-  for (const item of items) {
-    try {
-      const check = await validateCartItem(item.productVariantId, item.quantity);
-
-      if (!check.isValid) {
-        invalidItems.push({
-          productVariantId: item.productVariantId,
-          productName: check.productName,
-          reason: check.errors?.join(", ") || "Invalid",
-        });
-        continue;
-      }
-
-      // Map sang response format
-      validItems.push({
-        id: `temp-${check.variant.id}`, // ID tạm
-        productVariantId: check.variant.id,
-        productId: check.variant.product.id,
-        productName: check.variant.product.name,
-        productSlug: check.variant.product.slug,
-        brandName: check.variant.product.brand.name,
-        variantCode: check.variant.code || undefined,
-        image: check.variant.product.img[0]?.imageUrl || undefined,
-        color: check.colorAttr?.attributeOption.label,
-        colorValue: check.colorAttr?.attributeOption.value,
-        quantity: item.quantity,
-        unitPrice: Number(check.variant.price),
-        totalPrice: item.quantity * Number(check.variant.price),
-        availableQuantity: check.availableQuantity,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-    } catch (error: any) {
-      invalidItems.push({
-        productVariantId: item.productVariantId,
-        productName: "Unknown",
-        reason: error.message,
-      });
-    }
-  }
-
-  return {
-    validItems,
-    invalidItems: invalidItems.length > 0 ? invalidItems : undefined,
-    totalItems: validItems.length,
-    totalQuantity: validItems.reduce((sum, i) => sum + i.quantity, 0),
-    subtotal: validItems.reduce((sum, i) => sum + i.totalPrice, 0),
-    hasErrors: invalidItems.length > 0,
-  };
-};
-
-/**
- * 4. SYNC: LocalStorage -> Database (Khi User Login)
+ * 3. SYNC: LocalStorage -> Database (Khi User Login)
+ * Xử lý Soft Validate: Tự điều chỉnh số lượng nếu vượt tồn kho thay vì quăng lỗi
  */
 export const syncLocalStorageToDatabase = async (
   userId: string,
   items: LocalStorageCartItem[]
-) => {
-  const result = { synced: 0, failed: 0, errors: [] as any[] };
+): Promise<SyncCartResult> => {
+  const result: SyncCartResult = { synced: 0, failed: 0, warnings: [] };
 
   for (const item of items) {
     try {
-      // Tái sử dụng hàm addToCart để xử lý logic merge/cộng dồn
-      await addToCart(userId, {
-        productVariantId: item.productVariantId,
-        quantity: item.quantity,
-      });
-      result.synced++;
+      const check = await validateCartItem(item.productVariantId, item.quantity);
+      
+      // Bỏ qua sản phẩm ngưng kinh doanh
+      if (!check.variant || !check.variant.isActive || !check.variant.product.isActive) {
+        result.failed++;
+        result.warnings.push(`"${check.productName || 'Sản phẩm ẩn'}" đã ngừng kinh doanh và bị loại khỏi giỏ hàng.`);
+        continue;
+      }
+
+      // Xử lý vượt tồn kho
+      let finalQuantity = item.quantity;
+      if (check.availableQuantity === 0) {
+        result.failed++;
+        result.warnings.push(`"${check.productName}" đã hết hàng.`);
+        continue;
+      } else if (item.quantity > check.availableQuantity) {
+        finalQuantity = check.availableQuantity;
+        result.warnings.push(`"${check.productName}" chỉ còn ${check.availableQuantity} sản phẩm. Đã tự động điều chỉnh.`);
+      }
+
+      const existingItem = await repo.findByUserAndVariant(userId, item.productVariantId);
+
+      if (existingItem) {
+        // Đảm bảo tổng số lượng (sau khi cộng) không vượt tồn kho
+        const newTotalQty = existingItem.quantity + finalQuantity;
+        const safeQty = Math.min(newTotalQty, check.availableQuantity);
+        
+        await repo.update(existingItem.id, { quantity: safeQty, unitPrice: Number(check.variant.price) });
+        result.synced++;
+      } else {
+        await repo.create({
+          userId,
+          productVariantId: item.productVariantId,
+          quantity: finalQuantity,
+          unitPrice: Number(check.variant.price),
+        });
+        result.synced++;
+      }
     } catch (error: any) {
       result.failed++;
-      result.errors.push({ id: item.productVariantId, reason: error.message });
+      console.error(`Lỗi sync item ${item.productVariantId}:`, error.message);
     }
   }
   return result;
 };
 
 /**
- * 5. USER: Add to Cart (Database)
+ * 4. USER: Add to Cart (Database)
  */
 export const addToCart = async (userId: string, input: AddToCartInput) => {
-  // Validate Inventory & Price
   const check = await validateCartItem(input.productVariantId, input.quantity);
   
   if (!check.isValid) {
     throw new Error(check.errors?.join(", "));
   }
 
-  // Check existing
   const existingItem = await repo.findByUserAndVariant(userId, input.productVariantId);
 
   if (existingItem) {
@@ -209,11 +172,13 @@ export const addToCart = async (userId: string, input: AddToCartInput) => {
     if (check.availableQuantity < newQuantity) {
       throw new Error(`Kho chỉ còn ${check.availableQuantity}, không đủ thêm.`);
     }
-    const updated = await repo.update(existingItem.id, { quantity: newQuantity });
+    const updated = await repo.update(existingItem.id, { 
+      quantity: newQuantity, 
+      unitPrice: Number(check.variant.price) 
+    });
     return repo.transformToCartResponse(updated);
   }
 
-  // Create new
   const newItem = await repo.create({
     userId,
     productVariantId: input.productVariantId,
@@ -225,7 +190,7 @@ export const addToCart = async (userId: string, input: AddToCartInput) => {
 };
 
 /**
- * 6. USER: Update Cart Item
+ * 5. USER: Update Cart Item
  */
 export const updateCartItem = async (
   userId: string,
@@ -237,18 +202,20 @@ export const updateCartItem = async (
     throw new Error("Sản phẩm không tồn tại hoặc không có quyền truy cập");
   }
 
-  // Check inventory cho số lượng mới
   const check = await validateCartItem(item.productVariantId, input.quantity);
   if (!check.isValid) {
     throw new Error(check.errors?.join(", "));
   }
 
-  const updated = await repo.update(cartItemId, { quantity: input.quantity });
+  const updated = await repo.update(cartItemId, { 
+    quantity: input.quantity,
+    unitPrice: Number(check.variant.price) 
+  });
   return repo.transformToCartResponse(updated);
 };
 
 /**
- * 7. USER: Remove Item
+ * 6. USER: Remove Item
  */
 export const removeFromCart = async (userId: string, cartItemId: string) => {
   const item = await repo.findById(cartItemId);
@@ -260,7 +227,7 @@ export const removeFromCart = async (userId: string, cartItemId: string) => {
 };
 
 /**
- * 8. USER: Clear Cart
+ * 7. USER: Clear Cart
  */
 export const clearCart = async (userId: string) => {
   await repo.clearCart(userId);

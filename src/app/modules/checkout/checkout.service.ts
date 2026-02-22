@@ -1,21 +1,14 @@
 import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
-import {
-  CheckoutInput,
-  CartValidationResult,
-  CartItemValidation,
-  CheckoutSummary,
-} from "./checkout.types";
-import { BadRequestError, NotFoundError } from "@/utils/errors";
+import { CheckoutInput, CartValidationResult, CartItemValidation, CheckoutSummary } from "./checkout.types";
+import { BadRequestError, NotFoundError } from "@/errors";
 
 /**
  * Validate cart for user
  * - Check if cart exists and not empty
  * - Check each item validity (product exists, is active, has inventory)
  */
-export const validateCartItems = async (
-  userId: string
-): Promise<CartValidationResult> => {
+export const validateCartItems = async (userId: string): Promise<CartValidationResult> => {
   const cartItems = await prisma.cart_items.findMany({
     where: { userId },
     include: {
@@ -63,9 +56,7 @@ export const validateCartItems = async (
 
       // Check stock quantity
       if (availableQuantity < quantity) {
-        itemErrors.push(
-          `${product.name} only has ${availableQuantity} items available (you requested ${quantity})`
-        );
+        itemErrors.push(`${product.name} only has ${availableQuantity} items available (you requested ${quantity})`);
       }
 
       if (itemErrors.length === 0) {
@@ -118,10 +109,7 @@ export const calculateSubtotal = async (userId: string): Promise<number> => {
  * Calculate shipping fee based on location and subtotal
  * Free shipping if subtotal >= 500,000 VND
  */
-export const calculateShippingFee = async (
-  subtotal: number,
-  shippingAddressId: string
-): Promise<number> => {
+export const calculateShippingFee = async (subtotal: number, shippingAddressId: string): Promise<number> => {
   // Free shipping threshold
   const FREE_SHIPPING_THRESHOLD = 500000;
   const DEFAULT_SHIPPING_FEE = 30000;
@@ -150,26 +138,22 @@ export const calculateShippingFee = async (
   };
 
   // Return province-specific fee or default
-  return provinceFees[address.provinceId || ''] || DEFAULT_SHIPPING_FEE;
+  return provinceFees[address.provinceId || ""] || DEFAULT_SHIPPING_FEE;
 };
 
 /**
  * 🔥 NEW - Calculate VAT tax
  * Standard VAT rate in Vietnam is 10%
  * Tax is applied on: subtotal + shipping fee - voucher discount
- * 
+ *
  * @param subtotal - Subtotal amount before tax
  * @param shippingFee - Shipping fee
  * @param voucherDiscount - Voucher discount amount
  * @returns Tax amount (rounded to nearest integer)
  */
-export const calculateTax = (
-  subtotal: number,
-  shippingFee: number,
-  voucherDiscount: number
-): number => {
+export const calculateTax = (subtotal: number, shippingFee: number, voucherDiscount: number): number => {
   // Vietnam VAT rate
-  const VAT_RATE = 0.10; // 10%
+  const VAT_RATE = 0.1; // 10%
 
   // Taxable amount = subtotal + shipping - discount
   // Note: In Vietnam, VAT is typically calculated on the total before discount
@@ -186,11 +170,7 @@ export const calculateTax = (
 /**
  * Validate voucher and calculate discount
  */
-export const validateAndApplyVoucher = async (
-  voucherId: string | undefined,
-  subtotal: number,
-  userId: string
-): Promise<{ discount: number; voucherData: any }> => {
+export const validateAndApplyVoucher = async (voucherId: string | undefined, subtotal: number, userId: string): Promise<{ discount: number; voucherData: any }> => {
   if (!voucherId) {
     return { discount: 0, voucherData: null };
   }
@@ -199,9 +179,9 @@ export const validateAndApplyVoucher = async (
     where: { id: voucherId },
     include: {
       voucherUsers: {
-        where: { userId }
-      }
-    }
+        where: { userId },
+      },
+    },
   });
 
   if (!voucher) {
@@ -229,21 +209,19 @@ export const validateAndApplyVoucher = async (
 
   // Check min order value
   if (subtotal < Number(voucher.minOrderValue)) {
-    throw new BadRequestError(
-      `Minimum order value is ${Number(voucher.minOrderValue).toLocaleString()} VND to use this voucher`
-    );
+    throw new BadRequestError(`Minimum order value is ${Number(voucher.minOrderValue).toLocaleString()} VND to use this voucher`);
   }
 
   // Check if user is allowed to use this voucher
   // If voucherUsers table has entries, only those users can use it
   const allVoucherUsers = await prisma.voucher_user.findMany({
-    where: { voucherId }
+    where: { voucherId },
   });
 
   if (allVoucherUsers.length > 0) {
     // Voucher is restricted to specific users
     const userVoucher = voucher.voucherUsers[0];
-    
+
     if (!userVoucher) {
       throw new BadRequestError("You are not allowed to use this voucher");
     }
@@ -272,18 +250,13 @@ export const validateAndApplyVoucher = async (
  * Prepare checkout data with all validations
  * 🔥 UPDATED: Added tax calculation
  */
-export const prepareCheckoutData = async (
-  userId: string,
-  input: CheckoutInput
-): Promise<CheckoutSummary> => {
+export const prepareCheckoutData = async (userId: string, input: CheckoutInput): Promise<CheckoutSummary> => {
   const { paymentMethodId, shippingAddressId, voucherId } = input;
 
   // Step 1: Validate cart and items
   const cartValidation = await validateCartItems(userId);
   if (!cartValidation.isValid) {
-    throw new BadRequestError(
-      `Invalid cart: ${cartValidation.errors.join(", ")}`
-    );
+    throw new BadRequestError(`Invalid cart: ${cartValidation.errors.join(", ")}`);
   }
 
   // Step 2: Validate payment method
@@ -330,11 +303,7 @@ export const prepareCheckoutData = async (
   const shippingFee = await calculateShippingFee(subtotalAmount, shippingAddressId);
 
   // Step 7: Validate and apply voucher
-  const { discount: voucherDiscount } = await validateAndApplyVoucher(
-    voucherId,
-    subtotalAmount,
-    userId
-  );
+  const { discount: voucherDiscount } = await validateAndApplyVoucher(voucherId, subtotalAmount, userId);
 
   // Step 8: 🔥 NEW - Calculate tax (VAT)
   const taxAmount = calculateTax(subtotalAmount, shippingFee, voucherDiscount);
@@ -361,10 +330,7 @@ export const prepareCheckoutData = async (
  * 🔥 FIXED: Now uses transaction and reserves inventory
  * 🔥 UPDATED: Added taxAmount to order creation
  */
-export const createOrderFromCheckout = async (
-  userId: string,
-  checkoutSummary: CheckoutSummary
-) => {
+export const createOrderFromCheckout = async (userId: string, checkoutSummary: CheckoutSummary) => {
   const {
     items,
     subtotalAmount,
@@ -426,9 +392,7 @@ export const createOrderFromCheckout = async (
 
       // Check if we have enough stock
       if (variant.quantity < item.quantity) {
-        throw new BadRequestError(
-          `Not enough stock for ${item.productName}. Available: ${variant.quantity}, Requested: ${item.quantity}`
-        );
+        throw new BadRequestError(`Not enough stock for ${item.productName}. Available: ${variant.quantity}, Requested: ${item.quantity}`);
       }
 
       // Reduce quantity and increase soldCount
@@ -463,8 +427,8 @@ export const createOrderFromCheckout = async (
         data: {
           voucherId,
           userId,
-          orderId: newOrder.id
-        }
+          orderId: newOrder.id,
+        },
       });
 
       // Update user voucher usage if exists

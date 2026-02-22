@@ -1,16 +1,8 @@
-// =====================
-// === ENUMS ===
-// =====================
-
 export enum CommentTargetType {
   BLOG = "BLOG",
   PRODUCT = "PRODUCT",
   PAGE = "PAGE",
 }
-
-// =====================
-// === SHARED TYPES ===
-// =====================
 
 export interface CommentUser {
   id: string;
@@ -18,10 +10,6 @@ export interface CommentUser {
   email: string;
   avatarImage?: string;
 }
-
-// =====================
-// === COMMENT TYPES ===
-// =====================
 
 export interface Comment {
   id: string;
@@ -33,19 +21,12 @@ export interface Comment {
   isApproved: boolean;
   createdAt: Date;
   user: CommentUser;
-  // For nested comments
-  replies?: Comment[];
   repliesCount?: number;
 }
 
 export interface CommentWithReplies extends Comment {
   replies: Comment[];
-  repliesCount: number;
 }
-
-// =====================
-// === RAW DB TYPES ===
-// =====================
 
 export interface RawComment {
   id: string;
@@ -63,10 +44,6 @@ export interface RawComment {
     avatarImage: string | null;
   };
 }
-
-// =====================
-// === REQUEST TYPES ===
-// =====================
 
 export interface CreateCommentInput {
   content: string;
@@ -86,14 +63,10 @@ export interface ListCommentsQuery {
   targetType?: CommentTargetType;
   targetId?: string;
   isApproved?: boolean;
-  parentId?: string | null; // null = top-level comments only
+  parentId?: string | null;
   sortBy: "createdAt";
   sortOrder: "asc" | "desc";
 }
-
-// =====================
-// === RESPONSE TYPES ===
-// =====================
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -104,9 +77,3 @@ export interface PaginatedResponse<T> {
 }
 
 export interface CommentListResponse extends PaginatedResponse<Comment> {}
-
-// =====================
-// === STATS TYPES ===
-// =====================
-
-export interface CommentsCountMap extends Map<string, number> {}

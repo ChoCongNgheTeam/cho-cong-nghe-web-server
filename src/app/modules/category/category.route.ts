@@ -1,6 +1,11 @@
 import { Router } from "express";
 import { validate } from "@/app/middlewares/validate.middleware";
+import { authMiddleware } from "@/app/middlewares/auth.middleware";
+import { requireRole } from "@/app/middlewares/role.middleware";
+import { categoryUpload } from "@/app/middlewares/upload/categoryUpload";
 import {
+  getCategoriesPublicHandler,
+  getCategoriesAdminHandler,
   getRootCategoriesHandler,
   getFeaturedCategoriesHandler,
   getCategoryTreeHandler,
@@ -23,102 +28,46 @@ import {
   reorderCategorySchema,
   categoryIdParamSchema,
   attributeIdParamSchema,
+  categoryParamsSchema,
+  categorySlugParamsSchema,
+  listCategoriesQuerySchema,
+  featuredCategoriesQuerySchema,
 } from "./category.validation";
-import { authMiddleware } from "@/app/middlewares/auth.middleware";
-import { requireRole } from "@/app/middlewares/role.middleware";
+import { asyncHandler } from "@/utils/async-handler";
 
 const router = Router();
 
-// =====================
-// === PUBLIC ROUTES ===
-// =====================
+const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
 
-router.get("/roots", getRootCategoriesHandler);
+// Public
+router.get("/", validate(listCategoriesQuerySchema, "query"), asyncHandler(getCategoriesPublicHandler));
 
-// Lấy featured categories cho home
-// Query params: ?limit=6 (optional)
-router.get("/featured", getFeaturedCategoriesHandler);
+// Tĩnh trước, động sau — tránh conflict với /:id hay /:categoryId
+router.get("/roots", asyncHandler(getRootCategoriesHandler));
+router.get("/featured", validate(featuredCategoriesQuerySchema, "query"), asyncHandler(getFeaturedCategoriesHandler));
+router.get("/tree", asyncHandler(getCategoryTreeHandler));
+router.get("/slug/:slug", validate(categorySlugParamsSchema, "params"), asyncHandler(getCategoryBySlugHandler));
 
-// Lấy category tree cho menu (nested structure)
-router.get("/tree", getCategoryTreeHandler);
+// Admin
+router.get("/admin/all", ...adminAuth, validate(listCategoriesQuerySchema, "query"), asyncHandler(getCategoriesAdminHandler));
+router.get("/admin/roots", ...adminAuth, asyncHandler(getRootCategoriesForAdminHandler));
 
-router.get("/slug/:slug", getCategoryBySlugHandler);
+router.post("/admin/reorder", ...adminAuth, validate(reorderCategorySchema, "body"), asyncHandler(reorderCategoryHandler));
 
-// ========================
-// === ADMIN ONLY ROUTES ===
-// ========================
+router.get("/attributes/all", ...adminAuth, asyncHandler(getAllAttributesHandler));
+router.get("/attributes/:attributeId/options", ...adminAuth, validate(attributeIdParamSchema, "params"), asyncHandler(getAttributeOptionsHandler));
 
-router.get("/admin/all", authMiddleware, requireRole("ADMIN"), getAllCategoriesHandler);
+router.get("/specifications/all", ...adminAuth, asyncHandler(getAllSpecificationsHandler));
 
-router.get("/admin/roots", authMiddleware, requireRole("ADMIN"), getRootCategoriesForAdminHandler);
+// Admin — động
+router.get("/admin/:id", ...adminAuth, validate(categoryParamsSchema, "params"), asyncHandler(getCategoryDetailHandler));
 
-router.get("/admin/:id", authMiddleware, requireRole("ADMIN"), getCategoryDetailHandler);
+router.post("/admin", ...adminAuth, categoryUpload.single("imageUrl"), validate(createCategorySchema, "body"), asyncHandler(createCategoryHandler));
 
-router.post(
-  "/admin",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(createCategorySchema),
-  createCategoryHandler,
-);
+router.patch("/admin/:id", ...adminAuth, categoryUpload.single("imageUrl"), validate(categoryParamsSchema, "params"), validate(updateCategorySchema, "body"), asyncHandler(updateCategoryHandler));
 
-router.patch(
-  "/admin/:id",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(updateCategorySchema),
-  updateCategoryHandler,
-);
+router.delete("/admin/:id", ...adminAuth, validate(categoryParamsSchema, "params"), asyncHandler(deleteCategoryHandler));
 
-router.delete("/admin/:id", authMiddleware, requireRole("ADMIN"), deleteCategoryHandler);
-
-router.post(
-  "/admin/reorder",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(reorderCategorySchema),
-  reorderCategoryHandler,
-);
-
-/**
- * GET /api/v1/categories/:categoryId/template
- * Lấy template (attributes + specifications) cho category
- */
-router.get(
-  "/:categoryId/template",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(categoryIdParamSchema, "params"),
-  getCategoryTemplateHandler,
-);
-
-/**
- * GET /api/v1/categories/attributes/all
- * Lấy tất cả attributes (cho dropdown "Thêm attribute tuỳ chỉnh")
- */
-router.get("/attributes/all", authMiddleware, requireRole("ADMIN"), getAllAttributesHandler);
-
-/**
- * GET /api/v1/categories/attributes/:attributeId/options
- * Lấy options cho một attribute
- */
-router.get(
-  "/attributes/:attributeId/options",
-  authMiddleware,
-  requireRole("ADMIN"),
-  validate(attributeIdParamSchema, "params"),
-  getAttributeOptionsHandler,
-);
-
-/**
- * GET /api/v1/categories/specifications/all
- * Lấy tất cả specifications (cho dropdown "Thêm spec tuỳ chỉnh")
- */
-router.get(
-  "/specifications/all",
-  authMiddleware,
-  requireRole("ADMIN"),
-  getAllSpecificationsHandler,
-);
+router.get("/:categoryId/template", ...adminAuth, validate(categoryIdParamSchema, "params"), asyncHandler(getCategoryTemplateHandler));
 
 export default router;

@@ -11,16 +11,19 @@ import { checkoutSchema } from "./checkout.validation";
 const router = Router();
 
 // GET /checkout/validate - Validate current cart
-router.get("/validate", authMiddleware, validateCheckoutHandler);
+// SỬA: Thêm (true) vào sau authMiddleware
+router.get("/validate", authMiddleware(true), validateCheckoutHandler);
 
 // GET /checkout/preview - Preview checkout summary
-router.get("/preview", authMiddleware, checkoutPreviewHandler);
+// SỬA: Thêm (true) vào sau authMiddleware
+router.get("/preview", authMiddleware(true), checkoutPreviewHandler);
 
 // POST /checkout - Create order from cart
+// SỬA: Thêm (true) và thêm "body" vào hàm validate
 router.post(
   "/",
-  authMiddleware,
-  validate(checkoutSchema),
+  authMiddleware(true),
+  validate(checkoutSchema, "body"), 
   checkoutHandler
 );
 

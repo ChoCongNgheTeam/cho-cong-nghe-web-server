@@ -9,11 +9,7 @@ interface CategorySeedData {
   isFeatured?: boolean;
 }
 
-export async function seedCategoryGroup(
-  prisma: PrismaClient,
-  categoryData: CategorySeedData[],
-  groupName?: string,
-) {
+export async function seedCategoryGroup(prisma: PrismaClient, categoryData: CategorySeedData[], groupName?: string) {
   if (groupName) {
     console.log(` 🌱 Seeding ${groupName}`);
   }

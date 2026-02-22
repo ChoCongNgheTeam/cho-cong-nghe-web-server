@@ -1,8 +1,9 @@
 import { Comment, CommentUser, CommentWithReplies } from "./comment.types";
 
-/**
- * Transform user data
- */
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
+
 const transformUser = (user: any): CommentUser => ({
   id: user.id,
   fullName: user.fullName || undefined,
@@ -10,9 +11,6 @@ const transformUser = (user: any): CommentUser => ({
   avatarImage: user.avatarImage || undefined,
 });
 
-/**
- * Transform comment (without replies)
- */
 export const transformComment = (comment: any): Comment => {
   return {
     id: comment.id,
@@ -27,9 +25,6 @@ export const transformComment = (comment: any): Comment => {
   };
 };
 
-/**
- * Transform comment with replies
- */
 export const transformCommentWithReplies = (comment: any): CommentWithReplies => {
   const replies = comment.replies ? comment.replies.map(transformComment) : [];
 
@@ -40,9 +35,6 @@ export const transformCommentWithReplies = (comment: any): CommentWithReplies =>
   };
 };
 
-/**
- * Transform list of comments with optional replies
- */
 export const transformCommentsList = (
   comments: any[],
   includeReplies: boolean = false,

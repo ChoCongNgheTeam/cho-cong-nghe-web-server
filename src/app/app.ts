@@ -5,7 +5,7 @@ import cookieParser from "cookie-parser";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "@/config/swagger";
 import { cleanupRefreshTokens } from "./modules/auth/auth.service";
-import { globalErrorHandler } from "./middlewares/error.middleware";
+import { errorMiddleware } from "./middlewares/error.middleware";
 
 const app = express();
 
@@ -14,7 +14,7 @@ app.use(
     // origin: process.env.FRONTEND_URL || ["http://localhost:3000", "http://127.0.0.1:5500",],
     origin: true,
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
@@ -35,7 +35,6 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use("/api/v1", routes);
 
-// BẮT LỖI TẬP TRUNG (PHẢI ĐẶT Ở ĐÂY, SAU CÁC ROUTES)
-app.use(globalErrorHandler);
+app.use(errorMiddleware);
 
 export default app;
