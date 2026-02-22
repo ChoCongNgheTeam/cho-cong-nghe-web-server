@@ -270,6 +270,7 @@ model products {
   description   String?
   slug          String   @unique
   viewsCount    BigInt   @default(0)
+  totalsoldcount BigInt   @default(0)
   ratingAverage Decimal  @default("0.00") @db.Decimal(3, 2)
   ratingCount   Int      @default(0)
   isActive      Boolean  @default(true)
