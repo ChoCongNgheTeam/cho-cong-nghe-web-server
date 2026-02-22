@@ -28,6 +28,8 @@ const getActiveHomeCampaigns = async (): Promise<HomeCampaign[]> => {
     campaignService.getActiveCampaigns(CampaignType.EVENT),
   ]);
 
+  // console.log(allCampaigns);
+
   // Flatten and filter by date
   const campaigns = allCampaigns.flat().filter((campaign) => {
     // Check if campaign is within valid date range
@@ -37,8 +39,11 @@ const getActiveHomeCampaigns = async (): Promise<HomeCampaign[]> => {
     return isNotExpired && isNotFuture;
   });
 
+  console.log(campaigns);
+
   // Get full campaign details with categories
   const campaignsWithCategories = await Promise.all(campaigns.map((campaign) => campaignService.getCampaignBySlug(campaign.slug)));
+  console.log(campaignsWithCategories);
 
   // Filter out campaigns with no categories
   return campaignsWithCategories.filter((campaign) => campaign.categories && campaign.categories.length > 0);

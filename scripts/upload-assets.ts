@@ -154,6 +154,20 @@ async function uploadAssets() {
     }),
   );
 
+  // -------- Campaigns --------
+  const campaigns = await prisma.campaign_categories.findMany({
+    where: {
+      imageUrl: null,
+    },
+  });
+
+  await uploadImages(campaigns, (id, url) =>
+    prisma.campaign_categories.update({
+      where: { id },
+      data: { imageUrl: url },
+    }),
+  );
+
   console.log("✅ All assets uploaded");
 }
 
