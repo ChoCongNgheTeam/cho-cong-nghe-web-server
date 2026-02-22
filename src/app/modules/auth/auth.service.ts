@@ -68,7 +68,7 @@ export const login = async (input: LoginInput, meta?: { userAgent?: string; ip?:
 
   const refreshTokenTTL = rememberMe ? jwtConfig.refreshToken.ttl.long : jwtConfig.refreshToken.ttl.short;
 
-  const absoluteTTL = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+  const absoluteTTL = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000; // 30 ngày, 7 ngày
 
   const now = Date.now();
   const refreshToken = signRefreshToken({ userId: user.id }, refreshTokenTTL);

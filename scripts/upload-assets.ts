@@ -110,17 +110,17 @@ async function uploadAssets() {
     }),
   );
 
-  const categoriesTrend = await prisma.categories.findMany({
+  const categories = await prisma.categories.findMany({
     where: {
-      trendImagePath: { not: null },
-      trendImageUrl: null,
+      imagePath: { not: null },
+      imageUrl: null,
     },
   });
 
-  await uploadImages(categoriesTrend, (id, url) =>
+  await uploadImages(categories, (id, url) =>
     prisma.categories.update({
       where: { id },
-      data: { trendImageUrl: url },
+      data: { imageUrl: url },
     }),
   );
 
