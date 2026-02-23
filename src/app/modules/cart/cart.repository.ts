@@ -41,6 +41,13 @@ export const cartItemSelect = {
   },
 };
 
+export const findVariantWithProductById = async (variantId: string) => {
+  return prisma.products_variants.findUnique({
+    where: { id: variantId },
+    include: { product: true },
+  });
+};
+
 export const findByUserId = async (userId: string) => {
   return prisma.cart_items.findMany({
     where: { userId },
