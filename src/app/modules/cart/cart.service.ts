@@ -1,14 +1,11 @@
 import * as repo from "./cart.repository";
-import prisma from "@/config/db";
 import { AddToCartInput, UpdateCartItemInput, LocalStorageCartItem, SyncCartResult } from "./cart.types";
+import { NotFoundError, BadRequestError } from "@/errors";
 
 export const validateCartItemStatus = async (variantId: string, quantity: number) => {
-  const variant = await prisma.products_variants.findUnique({
-    where: { id: variantId },
-    include: { product: true },
-  });
+  const variant = await repo.findVariantWithProductById(variantId);
 
-  if (!variant) throw new Error("Sản phẩm không tồn tại");
+  if (!variant) throw new NotFoundError("Sản phẩm không tồn tại");
 
   const errors: string[] = [];
   if (!variant.isActive || !variant.product.isActive) {
@@ -43,13 +40,13 @@ export const getCart = async (userId: string) => {
 
 export const addToCart = async (userId: string, input: AddToCartInput) => {
   const check = await validateCartItemStatus(input.productVariantId, input.quantity);
-  if (!check.isValid) throw new Error(check.errors.join(", "));
+  if (!check.isValid) throw new BadRequestError(check.errors.join(", "));
 
   const existing = await repo.findByUserAndVariant(userId, input.productVariantId);
 
   if (existing) {
     const newQty = existing.quantity + input.quantity;
-    if (check.availableQuantity < newQty) throw new Error("Vượt quá số lượng tồn kho");
+    if (check.availableQuantity < newQty) throw new BadRequestError("Vượt quá số lượng tồn kho");
     
     const updated = await repo.update(existing.id, { 
       quantity: newQty, 
@@ -102,10 +99,10 @@ export const syncLocalStorageToDatabase = async (userId: string, items: LocalSto
 
 export const updateCartItem = async (userId: string, cartItemId: string, input: UpdateCartItemInput) => {
   const item = await repo.findById(cartItemId);
-  if (!item || item.userId !== userId) throw new Error("Không có quyền chỉnh sửa");
+  if (!item || item.userId !== userId) throw new BadRequestError("Không có quyền chỉnh sửa");
 
   const check = await validateCartItemStatus(item.productVariantId, input.quantity);
-  if (!check.isValid) throw new Error(check.errors.join(", "));
+  if (!check.isValid) throw new BadRequestError(check.errors.join(", "));
 
   const updated = await repo.update(cartItemId, { quantity: input.quantity, unitPrice: check.currentPrice });
   return repo.transformToCartResponse(updated);
