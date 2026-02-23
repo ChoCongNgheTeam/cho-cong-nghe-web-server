@@ -1,6 +1,6 @@
 import { Decimal } from "@prisma/client/runtime/library";
 
-// Database cart item (Chỉ còn userId)
+// Database cart item
 export interface CartItem {
   id: string;
   userId: string;
@@ -16,24 +16,21 @@ export interface CartItemWithProduct extends CartItem {
     id: string;
     code: string | null;
     product: {
+      // ... giữ nguyên ...
       id: string;
       name: string;
       slug: string;
-      brand: {
-        id: string;
-        name: string;
-      };
-      img: Array<{
-        id: string;
-        imageUrl: string | null;
-        altText: string | null;
-      }>;
+      brand: { id: string; name: string };
+      img: Array<{ id: string; imageUrl: string | null; altText: string | null }>;
     };
     variantAttributes: Array<{
       attributeOption: {
-        type: string;
         label: string;
         value: string;
+        attribute?: {
+          name?: string;
+          code?: string | null; // Đổi type thành code
+        }
       };
     }>;
     quantity: number;
@@ -67,25 +64,17 @@ export interface CartSummary {
   subtotal: number;
 }
 
-// LocalStorage & Sync types
-export interface ValidatedLocalStorageCart {
-  validItems: CartResponse[];
-  invalidItems?: Array<{
-    productVariantId: string;
-    productName: string;
-    reason: string;
-  }>;
-  totalItems: number;
-  totalQuantity: number;
-  subtotal: number;
-  hasErrors: boolean;
-}
-
 export interface LocalStorageCartItem {
   productVariantId: string;
   quantity: number;
   addedAt?: number;
-  // Các field khác (name, price...) FE tự lưu để hiển thị nhanh, BE chỉ cần ID và Qty để validate
+}
+
+// Kết quả trả về khi gọi Sync Local -> DB
+export interface SyncCartResult {
+  synced: number;
+  failed: number;
+  warnings: string[];
 }
 
 // Input types

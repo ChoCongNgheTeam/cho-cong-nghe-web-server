@@ -1,7 +1,7 @@
 import prisma from "@/config/db";
-import { CartResponse, CartItemWithProduct } from "./cart.types";
+import { CartResponse } from "./cart.types";
 
-const selectCartItem = {
+export const cartItemSelect = {
   id: true,
   userId: true,
   productVariantId: true,
@@ -14,26 +14,25 @@ const selectCartItem = {
       id: true,
       code: true,
       quantity: true,
+      price: true,
+      isActive: true,
       product: {
         select: {
           id: true,
           name: true,
           slug: true,
-          brand: {
-            select: { id: true, name: true },
-          },
-          img: {
-            select: { id: true, imageUrl: true, altText: true },
-          },
+          isActive: true,
+          brand: { select: { id: true, name: true } },
+          img: { select: { id: true, imageUrl: true, altText: true } },
         },
       },
       variantAttributes: {
         select: {
           attributeOption: {
             select: {
-              type: true,
               label: true,
               value: true,
+              attribute: { select: { name: true, code: true } },
             },
           },
         },
@@ -42,43 +41,28 @@ const selectCartItem = {
   },
 };
 
-/**
- * Lấy giỏ hàng theo userId
- */
 export const findByUserId = async (userId: string) => {
   return prisma.cart_items.findMany({
     where: { userId },
-    select: selectCartItem,
+    select: cartItemSelect,
     orderBy: { createdAt: "desc" },
   });
 };
 
-/**
- * Lấy một item cụ thể
- */
-export const findById = async (cartItemId: string) => {
+export const findById = async (id: string) => {
   return prisma.cart_items.findUnique({
-    where: { id: cartItemId },
-    select: selectCartItem,
+    where: { id },
+    select: cartItemSelect,
   });
 };
 
-/**
- * Kiểm tra xem user đã có item này chưa
- */
-export const findByUserAndVariant = async (
-  userId: string,
-  productVariantId: string
-) => {
+export const findByUserAndVariant = async (userId: string, variantId: string) => {
   return prisma.cart_items.findFirst({
-    where: { userId, productVariantId },
-    select: selectCartItem,
+    where: { userId, productVariantId: variantId },
+    select: cartItemSelect,
   });
 };
 
-/**
- * Tạo mới item trong DB
- */
 export const create = async (data: {
   userId: string;
   productVariantId: string;
@@ -86,66 +70,33 @@ export const create = async (data: {
   unitPrice: number;
 }) => {
   return prisma.cart_items.create({
-    data: {
-      userId: data.userId,
-      productVariantId: data.productVariantId,
-      quantity: data.quantity,
-      unitPrice: data.unitPrice,
-    },
-    select: selectCartItem,
+    data,
+    select: cartItemSelect,
   });
 };
 
-/**
- * Cập nhật item
- */
-export const update = async (
-  cartItemId: string,
-  data: { quantity?: number; unitPrice?: number }
-) => {
+export const update = async (id: string, data: { quantity?: number; unitPrice?: number }) => {
   return prisma.cart_items.update({
-    where: { id: cartItemId },
+    where: { id },
     data: { ...data, updatedAt: new Date() },
-    select: selectCartItem,
+    select: cartItemSelect,
   });
 };
 
-/**
- * Xóa item
- */
-export const remove = async (cartItemId: string) => {
-  return prisma.cart_items.delete({
-    where: { id: cartItemId },
-    select: selectCartItem,
-  });
+export const remove = async (id: string) => {
+  return prisma.cart_items.delete({ where: { id } });
 };
 
-/**
- * Xóa toàn bộ giỏ hàng của user
- */
 export const clearCart = async (userId: string) => {
-  return prisma.cart_items.deleteMany({
-    where: { userId },
-  });
+  return prisma.cart_items.deleteMany({ where: { userId } });
 };
 
-/**
- * Transform helper
- */
-export const transformToCartResponse = (
-  item: CartItemWithProduct
-): CartResponse => {
-  const availableQuantity = item.productVariant.quantity || 0;
-
-  const unitPrice =
-    typeof item.unitPrice === "number"
-      ? item.unitPrice
-      : Number(item.unitPrice.toString());
-
-  const colorAttribute = item.productVariant.variantAttributes.find(
-    (attr: any) =>
-      ["color", "màu"].includes((attr.attributeOption.type || "").toLowerCase())
-  );
+export const transformToCartResponse = (item: any): CartResponse => {
+  const colorAttr = item.productVariant.variantAttributes.find((attr: any) => {
+    const code = (attr.attributeOption.attribute?.code || "").toLowerCase();
+    const name = (attr.attributeOption.attribute?.name || "").toLowerCase();
+    return ["color", "màu", "màu sắc"].includes(code || name);
+  });
 
   return {
     id: item.id,
@@ -155,13 +106,13 @@ export const transformToCartResponse = (
     productSlug: item.productVariant.product.slug,
     brandName: item.productVariant.product.brand.name,
     variantCode: item.productVariant.code || undefined,
-    image: item.productVariant.product.img[0]?.imageUrl ?? undefined,
-    color: colorAttribute?.attributeOption.label,
-    colorValue: colorAttribute?.attributeOption.value,
+    image: item.productVariant.product.img[0]?.imageUrl,
+    color: colorAttr?.attributeOption.label,
+    colorValue: colorAttr?.attributeOption.value,
     quantity: item.quantity,
-    unitPrice,
-    totalPrice: item.quantity * unitPrice,
-    availableQuantity,
+    unitPrice: Number(item.unitPrice),
+    totalPrice: item.quantity * Number(item.unitPrice),
+    availableQuantity: item.productVariant.quantity || 0,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   };

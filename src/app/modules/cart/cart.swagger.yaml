@@ -1,36 +1,25 @@
 openapi: 3.0.0
 info:
   title: Cart API
-  version: 1.0.0
+  version: 1.0.1
   description: |
-    API quản lý giỏ hàng cho cả người dùng đã đăng nhập (DB) và khách (localStorage).
-    - User: Lưu trữ trực tiếp trong Database.
-    - Guest: Lưu trữ tại localStorage phía FE, gửi lên BE để validate giá và tồn kho.
+    API quản lý giỏ hàng đã được tối ưu hiệu năng.
+    - Guest: Tự lưu bằng localStorage tại Front-End, KHÔNG gọi API lấy giỏ hàng.
+    - User (Đã login): Lưu DB. Khi mới login sẽ gọi API sync để đồng bộ.
 
 tags:
   - name: Cart
-    description: Các thao tác với giỏ hàng và quản lý session
+    description: Quản lý giỏ hàng DB và đồng bộ
 
 paths:
-  /cart/get:
-    post:
-      summary: Lấy thông tin giỏ hàng (Hỗ trợ cả Guest và User)
-      description: |
-        - Nếu có Token: Lấy từ DB.
-        - Nếu là Guest: Gửi danh sách items từ localStorage lên body để BE validate thông tin mới nhất.
-        - Rate limit: 30 requests/phút.
+  /cart:
+    get:
+      summary: Lấy giỏ hàng từ Database (Bắt buộc Login)
+      description: Dành riêng cho User đã đăng nhập. Guest tự lấy từ localStorage.
       tags:
         - Cart
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                items:
-                  type: array
-                  items:
-                    $ref: "#/components/schemas/LocalStorageItem"
+      security:
+        - bearerAuth: []
       responses:
         "200":
           description: Lấy giỏ hàng thành công
@@ -40,16 +29,47 @@ paths:
                 type: object
                 properties:
                   data:
-                    oneOf:
-                      - $ref: "#/components/schemas/CartSummary"
-                      - $ref: "#/components/schemas/ValidatedLocalStorageCart"
+                    $ref: "#/components/schemas/CartSummary"
                   message:
                     type: string
+        "401":
+          description: Chưa đăng nhập
+
+    post:
+      summary: Thêm sản phẩm vào DB (Chỉ cho User)
+      description: "Rate limit: 10 requests/phút."
+      tags:
+        - Cart
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddToCartInput"
+      responses:
+        "201":
+          description: Thêm thành công
+        "400":
+          description: Vượt số lượng tồn kho
+        "401":
+          description: Chưa đăng nhập
+
+    delete:
+      summary: Xóa sạch giỏ hàng DB (Chỉ cho User)
+      tags:
+        - Cart
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Đã làm trống giỏ hàng
 
   /cart/validate-item:
     post:
-      summary: Kiểm tra 1 sản phẩm trước khi thêm vào localStorage (Guest)
-      description: Check tồn kho, giá, màu sắc của 1 variant.
+      summary: Kiểm tra nhanh 1 sản phẩm trước khi cập nhật localStorage (Guest)
+      description: Dùng chung với cơ chế Debounce tại FE để check lượng tồn kho hiện tại.
       tags:
         - Cart
       requestBody:
@@ -76,7 +96,8 @@ paths:
 
   /cart/sync:
     post:
-      summary: Đồng bộ giỏ hàng từ localStorage vào DB (Khi Login)
+      summary: Đồng bộ giỏ hàng từ localStorage vào DB (Khi mới Login)
+      description: Tự động điều chỉnh số lượng nếu vượt tồn kho (Soft Validate) và trả về cảnh báo để FE hiển thị.
       tags:
         - Cart
       security:
@@ -94,37 +115,23 @@ paths:
                     $ref: "#/components/schemas/LocalStorageItem"
       responses:
         "200":
-          description: Đồng bộ thành công
-
-  /cart:
-    post:
-      summary: Thêm sản phẩm vào DB (Chỉ cho User)
-      description: "Rate limit: 10 requests/phút."
-      tags:
-        - Cart
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AddToCartInput"
-      responses:
-        "201":
-          description: Thêm thành công
-        "401":
-          description: Chưa đăng nhập
-
-    delete:
-      summary: Xóa sạch giỏ hàng (Chỉ cho User)
-      tags:
-        - Cart
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Đã làm trống giỏ hàng
+          description: Đồng bộ thành công (Có thể kèm warning)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  hasWarnings: { type: boolean }
+                  warnings:
+                    type: array
+                    items: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      synced: { type: integer }
+                      failed: { type: integer }
+                  success: { type: boolean }
 
   /cart/{cartItemId}:
     parameters:
@@ -190,12 +197,8 @@ components:
         productVariantId:
           type: string
           format: uuid
-        productId:
-          type: string
-          format: uuid
         quantity:
           type: integer
-        # Các field khác FE có thể gửi nhưng BE chủ yếu dùng 2 field trên
 
     CartItemResponse:
       type: object
@@ -220,29 +223,3 @@ components:
             $ref: "#/components/schemas/CartItemResponse"
         totalItems: { type: integer }
         subtotal: { type: number }
-
-    ValidatedLocalStorageCart:
-      type: object
-      properties:
-        validItems:
-          type: array
-          items:
-            $ref: "#/components/schemas/CartItemResponse"
-        invalidItems:
-          type: array
-          items:
-            type: object
-            properties:
-              productVariantId: { type: string }
-              reason: { type: string }
-        hasErrors: { type: boolean }
-
-  responses:
-    ServerError:
-      description: Lỗi hệ thống
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              message: { type: string, example: Lỗi server }

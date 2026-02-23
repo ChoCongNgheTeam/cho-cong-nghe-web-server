@@ -70,7 +70,7 @@ export const provinceIdSchema = z.object({
 export const wardSearchSchema = z.object({
   q: z.string().min(1, "Từ khóa tìm kiếm không được để trống").optional(),
   page: z.coerce.number().min(1).default(1).optional(),
-  perPage: z.coerce.number().min(1).max(100).default(50).optional(),
+  perPage: z.coerce.number().min(1).max(1000).default(1000).optional(),
 });
 
 // ==================== LOCATION VALIDATION ====================

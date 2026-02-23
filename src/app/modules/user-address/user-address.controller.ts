@@ -11,30 +11,15 @@ import { CreateProvinceInput, CreateWardInput } from "./user-address.validation"
  * GET /api/v1/addresses
  */
 export const getUserAddressesHandler = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.id;
+  const userId = req.user!.id;
+  const result = await service.getUserAddresses(userId);
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Vui lòng đăng nhập",
-      });
-    }
-
-    const result = await service.getUserAddresses(userId);
-
-    res.json({
-      success: true,
-      data: result.data,
-      total: result.total,
-      message: "Lấy danh sách địa chỉ thành công",
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  res.json({
+    success: true,
+    data: result.data,
+    total: result.total,
+    message: "Lấy danh sách địa chỉ thành công",
+  });
 };
 
 /**
@@ -42,31 +27,16 @@ export const getUserAddressesHandler = async (req: Request, res: Response) => {
  * GET /api/v1/addresses/:addressId
  */
 export const getAddressHandler = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.id;
-    const { addressId } = req.params;
+  const userId = req.user!.id;
+  const { addressId } = req.params;
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Vui lòng đăng nhập",
-      });
-    }
+  const address = await service.getAddress(addressId, userId);
 
-    const address = await service.getAddress(addressId, userId);
-
-    res.json({
-      success: true,
-      data: address,
-      message: "Lấy thông tin địa chỉ thành công",
-    });
-  } catch (error: any) {
-    const statusCode = error.message?.includes("không có quyền") ? 403 : 404;
-    res.status(statusCode).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  res.json({
+    success: true,
+    data: address,
+    message: "Lấy thông tin địa chỉ thành công",
+  });
 };
 
 /**
@@ -74,30 +44,15 @@ export const getAddressHandler = async (req: Request, res: Response) => {
  * POST /api/v1/addresses
  */
 export const createAddressHandler = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.id;
+  const userId = req.user!.id;
+  const input: CreateAddressInput = req.body;
+  const address = await service.createAddress(userId, input);
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Vui lòng đăng nhập",
-      });
-    }
-
-    const input: CreateAddressInput = req.body;
-    const address = await service.createAddress(userId, input);
-
-    res.status(201).json({
-      success: true,
-      data: address,
-      message: "Tạo địa chỉ thành công",
-    });
-  } catch (error: any) {
-    res.status(400).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  res.status(201).json({
+    success: true,
+    data: address,
+    message: "Tạo địa chỉ thành công",
+  });
 };
 
 /**
@@ -105,37 +60,16 @@ export const createAddressHandler = async (req: Request, res: Response) => {
  * PATCH /api/v1/addresses/:addressId
  */
 export const updateAddressHandler = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.id;
-    const { addressId } = req.params;
+  const userId = req.user!.id;
+  const { addressId } = req.params;
+  const input: UpdateAddressInput = req.body;
+  const address = await service.updateAddress(addressId, userId, input);
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Vui lòng đăng nhập",
-      });
-    }
-
-    const input: UpdateAddressInput = req.body;
-    const address = await service.updateAddress(addressId, userId, input);
-
-    res.json({
-      success: true,
-      data: address,
-      message: "Cập nhật địa chỉ thành công",
-    });
-  } catch (error: any) {
-    const statusCode = error.message?.includes("không có quyền")
-      ? 403
-      : error.message?.includes("không tồn tại")
-        ? 404
-        : 400;
-
-    res.status(statusCode).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  res.json({
+    success: true,
+    data: address,
+    message: "Cập nhật địa chỉ thành công",
+  });
 };
 
 /**
@@ -143,36 +77,16 @@ export const updateAddressHandler = async (req: Request, res: Response) => {
  * DELETE /api/v1/addresses/:addressId
  */
 export const deleteAddressHandler = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.id;
-    const { addressId } = req.params;
+  const userId = req.user!.id;
+  const { addressId } = req.params;
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Vui lòng đăng nhập",
-      });
-    }
+  const result = await service.deleteAddress(addressId, userId);
 
-    const result = await service.deleteAddress(addressId, userId);
-
-    res.json({
-      success: true,
-      data: result,
-      message: "Xóa địa chỉ thành công",
-    });
-  } catch (error: any) {
-    const statusCode = error.message?.includes("không có quyền")
-      ? 403
-      : error.message?.includes("không tồn tại")
-        ? 404
-        : 400;
-
-    res.status(statusCode).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  res.json({
+    success: true,
+    data: result,
+    message: "Xóa địa chỉ thành công",
+  });
 };
 
 /**
@@ -180,36 +94,16 @@ export const deleteAddressHandler = async (req: Request, res: Response) => {
  * PUT /api/v1/addresses/:addressId/set-default
  */
 export const setDefaultAddressHandler = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.id;
-    const { addressId } = req.params;
+  const userId = req.user!.id;
+  const { addressId } = req.params;
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Vui lòng đăng nhập",
-      });
-    }
+  const address = await service.setDefaultAddress(addressId, userId);
 
-    const address = await service.setDefaultAddress(addressId, userId);
-
-    res.json({
-      success: true,
-      data: address,
-      message: "Đặt địa chỉ mặc định thành công",
-    });
-  } catch (error: any) {
-    const statusCode = error.message?.includes("không có quyền")
-      ? 403
-      : error.message?.includes("không tồn tại")
-        ? 404
-        : 400;
-
-    res.status(statusCode).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  res.json({
+    success: true,
+    data: address,
+    message: "Đặt địa chỉ mặc định thành công",
+  });
 };
 
 /**
@@ -217,29 +111,15 @@ export const setDefaultAddressHandler = async (req: Request, res: Response) => {
  * GET /api/v1/addresses/default
  */
 export const getDefaultAddressHandler = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.id;
+  const userId = req.user!.id;
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Vui lòng đăng nhập",
-      });
-    }
+  const address = await service.getDefaultAddress(userId);
 
-    const address = await service.getDefaultAddress(userId);
-
-    res.json({
-      success: true,
-      data: address,
-      message: "Lấy địa chỉ mặc định thành công",
-    });
-  } catch (error: any) {
-    res.status(404).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  res.json({
+    success: true,
+    data: address,
+    message: "Lấy địa chỉ mặc định thành công",
+  });
 };
 
 // ==================== LOCATION CONTROLLERS ====================
@@ -249,20 +129,13 @@ export const getDefaultAddressHandler = async (req: Request, res: Response) => {
  * GET /api/v1/locations/provinces
  */
 export const getProvincesHandler = async (req: Request, res: Response) => {
-  try {
-    const provinces = await service.getProvinces();
+  const provinces = await service.getProvinces();
 
-    res.json({
-      success: true,
-      data: provinces,
-      message: "Lấy danh sách tỉnh/thành phố thành công",
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  res.json({
+    success: true,
+    data: provinces,
+    message: "Lấy danh sách tỉnh/thành phố thành công",
+  });
 };
 
 /**
@@ -270,30 +143,22 @@ export const getProvincesHandler = async (req: Request, res: Response) => {
  * GET /api/v1/locations/provinces/:provinceId/wards
  */
 export const getWardsByProvinceHandler = async (req: Request, res: Response) => {
-  try {
-    const { provinceId } = req.params;
-    const { page = "1", perPage = "50", q } = req.query;
+  const { provinceId } = req.params;
+  const { page = "1", perPage = "50", q } = req.query;
 
-    const result = await service.getWardsByProvince(
-      provinceId,
-      parseInt(page as string),
-      parseInt(perPage as string),
-      q as string
-    );
+  const result = await service.getWardsByProvince(
+    provinceId,
+    parseInt(page as string),
+    parseInt(perPage as string),
+    q as string
+  );
 
-    res.json({
-      success: true,
-      data: result.data,
-      meta: result.meta,
-      message: "Lấy danh sách phường/xã thành công",
-    });
-  } catch (error: any) {
-    const statusCode = error.message?.includes("không tồn tại") ? 404 : 500;
-    res.status(statusCode).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  res.json({
+    success: true,
+    data: result.data,
+    meta: result.meta,
+    message: "Lấy danh sách phường/xã thành công",
+  });
 };
 
 /**
@@ -301,22 +166,15 @@ export const getWardsByProvinceHandler = async (req: Request, res: Response) => 
  * POST /api/v1/locations/provinces
  */
 export const createProvinceHandler = async (req: Request, res: Response) => {
-  try {
-    // Lưu ý: Cần check quyền Admin ở middleware route
-    const input: CreateProvinceInput = req.body;
-    const province = await service.createProvince(input);
+  // Lưu ý: Cần check quyền Admin ở middleware route
+  const input: CreateProvinceInput = req.body;
+  const province = await service.createProvince(input);
 
-    res.status(201).json({
-      success: true,
-      data: province,
-      message: "Tạo tỉnh/thành phố thành công",
-    });
-  } catch (error: any) {
-    res.status(400).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  res.status(201).json({
+    success: true,
+    data: province,
+    message: "Tạo tỉnh/thành phố thành công",
+  });
 };
 
 /**
@@ -324,21 +182,13 @@ export const createProvinceHandler = async (req: Request, res: Response) => {
  * POST /api/v1/locations/wards
  */
 export const createWardHandler = async (req: Request, res: Response) => {
-  try {
-    // Lưu ý: Cần check quyền Admin ở middleware route
-    const input: CreateWardInput = req.body;
-    const ward = await service.createWard(input);
+  // Lưu ý: Cần check quyền Admin ở middleware route
+  const input: CreateWardInput = req.body;
+  const ward = await service.createWard(input);
 
-    res.status(201).json({
-      success: true,
-      data: ward,
-      message: "Tạo phường/xã thành công",
-    });
-  } catch (error: any) {
-    const statusCode = error.message?.includes("không tồn tại") ? 404 : 400;
-    res.status(statusCode).json({
-      success: false,
-      message: error.message || "Lỗi server",
-    });
-  }
+  res.status(201).json({
+    success: true,
+    data: ward,
+    message: "Tạo phường/xã thành công",
+  });
 };
