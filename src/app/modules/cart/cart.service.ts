@@ -1,72 +1,11 @@
 import * as repo from "./cart.repository";
-import {
-  AddToCartInput,
-  UpdateCartItemInput,
-  CartSummary,
-  LocalStorageCartItem,
-  SyncCartResult
-} from "./cart.types";
 import prisma from "@/config/db";
+import { AddToCartInput, UpdateCartItemInput, LocalStorageCartItem, SyncCartResult } from "./cart.types";
 
-/**
- * 1. GET: Lấy giỏ hàng từ DB (Logged-in User)
- */
-export const getCart = async (userId: string): Promise<CartSummary> => {
-  const items = await repo.findByUserId(userId);
-
-  return {
-    items: items.map(repo.transformToCartResponse),
-    totalItems: items.length,
-    totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
-    subtotal: items.reduce(
-      (sum, item) => sum + item.quantity * Number(item.unitPrice),
-      0
-    ),
-  };
-};
-
-/**
- * 2. Helper: Validate chi tiết 1 variant
- */
-export const validateCartItem = async (
-  productVariantId: string,
-  quantity: number
-): Promise<any> => {
+export const validateCartItemStatus = async (variantId: string, quantity: number) => {
   const variant = await prisma.products_variants.findUnique({
-    where: { id: productVariantId },
-    select: {
-      id: true,
-      code: true,
-      price: true,
-      quantity: true,
-      isActive: true,
-      product: {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          isActive: true,
-          brand: { select: { name: true } },
-          img: { select: { imageUrl: true } },
-        },
-      },
-      variantAttributes: {
-        select: {
-          attributeOption: {
-            select: {
-              label: true,
-              value: true,
-              attribute: {   
-                select: {
-                  name: true,
-                  code: true, 
-                }
-              }
-            },
-          },
-        },
-      },
-    },
+    where: { id: variantId },
+    include: { product: true },
   });
 
   if (!variant) throw new Error("Sản phẩm không tồn tại");
@@ -77,104 +16,44 @@ export const validateCartItem = async (
   }
 
   const available = variant.quantity || 0;
-
   if (available < quantity) {
     errors.push(`Chỉ còn ${available} sản phẩm`);
   }
 
-  const colorAttr = variant.variantAttributes.find((attr: any) => {
-    const attrName = (attr.attributeOption.attribute?.code || attr.attributeOption.attribute?.name || "").toLowerCase();
-    return ["color", "màu", "màu sắc"].includes(attrName);
-  });
-
   return {
-    variant,
-    productName: variant.product.name,
-    availableQuantity: available,
     isValid: errors.length === 0,
-    errors: errors.length > 0 ? errors : undefined,
-    colorAttr,
+    errors,
+    availableQuantity: available,
+    currentPrice: Number(variant.price),
+    productName: variant.product.name,
   };
 };
 
-/**
- * 3. SYNC: LocalStorage -> Database (Khi User Login)
- * Xử lý Soft Validate: Tự điều chỉnh số lượng nếu vượt tồn kho thay vì quăng lỗi
- */
-export const syncLocalStorageToDatabase = async (
-  userId: string,
-  items: LocalStorageCartItem[]
-): Promise<SyncCartResult> => {
-  const result: SyncCartResult = { synced: 0, failed: 0, warnings: [] };
+export const getCart = async (userId: string) => {
+  const items = await repo.findByUserId(userId);
+  const formattedItems = items.map(repo.transformToCartResponse);
 
-  for (const item of items) {
-    try {
-      const check = await validateCartItem(item.productVariantId, item.quantity);
-      
-      // Bỏ qua sản phẩm ngưng kinh doanh
-      if (!check.variant || !check.variant.isActive || !check.variant.product.isActive) {
-        result.failed++;
-        result.warnings.push(`"${check.productName || 'Sản phẩm ẩn'}" đã ngừng kinh doanh và bị loại khỏi giỏ hàng.`);
-        continue;
-      }
-
-      // Xử lý vượt tồn kho
-      let finalQuantity = item.quantity;
-      if (check.availableQuantity === 0) {
-        result.failed++;
-        result.warnings.push(`"${check.productName}" đã hết hàng.`);
-        continue;
-      } else if (item.quantity > check.availableQuantity) {
-        finalQuantity = check.availableQuantity;
-        result.warnings.push(`"${check.productName}" chỉ còn ${check.availableQuantity} sản phẩm. Đã tự động điều chỉnh.`);
-      }
-
-      const existingItem = await repo.findByUserAndVariant(userId, item.productVariantId);
-
-      if (existingItem) {
-        // Đảm bảo tổng số lượng (sau khi cộng) không vượt tồn kho
-        const newTotalQty = existingItem.quantity + finalQuantity;
-        const safeQty = Math.min(newTotalQty, check.availableQuantity);
-        
-        await repo.update(existingItem.id, { quantity: safeQty, unitPrice: Number(check.variant.price) });
-        result.synced++;
-      } else {
-        await repo.create({
-          userId,
-          productVariantId: item.productVariantId,
-          quantity: finalQuantity,
-          unitPrice: Number(check.variant.price),
-        });
-        result.synced++;
-      }
-    } catch (error: any) {
-      result.failed++;
-      console.error(`Lỗi sync item ${item.productVariantId}:`, error.message);
-    }
-  }
-  return result;
+  return {
+    items: formattedItems,
+    totalItems: formattedItems.length,
+    totalQuantity: formattedItems.reduce((sum, item) => sum + item.quantity, 0),
+    subtotal: formattedItems.reduce((sum, item) => sum + item.totalPrice, 0),
+  };
 };
 
-/**
- * 4. USER: Add to Cart (Database)
- */
 export const addToCart = async (userId: string, input: AddToCartInput) => {
-  const check = await validateCartItem(input.productVariantId, input.quantity);
-  
-  if (!check.isValid) {
-    throw new Error(check.errors?.join(", "));
-  }
+  const check = await validateCartItemStatus(input.productVariantId, input.quantity);
+  if (!check.isValid) throw new Error(check.errors.join(", "));
 
-  const existingItem = await repo.findByUserAndVariant(userId, input.productVariantId);
+  const existing = await repo.findByUserAndVariant(userId, input.productVariantId);
 
-  if (existingItem) {
-    const newQuantity = existingItem.quantity + input.quantity;
-    if (check.availableQuantity < newQuantity) {
-      throw new Error(`Kho chỉ còn ${check.availableQuantity}, không đủ thêm.`);
-    }
-    const updated = await repo.update(existingItem.id, { 
-      quantity: newQuantity, 
-      unitPrice: Number(check.variant.price) 
+  if (existing) {
+    const newQty = existing.quantity + input.quantity;
+    if (check.availableQuantity < newQty) throw new Error("Vượt quá số lượng tồn kho");
+    
+    const updated = await repo.update(existing.id, { 
+      quantity: newQty, 
+      unitPrice: check.currentPrice 
     });
     return repo.transformToCartResponse(updated);
   }
@@ -183,53 +62,55 @@ export const addToCart = async (userId: string, input: AddToCartInput) => {
     userId,
     productVariantId: input.productVariantId,
     quantity: input.quantity,
-    unitPrice: Number(check.variant.price),
+    unitPrice: check.currentPrice,
   });
-
   return repo.transformToCartResponse(newItem);
 };
 
-/**
- * 5. USER: Update Cart Item
- */
-export const updateCartItem = async (
-  userId: string,
-  cartItemId: string,
-  input: UpdateCartItemInput
-) => {
+export const syncLocalStorageToDatabase = async (userId: string, items: LocalStorageCartItem[]): Promise<SyncCartResult> => {
+  const result: SyncCartResult = { synced: 0, failed: 0, warnings: [] };
+
+  for (const item of items) {
+    try {
+      const check = await validateCartItemStatus(item.productVariantId, item.quantity);
+      
+      if (check.availableQuantity === 0 || check.errors.includes("Sản phẩm ngừng kinh doanh")) {
+        result.failed++;
+        result.warnings.push(`"${check.productName}" đã hết hàng hoặc ngừng kinh doanh.`);
+        continue;
+      }
+
+      const finalQty = Math.min(item.quantity, check.availableQuantity);
+      if (item.quantity > check.availableQuantity) {
+        result.warnings.push(`"${check.productName}" đã được điều chỉnh về số lượng tối đa.`);
+      }
+
+      const existing = await repo.findByUserAndVariant(userId, item.productVariantId);
+      if (existing) {
+        const safeQty = Math.min(existing.quantity + finalQty, check.availableQuantity);
+        await repo.update(existing.id, { quantity: safeQty, unitPrice: check.currentPrice });
+      } else {
+        await repo.create({ userId, productVariantId: item.productVariantId, quantity: finalQty, unitPrice: check.currentPrice });
+      }
+      result.synced++;
+    } catch (error) {
+      result.failed++;
+    }
+  }
+  return result;
+};
+
+export const updateCartItem = async (userId: string, cartItemId: string, input: UpdateCartItemInput) => {
   const item = await repo.findById(cartItemId);
-  if (!item || item.userId !== userId) {
-    throw new Error("Sản phẩm không tồn tại hoặc không có quyền truy cập");
-  }
+  if (!item || item.userId !== userId) throw new Error("Không có quyền chỉnh sửa");
 
-  const check = await validateCartItem(item.productVariantId, input.quantity);
-  if (!check.isValid) {
-    throw new Error(check.errors?.join(", "));
-  }
+  const check = await validateCartItemStatus(item.productVariantId, input.quantity);
+  if (!check.isValid) throw new Error(check.errors.join(", "));
 
-  const updated = await repo.update(cartItemId, { 
-    quantity: input.quantity,
-    unitPrice: Number(check.variant.price) 
-  });
+  const updated = await repo.update(cartItemId, { quantity: input.quantity, unitPrice: check.currentPrice });
   return repo.transformToCartResponse(updated);
 };
 
-/**
- * 6. USER: Remove Item
- */
-export const removeFromCart = async (userId: string, cartItemId: string) => {
-  const item = await repo.findById(cartItemId);
-  if (!item || item.userId !== userId) {
-    throw new Error("Không tìm thấy sản phẩm");
-  }
-  await repo.remove(cartItemId);
-  return { message: "Đã xóa sản phẩm" };
-};
+export const removeFromCart = (userId: string, id: string) => repo.remove(id);
 
-/**
- * 7. USER: Clear Cart
- */
-export const clearCart = async (userId: string) => {
-  await repo.clearCart(userId);
-  return { message: "Giỏ hàng đã được làm trống" };
-};
+export const clearCart = (userId: string) => repo.clearCart(userId);
