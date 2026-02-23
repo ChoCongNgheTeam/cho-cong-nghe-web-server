@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authMiddleware } from "@/app/middlewares/auth.middleware";
 import { validate } from "@/app/middlewares/validate.middleware";
+import { asyncHandler } from "@/utils/async-handler";
 import {
   validateCheckoutHandler,
   checkoutHandler,
@@ -11,20 +12,17 @@ import { checkoutSchema } from "./checkout.validation";
 const router = Router();
 
 // GET /checkout/validate - Validate current cart
-// SỬA: Thêm (true) vào sau authMiddleware
-router.get("/validate", authMiddleware(true), validateCheckoutHandler);
+router.get("/validate", authMiddleware(), asyncHandler(validateCheckoutHandler));
 
 // GET /checkout/preview - Preview checkout summary
-// SỬA: Thêm (true) vào sau authMiddleware
-router.get("/preview", authMiddleware(true), checkoutPreviewHandler);
+router.get("/preview", authMiddleware(), asyncHandler(checkoutPreviewHandler));
 
 // POST /checkout - Create order from cart
-// SỬA: Thêm (true) và thêm "body" vào hàm validate
 router.post(
   "/",
-  authMiddleware(true),
-  validate(checkoutSchema, "body"), 
-  checkoutHandler
+  authMiddleware(),
+  validate(checkoutSchema, "body"),
+  asyncHandler(checkoutHandler)
 );
 
 export default router;

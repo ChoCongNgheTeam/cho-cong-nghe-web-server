@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authMiddleware } from "@/app/middlewares/auth.middleware";
 import { validate } from "@/app/middlewares/validate.middleware";
+import { asyncHandler } from "@/utils/async-handler";
 import * as c from "./user-address.controller";
 import {
   createAddressSchema,
@@ -20,7 +21,7 @@ const router = Router();
  * Lấy tất cả tỉnh/thành phố
  * GET /api/v1/locations/provinces
  */
-router.get("/locations/provinces", c.getProvincesHandler);
+router.get("/locations/provinces", asyncHandler(c.getProvincesHandler));
 
 /**
  * Lấy wards theo province
@@ -30,7 +31,7 @@ router.get(
   "/locations/:provinceId/wards",
   validate(provinceIdSchema, "params"),
   validate(wardSearchSchema, "query"),
-  c.getWardsByProvinceHandler
+  asyncHandler(c.getWardsByProvinceHandler)
 );
 
 /**
@@ -39,10 +40,10 @@ router.get(
  */
 router.post(
   "/locations/provinces",
-  // authMiddleware,             <--  đăng nhập
+  // authMiddleware(),             <--  đăng nhập
   // authorize(['ADMIN']),       <--  chỉ Admin được tạo
   validate(createProvinceSchema, "body"),
-  c.createProvinceHandler
+  asyncHandler(c.createProvinceHandler)
 );
 
 /**
@@ -51,28 +52,28 @@ router.post(
  */
 router.post(
   "/locations/wards",
-  // authMiddleware,             <--  đăng nhập
+  // authMiddleware(),             <--  đăng nhập
   // authorize(['ADMIN']),       <--  chỉ Admin được tạo
   validate(createWardSchema, "body"),
-  c.createWardHandler
+  asyncHandler(c.createWardHandler)
 );
 
 // ==================== ADDRESS ROUTES (PROTECTED) ====================
 
 // Tất cả các route address yêu cầu đăng nhập
-router.use(authMiddleware(true));
+router.use(authMiddleware());
 
 /**
  * Lấy tất cả địa chỉ của user
  * GET /api/v1/addresses
  */
-router.get("/", c.getUserAddressesHandler);
+router.get("/", asyncHandler(c.getUserAddressesHandler));
 
 /**
  * Lấy địa chỉ mặc định
  * GET /api/v1/addresses/default
  */
-router.get("/default", c.getDefaultAddressHandler);
+router.get("/default", asyncHandler(c.getDefaultAddressHandler));
 
 /**
  * Lấy một địa chỉ
@@ -81,7 +82,7 @@ router.get("/default", c.getDefaultAddressHandler);
 router.get(
   "/:addressId",
   validate(addressIdSchema, "params"),
-  c.getAddressHandler
+  asyncHandler(c.getAddressHandler)
 );
 
 /**
@@ -91,7 +92,7 @@ router.get(
 router.post(
   "/",
   validate(createAddressSchema, "body"),
-  c.createAddressHandler
+  asyncHandler(c.createAddressHandler)
 );
 
 /**
@@ -102,7 +103,7 @@ router.patch(
   "/:addressId",
   validate(addressIdSchema, "params"),
   validate(updateAddressSchema, "body"),
-  c.updateAddressHandler
+  asyncHandler(c.updateAddressHandler)
 );
 
 /**
@@ -112,7 +113,7 @@ router.patch(
 router.delete(
   "/:addressId",
   validate(addressIdSchema, "params"),
-  c.deleteAddressHandler
+  asyncHandler(c.deleteAddressHandler)
 );
 
 /**
@@ -122,7 +123,7 @@ router.delete(
 router.put(
   "/:addressId/set-default",
   validate(addressIdSchema, "params"),
-  c.setDefaultAddressHandler
+  asyncHandler(c.setDefaultAddressHandler)
 );
 
 export default router;

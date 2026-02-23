@@ -1,6 +1,8 @@
 import * as repo from "./user-address.repository";
 import { CreateAddressInput, UpdateAddressInput, AddressResponse } from "./user-address.types";
 import { CreateProvinceInput, CreateWardInput } from "./user-address.validation";
+import { NotFoundError, ForbiddenError, DuplicateError } from "@/errors";
+import { handlePrismaError } from "@/utils/handle-prisma-error";
 
 
 /**
@@ -43,7 +45,7 @@ const formatAddressResponse = (address: any): AddressResponse => {
  * Lấy tất cả địa chỉ của user
  */
 export const getUserAddresses = async (userId: string) => {
-  const addresses = await repo.findByUserId(userId);
+  const addresses = await repo.findByUserId(userId).catch(handlePrismaError);
   
   return {
     data: addresses.map(formatAddressResponse),
@@ -55,14 +57,14 @@ export const getUserAddresses = async (userId: string) => {
  * Lấy một địa chỉ
  */
 export const getAddress = async (addressId: string, userId: string) => {
-  const address = await repo.findById(addressId);
+  const address = await repo.findById(addressId).catch(handlePrismaError);
 
   if (!address) {
-    throw new Error("Địa chỉ không tồn tại");
+    throw new NotFoundError("Địa chỉ");
   }
 
   if (address.userId !== userId) {
-    throw new Error("Bạn không có quyền truy cập địa chỉ này");
+    throw new ForbiddenError("Bạn không có quyền truy cập địa chỉ này");
   }
 
   return formatAddressResponse(address);
@@ -72,19 +74,19 @@ export const getAddress = async (addressId: string, userId: string) => {
  * Tạo mới địa chỉ
  */
 export const createAddress = async (userId: string, input: CreateAddressInput) => {
-  // Kiểm tra province tồn tại
-  const province = await repo.findProvinceById(input.provinceId);
+  // Check 1: Business logic - Validate province and ward
+  const province = await repo.findProvinceById(input.provinceId).catch(handlePrismaError);
   if (!province) {
-    throw new Error("Tỉnh/Thành phố không tồn tại");
+    throw new NotFoundError("Tỉnh/Thành phố");
   }
 
-  // Kiểm tra ward tồn tại
-  const ward = await repo.findWardById(input.wardId);
+  const ward = await repo.findWardById(input.wardId).catch(handlePrismaError);
   if (!ward) {
-    throw new Error("Phường/Xã không tồn tại");
+    throw new NotFoundError("Phường/Xã");
   }
 
-  const address = await repo.create(userId, input);
+  // Check 2: Handle Prisma error - database constraint
+  const address = await repo.create(userId, input).catch(handlePrismaError);
   return formatAddressResponse(address);
 };
 
@@ -96,33 +98,33 @@ export const updateAddress = async (
   userId: string,
   input: UpdateAddressInput
 ) => {
-  const address = await repo.findById(addressId);
+  const address = await repo.findById(addressId).catch(handlePrismaError);
 
   if (!address) {
-    throw new Error("Địa chỉ không tồn tại");
+    throw new NotFoundError("Địa chỉ");
   }
 
   if (address.userId !== userId) {
-    throw new Error("Bạn không có quyền cập nhật địa chỉ này");
+    throw new ForbiddenError("Bạn không có quyền cập nhật địa chỉ này");
   }
 
   // Validate province nếu update
   if (input.provinceId) {
-    const province = await repo.findProvinceById(input.provinceId);
+    const province = await repo.findProvinceById(input.provinceId).catch(handlePrismaError);
     if (!province) {
-      throw new Error("Tỉnh/Thành phố không tồn tại");
+      throw new NotFoundError("Tỉnh/Thành phố");
     }
   }
 
   // Validate ward nếu update
   if (input.wardId) {
-    const ward = await repo.findWardById(input.wardId);
+    const ward = await repo.findWardById(input.wardId).catch(handlePrismaError);
     if (!ward) {
-      throw new Error("Phường/Xã không tồn tại");
+      throw new NotFoundError("Phường/Xã");
     }
   }
 
-  const updatedAddress = await repo.update(addressId, userId, input);
+  const updatedAddress = await repo.update(addressId, userId, input).catch(handlePrismaError);
   return formatAddressResponse(updatedAddress);
 };
 
@@ -130,34 +132,34 @@ export const updateAddress = async (
  * Xóa địa chỉ
  */
 export const deleteAddress = async (addressId: string, userId: string) => {
-  const address = await repo.findById(addressId);
+  const address = await repo.findById(addressId).catch(handlePrismaError);
 
   if (!address) {
-    throw new Error("Địa chỉ không tồn tại");
+    throw new NotFoundError("Địa chỉ");
   }
 
   if (address.userId !== userId) {
-    throw new Error("Bạn không có quyền xóa địa chỉ này");
+    throw new ForbiddenError("Bạn không có quyền xóa địa chỉ này");
   }
 
-  return repo.remove(addressId);
+  return repo.remove(addressId).catch(handlePrismaError);
 };
 
 /**
  * Đặt địa chỉ mặc định
  */
 export const setDefaultAddress = async (addressId: string, userId: string) => {
-  const address = await repo.findById(addressId);
+  const address = await repo.findById(addressId).catch(handlePrismaError);
 
   if (!address) {
-    throw new Error("Địa chỉ không tồn tại");
+    throw new NotFoundError("Địa chỉ");
   }
 
   if (address.userId !== userId) {
-    throw new Error("Bạn không có quyền cập nhật địa chỉ này");
+    throw new ForbiddenError("Bạn không có quyền cập nhật địa chỉ này");
   }
 
-  const updatedAddress = await repo.setDefault(addressId, userId);
+  const updatedAddress = await repo.setDefault(addressId, userId).catch(handlePrismaError);
   return formatAddressResponse(updatedAddress);
 };
 
@@ -165,10 +167,10 @@ export const setDefaultAddress = async (addressId: string, userId: string) => {
  * Lấy địa chỉ mặc định
  */
 export const getDefaultAddress = async (userId: string) => {
-  const address = await repo.findDefaultAddress(userId);
+  const address = await repo.findDefaultAddress(userId).catch(handlePrismaError);
 
   if (!address) {
-    throw new Error("Chưa có địa chỉ mặc định");
+    throw new NotFoundError("Địa chỉ mặc định");
   }
 
   return formatAddressResponse(address);
@@ -180,7 +182,7 @@ export const getDefaultAddress = async (userId: string) => {
  * Lấy tất cả tỉnh/thành phố
  */
 export const getProvinces = async () => {
-  return repo.findAllProvinces();
+  return repo.findAllProvinces().catch(handlePrismaError);
 };
 
 /**
@@ -192,43 +194,46 @@ export const getWardsByProvince = async (
   perPage: number = 50,
   search?: string
 ) => {
-  // Validate province tồn tại
-  const province = await repo.findProvinceById(provinceId);
+  // Check 1: Business logic - Validate province exists
+  const province = await repo.findProvinceById(provinceId).catch(handlePrismaError);
   if (!province) {
-    throw new Error("Tỉnh/Thành phố không tồn tại");
+    throw new NotFoundError("Tỉnh/Thành phố");
   }
 
-  return repo.findWardsByProvince(provinceId, page, perPage, search);
+  // Check 2: Handle Prisma error
+  return repo.findWardsByProvince(provinceId, page, perPage, search).catch(handlePrismaError);
 };
 
 /**
  * Tạo mới Tỉnh/Thành phố
  */
 export const createProvince = async (input: CreateProvinceInput) => {
-  // Kiểm tra trùng mã
-  const existing = await repo.findProvinceByCode(input.code);
+  // Check 1: Business logic - Check if code already exists
+  const existing = await repo.findProvinceByCode(input.code).catch(handlePrismaError);
   if (existing) {
-    throw new Error(`Mã tỉnh/thành phố '${input.code}' đã tồn tại`);
+    throw new DuplicateError(`Mã tỉnh/thành phố '${input.code}'`);
   }
 
-  return repo.createProvince(input);
+  // Check 2: Handle Prisma error
+  return repo.createProvince(input).catch(handlePrismaError);
 };
 
 /**
  * Tạo mới Phường/Xã
  */
 export const createWard = async (input: CreateWardInput) => {
-  // 1. Kiểm tra Province có tồn tại không
-  const province = await repo.findProvinceById(input.provinceId);
+  // Check 1: Business logic - Validate province exists
+  const province = await repo.findProvinceById(input.provinceId).catch(handlePrismaError);
   if (!province) {
-    throw new Error("Tỉnh/Thành phố không tồn tại");
+    throw new NotFoundError("Tỉnh/Thành phố");
   }
 
-  // 2. Kiểm tra trùng mã Ward
-  const existing = await repo.findWardByCode(input.code);
+  // Check 1: Business logic - Check if ward code already exists
+  const existing = await repo.findWardByCode(input.code).catch(handlePrismaError);
   if (existing) {
-    throw new Error(`Mã phường/xã '${input.code}' đã tồn tại`);
+    throw new DuplicateError(`Mã phường/xã '${input.code}'`);
   }
 
-  return repo.createWard(input);
+  // Check 2: Handle Prisma error
+  return repo.createWard(input).catch(handlePrismaError);
 };

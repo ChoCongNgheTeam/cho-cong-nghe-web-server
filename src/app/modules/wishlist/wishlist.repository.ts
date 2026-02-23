@@ -7,11 +7,37 @@ export const getWishlistByUserId = async (userId: string): Promise<WishlistItem[
     where: {
       userId,
     },
-    include: {
+    select: {
+      id: true,
+      userId: true,
+      productVariantId: true,
+      createdAt: true,
       productVariant: {
-        include: {
+        select: {
+          id: true,
+          productId: true,
+          code: true,
+          price: true,
+          soldCount: true,
+          weight: true,
+          isDefault: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
           product: {
-            include: {
+            select: {
+              id: true,
+              brandId: true,
+              name: true,
+              description: true,
+              slug: true,
+              viewsCount: true,
+              ratingAverage: true,
+              ratingCount: true,
+              isActive: true,
+              isFeatured: true,
+              createdAt: true,
+              updatedAt: true,
               brand: {
                 select: {
                   id: true,
@@ -39,21 +65,47 @@ export const getWishlistByUserId = async (userId: string): Promise<WishlistItem[
     orderBy: {
       createdAt: "desc",
     },
-  });
+  }) as Promise<WishlistItem[]>;
 };
 
 // Add product variant to wishlist
-export const addToWishlist = async (userId: string, productVariantId: string) => {
+export const addToWishlist = async (userId: string, productVariantId: string): Promise<WishlistItem> => {
   return prisma.wishlist.create({
     data: {
       userId,
       productVariantId,
     },
-    include: {
+    select: {
+      id: true,
+      userId: true,
+      productVariantId: true,
+      createdAt: true,
       productVariant: {
-        include: {
+        select: {
+          id: true,
+          productId: true,
+          code: true,
+          price: true,
+          soldCount: true,
+          weight: true,
+          isDefault: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
           product: {
-            include: {
+            select: {
+              id: true,
+              brandId: true,
+              name: true,
+              description: true,
+              slug: true,
+              viewsCount: true,
+              ratingAverage: true,
+              ratingCount: true,
+              isActive: true,
+              isFeatured: true,
+              createdAt: true,
+              updatedAt: true,
               brand: {
                 select: {
                   id: true,
@@ -78,7 +130,7 @@ export const addToWishlist = async (userId: string, productVariantId: string) =>
         },
       },
     },
-  });
+  }) as Promise<WishlistItem>;
 };
 
 // Remove product variant from wishlist
