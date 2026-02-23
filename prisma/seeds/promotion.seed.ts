@@ -48,7 +48,7 @@ const promotionTemplates: {
     name: "APPLE_IPHONE_GIAM_10_PERCENT",
     description: "Giảm 10% cho tất cả iPhone",
     priority: 20,
-    isActive: false, // Mặc định tắt, bật khi cần
+    isActive: true, // Mặc định tắt, bật khi cần
     notes: "Apply cho brand: Apple (iPhone) - Lấy brand ID và update vào targetId",
     rules: [
       {
@@ -58,7 +58,7 @@ const promotionTemplates: {
     ],
     targets: [
       {
-        targetType: TargetType.BRAND,
+        targetType: TargetType.CATEGORY,
         targetId: null, // Update brand ID sau
       },
     ],
