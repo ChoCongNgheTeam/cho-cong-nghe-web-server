@@ -46,7 +46,6 @@ const orderSelect = {
       phone: true,
       detailAddress: true,
       provinceId: true,
-      districtId: true,
       wardId: true,
     },
   },
@@ -65,6 +64,13 @@ const orderSelect = {
               id: true,
               name: true,
               slug: true,
+              img: {
+                take: 1,
+                select: {
+                imageUrl: true,
+                color: true // Lấy thêm màu nếu cần
+          }
+        }
             },
           },
           variantAttributes: {
@@ -79,10 +85,7 @@ const orderSelect = {
               },
             },
           },
-          images: {
-            take: 1,
-            select: { imageUrl: true },
-          },
+          
         },
       },
     },

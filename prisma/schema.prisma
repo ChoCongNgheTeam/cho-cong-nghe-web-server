@@ -217,6 +217,8 @@ model user_addresses {
   user      users      @relation(fields: [userId], references: [id])
   province  provinces  @relation(fields: [provinceId], references: [id])
   ward      wards      @relation(fields: [wardId], references: [id])
+  orders    orders[]
+
 
   @@unique([userId, detailAddress, phone])
   @@index([userId])
@@ -565,6 +567,7 @@ model orders {
   user            users                  @relation(fields: [userId], references: [id])
   paymentMethod   payment_methods        @relation(fields: [paymentMethodId], references: [id])
   voucher         vouchers?              @relation(fields: [voucherId], references: [id])
+  shippingAddress user_addresses         @relation(fields: [shippingAddressId], references: [id])
   orderItems      order_items[]
   voucherUsages   voucher_usages[]
   transactions    payment_transactions[]

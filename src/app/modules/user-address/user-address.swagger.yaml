@@ -13,7 +13,7 @@ tags:
 paths:
   # ==================== LOCATIONS API ====================
   
-  /locations/provinces:
+  /addresses/locations/provinces:
     get:
       summary: Lấy danh sách tất cả Tỉnh/Thành phố
       tags:
@@ -39,7 +39,38 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
-  /locations/provinces/{provinceId}/wards:
+    post:
+      summary: Tạo mới Tỉnh/Thành phố (Nên dành cho Admin)
+      tags:
+        - Locations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProvinceInput"
+      responses:
+        "201":
+          description: Tạo tỉnh/thành phố thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Province"
+                  message:
+                    type: string
+                    example: "Tạo tỉnh/thành phố thành công"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /addresses/locations/{provinceId}/wards:
     get:
       summary: Lấy danh sách Phường/Xã theo Tỉnh/Thành phố
       tags:
@@ -64,8 +95,8 @@ paths:
           schema:
             type: integer
             minimum: 1
-            maximum: 100
-            default: 50
+            maximum: 1000
+            default: 1000
           description: Số lượng items mỗi trang
         - name: q
           in: query
@@ -105,6 +136,38 @@ paths:
                   message:
                     type: string
                     example: "Tỉnh/Thành phố không tồn tại"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /addresses/locations/wards:
+    post:
+      summary: Tạo mới Phường/Xã (Nên dành cho Admin)
+      tags:
+        - Locations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWardInput"
+      responses:
+        "201":
+          description: Tạo phường/xã thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Ward"
+                  message:
+                    type: string
+                    example: "Tạo phường/xã thành công"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "500":
           $ref: "#/components/responses/ServerError"
 
@@ -425,6 +488,66 @@ components:
           type: string
           description: Loại (phuong, xa, thi_tran)
           example: "phuong"
+        provinceId:
+          type: string
+          format: uuid
+          description: ID của Tỉnh/Thành phố
+
+    CreateProvinceInput:
+      type: object
+      required:
+        - code
+        - name
+        - fullName
+        - type
+      properties:
+        code:
+          type: string
+          description: Mã tỉnh/thành phố
+          example: "01"
+        name:
+          type: string
+          description: Tên tỉnh/thành phố
+          example: "Hà Nội"
+        fullName:
+          type: string
+          description: Tên đầy đủ của tỉnh/thành phố
+          example: "Thành phố Hà Nội"
+        type:
+          type: string
+          description: Loại (thanh_pho_trung_uong, tinh)
+          example: "thanh_pho_trung_uong"
+
+    CreateWardInput:
+      type: object
+      required:
+        - code
+        - name
+        - fullName
+        - type
+        - provinceId
+      properties:
+        code:
+          type: string
+          description: Mã phường/xã
+          example: "00001"
+        name:
+          type: string
+          description: Tên phường/xã
+          example: "Phúc Xá"
+        fullName:
+          type: string
+          description: Tên đầy đủ
+          example: "Phường Phúc Xá"
+        type:
+          type: string
+          description: Loại (phuong, xa, thi_tran)
+          example: "phuong"
+        provinceId:
+          type: string
+          format: uuid
+          description: ID của Tỉnh/Thành phố
+          example: "550e8400-e29b-41d4-a716-446655440001"
 
     AddressResponse:
       type: object
@@ -589,11 +712,11 @@ components:
         perPage:
           type: integer
           description: Số items mỗi trang
-          example: 50
+          example: 1000
         totalPages:
           type: integer
           description: Tổng số trang
-          example: 10
+          example: 1
 
   # ==================== PARAMETERS ====================
   
@@ -664,7 +787,7 @@ components:
                 example: false
               message:
                 type: string
-                example: "Phường/Xã không thuộc Tỉnh/Thành phố đã chọn"
+                example: "Dữ liệu đầu vào không hợp lệ"
 
     ServerError:
       description: Lỗi server
