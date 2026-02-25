@@ -29,26 +29,25 @@ import prisma from "prisma/client";
 export const register = async (input: RegisterInput) => {
   const { email, password, ...rest } = input;
 
-  const existedUser = await findByEmailOrUserName(email, rest.userName);
+  const normalizedEmail = email.toLowerCase();
+
+  const existedUser = await findByEmailOrUserName(normalizedEmail, rest.userName);
 
   if (existedUser) {
-    if (existedUser.email === email) throw new DuplicateError("Email");
+    if (existedUser.email === normalizedEmail) throw new DuplicateError("Email");
     if (existedUser.userName === rest.userName) throw new DuplicateError("Tên đăng nhập");
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  // Không cần try/catch — Prisma error sẽ được handlePrismaError ở global handler xử lý
-  // nếu muốn bắt P2002 fallback thì vẫn có thể gọi handlePrismaError tại đây
   return createUser({
-    email,
+    email: normalizedEmail,
     passwordHash,
     role: "CUSTOMER",
     avatarImage: "./images/avatar.png",
     ...rest,
   }).catch(handlePrismaError);
 };
-
 export const login = async (input: LoginInput, meta?: { userAgent?: string; ip?: string }) => {
   const { userName, password, rememberMe } = input;
 
