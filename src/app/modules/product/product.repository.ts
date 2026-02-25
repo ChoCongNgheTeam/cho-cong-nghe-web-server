@@ -562,20 +562,7 @@ export const findBySlug = async (slug: string) => {
     include: {
       brand: true,
       category: {
-        select: {
-          id: true,
-          name: true,
-          parentId: true,
-          description: true,
-          imagePath: true,
-          imageUrl: true,
-          slug: true,
-          position: true,
-          isFeatured: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+        select: selectCategoryTree,
       },
       img: {
         orderBy: [{ color: "asc" }, { position: "asc" }],

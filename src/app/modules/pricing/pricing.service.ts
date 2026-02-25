@@ -1,26 +1,6 @@
-import {
-  PricingProductInput,
-  PricingCartInput,
-  PricingResult,
-  PricedProduct,
-  PricingContext,
-  AppliedDiscount,
-  DisplayPromotion,
-} from "./pricing.types";
-import {
-  getBestPromotionRule,
-  calculatePromotionRuleDiscount,
-  isVoucherValid,
-  calculateVoucherDiscount,
-  getApplicablePromotionRules,
-  getAllAvailablePromotions,
-} from "./pricing.rules";
-import {
-  calculateDiscountPercentage,
-  formatPromotionDescription,
-  formatVoucherDescription,
-  validatePricingInput,
-} from "./pricing.helpers";
+import { PricingProductInput, PricingCartInput, PricingResult, PricedProduct, PricingContext, AppliedDiscount, DisplayPromotion } from "./pricing.types";
+import { getBestPromotionRule, calculatePromotionRuleDiscount, isVoucherValid, calculateVoucherDiscount, getApplicablePromotionRules, getAllAvailablePromotions } from "./pricing.rules";
+import { calculateDiscountPercentage, formatPromotionDescription, formatVoucherDescription, validatePricingInput } from "./pricing.helpers";
 import { PromotionActionType } from "@prisma/client";
 import * as promotionRepo from "../promotion/promotion.repository";
 import * as voucherRepo from "../voucher/voucher.repository";
@@ -32,11 +12,7 @@ import * as voucherRepo from "../voucher/voucher.repository";
  * @param userId - User ID (optional)
  * @param mode - "detail" = show all promotions, "cart" = apply with quantity check
  */
-export const calculateProductPrice = async (
-  input: PricingProductInput,
-  userId?: string,
-  mode: "detail" | "cart" = "cart",
-): Promise<PricedProduct> => {
+export const calculateProductPrice = async (input: PricingProductInput, userId?: string, mode: "detail" | "cart" = "cart"): Promise<PricedProduct> => {
   // Validate
   const validation = validatePricingInput(input.basePrice, input.quantity);
   if (!validation.valid) {
@@ -65,23 +41,11 @@ export const calculateProductPrice = async (
     availablePromotions.push(...allPromotions);
 
     // Still apply best discount for price display
-    const bestPromotionResult = getBestPromotionRule(
-      input.productId,
-      input.basePrice,
-      input.quantity,
-      input.categoryPath,
-      input.brandId,
-      context,
-    );
+    const bestPromotionResult = getBestPromotionRule(input.productId, input.basePrice, input.quantity, input.categoryPath, input.brandId, context);
 
     if (bestPromotionResult) {
       const { promotion, rule } = bestPromotionResult;
-      const { discountAmount } = calculatePromotionRuleDiscount(
-        rule,
-        input.basePrice,
-        input.quantity,
-        promotion.maxDiscountValue,
-      );
+      const { discountAmount } = calculatePromotionRuleDiscount(rule, input.basePrice, input.quantity, promotion.maxDiscountValue);
 
       finalPrice = input.basePrice - discountAmount / input.quantity;
       totalDiscount = discountAmount;
@@ -97,25 +61,12 @@ export const calculateProductPrice = async (
     }
   } else {
     // CART MODE: Apply promotions with quantity validation
-    const bestPromotionResult = getBestPromotionRule(
-      input.productId,
-      input.basePrice,
-      input.quantity,
-      input.categoryPath,
-      input.brandId,
-      context,
-    );
+    const bestPromotionResult = getBestPromotionRule(input.productId, input.basePrice, input.quantity, input.categoryPath, input.brandId, context);
 
     const addedPromotionIds = new Set<string>();
 
     for (const promotion of context.availablePromotions) {
-      const applicableRules = getApplicablePromotionRules(
-        promotion,
-        input.productId,
-        input.quantity,
-        input.brandId,
-        context,
-      );
+      const applicableRules = getApplicablePromotionRules(promotion, input.productId, input.quantity, input.brandId, context);
 
       if (applicableRules.length > 0) {
         // Add to available promotions (unique by promotion ID)
@@ -128,9 +79,7 @@ export const calculateProductPrice = async (
             actionType: representativeRule.actionType,
             buyQuantity: representativeRule.buyQuantity,
             getQuantity: representativeRule.getQuantity,
-            discountValue: representativeRule.discountValue
-              ? Number(representativeRule.discountValue)
-              : undefined,
+            discountValue: representativeRule.discountValue ? Number(representativeRule.discountValue) : undefined,
           });
           addedPromotionIds.add(promotion.id);
         }
@@ -138,12 +87,7 @@ export const calculateProductPrice = async (
         // Apply promotion if it's the best one
         if (bestPromotionResult && bestPromotionResult.promotion.id === promotion.id) {
           const { rule } = bestPromotionResult;
-          const { discountAmount } = calculatePromotionRuleDiscount(
-            rule,
-            input.basePrice,
-            input.quantity,
-            promotion.maxDiscountValue,
-          );
+          const { discountAmount } = calculatePromotionRuleDiscount(rule, input.basePrice, input.quantity, promotion.maxDiscountValue);
 
           finalPrice = input.basePrice - discountAmount / input.quantity;
           totalDiscount = discountAmount;
@@ -160,17 +104,10 @@ export const calculateProductPrice = async (
           }
 
           // Handle gifts for this promotion
-          const giftRules = applicableRules.filter(
-            (r) =>
-              r.actionType === PromotionActionType.GIFT_PRODUCT &&
-              r.giftProductVariantId &&
-              r.getQuantity,
-          );
+          const giftRules = applicableRules.filter((r) => r.actionType === PromotionActionType.GIFT_PRODUCT && r.giftProductVariantId && r.getQuantity);
 
           for (const giftRule of giftRules) {
-            const sets = giftRule.buyQuantity
-              ? Math.floor(input.quantity / giftRule.buyQuantity)
-              : 1;
+            const sets = giftRule.buyQuantity ? Math.floor(input.quantity / giftRule.buyQuantity) : 1;
 
             const giftQuantity = sets * giftRule.getQuantity!;
 
@@ -181,12 +118,7 @@ export const calculateProductPrice = async (
               });
 
               const giftDescription = formatPromotionDescription(giftRule);
-              if (
-                !appliedPromotions.some(
-                  (ap) =>
-                    ap.id === promotion.id && ap.actionType === PromotionActionType.GIFT_PRODUCT,
-                )
-              ) {
+              if (!appliedPromotions.some((ap) => ap.id === promotion.id && ap.actionType === PromotionActionType.GIFT_PRODUCT)) {
                 appliedPromotions.push({
                   type: "PROMOTION",
                   id: promotion.id,
@@ -232,9 +164,7 @@ export const calculateCartPrice = async (input: PricingCartInput): Promise<Prici
   const errors: string[] = [];
 
   // Calculate price for each item (CART MODE)
-  const pricedItems = await Promise.all(
-    input.items.map((item) => calculateProductPrice(item, input.userId, "cart")),
-  );
+  const pricedItems = await Promise.all(input.items.map((item) => calculateProductPrice(item, input.userId, "cart")));
 
   // Calculate subtotal (after promotion)
   const subtotal = pricedItems.reduce((sum, item) => sum + item.totalFinalPrice, 0);
@@ -324,14 +254,7 @@ export const calculateCartPrice = async (input: PricingCartInput): Promise<Prici
   };
 };
 
-export const getVariantPricing = async (
-  productId: string,
-  variantId: string,
-  basePrice: number,
-  brandId?: string,
-  categoryPath?: string[],
-  userId?: string,
-) => {
+export const getVariantPricing = async (productId: string, variantId: string, basePrice: number, brandId?: string, categoryPath?: string[], userId?: string) => {
   // Use DETAIL MODE to show all promotions
   const pricedProduct = await calculateProductPrice(
     {
@@ -346,12 +269,16 @@ export const getVariantPricing = async (
     "detail", // Show all available promotions
   );
 
+  const hasPromotion = pricedProduct.hasPromotion;
+
   return {
     base: pricedProduct.basePrice,
-    final: pricedProduct.finalPrice,
-    discountAmount: pricedProduct.totalDiscount,
-    discountPercentage: pricedProduct.discountPercentage,
-    hasPromotion: pricedProduct.hasPromotion,
+    ...(hasPromotion && {
+      final: pricedProduct.finalPrice,
+      discountAmount: pricedProduct.totalDiscount,
+      discountPercentage: pricedProduct.discountPercentage,
+    }),
+    hasPromotion,
     promotions: pricedProduct.appliedPromotions.map((p) => ({
       id: p.id,
       name: p.name,
