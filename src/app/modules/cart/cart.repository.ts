@@ -23,7 +23,7 @@ export const cartItemSelect = {
           slug: true,
           isActive: true,
           brand: { select: { id: true, name: true } },
-          img: { select: { id: true, imageUrl: true, altText: true } },
+          img: { select: { id: true, imageUrl: true, altText: true, color: true } },
         },
       },
       variantAttributes: {
@@ -105,6 +105,16 @@ export const transformToCartResponse = (item: any): CartResponse => {
     return ["color", "màu", "màu sắc"].includes(code || name);
   });
 
+  const colorValue = colorAttr?.attributeOption.value;
+
+  // BƯỚC 2: Tìm bức ảnh có trường color khớp với colorValue của Variant
+  const matchingImage = item.productVariant.product.img.find(
+    (img: any) => img.color === colorValue
+  );
+
+  // Nếu tìm thấy ảnh trùng màu thì lấy, nếu không (ví dụ sản phẩm không phân loại theo màu) thì fallback về ảnh đầu tiên
+  const finalImageUrl = matchingImage?.imageUrl || item.productVariant.product.img[0]?.imageUrl;
+
   return {
     id: item.id,
     productVariantId: item.productVariantId,
@@ -113,9 +123,9 @@ export const transformToCartResponse = (item: any): CartResponse => {
     productSlug: item.productVariant.product.slug,
     brandName: item.productVariant.product.brand.name,
     variantCode: item.productVariant.code || undefined,
-    image: item.productVariant.product.img[0]?.imageUrl,
+    image: finalImageUrl, // BƯỚC 3: Gán link ảnh đã lọc được
     color: colorAttr?.attributeOption.label,
-    colorValue: colorAttr?.attributeOption.value,
+    colorValue: colorValue,
     quantity: item.quantity,
     unitPrice: Number(item.unitPrice),
     totalPrice: item.quantity * Number(item.unitPrice),
