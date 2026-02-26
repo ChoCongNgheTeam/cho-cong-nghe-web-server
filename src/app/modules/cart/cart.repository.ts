@@ -105,6 +105,12 @@ export const transformToCartResponse = (item: any): CartResponse => {
     return ["color", "màu", "màu sắc"].includes(code || name);
   });
 
+  const storageAttr = item.productVariant.variantAttributes.find((attr: any) => {
+    const code = (attr.attributeOption.attribute?.code || "").toLowerCase();
+    const name = (attr.attributeOption.attribute?.name || "").toLowerCase();
+    return ["storage", "dung lượng", "rom", "rom_capacity"].includes(code || name);
+  });
+
   const colorValue = colorAttr?.attributeOption.value;
 
   // BƯỚC 2: Tìm bức ảnh có trường color khớp với colorValue của Variant
@@ -126,6 +132,8 @@ export const transformToCartResponse = (item: any): CartResponse => {
     image: finalImageUrl, // BƯỚC 3: Gán link ảnh đã lọc được
     color: colorAttr?.attributeOption.label,
     colorValue: colorValue,
+    storage: storageAttr?.attributeOption.label,      // BẮT ĐƯỢC 256GB VÀ TRẢ RA NGOÀI
+    storageValue: storageAttr?.attributeOption.value,
     quantity: item.quantity,
     unitPrice: Number(item.unitPrice),
     totalPrice: item.quantity * Number(item.unitPrice),
