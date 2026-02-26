@@ -23,7 +23,7 @@ export const cartItemSelect = {
           slug: true,
           isActive: true,
           brand: { select: { id: true, name: true } },
-          img: { select: { id: true, imageUrl: true, altText: true, color: true } },
+          img: { select: { id: true, imageUrl: true, altText: true, color: true }, orderBy: { position: "asc" as any } },
         },
       },
       variantAttributes: {
