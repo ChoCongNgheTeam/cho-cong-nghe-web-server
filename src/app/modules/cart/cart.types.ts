@@ -49,6 +49,8 @@ export interface CartResponse {
   image?: string;
   color?: string;
   colorValue?: string;
+  storage?: string;       
+  storageValue?: string;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
