@@ -97,3 +97,8 @@ export type ValidateItemInput = {
 export type SyncCartInput = {
   items: LocalStorageCartItem[];
 };
+
+export type ChangeVariantInput = {
+  newVariantId: string;
+  quantity: number;
+};

@@ -1,5 +1,5 @@
 import * as repo from "./cart.repository";
-import { AddToCartInput, UpdateCartItemInput, LocalStorageCartItem, SyncCartResult } from "./cart.types";
+import { AddToCartInput, UpdateCartItemInput, LocalStorageCartItem, SyncCartResult, ChangeVariantInput } from "./cart.types";
 import { NotFoundError, BadRequestError } from "@/errors";
 
 export const validateCartItemStatus = async (variantId: string, quantity: number) => {
@@ -106,6 +106,39 @@ export const updateCartItem = async (userId: string, cartItemId: string, input: 
 
   const updated = await repo.update(cartItemId, { quantity: input.quantity, unitPrice: check.currentPrice });
   return repo.transformToCartResponse(updated);
+};
+
+export const changeCartItemVariant = async (userId: string, cartItemId: string, input: ChangeVariantInput) => {
+  const oldItem = await repo.findById(cartItemId);
+  if (!oldItem || oldItem.userId !== userId) throw new BadRequestError("Không tìm thấy sản phẩm trong giỏ hàng");
+
+  const check = await validateCartItemStatus(input.newVariantId, input.quantity);
+  if (!check.isValid) throw new BadRequestError(check.errors.join(", "));
+
+  const existingNewVariantItem = await repo.findByUserAndVariant(userId, input.newVariantId);
+
+  if (existingNewVariantItem && existingNewVariantItem.id !== cartItemId) {
+    const newQty = existingNewVariantItem.quantity + input.quantity;
+    const safeQty = Math.min(newQty, check.availableQuantity);
+    
+    const updated = await repo.update(existingNewVariantItem.id, { 
+      quantity: safeQty, 
+      unitPrice: check.currentPrice 
+    });
+    
+    await repo.remove(cartItemId);
+    
+    return repo.transformToCartResponse(updated);
+  } else {
+    const safeQty = Math.min(input.quantity, check.availableQuantity);
+    const updated = await repo.update(cartItemId, { 
+      productVariantId: input.newVariantId, 
+      quantity: safeQty, 
+      unitPrice: check.currentPrice 
+    });
+    
+    return repo.transformToCartResponse(updated);
+  }
 };
 
 export const removeFromCart = (userId: string, id: string) => repo.remove(id);

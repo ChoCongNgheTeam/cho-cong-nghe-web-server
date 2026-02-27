@@ -47,6 +47,13 @@ const orderSelect = {
       detailAddress: true,
       provinceId: true,
       wardId: true,
+      // Lấy thêm tên Tỉnh/Thành và Phường/Xã
+      province: {
+        select: { fullName: true }
+      },
+      ward: {
+        select: { fullName: true }
+      }
     },
   },
   orderItems: {

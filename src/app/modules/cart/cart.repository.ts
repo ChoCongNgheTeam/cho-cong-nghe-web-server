@@ -82,7 +82,7 @@ export const create = async (data: {
   });
 };
 
-export const update = async (id: string, data: { quantity?: number; unitPrice?: number }) => {
+export const update = async (id: string, data: { productVariantId?: string; quantity?: number; unitPrice?: number }) => {
   return prisma.cart_items.update({
     where: { id },
     data: { ...data, updatedAt: new Date() },

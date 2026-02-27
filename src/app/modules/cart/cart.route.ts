@@ -8,7 +8,8 @@ import {
   updateCartItemSchema, 
   cartItemParamsSchema, 
   validateItemSchema, 
-  syncCartSchema 
+  syncCartSchema, 
+  changeVariantSchema
 } from "./cart.validation";
 import { addToCartLimiter, generalCartLimiter, getCartLimiter } from "@/utils/rateLimiter";
 
@@ -47,13 +48,21 @@ router.post("/", addToCartLimiter, validate(addToCartSchema, "body"), asyncHandl
 
 // 5. Update item
 router.put(
-  "/:cartItemId", 
+  "/:cartItemId/change-quantity", 
   validate(cartItemParamsSchema, "params"), 
   validate(updateCartItemSchema, "body"), 
   asyncHandler(c.updateCartItemHandler)
 );
 
-// 6. Xóa 1 item
+// 6. Change item variant
+router.put(
+  "/:cartItemId/change-variant", 
+  validate(cartItemParamsSchema, "params"), 
+  validate(changeVariantSchema, "body"), 
+  asyncHandler(c.changeCartItemVariantHandler)
+);
+
+// 7. Xóa 1 item
 router.delete(
   "/:cartItemId", 
   validate(cartItemParamsSchema, "params"), 
