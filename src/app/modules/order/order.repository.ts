@@ -4,6 +4,7 @@ import { CreateOrderDTO } from "./order.dto";
 
 const orderSelect = {
   id: true,
+  orderCode: true, 
   userId: true,
   paymentMethodId: true,
   voucherId: true,
@@ -47,7 +48,6 @@ const orderSelect = {
       detailAddress: true,
       provinceId: true,
       wardId: true,
-      // Lấy thêm tên Tỉnh/Thành và Phường/Xã
       province: {
         select: { fullName: true }
       },
@@ -74,10 +74,10 @@ const orderSelect = {
               img: {
                 take: 1,
                 select: {
-                imageUrl: true,
-                color: true // Lấy thêm màu nếu cần
-          }
-        }
+                  imageUrl: true,
+                  color: true
+                }
+              }
             },
           },
           variantAttributes: {
@@ -92,7 +92,6 @@ const orderSelect = {
               },
             },
           },
-          
         },
       },
     },
@@ -125,6 +124,7 @@ export const createOrder = async (data: CreateOrderDTO) => {
   return prisma.$transaction(async (tx) => {
     return tx.orders.create({
       data: {
+        orderCode: data.orderCode, // Truyền orderCode vào DB
         user: { connect: { id: data.userId } },
         paymentMethod: { connect: { id: data.paymentMethodId } },
         shippingAddress: { connect: { id: data.shippingAddressId } },
@@ -141,9 +141,11 @@ export const createOrder = async (data: CreateOrderDTO) => {
           },
         },
       },
+      select: orderSelect, // Trả về đầy đủ thông tin sau khi tạo
     });
   });
 };
+
 export const updateOrder = async (id: string, data: Prisma.ordersUpdateInput) => {
   return prisma.orders.update({
     where: { id },

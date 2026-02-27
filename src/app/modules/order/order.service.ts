@@ -12,7 +12,6 @@ export const getOrderDetail = async (orderId: string, userId?: string) => {
   const order = await findOrderById(orderId);
   if (!order) throw new NotFoundError("Đơn hàng");
 
-  // Nếu là user → kiểm tra quyền sở hữu
   if (userId && order.userId !== userId) {
     throw new BadRequestError("Bạn không có quyền xem đơn hàng này");
   }
@@ -23,7 +22,6 @@ export const getOrderDetail = async (orderId: string, userId?: string) => {
 export const createUserOrder = async (userId: string, input: CreateOrderInput) => {
   const { paymentMethodId, voucherId, shippingAddressId, orderItems } = input;
 
-  // Validate address thuộc user
   const address = await prisma.user_addresses.findUnique({
     where: { id: shippingAddressId },
   });
@@ -31,41 +29,37 @@ export const createUserOrder = async (userId: string, input: CreateOrderInput) =
     throw new NotFoundError("Địa chỉ giao hàng");
   }
 
-  // Validate payment method
   const paymentMethod = await prisma.payment_methods.findUnique({
     where: { id: paymentMethodId, isActive: true },
   });
   if (!paymentMethod) throw new NotFoundError("Phương thức thanh toán");
 
-  // Validate voucher (nếu có)
   let voucherDiscount = 0;
   if (voucherId) {
     const voucher = await prisma.vouchers.findUnique({
       where: { id: voucherId, isActive: true },
     });
     if (!voucher) throw new NotFoundError("Voucher");
-
-    // Kiểm tra điều kiện áp dụng (minOrderValue, endDate, maxUses,...)
-    // Có thể mở rộng logic phức tạp hơn ở đây
     voucherDiscount = Number(voucher.discountValue);
   }
 
-  // Validate + tính toán order items
   let subtotal = new Prisma.Decimal(0);
   const itemsToCreate: any[] = [];
 
   for (const item of orderItems) {
     const variant = await prisma.products_variants.findUnique({
       where: { id: item.productVariantId, isActive: true },
-      include: { inventory: true },
+      // include: { inventory: true }, // Mở ra nếu bạn dùng bảng inventory
     });
 
     if (!variant) throw new NotFoundError(`Sản phẩm variant ${item.productVariantId}`);
-    if (!variant.inventory || variant.inventory.quantity < item.quantity) {
+    
+    // Nếu dùng bảng quantity trên variant trực tiếp thì check ở đây
+    if (variant.quantity < item.quantity) {
       throw new BadRequestError(`Sản phẩm không đủ hàng: ${variant.code || variant.id}`);
     }
 
-    const unitPrice = variant.price; // Giá lấy từ variant
+    const unitPrice = variant.price;
 
     subtotal = subtotal.plus(new Prisma.Decimal(unitPrice).mul(item.quantity));
 
@@ -77,10 +71,16 @@ export const createUserOrder = async (userId: string, input: CreateOrderInput) =
   }
   const voucherDiscountDecimal = new Prisma.Decimal(voucherDiscount);
 
-  const shippingFee = new Prisma.Decimal(20000); // Phí vận chuyển cố định hoặc tính toán theo địa chỉ, trọng lượng,...
+  const shippingFee = new Prisma.Decimal(20000);
   const totalAmount = subtotal.plus(shippingFee).minus(voucherDiscountDecimal);
 
+  // Tạo orderCode dạng: ORD + YYMMDD + 4 số ngẫu nhiên (VD: ORD2602278912)
+  const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+  const randomPart = Math.floor(1000 + Math.random() * 9000);
+  const orderCode = `ORD${datePart}${randomPart}`;
+
   return createOrder({
+    orderCode, // Truyền orderCode vào DTO
     userId,
     paymentMethodId,
     voucherId: voucherId || undefined,
@@ -108,14 +108,13 @@ export const deleteOrderAdmin = async (orderId: string) => {
   const order = await findOrderById(orderId);
   if (!order) throw new NotFoundError("Đơn hàng");
 
-  // Hoàn lại stock khi xóa đơn (nếu cần)
   await prisma.$transaction(async (tx) => {
+    // Hoàn lại stock (Cập nhật logic theo cấu trúc DB hiện tại của bạn)
     for (const item of order.orderItems) {
-      await tx.inventory.update({
-        where: { variantId: item.productVariant.id },
+      await tx.products_variants.update({
+        where: { id: item.productVariant.id },
         data: {
           quantity: { increment: item.quantity },
-          reservedQuantity: { increment: item.quantity },
         },
       });
     }
