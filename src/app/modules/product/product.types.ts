@@ -149,6 +149,7 @@ export interface ProductCard {
   isNew?: boolean;
   highlights: ProductCardHighlight[];
   inStock: boolean;
+  isActive: boolean;
 }
 
 // =====================

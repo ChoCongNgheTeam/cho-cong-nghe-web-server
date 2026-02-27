@@ -2,7 +2,7 @@ import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
 import { ListProductsQuery, ReviewsQuery } from "./product.validation";
 import { OrderStatus } from "@prisma/client";
-import { fa } from "zod/v4/locales";
+import { fa, is } from "zod/v4/locales";
 import { extractVariantOptions } from "@/helpers/variant-options";
 import { HighlightSpecificationGroup } from "./product.types";
 
@@ -84,7 +84,8 @@ const selectProductCard = {
   viewsCount: true,
   ratingAverage: true,
   ratingCount: true,
-  isFeatured: false,
+  isFeatured: true,
+  isActive: true,
   variants: {
     where: { isActive: true },
     select: selectVariant,
