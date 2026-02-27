@@ -10,6 +10,3 @@ ALTER TABLE "orders" ADD COLUMN     "orderCode" TEXT NOT NULL;
 
 -- CreateIndex
 CREATE UNIQUE INDEX "orders_orderCode_key" ON "orders"("orderCode");
-
--- AddForeignKey
-ALTER TABLE "orders" ADD CONSTRAINT "orders_shippingAddressId_fkey" FOREIGN KEY ("shippingAddressId") REFERENCES "user_addresses"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

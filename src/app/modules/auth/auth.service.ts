@@ -44,7 +44,7 @@ export const register = async (input: RegisterInput) => {
     email: normalizedEmail,
     passwordHash,
     role: "CUSTOMER",
-    avatarImage: "./images/avatar.png",
+    avatarImage: null,
     ...rest,
   }).catch(handlePrismaError);
 };
@@ -54,6 +54,10 @@ export const login = async (input: LoginInput, meta?: { userAgent?: string; ip?:
   const user = await findByUserName(userName);
 
   if (!user || !user.isActive) {
+    throw new UnauthorizedError("Tài khoản hoặc mật khẩu không đúng");
+  }
+
+  if (!user.passwordHash) {
     throw new UnauthorizedError("Tài khoản hoặc mật khẩu không đúng");
   }
 
