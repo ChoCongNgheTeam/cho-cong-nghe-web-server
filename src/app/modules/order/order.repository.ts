@@ -1,6 +1,5 @@
 import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
-import { CreateOrderDTO } from "./order.dto";
 
 const orderSelect = {
   id: true,
@@ -48,12 +47,8 @@ const orderSelect = {
       detailAddress: true,
       provinceId: true,
       wardId: true,
-      province: {
-        select: { fullName: true }
-      },
-      ward: {
-        select: { fullName: true }
-      }
+      province: { select: { fullName: true } },
+      ward: { select: { fullName: true } }
     },
   },
   orderItems: {
@@ -71,13 +66,7 @@ const orderSelect = {
               id: true,
               name: true,
               slug: true,
-              img: {
-                take: 1,
-                select: {
-                  imageUrl: true,
-                  color: true
-                }
-              }
+              img: { take: 1, select: { imageUrl: true, color: true } }
             },
           },
           variantAttributes: {
@@ -85,9 +74,7 @@ const orderSelect = {
               attributeOption: {
                 select: {
                   value: true,
-                  attribute: {
-                    select: { name: true },
-                  },
+                  attribute: { select: { name: true } },
                 },
               },
             },
@@ -120,48 +107,10 @@ export const findOrderById = async (id: string) => {
   });
 };
 
-export const createOrder = async (data: CreateOrderDTO) => {
-  return prisma.$transaction(async (tx) => {
-    return tx.orders.create({
-      data: {
-        orderCode: data.orderCode, // Truyền orderCode vào DB
-        user: { connect: { id: data.userId } },
-        paymentMethod: { connect: { id: data.paymentMethodId } },
-        shippingAddress: { connect: { id: data.shippingAddressId } },
-        voucher: data.voucherId ? { connect: { id: data.voucherId } } : undefined,
-
-        subtotalAmount: data.subtotalAmount,
-        shippingFee: data.shippingFee,
-        voucherDiscount: data.voucherDiscount,
-        totalAmount: data.totalAmount,
-
-        orderItems: {
-          createMany: {
-            data: data.orderItems,
-          },
-        },
-      },
-      select: orderSelect, // Trả về đầy đủ thông tin sau khi tạo
-    });
-  });
-};
-
 export const updateOrder = async (id: string, data: Prisma.ordersUpdateInput) => {
   return prisma.orders.update({
     where: { id },
     data,
     select: orderSelect,
-  });
-};
-
-export const deleteOrder = async (id: string) => {
-  return prisma.$transaction(async (tx) => {
-    await tx.order_items.deleteMany({
-      where: { orderId: id },
-    });
-
-    return tx.orders.delete({
-      where: { id },
-    });
   });
 };
