@@ -551,7 +551,7 @@ model cart_items {
 
 model orders {
   id                String        @id @default(uuid()) @db.Uuid
-  orderCode         String        @unique @default(uuid())
+  orderCode         String        @unique 
   userId            String        @db.Uuid
   paymentMethodId   String        @db.Uuid
   voucherId         String?       @db.Uuid
