@@ -2,12 +2,12 @@ import { Request, Response } from "express";
 import {
   getMyOrders,
   getOrderDetail,
-  createUserOrder,
   getAllOrdersAdmin,
   updateOrderAdmin,
   deleteOrderAdmin,
 } from "./order.service";
 
+// ================== PUBLIC (USER) ==================
 export const getMyOrdersHandler = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const orders = await getMyOrders(userId);
@@ -28,16 +28,7 @@ export const getOrderDetailHandler = async (req: Request, res: Response) => {
   });
 };
 
-export const createOrderHandler = async (req: Request, res: Response) => {
-  const userId = req.user!.id;
-  const order = await createUserOrder(userId, req.body);
-  res.status(201).json({
-    data: order,
-    message: "Tạo đơn hàng thành công",
-  });
-};
-
-// Admin
+// ================== ADMIN ==================
 export const getAllOrdersAdminHandler = async (req: Request, res: Response) => {
   const orders = await getAllOrdersAdmin();
   res.json({

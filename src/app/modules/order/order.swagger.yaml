@@ -24,14 +24,15 @@ paths:
               example:
                 data:
                   - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    orderCode: "CCN-260227-X4K9P"
                     subtotalAmount: "1500000.00"
                     shippingFee: "20000.00"
                     voucherDiscount: "100000.00"
                     totalAmount: "1420000.00"
                     orderStatus: "PENDING"
                     paymentStatus: "UNPAID"
-                    orderDate: "2025-12-30T10:00:00.000Z"
-                    updatedAt: "2025-12-30T10:00:00.000Z"
+                    orderDate: "2026-02-27T10:00:00.000Z"
+                    updatedAt: "2026-02-27T10:00:00.000Z"
                     user:
                       id: "user-uuid-123"
                       fullName: "Nguyễn Văn A"
@@ -100,14 +101,15 @@ paths:
               example:
                 data:
                   id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                  orderCode: "CCN-260227-X4K9P"
                   subtotalAmount: "1500000.00"
                   shippingFee: "20000.00"
                   voucherDiscount: "100000.00"
                   totalAmount: "1420000.00"
                   orderStatus: "PENDING"
                   paymentStatus: "UNPAID"
-                  orderDate: "2025-12-30T10:00:00.000Z"
-                  updatedAt: "2025-12-30T10:00:00.000Z"
+                  orderDate: "2026-02-27T10:00:00.000Z"
+                  updatedAt: "2026-02-27T10:00:00.000Z"
                   voucher:
                     code: "GIAM100K"
                     description: "Giảm 100k cho đơn từ 1 triệu"
@@ -123,47 +125,6 @@ paths:
                 message: "Lấy chi tiết đơn hàng thành công"
         "400":
           description: Không có quyền xem đơn hàng này
-        "404":
-          $ref: "#/components/responses/NotFoundError"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
-  /orders:
-    post:
-      summary: Tạo đơn hàng mới
-      tags: [Orders - Public]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateOrderRequest"
-      description: Tạo đơn hàng từ giỏ hàng của user. Hệ thống sẽ kiểm tra tồn kho, địa chỉ, voucher, phương thức thanh toán...
-      responses:
-        "201":
-          description: Tạo đơn hàng thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    $ref: "#/components/schemas/OrderDetail"
-                  message:
-                    type: string
-              example:
-                data:
-                  id: "new-order-uuid-999"
-                  totalAmount: "1420000.00"
-                  orderStatus: "PENDING"
-                  paymentStatus: "UNPAID"
-                message: "Tạo đơn hàng thành công"
-        "400":
-          description: Lỗi validate (không đủ hàng, voucher không hợp lệ, địa chỉ không thuộc user...)
         "404":
           $ref: "#/components/responses/NotFoundError"
         "401":
@@ -208,7 +169,7 @@ paths:
                   message:
                     type: string
               example:
-                data: [{ ... }] # tương tự example ở trên nhưng có nhiều đơn
+                data: [{ ... }]
                 total: 158
                 message: "Lấy tất cả đơn hàng thành công"
         "401":
@@ -353,7 +314,7 @@ components:
           type: string
         orderStatus:
           type: string
-          enum: [PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED, RETURNED]
+          enum: [PENDING, PROCESSING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED, RETURNED]
         paymentStatus:
           type: string
           enum: [UNPAID, PAID, REFUNDED]
@@ -460,48 +421,20 @@ components:
                         imageUrl:
                           type: string
 
-    CreateOrderRequest:
-      type: object
-      required:
-        - paymentMethodId
-        - shippingAddressId
-        - orderItems
-      properties:
-        paymentMethodId:
-          type: string
-          format: uuid
-        voucherId:
-          type: string
-          format: uuid
-          nullable: true
-        shippingAddressId:
-          type: string
-          format: uuid
-        orderItems:
-          type: array
-          minItems: 1
-          items:
-            type: object
-            required:
-              - productVariantId
-              - quantity
-            properties:
-              productVariantId:
-                type: string
-                format: uuid
-              quantity:
-                type: integer
-                minimum: 1
-
     UpdateOrderAdminRequest:
       type: object
       properties:
         orderStatus:
           type: string
-          enum: [PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED, RETURNED]
+          enum: [PENDING, PROCESSING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED, RETURNED]
         paymentStatus:
           type: string
           enum: [UNPAID, PAID, REFUNDED]
+        shippingFee:
+          type: number
+        voucherDiscount:
+          type: number
+
   securitySchemes:
     bearerAuth:
       type: http

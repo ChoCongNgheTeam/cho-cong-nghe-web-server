@@ -64,10 +64,32 @@ export const executeOrderTransaction = async (userId: string, checkoutSummary: C
     voucherId,
   } = checkoutSummary;
 
+  // --- LOGIC TẠO MÃ ĐƠN HÀNG MỚI THEO FORMAT CCN-YYMMDD-XXXXX ---
+  const brandPart = "CCN";
+  
+  // Lấy ngày tháng năm định dạng YYMMDD
+  const date = new Date();
+  const yy = String(date.getFullYear()).slice(-2);
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const datePart = `${yy}${mm}${dd}`;
+
+  // Tạo chuỗi 5 ký tự ngẫu nhiên (Chữ in hoa + Số)
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let randomPart = '';
+  for (let i = 0; i < 5; i++) {
+    randomPart += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+
+  // Ghép lại thành mã hoàn chỉnh
+  const newOrderCode = `${brandPart}-${datePart}-${randomPart}`;
+  // -------------------------------------------------------------
+
   return prisma.$transaction(async (tx) => {
     // 1. Tạo order mới
     const newOrder = await tx.orders.create({
       data: {
+        orderCode: newOrderCode, 
         userId,
         paymentMethodId,
         voucherId: voucherId || null,
