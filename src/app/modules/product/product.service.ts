@@ -199,7 +199,11 @@ export const deleteProduct = async (id: string) => {
 // ── Promotion / Sale ──────────────────────────────────────────────────────────
 
 export const getFlashSaleProducts = async (date: Date = new Date(), options: { limit?: number; categoryId?: string } = {}) => {
-  const products = await repo.findProductsOnSaleByDate(date, options);
+  const { products, promotions } = await repo.findProductsOnSaleByDate(date, options);
+
+  console.log(promotions);
+
+  const firstPromotion = promotions?.[0];
 
   return {
     data: products.map((product) => {
@@ -219,11 +223,13 @@ export const getFlashSaleProducts = async (date: Date = new Date(), options: { l
     }),
     total: products.length,
     date,
+    startDate: firstPromotion?.startDate ?? null,
+    endDate: firstPromotion?.endDate ?? null,
   };
 };
 
 export const getCategoriesWithSaleProducts = async (date: Date = new Date(), limit = 5) => {
-  const [products, saleProductIds] = await Promise.all([repo.getProductsForCategoryRanking(date), getProductIdsFromPromotions(date)]);
+  const [products, { productIds: saleProductIds }] = await Promise.all([repo.getProductsForCategoryRanking(date), getProductIdsFromPromotions(date)]);
 
   const map = new Map<string, { totalProducts: number; saleProducts: number; newProducts: number; totalViews: number; totalSold: number }>();
   const NEW_DAYS = 15;

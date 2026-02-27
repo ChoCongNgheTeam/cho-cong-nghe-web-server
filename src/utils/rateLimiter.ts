@@ -26,14 +26,14 @@ export const forgotPasswordRateLimit = (req: Request): void => {
 
 export const refreshTokenLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 phút
-  max: 10, // 10 lần / IP
+  max: 59, // 10 lần / IP
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 export const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 50, // 5 lần / IP
 });
 
 export const forgotPasswordLimiter = rateLimit({

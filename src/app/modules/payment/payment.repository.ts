@@ -32,7 +32,7 @@ export const findActivePaymentMethods = async () => {
   return prisma.payment_methods.findMany({
     where: { isActive: true },
     select: paymentMethodSelect,
-    orderBy: { name: "asc" },
+    orderBy: { createdAt: "asc" },
   });
 };
 
@@ -43,11 +43,7 @@ export const findPaymentMethodById = async (id: string) => {
   });
 };
 
-export const createPaymentMethod = async (data: {
-  name: string;
-  description?: string;
-  isActive: boolean;
-}) => {
+export const createPaymentMethod = async (data: { name: string; description?: string; isActive: boolean }) => {
   return prisma.payment_methods.create({
     data,
     select: paymentMethodSelect,

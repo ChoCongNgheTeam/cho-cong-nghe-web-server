@@ -39,11 +39,11 @@ const getActiveHomeCampaigns = async (): Promise<HomeCampaign[]> => {
     return isNotExpired && isNotFuture;
   });
 
-  console.log(campaigns);
+  // console.log(campaigns);
 
   // Get full campaign details with categories
   const campaignsWithCategories = await Promise.all(campaigns.map((campaign) => campaignService.getCampaignBySlug(campaign.slug)));
-  console.log(campaignsWithCategories);
+  // console.log(campaignsWithCategories);
 
   // Filter out campaigns with no categories
   return campaignsWithCategories.filter((campaign) => campaign.categories && campaign.categories.length > 0);
@@ -88,6 +88,8 @@ export const getHomePageData = async (userId?: string): Promise<HomeResponse> =>
       products: flashSaleResult.data,
       total: flashSaleResult.total,
       date: flashSaleResult.date,
+      startDate: flashSaleResult.startDate,
+      endDate: flashSaleResult.endDate,
     },
     bannersSection1,
     // NEW: Active campaigns with categories

@@ -67,6 +67,8 @@ export interface HomeResponse {
     products: any[];
     total: number;
     date: Date;
+    startDate: Date | null;
+    endDate: Date | null;
   };
   bannersSection1: HomeBanner[];
   // NEW: Replace categoryRanking with activeCampaigns

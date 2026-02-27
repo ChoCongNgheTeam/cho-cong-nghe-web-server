@@ -1,4 +1,6 @@
+import { UserRole } from "@prisma/client";
 import prisma from "src/config/db";
+import { OAuthResolvedUser } from "./oauth/oauth.types";
 
 const selectUserWithoutPassword = {
   id: true,
@@ -150,6 +152,44 @@ export const cleanupRevokedExpiredRefreshTokens = async () => {
       revokedAt: {
         not: null,
       },
+    },
+  });
+};
+
+// ─── OAuth ────────────────────────────────────────────────────────────────────
+
+export const findOAuthAccount = (provider: string, providerAccountId: string) => {
+  return prisma.oauth_accounts.findUnique({
+    where: { provider_providerAccountId: { provider, providerAccountId } },
+    include: { user: true },
+  });
+};
+
+export const createOAuthAccount = (data: { userId: string; provider: string; providerAccountId: string; accessToken?: string; refreshToken?: string; expiresAt?: Date }) => {
+  return prisma.oauth_accounts.create({ data });
+};
+
+export const findUserById = (id: string) => {
+  return prisma.users.findUnique({ where: { id } });
+};
+
+export const createUserFromOAuth = async (data: { email: string; fullName: string; avatarImage?: string; userName: string }): Promise<OAuthResolvedUser> => {
+  return prisma.users.create({
+    data: {
+      ...data,
+      passwordHash: null,
+      isActive: true,
+      role: UserRole.CUSTOMER,
+    },
+    select: {
+      id: true,
+      email: true,
+      userName: true,
+      fullName: true,
+      role: true,
+      avatarImage: true,
+      createdAt: true,
+      isActive: true, // 🔥 thêm cái này để check isActive phía dưới
     },
   });
 };

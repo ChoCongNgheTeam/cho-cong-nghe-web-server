@@ -975,7 +975,12 @@ const getAllDescendantCategoryIds = async (categoryId: string): Promise<string[]
   return Array.from(result);
 };
 
-export const getProductIdsFromPromotions = async (date: Date): Promise<Set<string>> => {
+export const getProductIdsFromPromotions = async (
+  date: Date,
+): Promise<{
+  productIds: Set<string>;
+  promotions: any[];
+}> => {
   const productIds = new Set<string>();
 
   // Get active promotions on this date
@@ -1029,7 +1034,10 @@ export const getProductIdsFromPromotions = async (date: Date): Promise<Set<strin
     }
   }
 
-  return productIds;
+  return {
+    productIds,
+    promotions: activePromotions,
+  };
 };
 
 export const findProductsOnSaleByDate = async (
@@ -1042,16 +1050,17 @@ export const findProductsOnSaleByDate = async (
   const { limit = 15, categoryId } = options;
 
   // Get product IDs affected by promotions
-  const productIds = await getProductIdsFromPromotions(date);
+  const { productIds, promotions } = await getProductIdsFromPromotions(date);
 
   // console.log(productIds);
 
   if (productIds.size === 0) {
-    return [];
+    return { products: [], promotions: [] };
   }
 
   // Get products
-  return prisma.products.findMany({
+
+  const products = await prisma.products.findMany({
     where: {
       id: { in: Array.from(productIds) },
       isActive: true,
@@ -1061,6 +1070,8 @@ export const findProductsOnSaleByDate = async (
     orderBy: { createdAt: "desc" },
     take: limit,
   });
+
+  return { products, promotions };
 };
 
 export const getProductsForCategoryRanking = async (date: Date) => {
@@ -1089,7 +1100,7 @@ export const getProductsForCategoryRanking = async (date: Date) => {
 };
 
 export const findCategoriesWithSaleProducts = async (date: Date) => {
-  const productIds = await getProductIdsFromPromotions(date);
+  const { productIds } = await getProductIdsFromPromotions(date);
 
   if (productIds.size === 0) {
     return [];
@@ -1321,7 +1332,7 @@ export const findProductsByPromotionId = async (promotionId: string, limit: numb
 };
 
 export const getSaleProductsCountByCategories = async (date: Date) => {
-  const productIds = await getProductIdsFromPromotions(date);
+  const { productIds } = await getProductIdsFromPromotions(date);
 
   if (productIds.size === 0) {
     return new Map<string, number>();
