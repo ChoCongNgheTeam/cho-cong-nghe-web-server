@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 
 export type CreateOrderDTO = {
+  orderCode: string;
   userId: string;
   paymentMethodId: string;
   shippingAddressId: string;

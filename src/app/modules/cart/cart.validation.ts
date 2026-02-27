@@ -66,6 +66,14 @@ export const validateLocalCartSchema = z.object({
     .optional(),
 });
 
+export const changeVariantSchema = z.object({
+  newVariantId: z.string().uuid("ID variant mới không hợp lệ"),
+  quantity: z.coerce
+    .number()
+    .int("Số lượng phải là số nguyên")
+    .positive("Số lượng phải lớn hơn 0"),
+});
+
 // Export types
 export type AddToCartInput = z.infer<typeof addToCartSchema>;
 export type UpdateCartItemInput = z.infer<typeof updateCartItemSchema>;
@@ -73,3 +81,4 @@ export type ValidateItemInput = z.infer<typeof validateItemSchema>;
 export type SyncCartInput = z.infer<typeof syncCartSchema>;
 export type ValidateLocalCartInput = z.infer<typeof validateLocalCartSchema>;
 export type LocalStorageCartItem = z.infer<typeof localStorageCartItemSchema>;
+export type ChangeVariantInput = z.infer<typeof changeVariantSchema>;

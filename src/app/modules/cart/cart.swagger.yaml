@@ -133,7 +133,7 @@ paths:
                       failed: { type: integer }
                   success: { type: boolean }
 
-  /cart/{cartItemId}:
+  /cart/{cartItemId}/change-quantity:
     parameters:
       - in: path
         name: cartItemId
@@ -161,6 +161,49 @@ paths:
         "200":
           description: Cập nhật thành công
 
+  /cart/{cartItemId}/change-variant:
+    parameters:
+      - in: path
+        name: cartItemId
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Thay đổi phân loại (Variant) của 1 sản phẩm trong giỏ
+      description: Nếu variant mới đổi đã có sẵn trong giỏ, hệ thống sẽ tự động cộng dồn số lượng và xóa cartItem cũ.
+      tags:
+        - Cart
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - newVariantId
+                - quantity
+              properties:
+                newVariantId:
+                  type: string
+                  format: uuid
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        "200":
+          description: Đổi phân loại thành công (Trả về CartItemResponse đã gộp/cập nhật)
+
+  /cart/{cartItemId}:
+    parameters:
+      - in: path
+        name: cartItemId
+        required: true
+        schema:
+          type: string
+          format: uuid
     delete:
       summary: Xóa 1 sản phẩm khỏi DB
       tags:
@@ -209,6 +252,8 @@ components:
         image: { type: string }
         color: { type: string }
         colorValue: { type: string }
+        storage: { type: string }
+        storageValue: { type: string }
         quantity: { type: integer }
         unitPrice: { type: number }
         totalPrice: { type: number }

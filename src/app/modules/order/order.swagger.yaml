@@ -339,6 +339,9 @@ components:
         id:
           type: string
           format: uuid
+        orderCode:           
+          type: string      
+          description: "Mã đơn hàng hiển thị cho khách"
         subtotalAmount:
           type: string
           description: "Tổng tiền sản phẩm (decimal string)"

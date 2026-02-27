@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import * as cartService from "./cart.service";
-import { addToCartSchema, updateCartItemSchema } from "./cart.validation";
+import { addToCartSchema, updateCartItemSchema, changeVariantSchema } from "./cart.validation";
 import { UnauthorizedError } from "@/errors"; 
 
 export const validateItemHandler = async (req: Request, res: Response) => {
@@ -56,6 +56,16 @@ export const updateCartItemHandler = async (req: Request, res: Response) => {
   const input = updateCartItemSchema.parse(req.body);
   const data = await cartService.updateCartItem(userId, cartItemId, input);
   res.json({ data, message: "Cập nhật thành công" });
+};
+
+export const changeCartItemVariantHandler = async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const { cartItemId } = req.params;
+  if (!userId) throw new UnauthorizedError("Vui lòng đăng nhập");
+
+  const input = changeVariantSchema.parse(req.body);
+  const data = await cartService.changeCartItemVariant(userId, cartItemId, input);
+  res.json({ data, message: "Đổi phân loại thành công" });
 };
 
 export const removeFromCartHandler = async (req: Request, res: Response) => {
