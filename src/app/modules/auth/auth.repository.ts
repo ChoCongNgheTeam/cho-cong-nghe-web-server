@@ -156,7 +156,7 @@ export const cleanupRevokedExpiredRefreshTokens = async () => {
   });
 };
 
-// ─── OAuth ────────────────────────────────────────────────────────────────────
+// OAuth
 
 export const findOAuthAccount = (provider: string, providerAccountId: string) => {
   return prisma.oauth_accounts.findUnique({
@@ -173,7 +173,7 @@ export const findUserById = (id: string) => {
   return prisma.users.findUnique({ where: { id } });
 };
 
-export const createUserFromOAuth = async (data: { email: string; fullName: string; avatarImage?: string; userName: string }): Promise<OAuthResolvedUser> => {
+export const createUserFromOAuth = async (data: { email: string; fullName: string; avatarImage?: string | null; userName: string }): Promise<OAuthResolvedUser> => {
   return prisma.users.create({
     data: {
       ...data,
@@ -189,7 +189,7 @@ export const createUserFromOAuth = async (data: { email: string; fullName: strin
       role: true,
       avatarImage: true,
       createdAt: true,
-      isActive: true, // 🔥 thêm cái này để check isActive phía dưới
+      isActive: true,
     },
   });
 };

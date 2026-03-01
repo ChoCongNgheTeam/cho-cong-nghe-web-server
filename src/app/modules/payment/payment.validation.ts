@@ -12,11 +12,30 @@ export const updatePaymentMethodSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+// ✅ SePay thực tế webhook payload
+export const sePayWebhookSchema = z.object({
+  id: z.number(),
+  gateway: z.string(), // "MBBank", "VietcomBank", ...
+  transactionDate: z.string(),
+  accountNumber: z.string(),
+  subAccount: z.string().nullable().optional(),
+  code: z.string().nullable().optional(), // SePay tự parse từ content
+  content: z.string(), // Nội dung chuyển khoản
+  transferType: z.enum(["in", "out"]),
+  transferAmount: z.number(),
+  accumulated: z.number().optional(),
+  referenceCode: z.string().optional(), // Mã tham chiếu ngân hàng
+  description: z.string().optional(),
+  apiKey: z.string().optional(), // SePay gửi kèm để verify
+});
+
+export type SePayWebhookPayload = z.infer<typeof sePayWebhookSchema>;
+
+// Legacy / internal schema (giữ lại nếu cần test manual)
 export const webhookPayloadSchema = z
   .object({
-    orderId: z.uuid("orderId không hợp lệ"),
+    orderId: z.string().uuid("orderId không hợp lệ"),
     transactionRef: z.string().optional(),
     status: z.enum(["COMPLETED", "FAILED", "REFUNDED"]),
-    // các field khác tuỳ ngân hàng, để optional
   })
-  .passthrough(); // cho phép các field thừa từ ngân hàng
+  .passthrough();

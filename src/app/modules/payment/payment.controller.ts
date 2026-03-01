@@ -1,13 +1,6 @@
 import { Request, Response } from "express";
-import {
-  findAllPaymentMethods,
-  findActivePaymentMethods,
-  findPaymentMethodById,
-  createPaymentMethod,
-  updatePaymentMethod,
-  deletePaymentMethod,
-} from "./payment.repository";
-import { handlePaymentWebhook } from "./payment.service";
+import { findAllPaymentMethods, findActivePaymentMethods, findPaymentMethodById, createPaymentMethod, updatePaymentMethod, deletePaymentMethod } from "./payment.repository";
+import { handlePaymentWebhook, handleSePayWebhook } from "./payment.service";
 import { createPaymentMethodSchema, updatePaymentMethodSchema } from "./payment.validation";
 
 export const getAllPaymentMethodsHandler = async (_: Request, res: Response) => {
@@ -55,10 +48,14 @@ export const deletePaymentMethodHandler = async (req: Request, res: Response) =>
 // Webhook endpoint (public, không cần auth)
 export const webhookHandler = async (req: Request, res: Response) => {
   try {
-    const result = await handlePaymentWebhook(req.body);
+    console.log("[SePay Webhook] Received:", JSON.stringify(req.body));
+    const result = await handleSePayWebhook(req.body, req.headers);
+    // SePay cần nhận { success: true } để không retry
     res.json({ success: true, data: result });
   } catch (error: any) {
-    console.error("Webhook error:", error);
-    res.status(400).json({ success: false, message: error.message || "Webhook xử lý thất bại" });
+    console.error("[SePay Webhook] Error:", error.message);
+    // Vẫn trả 200 với success: false để SePay không spam retry
+    // Chỉ trả 4xx nếu muốn SePay retry
+    res.status(200).json({ success: false, message: error.message });
   }
 };

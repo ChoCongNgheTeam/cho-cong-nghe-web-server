@@ -14,7 +14,7 @@ export interface OAuthUserProfile {
   providerAccountId: string;
   email: string;
   fullName: string;
-  avatarImage?: string;
+  avatarImage?: string | null;
   accessToken?: string;
   refreshToken?: string;
   expiresAt?: Date;
@@ -42,27 +42,27 @@ const generateUserName = (email: string): string => {
  * Logic chung dùng cho mọi provider.
  */
 export const findOrCreateOAuthUser = async (provider: string, profile: OAuthUserProfile, meta?: OAuthLoginMeta) => {
-  // 1. Đã có tài khoản OAuth này chưa?
+  // Đã có tài khoản OAuth này chưa?
   let oauthAccount = await findOAuthAccount(provider, profile.providerAccountId);
 
   let user: OAuthResolvedUser | null = oauthAccount?.user ?? null;
   if (!user) {
-    // 2. Email đã tồn tại? → link account
+    // Email đã tồn tại? → link account
     const existingUser = profile.email ? await findByEmail(profile.email) : null;
 
     if (existingUser) {
       user = existingUser;
     } else {
-      // 3. Tạo user mới
+      // Tạo user mới
       user = await createUserFromOAuth({
         email: profile.email,
         fullName: profile.fullName,
-        avatarImage: profile.avatarImage ?? "./images/avatar.png",
+        avatarImage: profile.avatarImage ?? null,
         userName: generateUserName(profile.email),
       });
     }
 
-    // 4. Tạo bản ghi oauth_accounts
+    // Tạo bản ghi oauth_accounts
     await createOAuthAccount({
       userId: user.id,
       provider,
@@ -81,7 +81,7 @@ export const findOrCreateOAuthUser = async (provider: string, profile: OAuthUser
     throw new UnauthorizedError("Tài khoản đã bị vô hiệu hóa");
   }
 
-  // 5. Phát token (mặc định short session, không có rememberMe cho OAuth)
+  // Phát token (mặc định short session, không có rememberMe cho OAuth)
   const accessToken = signAccessToken({ userId: user.id, role: user.role });
   const accessTokenTTL = jwtConfig.accessToken.ttl;
   const refreshTokenTTL = jwtConfig.refreshToken.ttl.short;
@@ -113,7 +113,7 @@ export const findOrCreateOAuthUser = async (provider: string, profile: OAuthUser
   };
 };
 
-// ─── Google ───────────────────────────────────────────────────────────────────
+// Google
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 

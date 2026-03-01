@@ -31,16 +31,26 @@ export const checkoutHandler = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const input = req.body;
 
-  // Prepare checkout data with all validations
   const checkoutSummary = await prepareCheckoutData(userId, input);
-
-  // Create order
   const order = await createOrderFromCheckout(userId, checkoutSummary);
+
+  // Build bankTransferInfo nếu có
+  const bankTransferInfo = checkoutSummary.bankTransferCode
+    ? {
+        bankName: process.env.BANK_NAME,
+        accountNumber: process.env.BANK_ACCOUNT,
+        accountName: process.env.BANK_HOLDER,
+        amount: checkoutSummary.totalAmount,
+        content: checkoutSummary.bankTransferCode,
+        qrCode: `https://img.vietqr.io/image/${process.env.BANK_BIN}-${process.env.BANK_ACCOUNT}-compact2.png?amount=${checkoutSummary.totalAmount}&addInfo=${checkoutSummary.bankTransferCode}`,
+      }
+    : null;
 
   res.status(201).json({
     success: true,
     data: {
       orderId: order.id,
+      orderCode: order.orderCode,
       orderDate: order.orderDate,
       summary: {
         items: checkoutSummary.items,
@@ -52,6 +62,7 @@ export const checkoutHandler = async (req: Request, res: Response) => {
       },
       orderStatus: order.orderStatus,
       paymentStatus: order.paymentStatus,
+      bankTransferInfo, // ← null nếu không phải bank transfer
     },
     message: "Order created successfully",
   });

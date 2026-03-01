@@ -2,6 +2,7 @@ import * as repo from "./checkout.repository";
 import { CheckoutInput, CartValidationResult, CartItemValidation, CheckoutSummary } from "./checkout.types";
 import { BadRequestError, NotFoundError } from "@/errors";
 import { handlePrismaError } from "@/utils/handle-prisma-error";
+import { nanoid } from "nanoid";
 
 export const validateCartItems = async (userId: string): Promise<CartValidationResult> => {
   const cartItems = await repo.findCartItemsWithProduct(userId).catch(handlePrismaError);
@@ -68,7 +69,8 @@ export const calculateSubtotal = async (userId: string): Promise<number> => {
 
 export const calculateShippingFee = async (subtotal: number, shippingAddressId: string): Promise<number> => {
   const FREE_SHIPPING_THRESHOLD = 500000;
-  const DEFAULT_SHIPPING_FEE = 30000;
+  // const DEFAULT_SHIPPING_FEE = 30000;
+  const DEFAULT_SHIPPING_FEE = 1000;
 
   if (subtotal >= FREE_SHIPPING_THRESHOLD) return 0;
 
@@ -105,9 +107,7 @@ export const validateAndApplyVoucher = async (voucherId: string | undefined, sub
     if (userVoucher.usedCount >= userVoucher.maxUses) throw new BadRequestError("You have reached the maximum usage limit for this voucher");
   }
 
-  let discount = voucher.discountType === "DISCOUNT_PERCENT" 
-    ? (subtotal * Number(voucher.discountValue)) / 100 
-    : Number(voucher.discountValue);
+  let discount = voucher.discountType === "DISCOUNT_PERCENT" ? (subtotal * Number(voucher.discountValue)) / 100 : Number(voucher.discountValue);
 
   return { discount: Math.min(discount, subtotal), voucherData: voucher };
 };
@@ -125,7 +125,7 @@ export const prepareCheckoutData = async (userId: string, input: CheckoutInput):
   if (!shippingAddress || shippingAddress.userId !== userId) throw new NotFoundError("Shipping address");
 
   const subtotalAmount = await calculateSubtotal(userId);
-  
+
   const cartItems = await repo.findCartItemsWithProduct(userId);
   const items = cartItems.map((item) => ({
     productVariantId: item.productVariantId,
@@ -141,8 +141,21 @@ export const prepareCheckoutData = async (userId: string, input: CheckoutInput):
   const taxAmount = calculateTax(subtotalAmount, shippingFee, voucherDiscount);
   const totalAmount = subtotalAmount + shippingFee - voucherDiscount + taxAmount;
 
+  // Generate bankTransferCode nếu là BANK_TRANSFER
+  const isBankTransfer = paymentMethod.code === "BANK_TRANSFER";
+  const bankTransferCode = isBankTransfer ? `TT${nanoid(8).toUpperCase()}` : undefined;
+
   return {
-    items, subtotalAmount, shippingFee, voucherDiscount, taxAmount, totalAmount, paymentMethodId, shippingAddressId, voucherId,
+    items,
+    subtotalAmount,
+    shippingFee,
+    voucherDiscount,
+    taxAmount,
+    totalAmount,
+    paymentMethodId,
+    shippingAddressId,
+    voucherId,
+    bankTransferCode,
   };
 };
 

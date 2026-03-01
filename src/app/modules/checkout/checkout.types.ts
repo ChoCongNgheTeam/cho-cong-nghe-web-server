@@ -54,6 +54,7 @@ export interface CheckoutSummary {
   paymentMethodId: string;
   shippingAddressId: string;
   voucherId?: string;
+  bankTransferCode?: string;
 }
 
 /**

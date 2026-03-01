@@ -113,12 +113,7 @@ export interface CheckoutWithPricingResponse {
  * Get checkout summary with pricing
  * Dùng cho: Checkout page
  */
-export const getCheckoutWithPricing = async (
-  checkoutItems: CheckoutItemInput[],
-  shippingFee: number = 0,
-  userId?: string,
-  voucherCode?: string,
-): Promise<CheckoutWithPricingResponse> => {
+export const getCheckoutWithPricing = async (checkoutItems: CheckoutItemInput[], shippingFee: number = 0, userId?: string, voucherCode?: string): Promise<CheckoutWithPricingResponse> => {
   // Convert to pricing input
   const pricingInput: PricingProductInput[] = checkoutItems.map((item) => ({
     productId: item.productId,
@@ -265,19 +260,20 @@ export const calculateShippingFee = async (
     {
       id: "standard",
       name: "Giao hàng tiêu chuẩn",
-      fee: 30000,
+      // fee: 30000,
+      fee: 1000,
       estimatedDays: "3-5 ngày",
     },
     {
       id: "express",
       name: "Giao hàng nhanh",
-      fee: 50000,
+      // fee: 50000,
+      fee: 1000,
       estimatedDays: "1-2 ngày",
     },
   ];
 
-  const selectedMethod =
-    availableMethods.find((m) => m.id === shippingMethodId) || availableMethods[0];
+  const selectedMethod = availableMethods.find((m) => m.id === shippingMethodId) || availableMethods[0];
 
   return {
     fee: selectedMethod.fee,

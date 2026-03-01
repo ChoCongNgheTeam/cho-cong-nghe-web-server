@@ -50,6 +50,8 @@ enum PaymentStatus {
 enum PaymentTransactionStatus {
   PENDING
   COMPLETED
+  UNDERPAID
+  OVERPAID
   FAILED
   REFUNDED
 }
@@ -579,6 +581,7 @@ model orders {
   totalAmount       Decimal       @db.Decimal(10, 2)
   orderStatus       OrderStatus   @default(PENDING)
   paymentStatus     PaymentStatus @default(UNPAID)
+  bankTransferCode  String? @unique
   orderDate         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
@@ -621,6 +624,7 @@ model reviews {
 model payment_methods {
   id          String   @id @default(uuid()) @db.Uuid
   name        String   @unique
+  code        String   @unique
   description String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
