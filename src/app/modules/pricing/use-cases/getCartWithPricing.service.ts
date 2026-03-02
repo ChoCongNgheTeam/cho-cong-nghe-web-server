@@ -1,5 +1,5 @@
-import { calculateCartPrice } from "../pricing.service";
-import { PricingProductInput } from "../pricing.types";
+import { getVariantPricing } from "../pricing.service";
+import { mapPricingToSummary } from "../pricing.helpers";
 
 /**
  * Cart Item Input từ database
@@ -11,7 +11,7 @@ export interface CartItemInput {
   quantity: number;
   basePrice: number; // Giá gốc từ variant
 
-  // Context for pricing
+  // Context for pricing (Bắt buộc phải truyền vào từ Repo)
   brandId?: string;
   categoryId?: string;
   categoryPath?: string[];
@@ -23,11 +23,11 @@ export interface CartItemInput {
 }
 
 /**
- * Cart Summary Response
+ * Cart Summary Response - Đã chuẩn hóa field `price`
  */
 export interface CartWithPricingResponse {
   items: {
-    id: string; // cart_item id
+    id: string;
     productId: string;
     variantId: string;
     productName: string;
@@ -35,38 +35,21 @@ export interface CartWithPricingResponse {
     variantImage?: string;
     quantity: number;
 
-    // Pricing
-    basePrice: number;
-    finalPrice: number;
+    // 🔥 Dùng chung object price y hệt bên Product
+    price: any; 
+    
+    // Tiền tổng của item này trong giỏ (giá * số lượng)
     totalBasePrice: number;
     totalFinalPrice: number;
-    totalDiscount: number;
-    discountPercentage: number;
-
-    // Promotions
-    appliedPromotions: {
-      id: string;
-      name: string;
-      description: string;
-      discountAmount: number;
-      actionType: string;
-    }[];
-
-    // Gifts
-    gifts?: {
-      variantId: string;
-      quantity: number;
-    }[];
   }[];
 
-  // Summary
+  // Summary toàn giỏ hàng
   subtotal: number;
   totalPromotionDiscount: number;
   totalVoucherDiscount: number;
   totalDiscount: number;
   finalTotal: number;
 
-  // Applied voucher
   appliedVoucher?: {
     id: string;
     code: string;
@@ -74,183 +57,139 @@ export interface CartWithPricingResponse {
     description: string;
   };
 
-  // Total gifts
-  totalGifts: {
-    variantId: string;
-    quantity: number;
-    productName?: string; // Fetch from DB
-    productImage?: string;
-  }[];
-
-  // Validation
   isValid: boolean;
   errors: string[];
 }
 
 /**
  * ===== MAIN USECASE =====
- * Get cart with pricing calculation
- * Dùng cho: Cart page, Mini cart
+ * Tính giá giỏ hàng theo ĐÚNG pattern của ProductDetail
  */
 export const getCartWithPricing = async (
   cartItems: CartItemInput[],
   userId?: string,
   voucherCode?: string,
 ): Promise<CartWithPricingResponse> => {
-  // Convert to pricing input format
-  const pricingInput: PricingProductInput[] = cartItems.map((item) => ({
-    productId: item.productId,
-    variantId: item.variantId,
-    basePrice: item.basePrice,
-    quantity: item.quantity,
-    brandId: item.brandId,
-    categoryPath: item.categoryPath,
-  }));
+  let subtotal = 0;
+  let totalPromotionDiscount = 0;
+  const errors: string[] = [];
 
-  // Calculate pricing (CART MODE)
-  const pricingResult = await calculateCartPrice({
-    items: pricingInput,
-    userId,
-    voucherCode,
-  });
+  // 1. Lặp qua từng item và tính khuyến mãi hệt như Product
+  const items = await Promise.all(
+    cartItems.map(async (item) => {
+      // Gọi chung 1 hàm tính giá của hệ thống
+      const fullPricing = await getVariantPricing(
+        item.productId,
+        item.variantId,
+        item.basePrice,
+        item.brandId,
+        item.categoryPath,
+        userId
+      );
 
-  // Map to response format
-  const items = pricingResult.items.map((pricedItem, index) => {
-    const originalItem = cartItems[index];
+      // Map format chuẩn
+      const priceSummary = mapPricingToSummary(fullPricing);
+      const finalPrice = fullPricing.final ?? fullPricing.base;
 
-    return {
-      id: originalItem.id,
-      productId: pricedItem.productId,
-      variantId: pricedItem.variantId,
-      productName: originalItem.productName || "",
-      productSlug: originalItem.productSlug || "",
-      variantImage: originalItem.variantImage,
-      quantity: pricedItem.quantity,
+      // Tính tổng tiền cho dòng item này
+      const itemTotalBasePrice = item.basePrice * item.quantity;
+      const itemTotalFinalPrice = finalPrice * item.quantity;
 
-      // Pricing
-      basePrice: pricedItem.basePrice,
-      finalPrice: pricedItem.finalPrice,
-      totalBasePrice: pricedItem.totalBasePrice,
-      totalFinalPrice: pricedItem.totalFinalPrice,
-      totalDiscount: pricedItem.totalDiscount,
-      discountPercentage: pricedItem.discountPercentage,
+      // Cộng dồn vào tổng giỏ hàng
+      subtotal += itemTotalBasePrice;
+      totalPromotionDiscount += (item.basePrice - finalPrice) * item.quantity;
 
-      // Promotions
-      appliedPromotions: pricedItem.appliedPromotions.map((p) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        discountAmount: p.discountAmount,
-        actionType: p.actionType?.toString() || "",
-      })),
+      return {
+        id: item.id,
+        productId: item.productId,
+        variantId: item.variantId,
+        productName: item.productName || "",
+        productSlug: item.productSlug || "",
+        variantImage: item.variantImage,
+        quantity: item.quantity,
+        
+        // Trả ra object price quen thuộc cho FE
+        price: priceSummary,
 
-      // Gifts
-      gifts: pricedItem.giftProducts,
-    };
-  });
+        totalBasePrice: itemTotalBasePrice,
+        totalFinalPrice: itemTotalFinalPrice,
+      };
+    })
+  );
+
+  let totalVoucherDiscount = 0;
+  let appliedVoucher = undefined;
+  let finalTotal = subtotal - totalPromotionDiscount;
+
+  // 2. TÍCH HỢP VOUCHER (Nếu ông có module tính voucher riêng thì gọi ở đây)
+  // if (voucherCode && finalTotal > 0) {
+  //   const voucherInfo = await checkVoucher(voucherCode, finalTotal, userId);
+  //   if (voucherInfo.isValid) {
+  //     totalVoucherDiscount = voucherInfo.discountAmount;
+  //     finalTotal -= totalVoucherDiscount;
+  //     appliedVoucher = voucherInfo.details;
+  //   } else {
+  //     errors.push("Voucher không hợp lệ hoặc đã hết hạn");
+  //   }
+  // }
 
   return {
     items,
-    subtotal: pricingResult.subtotal,
-    totalPromotionDiscount: pricingResult.totalPromotionDiscount,
-    totalVoucherDiscount: pricingResult.totalVoucherDiscount,
-    totalDiscount: pricingResult.totalDiscount,
-    finalTotal: pricingResult.finalTotal,
-    appliedVoucher: pricingResult.appliedVoucher
-      ? {
-          id: pricingResult.appliedVoucher.id,
-          code: pricingResult.appliedVoucher.name,
-          discountAmount: pricingResult.appliedVoucher.discountAmount,
-          description: pricingResult.appliedVoucher.description,
-        }
-      : undefined,
-    totalGifts: pricingResult.totalGifts.map((gift) => ({
-      variantId: gift.variantId,
-      quantity: gift.quantity,
-      // Note: Fetch product info separately if needed
-    })),
-    isValid: pricingResult.isValid,
-    errors: pricingResult.errors,
+    subtotal,
+    totalPromotionDiscount,
+    totalVoucherDiscount,
+    totalDiscount: totalPromotionDiscount + totalVoucherDiscount,
+    finalTotal: Math.max(0, finalTotal),
+    appliedVoucher,
+    isValid: errors.length === 0,
+    errors,
   };
 };
 
 /**
- * ===== HELPER USECASE =====
- * Validate cart before checkout
+ * ===== HELPER USECASES =====
  */
 export const validateCartForCheckout = async (
   cartItems: CartItemInput[],
   userId?: string,
   voucherCode?: string,
-): Promise<{
-  isValid: boolean;
-  errors: string[];
-  warnings: string[];
-}> => {
+) => {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // Check empty cart
   if (cartItems.length === 0) {
     errors.push("Giỏ hàng trống");
     return { isValid: false, errors, warnings };
   }
 
-  // Check quantity
   cartItems.forEach((item) => {
     if (item.quantity <= 0) {
       errors.push(`Số lượng không hợp lệ cho sản phẩm ${item.productName}`);
     }
   });
 
-  // Get pricing to validate
   const cartWithPricing = await getCartWithPricing(cartItems, userId, voucherCode);
 
-  // Collect pricing errors
-  if (!cartWithPricing.isValid) {
-    errors.push(...cartWithPricing.errors);
-  }
+  if (!cartWithPricing.isValid) errors.push(...cartWithPricing.errors);
+  if (cartWithPricing.finalTotal < 0) errors.push("Tổng giá trị đơn hàng không hợp lệ");
 
-  // Check if final total is valid
-  if (cartWithPricing.finalTotal <= 0) {
-    errors.push("Tổng giá trị đơn hàng không hợp lệ");
-  }
-
-  return {
-    isValid: errors.length === 0,
-    errors,
-    warnings,
-  };
+  return { isValid: errors.length === 0, errors, warnings };
 };
 
-/**
- * ===== HELPER USECASE =====
- * Apply voucher to cart
- */
 export const applyVoucherToCart = async (
   cartItems: CartItemInput[],
   voucherCode: string,
   userId?: string,
-): Promise<{
-  success: boolean;
-  message: string;
-  cart?: CartWithPricingResponse;
-}> => {
+) => {
   try {
     const cart = await getCartWithPricing(cartItems, userId, voucherCode);
 
     if (!cart.isValid && cart.errors.length > 0) {
-      return {
-        success: false,
-        message: cart.errors[0],
-      };
+      return { success: false, message: cart.errors[0] };
     }
 
     if (!cart.appliedVoucher) {
-      return {
-        success: false,
-        message: "Voucher không áp dụng được cho giỏ hàng này",
-      };
+      return { success: false, message: "Voucher không áp dụng được cho giỏ hàng này" };
     }
 
     return {
@@ -259,17 +198,10 @@ export const applyVoucherToCart = async (
       cart,
     };
   } catch (error: any) {
-    return {
-      success: false,
-      message: error.message || "Lỗi khi áp dụng voucher",
-    };
+    return { success: false, message: error.message || "Lỗi khi áp dụng voucher" };
   }
 };
 
-/**
- * ===== HELPER USECASE =====
- * Remove voucher from cart
- */
 export const removeVoucherFromCart = async (
   cartItems: CartItemInput[],
   userId?: string,

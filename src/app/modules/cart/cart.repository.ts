@@ -23,6 +23,19 @@ export const cartItemSelect = {
           slug: true,
           isActive: true,
           brand: { select: { id: true, name: true } },
+          category: {
+            select: {
+              id: true,
+              slug: true,
+              parent: {
+                select: {
+                  id: true,
+                  slug: true,
+                  parent: { select: { id: true, slug: true } },
+                },
+              },
+            },
+          },
           img: { select: { id: true, imageUrl: true, altText: true, color: true }, orderBy: { position: "asc" as any } },
         },
       },
@@ -121,13 +134,30 @@ export const transformToCartResponse = (item: any): CartResponse => {
   // Nếu tìm thấy ảnh trùng màu thì lấy, nếu không (ví dụ sản phẩm không phân loại theo màu) thì fallback về ảnh đầu tiên
   const finalImageUrl = matchingImage?.imageUrl || item.productVariant.product.img[0]?.imageUrl;
 
+  // BƯỚC MỚI: Build Category Path từ cục category lấy được
+  const category = item.productVariant.product.category;
+  const categoryPath: string[] = [];
+  
+  if (category) {
+    categoryPath.push(category.id); // Level 1
+    if (category.parent) {
+      categoryPath.push(category.parent.id); // Level 2
+      if (category.parent.parent) {
+        categoryPath.push(category.parent.parent.id); // Level 3
+      }
+    }
+  }
+
   return {
     id: item.id,
     productVariantId: item.productVariantId,
     productId: item.productVariant.product.id,
     productName: item.productVariant.product.name,
     productSlug: item.productVariant.product.slug,
+    brandId: item.productVariant.product.brand.id,
     brandName: item.productVariant.product.brand.name,
+    categoryId: category?.id,
+    categoryPath: categoryPath.reverse(),
     variantCode: item.productVariant.code || undefined,
     image: finalImageUrl, // BƯỚC 3: Gán link ảnh đã lọc được
     color: colorAttr?.attributeOption.label,

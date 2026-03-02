@@ -2,6 +2,9 @@ import * as repo from "./cart.repository";
 import { AddToCartInput, UpdateCartItemInput, LocalStorageCartItem, SyncCartResult, ChangeVariantInput } from "./cart.types";
 import { NotFoundError, BadRequestError } from "@/errors";
 
+// 👉 IMPORT SERVICE TÍNH GIÁ MỚI 
+import { getCartWithPricing } from "../pricing/use-cases/getCartWithPricing.service";
+
 export const validateCartItemStatus = async (variantId: string, quantity: number) => {
   const variant = await repo.findVariantWithProductById(variantId);
 
@@ -27,14 +30,64 @@ export const validateCartItemStatus = async (variantId: string, quantity: number
 };
 
 export const getCart = async (userId: string) => {
+  // 1. Lấy dữ liệu giỏ hàng thô từ DB
   const items = await repo.findByUserId(userId);
   const formattedItems = items.map(repo.transformToCartResponse);
 
+  // Xử lý nhanh nếu giỏ hàng trống
+  if (formattedItems.length === 0) {
+    return {
+      items: [],
+      totalItems: 0,
+      totalQuantity: 0,
+      subtotal: 0,
+      totalPromotionDiscount: 0,
+      totalVoucherDiscount: 0,
+      totalDiscount: 0,
+      finalTotal: 0
+    };
+  }
+
+  // 2. Chuyển đổi dữ liệu sang Format mà Pricing Service yêu cầu
+  const cartInputForPricing = formattedItems.map(item => ({
+    id: item.id,
+    productId: item.productId,
+    variantId: item.productVariantId,
+    quantity: item.quantity,
+    basePrice: item.unitPrice,     // Giá gốc từ db
+    brandId: item.brandId,
+    categoryId: item.categoryId,
+    categoryPath: item.categoryPath,
+    productName: item.productName,
+    productSlug: item.productSlug,
+    variantImage: item.image,
+  }));
+
+  // 3. 🚀 GỌI HÀM TÍNH GIÁ KHUYẾN MÃI TỪ MODULE PRICING
+  const pricedCart = await getCartWithPricing(cartInputForPricing, userId);
+
+  // 4. Gộp thông tin UI (màu sắc, dung lượng) với thông tin Giá mới tính
+  const finalItems = pricedCart.items.map(pricedItem => {
+    const originalItem = formattedItems.find(i => i.id === pricedItem.id);
+    return {
+      ...originalItem,  // Lấy lại color, storage, brandName...
+      ...pricedItem,    // Đè lên thông tin giá mới (object price, totalFinalPrice...)
+    };
+  });
+
+  // 5. Trả dữ liệu về cho Controller
   return {
-    items: formattedItems,
+    items: finalItems,
     totalItems: formattedItems.length,
     totalQuantity: formattedItems.reduce((sum, item) => sum + item.quantity, 0),
-    subtotal: formattedItems.reduce((sum, item) => sum + item.totalPrice, 0),
+    
+    // Các field giá tiền đã được tính toán kỹ lưỡng từ Pricing Service
+    subtotal: pricedCart.subtotal,
+    totalPromotionDiscount: pricedCart.totalPromotionDiscount,
+    totalVoucherDiscount: pricedCart.totalVoucherDiscount,
+    totalDiscount: pricedCart.totalDiscount,
+    finalTotal: pricedCart.finalTotal, // ĐÂY LÀ SỐ TIỀN KHÁCH THỰC SỰ PHẢI TRẢ
+    appliedVoucher: pricedCart.appliedVoucher
   };
 };
 
