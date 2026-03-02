@@ -49,9 +49,10 @@ export interface CheckoutSummary {
   subtotalAmount: number;
   shippingFee: number;
   voucherDiscount: number;
-  taxAmount: number; // 🔥 NEW: VAT tax amount
+  taxAmount: number;
   totalAmount: number;
   paymentMethodId: string;
+  paymentMethodCode: string;
   shippingAddressId: string;
   voucherId?: string;
   bankTransferCode?: string;

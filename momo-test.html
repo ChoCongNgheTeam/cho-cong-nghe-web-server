@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>MoMo Payment Test</title>
+  </head>
+
+  <body>
+    <h2>MoMo Checkout Test</h2>
+
+    <button onclick="payWithMomo()">Pay with MoMo</button>
+
+    <pre id="result"></pre>
+
+    <script>
+      async function payWithMomo() {
+        const token =
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxYWVkZDA1MC1jYjk5LTQ4MGQtYTYwYi02ZjU3MmMwNmEyMzQiLCJyb2xlIjoiQ1VTVE9NRVIiLCJpYXQiOjE3NzI0NDkwMTIsImV4cCI6MTc3MjQ0OTkxMn0.a2QyYG3HKzRyFCHqrYatk2XoqykemQ-62015_Hw_8dY"; // thay token
+
+        const res = await fetch("http://localhost:5000/api/v1/payments/momo/create", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+          },
+          body: JSON.stringify({
+            orderId: "4d3db935-b38c-4754-b06f-68d5d14d37a8",
+            amount: 13490000.0,
+            orderInfo: "Thanh toan don hang test",
+          }),
+        });
+
+        const data = await res.json();
+
+        if (data?.data?.paymentUrl) window.location.href = data.data.paymentUrl;
+      }
+    </script>
+  </body>
+</html>

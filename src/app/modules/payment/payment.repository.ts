@@ -43,7 +43,7 @@ export const findPaymentMethodById = async (id: string) => {
   });
 };
 
-export const createPaymentMethod = async (data: { name: string; description?: string; isActive: boolean }) => {
+export const createPaymentMethod = async (data: { name: string; code: string; description?: string; isActive: boolean }) => {
   return prisma.payment_methods.create({
     data,
     select: paymentMethodSelect,

@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>ZaloPay Payment Test</title>
+  </head>
+
+  <body>
+    <h2>ZaloPay Checkout Test</h2>
+
+    <button onclick="payWithZaloPay()">Pay with ZaloPay</button>
+
+    <pre id="result"></pre>
+
+    <script>
+      async function payWithZaloPay() {
+        const token = "...";
+
+        const res = await fetch("http://localhost:5000/api/v1/payments/zalopay/create", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+          },
+          body: JSON.stringify({
+            orderId: "4d3db935-b38c-4754-b06f-68d5d14d37a8",
+            amount: 13490000,
+            description: "Thanh toan don hang test",
+          }),
+        });
+
+        const data = await res.json();
+        document.getElementById("result").textContent = JSON.stringify(data, null, 2);
+
+        if (data?.data?.paymentUrl) {
+          window.location.href = data.data.paymentUrl;
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -12,6 +12,11 @@ const methods = [
     description: "Ví điện tử MoMo",
   },
   {
+    name: "VNPay",
+    code: "VNPAY",
+    description: "Ví điện tử VNPay",
+  },
+  {
     name: "ZaloPay",
     code: "ZALOPAY",
     description: "Ví ZaloPay",

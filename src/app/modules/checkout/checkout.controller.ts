@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { prepareCheckoutData, createOrderFromCheckout, validateCartItems } from "./checkout.service";
+import { createMomoPaymentUrl, createVnpayPaymentUrl } from "../payment/payment.service";
 
 /**
  * GET /checkout/validate
@@ -34,35 +35,40 @@ export const checkoutHandler = async (req: Request, res: Response) => {
   const checkoutSummary = await prepareCheckoutData(userId, input);
   const order = await createOrderFromCheckout(userId, checkoutSummary);
 
-  // Build bankTransferInfo nếu có
-  const bankTransferInfo = checkoutSummary.bankTransferCode
-    ? {
-        bankName: process.env.BANK_NAME,
-        accountNumber: process.env.BANK_ACCOUNT,
-        accountName: process.env.BANK_HOLDER,
-        amount: checkoutSummary.totalAmount,
-        content: checkoutSummary.bankTransferCode,
-        qrCode: `https://img.vietqr.io/image/${process.env.BANK_BIN}-${process.env.BANK_ACCOUNT}-compact2.png?amount=${checkoutSummary.totalAmount}&addInfo=${checkoutSummary.bankTransferCode}`,
-      }
-    : null;
+  // Xác định payment info theo loại
+  let paymentInfo: any = null;
+  const methodCode = checkoutSummary.paymentMethodCode.toUpperCase();
+
+  if (methodCode?.includes("BANK_TRANSFER") && checkoutSummary.bankTransferCode) {
+    paymentInfo = {
+      type: "BANK_TRANSFER",
+      bankName: process.env.BANK_NAME,
+      accountNumber: process.env.BANK_ACCOUNT,
+      accountName: process.env.BANK_HOLDER,
+      amount: checkoutSummary.totalAmount,
+      content: checkoutSummary.bankTransferCode,
+      qrCode: `https://img.vietqr.io/image/${process.env.BANK_BIN}-${process.env.BANK_ACCOUNT}-compact2.png?amount=${checkoutSummary.totalAmount}&addInfo=${checkoutSummary.bankTransferCode}`,
+    };
+  } else if (methodCode?.includes("MOMO")) {
+    const momo = await createMomoPaymentUrl(order.id, checkoutSummary.totalAmount, `Thanh toan don hang ${order.orderCode}`);
+    paymentInfo = { type: "MOMO", ...momo };
+  } else if (methodCode?.includes("VNPAY")) {
+    const ipAddr = req.headers["x-forwarded-for"]?.toString().split(",")[0] || req.socket.remoteAddress || "127.0.0.1";
+    const vnpay = await createVnpayPaymentUrl(order.id, checkoutSummary.totalAmount, `Thanh toan don hang ${order.orderCode}`, ipAddr);
+    paymentInfo = { type: "VNPAY", ...vnpay };
+  }
 
   res.status(201).json({
     success: true,
     data: {
       orderId: order.id,
       orderCode: order.orderCode,
-      orderDate: order.orderDate,
-      summary: {
-        items: checkoutSummary.items,
-        subtotalAmount: checkoutSummary.subtotalAmount,
-        shippingFee: checkoutSummary.shippingFee,
-        voucherDiscount: checkoutSummary.voucherDiscount,
-        taxAmount: checkoutSummary.taxAmount,
-        totalAmount: checkoutSummary.totalAmount,
-      },
       orderStatus: order.orderStatus,
       paymentStatus: order.paymentStatus,
-      bankTransferInfo, // ← null nếu không phải bank transfer
+      summary: {
+        /* ... */
+      },
+      paymentInfo, // ← FE dùng paymentInfo.paymentUrl để redirect
     },
     message: "Order created successfully",
   });

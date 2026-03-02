@@ -582,6 +582,9 @@ model orders {
   orderStatus       OrderStatus   @default(PENDING)
   paymentStatus     PaymentStatus @default(UNPAID)
   bankTransferCode  String? @unique
+  momoOrderId      String? @unique 
+  vnpayTxnRef       String? @unique  
+  zaloPayTransId String? @unique
   orderDate         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 

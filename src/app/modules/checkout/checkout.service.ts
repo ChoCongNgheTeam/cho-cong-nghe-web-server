@@ -153,6 +153,7 @@ export const prepareCheckoutData = async (userId: string, input: CheckoutInput):
     taxAmount,
     totalAmount,
     paymentMethodId,
+    paymentMethodCode: paymentMethod.code,
     shippingAddressId,
     voucherId,
     bankTransferCode,
