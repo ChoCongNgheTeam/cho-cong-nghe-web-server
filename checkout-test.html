@@ -1,0 +1,174 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Checkout Test</title>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+      body {
+        font-family: sans-serif;
+        max-width: 540px;
+        margin: 40px auto;
+        padding: 0 16px;
+      }
+      #payment-element {
+        margin: 16px 0;
+      }
+      #stripe-submit {
+        background: #635bff;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-size: 16px;
+        cursor: pointer;
+        width: 100%;
+        margin-top: 8px;
+      }
+      #stripe-submit:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      #stripe-error {
+        color: #df1b41;
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Checkout Test</h2>
+
+    <button onclick="checkout()" style="padding: 10px 20px; font-size: 16px">Checkout</button>
+
+    <h3>Result:</h3>
+    <pre id="result"></pre>
+
+    <div id="payment-info"></div>
+
+    <script>
+      const TOKEN =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxYmU2MGFmMC1hNWFhLTQ3MTMtYTIzYi01ZGYwMzRjYTFmNjMiLCJyb2xlIjoiQ1VTVE9NRVIiLCJpYXQiOjE3NzI1MDk0NDAsImV4cCI6MTc3MjUxMDM0MH0.Ci9rYXcyCV7HNnO3SIJVE2UGogU-Pd-jt9EG0rXuvrk"; // thay token
+
+      let stripeInstance, stripeElements;
+
+      async function checkout() {
+        const res = await fetch("http://localhost:5000/api/v1/checkout", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + TOKEN,
+          },
+          body: JSON.stringify({
+            paymentMethodId: "e8b89dae-85e9-43ce-b5f9-aad2e11b0dbb",
+            shippingAddressId: "f3c12d89-431c-4f79-965f-e983524ce857",
+            voucherId: "",
+          }),
+        });
+
+        const data = await res.json();
+        document.getElementById("result").textContent = JSON.stringify(data, null, 2);
+
+        const info = data?.data?.paymentInfo;
+        if (!info) return;
+
+        renderPaymentInfo(info);
+      }
+
+      function renderPaymentInfo(info) {
+        const container = document.getElementById("payment-info");
+
+        switch (info.type) {
+          case "BANK_TRANSFER":
+            container.innerHTML = `
+              <h3>Bank Transfer</h3>
+              <p><b>Bank:</b> ${info.bankName}</p>
+              <p><b>Account:</b> ${info.accountNumber}</p>
+              <p><b>Holder:</b> ${info.accountName}</p>
+              <p><b>Content:</b> ${info.content}</p>
+              <p><b>Amount:</b> ${info.amount?.toLocaleString()} VND</p>
+              <img src="${info.qrCode}" width="260"/>
+            `;
+            break;
+
+          case "MOMO":
+            container.innerHTML = `
+              <h3>MoMo Payment</h3>
+              <p><b>Order:</b> ${info.momoOrderId}</p>
+              <a href="${info.paymentUrl}" target="_blank">
+                <button style="padding:10px 20px;font-size:16px;background:#ae2070;color:white;border:none;border-radius:6px;cursor:pointer;">
+                  Pay with MoMo
+                </button>
+              </a>
+            `;
+            break;
+
+          case "VNPAY":
+            container.innerHTML = `
+              <h3>VNPay Payment</h3>
+              <p><b>TxnRef:</b> ${info.txnRef}</p>
+              <a href="${info.paymentUrl}" target="_blank">
+                <button style="padding:10px 20px;font-size:16px;background:#0066cc;color:white;border:none;border-radius:6px;cursor:pointer;">
+                  Pay with VNPay
+                </button>
+              </a>
+            `;
+            break;
+
+          case "ZALOPAY":
+            container.innerHTML = `
+              <h3>ZaloPay Payment</h3>
+              <p><b>TransId:</b> ${info.appTransId}</p>
+              <a href="${info.paymentUrl}" target="_blank">
+                <button style="padding:10px 20px;font-size:16px;background:#0068ff;color:white;border:none;border-radius:6px;cursor:pointer;">
+                  Pay with ZaloPay
+                </button>
+              </a>
+            `;
+            break;
+
+          case "STRIPE":
+            container.innerHTML = `
+              <h3>Credit Card (Stripe)</h3>
+              <div id="payment-element"></div>
+              <button id="stripe-submit" onclick="confirmStripePayment()">Thanh toán</button>
+              <div id="stripe-error"></div>
+            `;
+            initStripeElement(info.clientSecret, info.publishableKey);
+            break;
+
+          default:
+            container.innerHTML = `<p>COD — Thanh toán khi nhận hàng</p>`;
+        }
+      }
+
+      function initStripeElement(clientSecret, publishableKey) {
+        stripeInstance = Stripe(publishableKey);
+        stripeElements = stripeInstance.elements({ clientSecret });
+
+        const paymentElement = stripeElements.create("payment");
+        paymentElement.mount("#payment-element");
+      }
+
+      async function confirmStripePayment() {
+        const btn = document.getElementById("stripe-submit");
+        const errDiv = document.getElementById("stripe-error");
+        btn.disabled = true;
+        errDiv.textContent = "";
+
+        const { error } = await stripeInstance.confirmPayment({
+          elements: stripeElements,
+          confirmParams: {
+            return_url: "http://localhost:5000/api/v1/payments/stripe/return",
+          },
+        });
+
+        // Chỉ vào đây nếu có lỗi (không redirect được)
+        if (error) {
+          errDiv.textContent = error.message;
+          btn.disabled = false;
+        }
+        // Nếu thành công → Stripe tự redirect, không cần xử lý thêm
+      }
+    </script>
+  </body>
+</html>

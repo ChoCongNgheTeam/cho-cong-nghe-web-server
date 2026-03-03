@@ -1,4 +1,14 @@
+/**
+ * payment.validation.ts
+ *
+ * Tập trung toàn bộ Zod schemas cho payment module.
+ */
+
 import { z } from "zod";
+
+// ---------------------------------------------------------------------------
+// Payment Method CRUD
+// ---------------------------------------------------------------------------
 
 export const createPaymentMethodSchema = z.object({
   name: z.string().min(1, "Tên phương thức thanh toán không được để trống"),
@@ -13,32 +23,41 @@ export const updatePaymentMethodSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+// ---------------------------------------------------------------------------
+// SePay
+// ---------------------------------------------------------------------------
+
 export const sePayWebhookSchema = z.object({
   id: z.number(),
-  gateway: z.string(), // "MBBank", "VietcomBank", ...
+  gateway: z.string(),
   transactionDate: z.string(),
   accountNumber: z.string(),
   subAccount: z.string().nullable().optional(),
-  code: z.string().nullable().optional(), // SePay tự parse từ content
-  content: z.string(), // Nội dung chuyển khoản
+  code: z.string().nullable().optional(),
+  content: z.string(),
   transferType: z.enum(["in", "out"]),
   transferAmount: z.number(),
   accumulated: z.number().optional(),
-  referenceCode: z.string().optional(), // Mã tham chiếu ngân hàng
+  referenceCode: z.string().optional(),
   description: z.string().optional(),
-  apiKey: z.string().optional(), // SePay gửi kèm để verify
+  apiKey: z.string().optional(),
 });
 
-// MoMo IPN payload
+export type SePayWebhookPayload = z.infer<typeof sePayWebhookSchema>;
+
+// ---------------------------------------------------------------------------
+// MoMo
+// ---------------------------------------------------------------------------
+
 export const momoIpnSchema = z
   .object({
     partnerCode: z.string(),
-    orderId: z.string(), // Chính là momoOrderId ta tự tạo
+    orderId: z.string(),
     requestId: z.string(),
     amount: z.number(),
     orderInfo: z.string(),
     orderType: z.string(),
-    transId: z.number(), // Mã giao dịch MoMo
+    transId: z.number(),
     resultCode: z.number(), // 0 = success
     message: z.string(),
     payType: z.string().optional(),
@@ -48,7 +67,12 @@ export const momoIpnSchema = z
   })
   .passthrough();
 
-// VNPay IPN query params
+export type MomoIpnPayload = z.infer<typeof momoIpnSchema>;
+
+// ---------------------------------------------------------------------------
+// VNPay
+// ---------------------------------------------------------------------------
+
 export const vnpayIpnSchema = z
   .object({
     vnp_TmnCode: z.string(),
@@ -62,16 +86,17 @@ export const vnpayIpnSchema = z
     vnp_TransactionNo: z.string(),
     vnp_ResponseCode: z.string(), // "00" = success
     vnp_TransactionStatus: z.string(),
-    vnp_TxnRef: z.string(), // Chính là vnpayTxnRef ta tự tạo
+    vnp_TxnRef: z.string(),
     vnp_SecureHash: z.string(),
   })
   .passthrough();
 
-export type SePayWebhookPayload = z.infer<typeof sePayWebhookSchema>;
-export type MomoIpnPayload = z.infer<typeof momoIpnSchema>;
 export type VnpayIpnPayload = z.infer<typeof vnpayIpnSchema>;
 
-// Legacy / internal schema (giữ lại nếu cần test manual)
+// ---------------------------------------------------------------------------
+// Legacy / manual test schema (giữ lại nếu cần)
+// ---------------------------------------------------------------------------
+
 export const webhookPayloadSchema = z
   .object({
     orderId: z.string().uuid("orderId không hợp lệ"),

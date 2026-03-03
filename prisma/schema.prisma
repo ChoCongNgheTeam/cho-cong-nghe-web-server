@@ -585,6 +585,7 @@ model orders {
   momoOrderId      String? @unique 
   vnpayTxnRef       String? @unique  
   zaloPayTransId String? @unique
+  stripePaymentIntentId String?
   orderDate         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 

@@ -6,6 +6,8 @@ import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "@/config/swagger";
 import { cleanupRefreshTokens } from "./modules/auth/auth.service";
 import { errorMiddleware } from "./middlewares/error.middleware";
+import { stripeWebhookHandler } from "./modules/payment/payment.controller";
+import { asyncHandler } from "@/utils/async-handler";
 
 const app = express();
 
@@ -26,6 +28,8 @@ if (process.env.NODE_ENV === "production") {
     });
   });
 }
+
+app.post("/api/v1/payments/webhook/stripe", express.raw({ type: "application/json" }), asyncHandler(stripeWebhookHandler));
 
 app.use(express.json());
 
