@@ -290,7 +290,10 @@ export const findWardsByProvince = async (
       },
       skip,
       take: perPage,
-      orderBy: { name: "asc" },
+      orderBy: [
+        { type: "asc" }, // Sắp xếp theo Loại trước (Phường sẽ đứng trước Xã theo bảng chữ cái p < x)
+        { name: "asc" }  // Sau đó mới sắp xếp theo Tên (A-Z)
+      ],
     }),
     prisma.wards.count({ where }),
   ]);
