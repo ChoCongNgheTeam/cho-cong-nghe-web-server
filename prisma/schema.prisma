@@ -108,22 +108,27 @@ enum PolicyType {
   PAYMENT
 }
 
-// --------------------- MODELS ---------------------
 
+// SOFT DELETE: users là entity chính, staff/admin cần trash
+// deletedBy tham chiếu chính nó (self-ref) — dùng String thay vì Uuid relation để tránh circular
 model users {
-  id           String   @id @default(uuid()) @db.Uuid
-  userName     String?  @unique
-  email        String   @unique
-  passwordHash  String?
+  id           String    @id @default(uuid()) @db.Uuid
+  userName     String?   @unique
+  email        String    @unique
+  passwordHash String?
   fullName     String?
   phone        String?
   gender       Gender?
-  dateOfBirth  DateTime?   
-  role         UserRole @default(CUSTOMER)
-  isActive     Boolean  @default(true)
+  dateOfBirth  DateTime?
+  role         UserRole  @default(CUSTOMER)
+  isActive     Boolean   @default(true)
   avatarImage  String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // --- Soft Delete ---
+  deletedAt    DateTime?
+  deletedBy    String?   @db.Uuid  // ID của admin/staff thực hiện xóa
 
   orders        orders[]
   userAddresses user_addresses[]
@@ -137,12 +142,15 @@ model users {
 
   passwordResetTokens password_reset_tokens[]
   refreshTokens       refresh_tokens[]
-  oauthAccounts oauth_accounts[]
+  oauthAccounts       oauth_accounts[]
+
+  @@index([deletedAt]) // để query isDeleted nhanh hơn
 }
 
+// CASCADE: oauth_accounts gắn chặt với user, xóa user thì xóa luôn
 model oauth_accounts {
-  id                String @id @default(uuid()) @db.Uuid
-  userId            String @db.Uuid
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @db.Uuid
   provider          String    // "google" | "facebook" | "apple"
   providerAccountId String
   accessToken       String?
@@ -156,11 +164,12 @@ model oauth_accounts {
   @@index([userId])
 }
 
+// CASCADE: token gắn chặt với user
 model password_reset_tokens {
   id        String   @id @default(uuid()) @db.Uuid
   token     String   @unique
   userId    String   @db.Uuid
-  user      users    @relation(fields: [userId], references: [id])
+  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
 
@@ -172,38 +181,41 @@ enum RefreshTokenTTLType {
   long
 }
 
+// CASCADE: refresh token gắn chặt với user
 model refresh_tokens {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @db.Uuid
-  token     String    @unique
-  expiresAt DateTime
+  id                String              @id @default(uuid()) @db.Uuid
+  userId            String              @db.Uuid
+  token             String              @unique
+  expiresAt         DateTime
   absoluteExpiresAt DateTime
-  ttlType   RefreshTokenTTLType
-  revokedAt DateTime?
-  createdAt DateTime  @default(now())
+  ttlType           RefreshTokenTTLType
+  revokedAt         DateTime?
+  createdAt         DateTime            @default(now())
 
-  deviceId  String? // optional
+  deviceId  String?
   userAgent String?
   ip        String?
 
-  user users @relation(fields: [userId], references: [id])
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
+// Không cần soft delete: đây là dữ liệu địa lý hệ thống, không xóa tùy tiện
 model provinces {
-  id       String   @id @default(uuid()) @db.Uuid
-  code     String   @unique
-  name     String
-  fullName String
-  type     String
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique
+  name      String
+  fullName  String
+  type      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  wards           wards[]
-  userAddresses   user_addresses[]
+  wards         wards[]
+  userAddresses user_addresses[]
 }
 
+// CASCADE theo province
 model wards {
   id         String   @id @default(uuid()) @db.Uuid
   code       String   @unique
@@ -214,194 +226,175 @@ model wards {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  province       provinces        @relation(fields: [provinceId], references: [id], onDelete: Cascade)
-  userAddresses  user_addresses[]
+  province      provinces      @relation(fields: [provinceId], references: [id], onDelete: Cascade)
+  userAddresses user_addresses[]
 
   @@index([provinceId])
 }
 
+// SOFT DELETE: địa chỉ user — không nên hard delete vì orders tham chiếu đến
+// Nếu user xóa địa chỉ → soft delete, order vẫn giữ snapshot địa chỉ
 model user_addresses {
-  id            String       @id @default(uuid()) @db.Uuid
-  userId        String       @db.Uuid
+  id            String      @id @default(uuid()) @db.Uuid
+  userId        String      @db.Uuid
   contactName   String
   phone         String
-  provinceId    String       @db.Uuid
-  wardId        String       @db.Uuid
+  provinceId    String      @db.Uuid
+  wardId        String      @db.Uuid
   detailAddress String
   type          AddressType?
-  isDefault     Boolean      @default(false)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  isDefault     Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
-  user      users      @relation(fields: [userId], references: [id])
-  province  provinces  @relation(fields: [provinceId], references: [id])
-  ward      wards      @relation(fields: [wardId], references: [id])
-  orders    orders[]
+  // --- Soft Delete ---
+  deletedAt     DateTime?
 
+  user     users      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  province provinces  @relation(fields: [provinceId], references: [id])
+  ward     wards      @relation(fields: [wardId], references: [id])
 
   @@unique([userId, detailAddress, phone])
   @@index([userId])
   @@index([provinceId])
   @@index([wardId])
+  @@index([deletedAt])
 }
 
+// SOFT DELETE: brands là entity chính của catalog
 model brands {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String   @unique
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @unique
   description String?
-  imagePath     String?
-  imageUrl      String?
-  slug        String   @unique
-  isFeatured  Boolean @default(false)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  imagePath   String?
+  imageUrl    String?
+  slug        String    @unique
+  isFeatured  Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // --- Soft Delete ---
+  deletedAt   DateTime?
+  deletedBy   String?   @db.Uuid
 
   products products[]
+
+  @@index([deletedAt])
 }
 
+// SOFT DELETE: categories là entity chính của catalog
 model categories {
-  id            String   @id @default(uuid()) @db.Uuid
-  name          String  
-  parentId      String?  @db.Uuid
-  description   String?
-  imagePath     String?
-  imageUrl      String?
-  slug          String   @unique
-  position      Int      @default(0)
-  isFeatured    Boolean  @default(false)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String
+  parentId    String?   @db.Uuid
+  description String?
+  imagePath   String?
+  imageUrl    String?
+  slug        String    @unique
+  position    Int       @default(0)
+  isFeatured  Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // --- Soft Delete ---
+  deletedAt   DateTime?
+  deletedBy   String?   @db.Uuid
 
   parent                 categories?               @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children               categories[]              @relation("CategoryHierarchy")
   products               products[]
   categorySpecifications category_specifications[]
-  variantAttributes category_variant_attributes[]
-  campaignCategories campaign_categories[]
-
+  variantAttributes      category_variant_attributes[]
+  campaignCategories     campaign_categories[]
 
   @@unique([parentId, position])
-  @@unique([name, parentId]) 
+  @@unique([name, parentId])
+  @@index([deletedAt])
 }
 
+// SOFT DELETE: campaigns là entity marketing, cần archive/restore
 model campaigns {
   id          String       @id @default(uuid()) @db.Uuid
   name        String
   slug        String       @unique
-
   type        CampaignType
   description String?
-
   startDate   DateTime?
   endDate     DateTime?
-
   isActive    Boolean      @default(true)
-
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  categories  campaign_categories[]
+  // --- Soft Delete ---
+  deletedAt   DateTime?
+  deletedBy   String?      @db.Uuid
+
+  categories campaign_categories[]
+
+  @@index([deletedAt])
 }
 
+// CASCADE: campaign_categories là bảng join, xóa campaign → xóa luôn
 model campaign_categories {
-  id          String   @id @default(uuid()) @db.Uuid
+  id          String  @id @default(uuid()) @db.Uuid
+  campaignId  String  @db.Uuid
+  categoryId  String  @db.Uuid
+  position    Int
+  imagePath   String
+  imageUrl    String?
+  title       String?
+  description String?
 
-  campaignId  String   @db.Uuid
-  categoryId  String   @db.Uuid
-
-  position    Int      
-
-  imagePath String
-  imageUrl  String? 
-  title       String?  
-  description String?  
-
-  campaign    campaigns  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  category    categories @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  campaign campaigns  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  category categories @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@unique([campaignId, categoryId])
   @@index([campaignId])
   @@index([categoryId])
 }
 
-
-// model product_categories {
-//   productId  String  @db.Uuid
-//   categoryId String  @db.Uuid
-//   isPrimary  Boolean @default(false)
-//   position   Int     @default(0)
-
-//   product  products   @relation(fields: [productId], references: [id])
-//   category categories @relation(fields: [categoryId], references: [id])
-
-//   @@id([productId, categoryId])
-//   @@unique([productId, categoryId])
-// }
-
+// SOFT DELETE: products là entity chính của catalog
 model products {
-  id            String   @id @default(uuid()) @db.Uuid
-  brandId       String   @db.Uuid
-  categoryId    String   @db.Uuid
-  name          String
-  description   String?
-  slug          String   @unique
-  viewsCount    BigInt   @default(0)
-  totalSoldCount  Int      @default(0)
-  ratingAverage Decimal  @default("0.00") @db.Decimal(3, 2)
-  ratingCount   Int      @default(0)
-  isActive      Boolean  @default(true)
-  isFeatured    Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String    @id @default(uuid()) @db.Uuid
+  brandId        String    @db.Uuid
+  categoryId     String    @db.Uuid
+  name           String
+  description    String?
+  slug           String    @unique
+  viewsCount     BigInt    @default(0)
+  totalSoldCount Int       @default(0)
+  ratingAverage  Decimal   @default("0.00") @db.Decimal(3, 2)
+  ratingCount    Int       @default(0)
+  isActive       Boolean   @default(true)
+  isFeatured     Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // --- Soft Delete ---
+  deletedAt      DateTime?
+  deletedBy      String?   @db.Uuid
 
   brand                 brands                   @relation(fields: [brandId], references: [id])
   category              categories               @relation(fields: [categoryId], references: [id])
-  // categories categories[]
   img                   product_color_images[]
   variants              products_variants[]
   productSpecifications product_specifications[]
 
   @@index([isActive, totalSoldCount])
-
+  @@index([deletedAt])
 }
-
-// model category_attributes {
-//   categoryId  String @db.Uuid
-//   attributeId String @db.Uuid
-
-//   category  categories @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-//   attribute attributes @relation(fields: [attributeId], references: [id], onDelete: Cascade)
-
-//   // Optional: tùy chỉnh thêm
-//   isRequired Boolean @default(false) // bắt buộc cho category này?
-//   sortOrder  Int     @default(0)
-
-//   @@id([categoryId, attributeId])
-// }
-
-// model attributes {
-//   id          String   @id @default(uuid()) @db.Uuid
-//   name        String   @unique
-//   description String?
-//   createdAt   DateTime @default(now())
-//   updatedAt   DateTime @updatedAt
-
-//   options             attributes_options[]
-//   allowedInCategories category_attributes[]
-// }
 
 model attributes {
-  id        String @id @default(uuid())
-  code      String @unique // color, storage, inch
-  name      String         // Màu sắc, Bộ nhớ, Kích thước
+  id        String   @id @default(uuid())
+  code      String   @unique // color, storage, inch
+  name      String           // Màu sắc, Bộ nhớ, Kích thước
   createdAt DateTime @default(now())
 
-  options attributes_options[]
+  options    attributes_options[]
   categories category_variant_attributes[]
 }
-
 
 model attributes_options {
   id          String   @id @default(uuid()) @db.Uuid
@@ -409,7 +402,7 @@ model attributes_options {
   value       String
   label       String
 
-  attribute attributes @relation(fields: [attributeId], references: [id])
+  attribute         attributes          @relation(fields: [attributeId], references: [id])
   variantAttributes variants_attributes[]
 
   @@unique([attributeId, value])
@@ -419,38 +412,45 @@ model category_variant_attributes {
   categoryId  String @db.Uuid
   attributeId String
 
-  category    categories @relation(fields: [categoryId], references: [id])
-  attribute   attributes @relation(fields: [attributeId], references: [id])
+  category  categories @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  attribute attributes @relation(fields: [attributeId], references: [id], onDelete: Cascade)
 
   @@id([categoryId, attributeId])
 }
 
-
+// SOFT DELETE: product variant — cần soft delete riêng vì có thể restore
+// Khi product bị soft delete thì variant vẫn giữ nguyên (không cascade soft delete)
+// Hard delete product → cascade hard delete variants
 model products_variants {
-  id        String   @id @default(uuid()) @db.Uuid
-  productId String   @db.Uuid
-  code      String?  @unique // SKU
-  price     Decimal  @db.Decimal(10, 2)
-  quantity  Int @default(10)
-  soldCount Int      @default(0)
-  // weight    Decimal? @db.Decimal(10, 2) // gram/kg
-  isDefault Boolean  @default(false)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(uuid()) @db.Uuid
+  productId String    @db.Uuid
+  code      String?   @unique // SKU
+  price     Decimal   @db.Decimal(10, 2)
+  quantity  Int       @default(10)
+  soldCount Int       @default(0)
+  isDefault Boolean   @default(false)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  product           products                 @relation(fields: [productId], references: [id])
+  // --- Soft Delete ---
+  deletedAt DateTime?
+  deletedBy String?   @db.Uuid
+
+  product           products             @relation(fields: [productId], references: [id], onDelete: Cascade)
   variantAttributes variants_attributes[]
-  // inventory         inventory?
   cartItems         cart_items[]
   orderItems        order_items[]
   wishlist          wishlist[]
+
+  @@index([deletedAt])
 }
 
+// CASCADE: ảnh gắn chặt với product
 model product_color_images {
   id        String   @id @default(uuid()) @db.Uuid
   productId String   @db.Uuid
-  color     String  
+  color     String
   imagePath String
   imageUrl  String?
   altText   String?
@@ -458,103 +458,83 @@ model product_color_images {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  product products @relation(fields: [productId], references: [id])
+  product products @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([productId, color, imagePath])
   @@index([productId, color])
 }
 
-
+// CASCADE: variant attributes gắn chặt với variant
 model variants_attributes {
   id                String   @id @default(uuid()) @db.Uuid
   productVariantId  String   @db.Uuid
   attributeOptionId String   @db.Uuid
   createdAt         DateTime @default(now())
 
-  productVariant  products_variants  @relation(fields: [productVariantId], references: [id])
+  productVariant  products_variants  @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
   attributeOption attributes_options @relation(fields: [attributeOptionId], references: [id])
 
   @@unique([productVariantId, attributeOptionId])
 }
 
-// model product_variant_images {
-//   id               String   @id @default(uuid()) @db.Uuid
-//   productVariantId String   @db.Uuid
-//   imagePath        String
-//   imageUrl         String?
-//   altText          String?
-//   position         Int      @default(0)
-//   createdAt        DateTime @default(now())
-//   updatedAt        DateTime @updatedAt
-
-//   productVariant products_variants @relation(fields: [productVariantId], references: [id])
-// }
-
-// model inventory {
-//   variantId        String   @id @db.Uuid
-//   quantity         Int      @default(0)
-//   reservedQuantity Int      @default(0)
-//   updatedAt        DateTime @updatedAt
-
-//   variant products_variants @relation(fields: [variantId], references: [id])
-// }
-
 model category_specifications {
   categoryId      String @db.Uuid
   specificationId String @db.Uuid
+  groupName       String
+  isRequired      Boolean @default(false)
+  sortOrder       Int     @default(0)
 
   category      categories     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   specification specifications @relation(fields: [specificationId], references: [id], onDelete: Cascade)
-  groupName     String
-  isRequired    Boolean        @default(false) // có thể override required theo category
-  sortOrder     Int            @default(0)
 
   @@id([categoryId, specificationId])
 }
 
 model specifications {
-  id        String   @id @default(uuid()) @db.Uuid
-  key       String   @unique // chip, ram, battery
-  name      String // Chip, RAM, Pin
-  group     String   @default("Thông số khác")
-  unit      String? // GB, mAh, inch
-  icon      String?
-  createdAt DateTime @default(now())
-
-  // Thêm các trường hỗ trợ
-  isFilterable Boolean @default(false) // có dùng làm bộ lọc (facet) không?
-  isRequired   Boolean @default(false) // bắt buộc cho category này?
-  sortOrder    Int     @default(0)
+  id           String    @id @default(uuid()) @db.Uuid
+  key          String    @unique
+  name         String
+  group        String    @default("Thông số khác")
+  unit         String?
+  icon         String?
+  isFilterable Boolean   @default(false)
+  isRequired   Boolean   @default(false)
+  sortOrder    Int       @default(0)
+  createdAt    DateTime  @default(now())
 
   productSpecifications product_specifications[]
   allowedInCategories   category_specifications[]
 }
 
+// CASCADE: specs gắn với product
 model product_specifications {
-  productId       String @db.Uuid
-  specificationId String @db.Uuid
+  productId       String  @db.Uuid
+  specificationId String  @db.Uuid
   value           String
-  sortOrder       Int    @default(0)
+  sortOrder       Int     @default(0)
   isHighlight     Boolean
 
-  product       products       @relation(fields: [productId], references: [id])
+  product       products       @relation(fields: [productId], references: [id], onDelete: Cascade)
   specification specifications @relation(fields: [specificationId], references: [id])
 
   @@id([productId, specificationId])
 }
 
+// CASCADE: wishlist gắn với user, SET NULL nếu variant bị soft delete thì giữ nguyên
+// Nếu user bị hard delete → xóa wishlist; nếu variant bị hard delete → xóa wishlist
 model wishlist {
   id               String   @id @default(uuid()) @db.Uuid
   userId           String   @db.Uuid
   productVariantId String   @db.Uuid
   createdAt        DateTime @default(now())
 
-  user           users             @relation(fields: [userId], references: [id])
-  productVariant products_variants @relation(fields: [productVariantId], references: [id])
+  user           users             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productVariant products_variants @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
 
   @@unique([userId, productVariantId])
 }
 
+// CASCADE theo user; giỏ hàng không cần soft delete
 model cart_items {
   id               String   @id @default(uuid()) @db.Uuid
   userId           String   @db.Uuid
@@ -564,40 +544,69 @@ model cart_items {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  user           users             @relation(fields: [userId], references: [id])
-  productVariant products_variants @relation(fields: [productVariantId], references: [id])
+  user           users             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productVariant products_variants @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
 }
 
+// SOFT DELETE: orders — không được hard delete, cần audit trail
+// cancelledAt riêng để track lý do hủy; deletedAt để ẩn khỏi danh sách
 model orders {
   id                String        @id @default(uuid()) @db.Uuid
-  orderCode         String        @unique 
+  orderCode         String        @unique
+
   userId            String        @db.Uuid
   paymentMethodId   String        @db.Uuid
   voucherId         String?       @db.Uuid
-  shippingAddressId String        @db.Uuid
+
+  // ===== ADDRESS SNAPSHOT =====
+  shippingAddressId String?       @db.Uuid // chỉ để trace (NO FK)
+
+  shippingContactName String
+  shippingPhone       String
+  shippingProvince    String
+  shippingWard        String
+  shippingDetail      String
+
+  // ===== MONEY =====
   subtotalAmount    Decimal       @db.Decimal(10, 2)
   shippingFee       Decimal       @default("0.00") @db.Decimal(10, 2)
   voucherDiscount   Decimal       @default("0.00") @db.Decimal(10, 2)
   totalAmount       Decimal       @db.Decimal(10, 2)
+
+  // ===== STATUS =====
   orderStatus       OrderStatus   @default(PENDING)
   paymentStatus     PaymentStatus @default(UNPAID)
-  bankTransferCode  String? @unique
-  momoOrderId      String? @unique 
-  vnpayTxnRef       String? @unique  
-  zaloPayTransId String? @unique
+
+  // ===== PAYMENT IDS =====
+  bankTransferCode      String?   @unique
+  momoOrderId           String?   @unique
+  vnpayTxnRef           String?   @unique
+  zaloPayTransId        String?   @unique
   stripePaymentIntentId String?
+
   orderDate         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
+  // --- Soft Delete (admin trash) ---
+  deletedAt         DateTime?
+  deletedBy         String?       @db.Uuid
+
+  // ===== RELATIONS =====
   user            users                  @relation(fields: [userId], references: [id])
   paymentMethod   payment_methods        @relation(fields: [paymentMethodId], references: [id])
   voucher         vouchers?              @relation(fields: [voucherId], references: [id])
-  shippingAddress user_addresses         @relation(fields: [shippingAddressId], references: [id])
+
   orderItems      order_items[]
   voucherUsages   voucher_usages[]
   transactions    payment_transactions[]
+
+  @@index([deletedAt])
+  @@index([userId])
+  @@index([orderStatus])
+  @@index([orderDate])
 }
 
+// CASCADE theo order; order_items là dữ liệu giao dịch, không soft delete độc lập
 model order_items {
   id               String   @id @default(uuid()) @db.Uuid
   orderId          String   @db.Uuid
@@ -606,11 +615,13 @@ model order_items {
   unitPrice        Decimal  @db.Decimal(10, 2)
   createdAt        DateTime @default(now())
 
-  order          orders            @relation(fields: [orderId], references: [id])
+  order          orders            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // Restrict vì cần giữ lịch sử mua hàng dù variant bị xóa
   productVariant products_variants @relation(fields: [productVariantId], references: [id])
   review         reviews?
 }
 
+// SOFT DELETE: reviews — admin có thể ẩn/restore review
 model reviews {
   id          String       @id @default(uuid()) @db.Uuid
   userId      String       @db.Uuid
@@ -621,10 +632,17 @@ model reviews {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
+  // --- Soft Delete ---
+  deletedAt   DateTime?
+  deletedBy   String?      @db.Uuid
+
   user      users       @relation(fields: [userId], references: [id])
   orderItem order_items @relation(fields: [orderItemId], references: [id])
+
+  @@index([deletedAt])
 }
 
+// Không soft delete: payment_methods là config hệ thống, dùng isActive để disable
 model payment_methods {
   id          String   @id @default(uuid()) @db.Uuid
   name        String   @unique
@@ -638,58 +656,65 @@ model payment_methods {
   payment_transactions payment_transactions[]
 }
 
+// Không soft delete: transaction là audit log tài chính, không được xóa
 model payment_transactions {
-  id String @id @default(uuid()) @db.Uuid
-
-  orderId         String @db.Uuid
-  paymentMethodId String @db.Uuid
-
-  amount         Decimal                  @db.Decimal(10, 2)
-  transactionRef String?
-  status         PaymentTransactionStatus
-  payload        Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String                   @id @default(uuid()) @db.Uuid
+  orderId         String                   @db.Uuid
+  paymentMethodId String                   @db.Uuid
+  amount          Decimal                  @db.Decimal(10, 2)
+  transactionRef  String?
+  status          PaymentTransactionStatus
+  payload         Json?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
 
   order         orders          @relation(fields: [orderId], references: [id])
   paymentMethod payment_methods @relation(fields: [paymentMethodId], references: [id])
 }
 
+// SOFT DELETE: vouchers — cần archive/restore, không xóa thật vì ảnh hưởng lịch sử order
 model vouchers {
-  id             String       @id @default(uuid()) @db.Uuid
-  code           String       @unique
-  description    String?
-  discountType   DiscountType
-  discountValue  Decimal      @db.Decimal(10, 2)
-  minOrderValue  Decimal      @default("0.00") @db.Decimal(10, 2)
-  maxDiscountValue Decimal?   @db.Decimal(10,2)
-  maxUses        Int?
-  maxUsesPerUser Int?
-  usesCount      Int          @default(0)
-  startDate      DateTime?
-  endDate        DateTime?
-  priority       Int          @default(0)
-  isActive       Boolean      @default(true)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id               String       @id @default(uuid()) @db.Uuid
+  code             String       @unique
+  description      String?
+  discountType     DiscountType
+  discountValue    Decimal      @db.Decimal(10, 2)
+  minOrderValue    Decimal      @default("0.00") @db.Decimal(10, 2)
+  maxDiscountValue Decimal?     @db.Decimal(10, 2)
+  maxUses          Int?
+  maxUsesPerUser   Int?
+  usesCount        Int          @default(0)
+  startDate        DateTime?
+  endDate          DateTime?
+  priority         Int          @default(0)
+  isActive         Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  // --- Soft Delete ---
+  deletedAt        DateTime?
+  deletedBy        String?      @db.Uuid
 
   orders        orders[]
   targets       voucher_targets[]
   voucherUsers  voucher_user[]
   voucherUsages voucher_usages[]
+
+  @@index([deletedAt])
 }
 
+// CASCADE: targets gắn với voucher
 model voucher_targets {
-  id         String   @id @default(uuid()) @db.Uuid
-  voucherId  String   @db.Uuid
+  id         String     @id @default(uuid()) @db.Uuid
+  voucherId  String     @db.Uuid
   targetType TargetType
   targetId   String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime   @default(now())
 
-  voucher vouchers @relation(fields: [voucherId], references: [id])
+  voucher vouchers @relation(fields: [voucherId], references: [id], onDelete: Cascade)
 }
 
+// CASCADE: voucher_user gắn với voucher và user
 model voucher_user {
   id        String   @id @default(uuid()) @db.Uuid
   voucherId String   @db.Uuid
@@ -698,12 +723,13 @@ model voucher_user {
   usedCount Int      @default(0)
   createdAt DateTime @default(now())
 
-  voucher vouchers @relation(fields: [voucherId], references: [id])
-  user    users    @relation(fields: [userId], references: [id])
+  voucher vouchers @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  user    users    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([voucherId, userId])
 }
 
+// Không xóa: voucher_usages là audit log giao dịch
 model voucher_usages {
   id        String   @id @default(uuid()) @db.Uuid
   voucherId String   @db.Uuid
@@ -716,120 +742,124 @@ model voucher_usages {
   order   orders   @relation(fields: [orderId], references: [id])
 }
 
+// SOFT DELETE: promotions — cần archive/restore
 model promotions {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String   @unique
-  description String?
-
-  priority    Int      @default(0)
-  isActive    Boolean  @default(true)
-
-  startDate   DateTime?
-  endDate     DateTime?
-
-  minOrderValue    Decimal? @db.Decimal(12,2)
-  maxDiscountValue Decimal? @db.Decimal(12,2)
-
+  id               String    @id @default(uuid()) @db.Uuid
+  name             String    @unique
+  description      String?
+  priority         Int       @default(0)
+  isActive         Boolean   @default(true)
+  startDate        DateTime?
+  endDate          DateTime?
+  minOrderValue    Decimal?  @db.Decimal(12, 2)
+  maxDiscountValue Decimal?  @db.Decimal(12, 2)
   usageLimit       Int?
-  usedCount        Int      @default(0)
+  usedCount        Int       @default(0)
+  createdAt        DateTime  @default(now())
 
-  createdAt   DateTime @default(now())
+  // --- Soft Delete ---
+  deletedAt        DateTime?
+  deletedBy        String?   @db.Uuid
 
-  rules    promotion_rules[]
-  targets  promotion_targets[]
+  rules   promotion_rules[]
+  targets promotion_targets[]
+
+  @@index([deletedAt])
 }
 
-
+// CASCADE: rules gắn chặt với promotion
 model promotion_rules {
-  id          String   @id @default(uuid()) @db.Uuid
-  promotionId String   @db.Uuid
-
-  actionType  PromotionActionType
-
-  discountValue        Decimal? @db.Decimal(10,2)
+  id                   String              @id @default(uuid()) @db.Uuid
+  promotionId          String              @db.Uuid
+  actionType           PromotionActionType
+  discountValue        Decimal?            @db.Decimal(10, 2)
   buyQuantity          Int?
   getQuantity          Int?
-  giftProductVariantId String?  @db.Uuid
+  giftProductVariantId String?             @db.Uuid
+  createdAt            DateTime            @default(now())
 
-  createdAt DateTime @default(now())
-
-  promotion promotions @relation(fields: [promotionId], references: [id])
+  promotion promotions @relation(fields: [promotionId], references: [id], onDelete: Cascade)
 }
 
+// CASCADE: targets gắn chặt với promotion
 model promotion_targets {
-  id          String   @id @default(uuid()) @db.Uuid
-  promotionId String   @db.Uuid
-
+  id          String     @id @default(uuid()) @db.Uuid
+  promotionId String     @db.Uuid
   targetType  TargetType
   targetId    String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  promotion promotions @relation(fields: [promotionId], references: [id])
+  promotion promotions @relation(fields: [promotionId], references: [id], onDelete: Cascade)
 }
 
-
+// SOFT DELETE: blogs — admin/staff cần trash, restore
 model blogs {
-  id         String     @id @default(uuid()) @db.Uuid
-  authorId   String     @db.Uuid
-
-  title      String
-  slug       String     @unique
-  content    String
-  imagePath   String?
-  imageUrl    String?
-  viewCount  Int        @default(0)
-  status     BlogStatus @default(DRAFT)
-
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-  publishedAt DateTime?
-
-  author     users      @relation(fields: [authorId], references: [id])
-  comments   comments[]
-}
-
-model comments {
-  id          String             @id @default(uuid()) @db.Uuid
-  userId      String             @db.Uuid
-
-  content     String
-  targetType  CommentTargetType
-  targetId    String
-
-  parentId    String?            @db.Uuid 
-  isApproved  Boolean            @default(false)
-
-  createdAt   DateTime           @default(now())
-
-  user        users              @relation(fields: [userId], references: [id])
-  parent      comments?          @relation("CommentParent", fields: [parentId], references: [id])
-  replies     comments[]         @relation("CommentParent")
-  blogs       blogs[]
-
-  @@index([targetType, targetId])
-}
-
-// =======================
-// PAGES / POLICIES
-// =======================
-
-model pages {
   id          String     @id @default(uuid()) @db.Uuid
-
-  type        PageType
-  policyType  PolicyType?
-
+  authorId    String     @db.Uuid
   title       String
   slug        String     @unique
   content     String
-
-  isPublished Boolean    @default(true)
-  priority    Int        @default(0)
-
+  imagePath   String?
+  imageUrl    String?
+  viewCount   Int        @default(0)
+  status      BlogStatus @default(DRAFT)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+  publishedAt DateTime?
+
+  // --- Soft Delete ---
+  deletedAt   DateTime?
+  deletedBy   String?    @db.Uuid
+
+  author   users      @relation(fields: [authorId], references: [id])
+  comments comments[]
+
+  @@index([deletedAt])
+}
+
+// SOFT DELETE: comments — admin có thể ẩn/restore comment
+model comments {
+  id         String            @id @default(uuid()) @db.Uuid
+  userId     String?           @db.Uuid
+  content    String
+  targetType CommentTargetType
+  targetId   String
+  parentId   String?           @db.Uuid
+  isApproved Boolean           @default(false)
+  createdAt  DateTime          @default(now())
+
+  // --- Soft Delete ---
+  deletedAt  DateTime?
+  deletedBy  String?           @db.Uuid
+
+  user    users?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  parent  comments?  @relation("CommentParent", fields: [parentId], references: [id])
+  replies comments[] @relation("CommentParent")
+  blogs   blogs[]
+
+  @@index([targetType, targetId])
+  @@index([deletedAt])
+}
+
+// SOFT DELETE: pages/policies — cần unpublish thay vì xóa thật
+model pages {
+  id          String      @id @default(uuid()) @db.Uuid
+  type        PageType
+  policyType  PolicyType?
+  title       String
+  slug        String      @unique
+  content     String
+  isPublished Boolean     @default(true)
+  priority    Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // --- Soft Delete ---
+  deletedAt   DateTime?
+  deletedBy   String?     @db.Uuid
+
+  @@index([deletedAt])
 }
 
 enum MediaType {
@@ -844,24 +874,25 @@ enum MediaPosition {
   HOME_SECTION_2
 }
 
-
+// SOFT DELETE: image_media — banner/slider cần trash, restore
 model image_media {
-  id          String   @id @default(uuid()) @db.Uuid
+  id        String        @id @default(uuid()) @db.Uuid
+  type      MediaType
+  position  MediaPosition
+  title     String?
+  imagePath String?
+  imageUrl  String?
+  linkUrl   String?
+  order     Int           @default(0)
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
-  type        MediaType
-  position    MediaPosition
-
-  title       String?
-  imagePath   String?
-  imageUrl    String?
-
-  linkUrl     String?
-  order       Int      @default(0)
-  isActive    Boolean  @default(true)
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  // --- Soft Delete ---
+  deletedAt DateTime?
+  deletedBy String?       @db.Uuid
 
   @@index([type, position])
   @@index([isActive])
+  @@index([deletedAt])
 }
