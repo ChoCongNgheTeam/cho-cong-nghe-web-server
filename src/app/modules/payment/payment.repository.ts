@@ -1,5 +1,16 @@
+/**
+ * payment.repository.ts
+ *
+ * Data access layer — tương tác trực tiếp với Prisma.
+ * Không chứa business logic.
+ */
+
 import prisma from "@/config/db";
 import { Prisma, PaymentTransactionStatus } from "@prisma/client";
+
+// ---------------------------------------------------------------------------
+// Selects (reusable)
+// ---------------------------------------------------------------------------
 
 const paymentMethodSelect = {
   id: true,
@@ -21,68 +32,70 @@ export const paymentTransactionSelect = {
   createdAt: true,
 };
 
-export const findAllPaymentMethods = async () => {
-  return prisma.payment_methods.findMany({
+// ---------------------------------------------------------------------------
+// Payment Methods
+// ---------------------------------------------------------------------------
+
+export const findAllPaymentMethods = () =>
+  prisma.payment_methods.findMany({
     select: paymentMethodSelect,
     orderBy: { createdAt: "desc" },
   });
-};
 
-export const findActivePaymentMethods = async () => {
-  return prisma.payment_methods.findMany({
+export const findActivePaymentMethods = () =>
+  prisma.payment_methods.findMany({
     where: { isActive: true },
     select: paymentMethodSelect,
     orderBy: { createdAt: "asc" },
   });
-};
 
-export const findPaymentMethodById = async (id: string) => {
-  return prisma.payment_methods.findUnique({
+export const findPaymentMethodById = (id: string) =>
+  prisma.payment_methods.findUnique({
     where: { id },
     select: paymentMethodSelect,
   });
-};
 
-export const createPaymentMethod = async (data: { name: string; description?: string; isActive: boolean }) => {
-  return prisma.payment_methods.create({
+export const createPaymentMethod = (data: { name: string; code: string; description?: string; isActive: boolean }) =>
+  prisma.payment_methods.create({
     data,
     select: paymentMethodSelect,
   });
-};
 
-export const updatePaymentMethod = async (id: string, data: Prisma.payment_methodsUpdateInput) => {
-  return prisma.payment_methods.update({
+export const updatePaymentMethod = (id: string, data: Prisma.payment_methodsUpdateInput) =>
+  prisma.payment_methods.update({
     where: { id },
     data,
     select: paymentMethodSelect,
   });
-};
 
-export const deletePaymentMethod = async (id: string) => {
-  return prisma.payment_methods.delete({
-    where: { id },
-  });
-};
+export const deletePaymentMethod = (id: string) => prisma.payment_methods.delete({ where: { id } });
 
+// ---------------------------------------------------------------------------
 // Payment Transactions
-export const createPaymentTransaction = async (data: {
+// ---------------------------------------------------------------------------
+
+export const createPaymentTransaction = (data: {
   orderId: string;
   paymentMethodId: string;
-  amount: Prisma.Decimal;
+  amount: Prisma.Decimal | number;
   transactionRef?: string;
   status: PaymentTransactionStatus;
   payload?: Prisma.InputJsonValue;
-}) => {
-  return prisma.payment_transactions.create({
+}) =>
+  prisma.payment_transactions.create({
     data,
     select: paymentTransactionSelect,
   });
-};
 
-export const findTransactionByOrderId = async (orderId: string) => {
-  return prisma.payment_transactions.findFirst({
+export const findTransactionByOrderId = (orderId: string) =>
+  prisma.payment_transactions.findFirst({
     where: { orderId },
     select: paymentTransactionSelect,
     orderBy: { createdAt: "desc" },
   });
-};
+
+export const findTransactionByRef = (transactionRef: string) =>
+  prisma.payment_transactions.findFirst({
+    where: { transactionRef },
+    select: paymentTransactionSelect,
+  });
