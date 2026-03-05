@@ -1,5 +1,5 @@
 import prisma from "@/config/db";
-import { Prisma, OrderStatus } from "@prisma/client";
+import { Prisma, OrderStatus, PaymentStatus } from "@prisma/client";
 import { CheckoutSummary } from "./checkout.types";
 
 export const findCartItemsWithProduct = async (userId: string) => {
@@ -52,48 +52,51 @@ export const findVoucherUsersCount = async (voucherId: string) => {
 /**
  * Transaction: Khởi tạo đơn hàng, trừ tồn kho, xóa giỏ hàng, cập nhật voucher
  */
-export const executeOrderTransaction = async (userId: string, checkoutSummary: CheckoutSummary) => {
-  const { items, subtotalAmount, shippingFee, voucherDiscount, totalAmount, paymentMethodId, shippingAddressId, voucherId, bankTransferCode } = checkoutSummary;
-
-  // --- LOGIC TẠO MÃ ĐƠN HÀNG MỚI THEO FORMAT CCN-YYMMDD-XXXXX ---
-  const brandPart = "CCN";
-
-  // Lấy ngày tháng năm định dạng YYMMDD
-  const date = new Date();
-  const yy = String(date.getFullYear()).slice(-2);
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  const datePart = `${yy}${mm}${dd}`;
-
-  // Tạo chuỗi 5 ký tự ngẫu nhiên (Chữ in hoa + Số)
-  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let randomPart = "";
-  for (let i = 0; i < 5; i++) {
-    randomPart += characters.charAt(Math.floor(Math.random() * characters.length));
-  }
-
-  // Ghép lại thành mã hoàn chỉnh
-  const newOrderCode = `${brandPart}-${datePart}-${randomPart}`;
-  // -------------------------------------------------------------
+export const executeOrderTransaction = async (
+  userId: string,
+  checkoutSummary: CheckoutSummary,
+  isFromCart: boolean = true
+) => {
+  const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, "");
+  const randomPart = Math.random().toString(36).substring(2, 7).toUpperCase();
+  const orderCode = `CCN-${datePart}-${randomPart}`;
 
   return prisma.$transaction(async (tx) => {
+    // 0. LẤY THÔNG TIN ĐỊA CHỈ ĐỂ LÀM SNAPSHOT
+    const address = await tx.user_addresses.findUnique({
+      where: { id: checkoutSummary.shippingAddressId },
+      include: { province: true, ward: true }
+    });
+
+    if (!address) {
+      throw new Error("Không tìm thấy thông tin địa chỉ giao hàng");
+    }
+
     // 1. Tạo order mới
     const newOrder = await tx.orders.create({
       data: {
-        orderCode: newOrderCode,
+        orderCode,
         userId,
-        paymentMethodId,
-        voucherId: voucherId || null,
-        shippingAddressId,
-        subtotalAmount: new Prisma.Decimal(subtotalAmount),
-        shippingFee: new Prisma.Decimal(shippingFee),
-        voucherDiscount: new Prisma.Decimal(voucherDiscount),
-        totalAmount: new Prisma.Decimal(totalAmount),
-        orderStatus: "PENDING",
-        paymentStatus: "UNPAID",
-        bankTransferCode: bankTransferCode || null,
+        paymentMethodId: checkoutSummary.paymentMethodId,
+        voucherId: checkoutSummary.voucherId,
+        shippingAddressId: checkoutSummary.shippingAddressId,
+        
+        // 🔥 BỔ SUNG 5 TRƯỜNG ADDRESS SNAPSHOT NÀY
+        shippingContactName: address.contactName,
+        shippingPhone: address.phone,
+        shippingProvince: address.province.fullName,
+        shippingWard: address.ward.fullName,
+        shippingDetail: address.detailAddress,
+
+        subtotalAmount: new Prisma.Decimal(checkoutSummary.subtotalAmount),
+        shippingFee: new Prisma.Decimal(checkoutSummary.shippingFee),
+        voucherDiscount: new Prisma.Decimal(checkoutSummary.voucherDiscount),
+        totalAmount: new Prisma.Decimal(checkoutSummary.totalAmount),
+        orderStatus: OrderStatus.PENDING,
+        paymentStatus: PaymentStatus.UNPAID,
+        bankTransferCode: checkoutSummary.bankTransferCode,
         orderItems: {
-          create: items.map((item) => ({
+          create: checkoutSummary.items.map((item) => ({
             productVariantId: item.productVariantId,
             quantity: item.quantity,
             unitPrice: new Prisma.Decimal(item.unitPrice),
@@ -102,22 +105,17 @@ export const executeOrderTransaction = async (userId: string, checkoutSummary: C
       },
       include: {
         orderItems: {
-          include: { productVariant: { include: { product: true } } },
+          include: {
+            productVariant: {
+              include: { product: true },
+            },
+          },
         },
       },
     });
 
     // 2. Trừ tồn kho & Tăng số lượng đã bán
-    for (const item of items) {
-      const variant = await tx.products_variants.findUnique({
-        where: { id: item.productVariantId },
-      });
-
-      if (!variant) throw new Error(`Product variant not found: ${item.productVariantId}`);
-      if (variant.quantity < item.quantity) {
-        throw new Error(`Not enough stock for ${item.productName}. Available: ${variant.quantity}`);
-      }
-
+    for (const item of checkoutSummary.items) {
       await tx.products_variants.update({
         where: { id: item.productVariantId },
         data: {
@@ -127,13 +125,16 @@ export const executeOrderTransaction = async (userId: string, checkoutSummary: C
       });
     }
 
-    // 3. Xóa các sản phẩm đã mua khỏi giỏ hàng
-    await tx.cart_items.deleteMany({
-      where: { userId },
-    });
+    // 3. Xóa giỏ hàng (chỉ khi checkout từ giỏ hàng)
+    if (isFromCart) {
+      await tx.cart_items.deleteMany({
+        where: { userId },
+      });
+    }
 
-    // 4. Cập nhật lượt sử dụng Voucher (Nếu có)
-    if (voucherId) {
+    // 4. Cập nhật voucher (nếu có)
+    if (checkoutSummary.voucherId) {
+      const voucherId = checkoutSummary.voucherId;
       await tx.vouchers.update({
         where: { id: voucherId },
         data: { usesCount: { increment: 1 } },
