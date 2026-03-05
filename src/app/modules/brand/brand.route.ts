@@ -12,29 +12,46 @@ import {
   getBrandDetailHandler,
   createBrandHandler,
   updateBrandHandler,
-  deleteBrandHandler,
+  softDeleteBrandHandler,
+  restoreBrandHandler,
+  hardDeleteBrandHandler,
+  getDeletedBrandsHandler
 } from "./brand.controller";
-import { createBrandSchema, updateBrandSchema, brandParamsSchema, brandSlugParamsSchema, featuredBrandsQuerySchema, listBrandsQuerySchema } from "./brand.validation";
+import { 
+  createBrandSchema, 
+  updateBrandSchema, 
+  brandParamsSchema, 
+  brandSlugParamsSchema, 
+  featuredBrandsQuerySchema, 
+  listBrandsQuerySchema 
+} from "./brand.validation";
 import { asyncHandler } from "@/utils/async-handler";
 
 const router = Router();
 
-const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
-
-// Public
+// ==================== PUBLIC ====================
 router.get("/", validate(listBrandsQuerySchema, "query"), asyncHandler(getBrandsPublicHandler));
 router.get("/active", asyncHandler(getActiveBrandsHandler));
 router.get("/featured", validate(featuredBrandsQuerySchema, "query"), asyncHandler(getFeaturedBrandsHandler));
-router.get("/slug/:slug", validate(brandSlugParamsSchema, "params"), asyncHandler(getBrandBySlugHandler));
+router.get("/slug/:slug", authMiddleware(false), validate(brandSlugParamsSchema, "params"), asyncHandler(getBrandBySlugHandler));
 
-// Admin
-router.get("/admin/all", ...adminAuth, validate(listBrandsQuerySchema, "query"), asyncHandler(getBrandsAdminHandler));
-router.get("/admin/:id", ...adminAuth, validate(brandParamsSchema, "params"), asyncHandler(getBrandDetailHandler));
+// ==================== STAFF & ADMIN ====================
+router.use("/admin", authMiddleware(true));
 
-router.post("/admin", ...adminAuth, brandUpload.single("imageUrl"), validate(createBrandSchema, "body"), asyncHandler(createBrandHandler));
+// Xem danh sách và chi tiết (Staff + Admin)
+router.get("/admin/all", requireRole("STAFF", "ADMIN"), validate(listBrandsQuerySchema, "query"), asyncHandler(getBrandsAdminHandler));
+router.get("/admin/:id", requireRole("STAFF", "ADMIN"), validate(brandParamsSchema, "params"), asyncHandler(getBrandDetailHandler));
 
-router.patch("/admin/:id", ...adminAuth, brandUpload.single("imageUrl"), validate(brandParamsSchema, "params"), validate(updateBrandSchema, "body"), asyncHandler(updateBrandHandler));
+// Tạo và Cập nhật (Admin Only)
+router.post("/admin", requireRole("ADMIN"), brandUpload.single("imageUrl"), validate(createBrandSchema, "body"), asyncHandler(createBrandHandler));
+router.patch("/admin/:id", requireRole("ADMIN"), brandUpload.single("imageUrl"), validate(brandParamsSchema, "params"), validate(updateBrandSchema, "body"), asyncHandler(updateBrandHandler));
 
-router.delete("/admin/:id", ...adminAuth, validate(brandParamsSchema, "params"), asyncHandler(deleteBrandHandler));
+// Soft Delete (Staff + Admin)
+router.delete("/admin/:id", requireRole("STAFF", "ADMIN"), validate(brandParamsSchema, "params"), asyncHandler(softDeleteBrandHandler));
+
+// Thùng rác & Xóa vĩnh viễn (Admin Only)
+router.get("/admin/trash/brands", requireRole("ADMIN"), validate(listBrandsQuerySchema, "query"), asyncHandler(getDeletedBrandsHandler));
+router.post("/admin/:id/restore", requireRole("ADMIN"), validate(brandParamsSchema, "params"), asyncHandler(restoreBrandHandler));
+router.delete("/admin/:id/permanent", requireRole("ADMIN"), validate(brandParamsSchema, "params"), asyncHandler(hardDeleteBrandHandler));
 
 export default router;

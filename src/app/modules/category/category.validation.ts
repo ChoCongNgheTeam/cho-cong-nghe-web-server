@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const categoryParamsSchema = z.object({
-  id: z.uuid({ message: "ID danh mục không hợp lệ" }),
+  id: z.string().uuid({ message: "ID danh mục không hợp lệ" }),
 });
 
 export const categorySlugParamsSchema = z.object({
@@ -21,6 +21,7 @@ export const listCategoriesQuerySchema = z.object({
   parentId: z.string().uuid().optional(),
   isFeatured: z.coerce.boolean().optional(),
   isActive: z.coerce.boolean().optional(),
+  includeDeleted: z.coerce.boolean().optional().default(false),
   sortBy: z.enum(["name", "position", "createdAt"]).default("position"),
   sortOrder: z.enum(["asc", "desc"]).default("asc"),
 });
@@ -36,7 +37,7 @@ export const createCategorySchema = z.object({
     .min(2, "Tên danh mục phải từ 2 ký tự")
     .max(100, "Tên danh mục tối đa 100 ký tự"),
 
-  parentId: z.uuid("Parent ID không hợp lệ").optional().or(z.literal("")),
+  parentId: z.string().uuid("Parent ID không hợp lệ").optional().or(z.literal("")),
 
   description: z.string().trim().max(500, "Mô tả tối đa 500 ký tự").optional().or(z.literal("")),
 
@@ -57,7 +58,7 @@ export const updateCategorySchema = z.object({
     .max(100, "Tên danh mục tối đa 100 ký tự")
     .optional(),
 
-  parentId: z.uuid("Parent ID không hợp lệ").optional().or(z.literal("")),
+  parentId: z.string().uuid("Parent ID không hợp lệ").optional().or(z.literal("")),
 
   description: z.string().trim().max(500, "Mô tả tối đa 500 ký tự").optional().or(z.literal("")),
 
@@ -73,11 +74,10 @@ export const updateCategorySchema = z.object({
 });
 
 export const reorderCategorySchema = z.object({
-  categoryId: z.uuid("Category ID không hợp lệ"),
-  newPosition: z.number().int().min(0, "Position phải >= 0"),
+  categoryId: z.string().uuid("Category ID không hợp lệ"),
+  newPosition: z.number().int().min(0, "Vị trí không hợp lệ"),
 });
 
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
 export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
-export type ReorderCategoryInput = z.infer<typeof reorderCategorySchema>;
 export type ListCategoriesQuery = z.infer<typeof listCategoriesQuerySchema>;

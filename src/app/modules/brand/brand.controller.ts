@@ -26,7 +26,8 @@ export const getFeaturedBrandsHandler = async (req: Request, res: Response) => {
 };
 
 export const getBrandBySlugHandler = async (req: Request, res: Response) => {
-  const brand = await brandService.getBrandBySlug(req.params.slug);
+  const isAdmin = req.user?.role === "ADMIN" || req.user?.role === "STAFF";
+  const brand = await brandService.getBrandBySlug(req.params.slug, isAdmin);
   res.json({ data: brand, message: "Lấy chi tiết thương hiệu thành công" });
 };
 
@@ -75,7 +76,22 @@ export const updateBrandHandler = async (req: Request, res: Response) => {
   }
 };
 
-export const deleteBrandHandler = async (req: Request, res: Response) => {
-  await brandService.deleteBrand(req.params.id);
-  res.json({ message: "Xóa thương hiệu thành công" });
+export const softDeleteBrandHandler = async (req: Request, res: Response) => {
+  await brandService.softDeleteBrand(req.params.id, req.user!.id);
+  res.json({ message: "Đã chuyển thương hiệu vào thùng rác" });
+};
+
+export const restoreBrandHandler = async (req: Request, res: Response) => {
+  await brandService.restoreBrand(req.params.id);
+  res.json({ message: "Khôi phục thương hiệu thành công" });
+};
+
+export const hardDeleteBrandHandler = async (req: Request, res: Response) => {
+  await brandService.hardDeleteBrand(req.params.id);
+  res.status(204).send();
+};
+
+export const getDeletedBrandsHandler = async (req: Request, res: Response) => {
+  const brands = await brandService.getDeletedBrands(req.query as unknown as ListBrandsQuery);
+  res.json({ data: brands, message: "Lấy danh sách thương hiệu đã xóa thành công" });
 };

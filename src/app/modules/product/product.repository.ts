@@ -2,7 +2,6 @@ import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
 import { ListProductsQuery, ReviewsQuery } from "./product.validation";
 import { OrderStatus } from "@prisma/client";
-import { fa, is } from "zod/v4/locales";
 import { extractVariantOptions } from "@/helpers/variant-options";
 import { HighlightSpecificationGroup } from "./product.types";
 
@@ -87,7 +86,7 @@ const selectProductCard = {
   isFeatured: true,
   isActive: true,
   variants: {
-    where: { isActive: true },
+    where: { isActive: true, deletedAt: null }, // Đã thêm deletedAt: null
     select: selectVariant,
     take: 1,
     orderBy: { isDefault: "desc" as const },
@@ -129,6 +128,7 @@ const selectProductDetail = {
   createdAt: true,
   updatedAt: true,
   variants: {
+    where: { deletedAt: null }, // Đã thêm deletedAt: null
     select: selectVariant,
     orderBy: { isDefault: "desc" as const },
   },
@@ -225,10 +225,18 @@ export const getDescendantCategoryIds = async (slug: string) => {
   return result.map((r) => r.id);
 };
 
-const buildProductWhere = async (query: ListProductsQuery, onlyActive: boolean): Promise<Prisma.productsWhereInput> => {
+const buildProductWhere = async (query: ListProductsQuery, isAdmin: boolean): Promise<Prisma.productsWhereInput> => {
   const where: Prisma.productsWhereInput = {};
 
-  if (onlyActive) where.isActive = true;
+  if (isAdmin && query.includeDeleted) {
+    // Không lọc deletedAt
+  } else {
+    where.deletedAt = null; 
+  }
+
+  if (!isAdmin) {
+    where.isActive = true;
+  }
 
   if (query.search) {
     where.OR = [{ name: { contains: query.search, mode: "insensitive" } }, { description: { contains: query.search, mode: "insensitive" } }];
@@ -236,7 +244,6 @@ const buildProductWhere = async (query: ListProductsQuery, onlyActive: boolean):
 
   if (query.category) {
     const ids = await getDescendantCategoryIds(query.category);
-
     where.categoryId = { in: ids };
   }
 
@@ -252,6 +259,7 @@ const buildProductWhere = async (query: ListProductsQuery, onlyActive: boolean):
     where.variants = {
       some: {
         isActive: true,
+        deletedAt: null,
         ...(query.minPrice && { price: { gte: query.minPrice } }),
         ...(query.maxPrice && { price: { lte: query.maxPrice } }),
       },
@@ -266,6 +274,7 @@ const buildProductWhere = async (query: ListProductsQuery, onlyActive: boolean):
     where.variants = {
       some: {
         isActive: true,
+        deletedAt: null,
         quantity: { gt: 0 },
       },
     };
@@ -275,11 +284,11 @@ const buildProductWhere = async (query: ListProductsQuery, onlyActive: boolean):
 };
 
 export const findAllPublic = async (query: ListProductsQuery) => {
-  return findAll(query, true);
+  return findAll(query, false);
 };
 
 export const findAllAdmin = async (query: ListProductsQuery) => {
-  return findAll(query, false);
+  return findAll(query, true);
 };
 
 export const findColorImagesByProductId = async (productId: string) => {
@@ -341,11 +350,11 @@ export const findOrderItemForReview = (userId: string, productId: string) => {
   });
 };
 
-const findAll = async (query: ListProductsQuery, onlyActive: boolean) => {
+const findAll = async (query: ListProductsQuery, isAdmin: boolean) => {
   const { page, limit, sortBy, sortOrder } = query;
   const skip = (page - 1) * limit;
 
-  const where = await buildProductWhere(query, onlyActive);
+  const where = await buildProductWhere(query, isAdmin);
 
   let orderBy: any;
 
@@ -361,8 +370,6 @@ const findAll = async (query: ListProductsQuery, onlyActive: boolean) => {
     orderBy = [{ totalSoldCount: "desc" }, { ratingAverage: "desc" }, { createdAt: "desc" }, { id: "asc" }];
   }
 
-  // console.log(orderBy);
-
   const [data, total] = await Promise.all([
     prisma.products.findMany({
       where,
@@ -373,7 +380,6 @@ const findAll = async (query: ListProductsQuery, onlyActive: boolean) => {
     }),
     prisma.products.count({ where }),
   ]);
-  // console.log(data);
 
   return {
     data,
@@ -390,6 +396,7 @@ export const findVariantByCode = async (productId: string, code: string) => {
       productId,
       code,
       isActive: true,
+      deletedAt: null,
     },
     select: selectVariant,
   });
@@ -400,23 +407,25 @@ export const findVariantByOptions = async (productId: string, options: Record<st
     where: {
       productId,
       isActive: true,
+      deletedAt: null,
     },
     select: selectVariant,
   });
 
   const matchedVariant = variants.find((variant) => {
     const variantOptions = extractVariantOptions(variant);
-
     return Object.entries(options).every(([key, value]) => variantOptions[key] === value);
   });
 
   return matchedVariant || null;
 };
 
-// UPDATE: findById - không include inventory
-export const findById = async (id: string) => {
-  return prisma.products.findUnique({
-    where: { id },
+export const findById = async (id: string, includeDeleted = false) => {
+  return prisma.products.findFirst({
+    where: { 
+      id,
+      ...(!includeDeleted ? { deletedAt: null } : {})
+    },
     include: {
       brand: true,
       category: {
@@ -432,6 +441,7 @@ export const findById = async (id: string) => {
         orderBy: [{ color: "asc" }, { position: "asc" }],
       },
       variants: {
+        where: { deletedAt: null },
         include: {
           variantAttributes: {
             include: {
@@ -457,10 +467,8 @@ export const findHighlightSpecificationGroups = async (
   groups: HighlightSpecificationGroup[];
   productSpecs: Map<string, string>;
 }> => {
-  // 1. Lấy category hierarchy
   const categoryIds = await getCategoryHierarchy(categoryId);
 
-  // 2. Lấy TẤT CẢ product specifications
   const productSpecs = await prisma.product_specifications.findMany({
     where: { productId },
     select: {
@@ -470,17 +478,13 @@ export const findHighlightSpecificationGroups = async (
     },
   });
 
-  // 3. Tạo map: specId -> value
   const specValueMap = new Map(productSpecs.map((ps) => [ps.specificationId, ps.value]));
-
-  // 4. Lấy SET các specIds có isHighlight = true
   const highlightSpecIds = new Set(productSpecs.filter((ps) => ps.isHighlight).map((ps) => ps.specificationId));
 
   if (highlightSpecIds.size === 0) {
     return { groups: [], productSpecs: specValueMap };
   }
 
-  // 5. Lấy TẤT CẢ category_specifications từ category hierarchy
   const allCategorySpecs = await prisma.category_specifications.findMany({
     where: {
       categoryId: { in: categoryIds },
@@ -499,7 +503,6 @@ export const findHighlightSpecificationGroups = async (
     },
   });
 
-  // 6. Group theo groupName
   const groupsMap = new Map<
     string,
     {
@@ -522,13 +525,11 @@ export const findHighlightSpecificationGroups = async (
 
     const group = groupsMap.get(cs.groupName)!;
 
-    // Check xem spec này có phải highlight không
     const isHighlight = highlightSpecIds.has(cs.specification.id);
     if (isHighlight) {
       group.hasHighlight = true;
     }
 
-    // Chỉ thêm spec có value trong product
     const value = specValueMap.get(cs.specification.id);
     if (value) {
       group.items.push({
@@ -538,16 +539,15 @@ export const findHighlightSpecificationGroups = async (
         icon: cs.specification.icon ?? undefined,
         unit: cs.specification.unit ?? undefined,
         value: value,
-        isHighlight, // Để FE biết spec nào là highlight
+        isHighlight,
       });
     }
   }
 
-  // 7. Lọc CHỈ các nhóm có highlight, sort và lấy 3 nhóm đầu
   const groups = Array.from(groupsMap.values())
-    .filter((g) => g.hasHighlight && g.items.length > 0) // Nhóm phải có highlight VÀ có items
+    .filter((g) => g.hasHighlight && g.items.length > 0)
     .sort((a, b) => a.sortOrder - b.sortOrder)
-    .slice(0, 3); // Lấy 3 nhóm đầu tiên
+    .slice(0, 3);
 
   return {
     groups: groups.map((g) => ({
@@ -557,9 +557,10 @@ export const findHighlightSpecificationGroups = async (
     productSpecs: specValueMap,
   };
 };
+
 export const findBySlug = async (slug: string) => {
-  return prisma.products.findUnique({
-    where: { slug },
+  return prisma.products.findFirst({
+    where: { slug, deletedAt: null },
     include: {
       brand: true,
       category: {
@@ -569,6 +570,7 @@ export const findBySlug = async (slug: string) => {
         orderBy: [{ color: "asc" }, { position: "asc" }],
       },
       variants: {
+        where: { deletedAt: null },
         include: {
           variantAttributes: {
             include: {
@@ -590,9 +592,10 @@ export const findBySlug = async (slug: string) => {
     },
   });
 };
+
 export const findSpecificationsBySlug = async (slug: string) => {
-  const product = await prisma.products.findUnique({
-    where: { slug },
+  const product = await prisma.products.findFirst({
+    where: { slug, deletedAt: null },
     select: {
       isActive: true,
       categoryId: true,
@@ -608,8 +611,6 @@ export const findSpecificationsBySlug = async (slug: string) => {
   if (!product) return null;
 
   const categoryIds = await getCategoryHierarchy(product.categoryId);
-
-  // console.log(categoryIds);
 
   const categorySpecifications = await prisma.category_specifications.findMany({
     where: {
@@ -645,6 +646,7 @@ export const findRelatedProducts = async (productId: string, limit: number = 8) 
     where: {
       id: { not: productId },
       isActive: true,
+      deletedAt: null,
       OR: [{ brandId: product.brandId }, { categoryId: product.categoryId }],
     },
     select: selectProductCard,
@@ -727,7 +729,6 @@ export const getReviewStats = async (productId: string) => {
   };
 };
 
-// UPDATE: create - không tạo inventory, dùng quantity trực tiếp
 export const create = async (data: any) => {
   const { variants, specifications, colorImages, ...product } = data;
 
@@ -759,7 +760,7 @@ export const create = async (data: any) => {
           variants?.map((v: any) => ({
             code: v.code,
             price: v.price,
-            quantity: v.quantity ?? 10, // Direct field với default value
+            quantity: v.quantity ?? 10,
             isDefault: v.isDefault || false,
             isActive: v.isActive ?? true,
             variantAttributes: {
@@ -775,7 +776,6 @@ export const create = async (data: any) => {
   });
 };
 
-// UPDATE: update - không update inventory, dùng quantity trực tiếp
 export const update = async (id: string, data: any) => {
   const { specifications, variants, colorImages, ...updateData } = data;
 
@@ -804,7 +804,7 @@ export const update = async (id: string, data: any) => {
 
   if (variants !== undefined) {
     const existingVariants = await prisma.products_variants.findMany({
-      where: { productId: id },
+      where: { productId: id, deletedAt: null },
       select: { id: true },
     });
 
@@ -813,28 +813,30 @@ export const update = async (id: string, data: any) => {
 
     const toDelete = existingIds.filter((id) => !updateIds.includes(id));
     if (toDelete.length > 0) {
-      await prisma.variants_attributes.deleteMany({
-        where: { productVariantId: { in: toDelete } },
-      });
-      // REMOVED: Delete inventory
-      await prisma.products_variants.deleteMany({
+      // Đã đổi từ deleteMany sang updateMany (Soft Delete cho Variant)
+      await prisma.products_variants.updateMany({
         where: { id: { in: toDelete } },
+        data: { deletedAt: new Date(), isActive: false }
       });
     }
 
     for (const variant of variants) {
-      if (variant._delete) {
+      if (variant._delete && variant.id) {
+         // Đã đổi sang Soft Delete
+         await prisma.products_variants.update({
+           where: { id: variant.id },
+           data: { deletedAt: new Date(), isActive: false }
+         });
         continue;
       }
 
       if (variant.id) {
-        // UPDATE existing variant - quantity là direct field
         await prisma.products_variants.update({
           where: { id: variant.id },
           data: {
             code: variant.code,
             price: variant.price,
-            quantity: variant.quantity, // ✅ Direct field
+            quantity: variant.quantity,
             isDefault: variant.isDefault,
             isActive: variant.isActive,
             ...(variant.variantAttributes && {
@@ -847,8 +849,7 @@ export const update = async (id: string, data: any) => {
             }),
           },
         });
-      } else {
-        // CREATE new variant
+      } else if (!variant._delete) {
         await prisma.products_variants.create({
           data: {
             productId: id,
@@ -876,84 +877,12 @@ export const update = async (id: string, data: any) => {
   });
 };
 
-// UPDATE: remove - không xóa inventory
-export const remove = async (id: string) => {
-  const variants = await prisma.products_variants.findMany({
-    where: { productId: id },
-    select: { id: true },
-  });
-
-  for (const variant of variants) {
-    await prisma.variants_attributes.deleteMany({
-      where: { productVariantId: variant.id },
-    });
-  }
-
-  // REMOVED: Delete inventory
-  await prisma.products_variants.deleteMany({ where: { productId: id } });
-  await prisma.product_color_images.deleteMany({ where: { productId: id } });
-  await prisma.product_specifications.deleteMany({ where: { productId: id } });
-
-  return prisma.products.delete({ where: { id } });
-};
-
 export const bulkUpdate = async (productIds: string[], updates: any) => {
   return prisma.products.updateMany({
     where: { id: { in: productIds } },
     data: updates,
   });
 };
-
-// export const getProductVariantOptionsMap = async (productIds: string[]) => {
-//   const rows = await prisma.variants_attributes.findMany({
-//     where: {
-//       productVariant: {
-//         productId: { in: productIds },
-//         isActive: true,
-//       },
-//     },
-//     select: {
-//       productVariant: {
-//         select: { productId: true },
-//       },
-//       attributeOption: {
-//         select: {
-//           type: true,
-//           value: true,
-//           label: true,
-//         },
-//       },
-//     },
-//   });
-
-//   const map = new Map<string, { type: string; options: { value: string; label: string }[] }[]>();
-
-//   // ensure all products exist
-//   for (const productId of productIds) {
-//     map.set(productId, []);
-//   }
-
-//   for (const row of rows) {
-//     const productId = row.productVariant.productId;
-//     const list = map.get(productId)!;
-
-//     let group = list.find((g) => g.type === row.attributeOption.type);
-
-//     if (!group) {
-//       group = { type: row.attributeOption.type, options: [] };
-//       list.push(group);
-//     }
-
-//     if (!group.options.some((o) => o.value === row.attributeOption.value)) {
-//       group.options.push({
-//         value: row.attributeOption.value,
-//         label: row.attributeOption.label,
-//       });
-//     }
-//   }
-
-//   return map;
-// };
 
 const getAllDescendantCategoryIds = async (categoryId: string): Promise<string[]> => {
   const result = new Set<string>();
@@ -984,7 +913,6 @@ export const getProductIdsFromPromotions = async (
 }> => {
   const productIds = new Set<string>();
 
-  // Get active promotions on this date
   const activePromotions = await prisma.promotions.findMany({
     where: {
       isActive: true,
@@ -1005,7 +933,6 @@ export const getProductIdsFromPromotions = async (
   for (const promotion of activePromotions) {
     for (const target of promotion.targets) {
       if (target.targetType === "PRODUCT" && target.targetId) {
-        // Direct product target
         productIds.add(target.targetId);
       } else if (target.targetType === "CATEGORY" && target.targetId) {
         const categoryIds = await getAllDescendantCategoryIds(target.targetId);
@@ -1014,6 +941,7 @@ export const getProductIdsFromPromotions = async (
           where: {
             categoryId: { in: categoryIds },
             isActive: true,
+            deletedAt: null,
           },
           select: { id: true },
         });
@@ -1021,13 +949,13 @@ export const getProductIdsFromPromotions = async (
         products.forEach((p) => productIds.add(p.id));
       } else if (target.targetType === "BRAND" && target.targetId) {
         const products = await prisma.products.findMany({
-          where: { brandId: target.targetId, isActive: true },
+          where: { brandId: target.targetId, isActive: true, deletedAt: null },
           select: { id: true },
         });
         products.forEach((p) => productIds.add(p.id));
       } else if (target.targetType === "ALL") {
         const products = await prisma.products.findMany({
-          where: { isActive: true },
+          where: { isActive: true, deletedAt: null },
           select: { id: true },
         });
         products.forEach((p) => productIds.add(p.id));
@@ -1049,22 +977,17 @@ export const findProductsOnSaleByDate = async (
   } = {},
 ) => {
   const { limit = 15, categoryId } = options;
-
-  // Get product IDs affected by promotions
   const { productIds, promotions } = await getProductIdsFromPromotions(date);
-
-  // console.log(productIds);
 
   if (productIds.size === 0) {
     return { products: [], promotions: [] };
   }
 
-  // Get products
-
   const products = await prisma.products.findMany({
     where: {
       id: { in: Array.from(productIds) },
       isActive: true,
+      deletedAt: null,
       ...(categoryId && { categoryId }),
     },
     select: selectProductCard,
@@ -1079,6 +1002,7 @@ export const getProductsForCategoryRanking = async (date: Date) => {
   return prisma.products.findMany({
     where: {
       isActive: true,
+      deletedAt: null,
     },
     select: {
       id: true,
@@ -1091,7 +1015,7 @@ export const getProductsForCategoryRanking = async (date: Date) => {
         },
       },
       variants: {
-        where: { isActive: true },
+        where: { isActive: true, deletedAt: null },
         select: {
           soldCount: true,
         },
@@ -1108,7 +1032,7 @@ export const findCategoriesWithSaleProducts = async (date: Date) => {
   }
 
   const products = await prisma.products.findMany({
-    where: { id: { in: Array.from(productIds) } },
+    where: { id: { in: Array.from(productIds) }, deletedAt: null },
     select: {
       category: {
         select: {
@@ -1123,10 +1047,8 @@ export const findCategoriesWithSaleProducts = async (date: Date) => {
     },
   });
 
-  // Xác định category hiển thị (CHA nếu có)
   const displayCategoryIds = Array.from(new Set(products.map((p) => p.category.parent?.id ?? p.category.id)));
 
-  // Lấy thông tin category CHA để render
   return prisma.categories.findMany({
     where: {
       id: { in: displayCategoryIds },
@@ -1147,10 +1069,6 @@ export const findCategoriesWithSaleProducts = async (date: Date) => {
   });
 };
 
-/**
- * 3. Get featured products by featured categories
- * For Home: Sections hiển thị sản phẩm featured theo category
- */
 export const findFeaturedProductsByCategories = async (
   options: {
     limit?: number;
@@ -1159,10 +1077,6 @@ export const findFeaturedProductsByCategories = async (
 ) => {
   const { limit = 5, categoriesLimit = 6 } = options;
 
-  /**
-   * Lấy category GỐC (Laptop, Phone, Tablet...)
-   *    => chỉ category cha mới tạo section
-   */
   const rootFeaturedCategories = await prisma.categories.findMany({
     where: {
       isFeatured: true,
@@ -1178,16 +1092,8 @@ export const findFeaturedProductsByCategories = async (
     take: categoriesLimit,
   });
 
-  /**
-   * Với mỗi category cha
-   *    → lấy toàn bộ category con (nhiều cấp nếu có)
-   *    → lấy sản phẩm isFeatured bên trong
-   */
   const results = await Promise.all(
     rootFeaturedCategories.map(async (rootCategory) => {
-      /**
-       * Lấy category cấp 1 (vd: Apple (Macbook))
-       */
       const level1Categories = await prisma.categories.findMany({
         where: {
           parentId: rootCategory.id,
@@ -1198,9 +1104,6 @@ export const findFeaturedProductsByCategories = async (
 
       const level1Ids = level1Categories.map((c) => c.id);
 
-      /**
-       * Lấy category cấp 2 (vd: MacBook Air 13 / 15)
-       */
       const level2Categories = await prisma.categories.findMany({
         where: {
           parentId: { in: level1Ids },
@@ -1211,14 +1114,12 @@ export const findFeaturedProductsByCategories = async (
 
       const allCategoryIds = [...level1Ids, ...level2Categories.map((c) => c.id)];
 
-      /**
-       * Lấy sản phẩm nổi bật từ TOÀN BỘ category con
-       */
       const products = await prisma.products.findMany({
         where: {
           categoryId: { in: allCategoryIds },
           isFeatured: true,
           isActive: true,
+          deletedAt: null,
         },
         select: selectProductCard,
         orderBy: { createdAt: "desc" },
@@ -1233,16 +1134,9 @@ export const findFeaturedProductsByCategories = async (
     }),
   );
 
-  /**
-   * Loại bỏ section không có sản phẩm
-   */
   return results.filter((r) => r.products.length > 0);
 };
 
-/**
- * 4. Get upcoming promotions (for preview)
- * For Home: Hiển thị các đợt sale sắp tới
- */
 export const findUpcomingPromotions = async (currentDate: Date, limit: number = 5) => {
   return prisma.promotions.findMany({
     where: {
@@ -1267,10 +1161,6 @@ export const findUpcomingPromotions = async (currentDate: Date, limit: number = 
   });
 };
 
-/**
- * 5. Get products for specific promotion (preview upcoming sales)
- * For Home: Xem trước sản phẩm sale trong promotion sắp tới
- */
 export const findProductsByPromotionId = async (promotionId: string, limit: number = 20) => {
   const promotion = await prisma.promotions.findUnique({
     where: { id: promotionId },
@@ -1288,21 +1178,21 @@ export const findProductsByPromotionId = async (promotionId: string, limit: numb
       productIds.add(target.targetId);
     } else if (target.targetType === "CATEGORY" && target.targetId) {
       const products = await prisma.products.findMany({
-        where: { categoryId: target.targetId, isActive: true },
+        where: { categoryId: target.targetId, isActive: true, deletedAt: null },
         select: { id: true },
       });
       products.forEach((p) => productIds.add(p.id));
     } else if (target.targetType === "BRAND" && target.targetId) {
       const products = await prisma.products.findMany({
-        where: { brandId: target.targetId, isActive: true },
+        where: { brandId: target.targetId, isActive: true, deletedAt: null },
         select: { id: true },
       });
       products.forEach((p) => productIds.add(p.id));
     } else if (target.targetType === "ALL") {
       const products = await prisma.products.findMany({
-        where: { isActive: true },
+        where: { isActive: true, deletedAt: null },
         select: { id: true },
-        take: limit, // Limit for ALL type
+        take: limit,
       });
       products.forEach((p) => productIds.add(p.id));
     }
@@ -1312,6 +1202,7 @@ export const findProductsByPromotionId = async (promotionId: string, limit: numb
     where: {
       id: { in: Array.from(productIds) },
       isActive: true,
+      deletedAt: null,
     },
     select: selectProductCard,
     orderBy: { createdAt: "desc" },
@@ -1340,7 +1231,7 @@ export const getSaleProductsCountByCategories = async (date: Date) => {
   }
 
   const products = await prisma.products.findMany({
-    where: { id: { in: Array.from(productIds) } },
+    where: { id: { in: Array.from(productIds) }, deletedAt: null },
     select: {
       category: {
         select: {
@@ -1359,7 +1250,6 @@ export const getSaleProductsCountByCategories = async (date: Date) => {
 
   for (const product of products) {
     const displayCategoryId = product.category.parent?.id ?? product.category.id;
-
     map.set(displayCategoryId, (map.get(displayCategoryId) || 0) + 1);
   }
 
@@ -1370,6 +1260,7 @@ export const findFeaturedProducts = async (limit: number = 12) => {
   return prisma.products.findMany({
     where: {
       isActive: true,
+      deletedAt: null,
     },
     select: {
       ...selectProductCard,
@@ -1377,6 +1268,7 @@ export const findFeaturedProducts = async (limit: number = 12) => {
         where: {
           isActive: true,
           isDefault: true,
+          deletedAt: null,
         },
         take: 1,
         select: {
@@ -1392,42 +1284,13 @@ export const findFeaturedProducts = async (limit: number = 12) => {
   });
 };
 
-// export const findBestSellingProducts = async (limit: number = 12) => {
-//   // Get products with highest sold count from variants
-//   const products = await prisma.products.findMany({
-//     where: { isActive: true },
-//     select: {
-//       ...selectProductCard,
-//       variants: {
-//         select: {
-//           id: true,
-//           price: true,
-//           quantity: true,
-//           soldCount: true,
-//         },
-//       },
-//     },
-//     orderBy: { viewsCount: "desc" },
-//     // take: limit * 3, // Get more to sort by soldCount
-//   });
-
-//   console.log(products);
-
-//   // Calculate total soldCount for each product
-//   const productsWithSoldCount = products.map((p) => ({
-//     ...p,
-//     totalSoldCount: p.variants.reduce((sum, v) => sum + v.soldCount, 0),
-//   }));
-
-//   // Sort by total soldCount and take top N
-//   return productsWithSoldCount.sort((a, b) => b.totalSoldCount - a.totalSoldCount).slice(0, limit);
-// };
 export const findBestSellingProducts = async (limit: number = 12) => {
   return prisma.products.findMany({
     where: {
       isActive: true,
+      deletedAt: null,
       variants: {
-        some: { isActive: true },
+        some: { isActive: true, deletedAt: null },
       },
     },
     orderBy: {
@@ -1438,7 +1301,7 @@ export const findBestSellingProducts = async (limit: number = 12) => {
       ...selectProductCard,
       totalSoldCount: true,
       variants: {
-        where: { isActive: true },
+        where: { isActive: true, deletedAt: null },
         orderBy: { isDefault: "desc" },
         take: 1,
         select: {
@@ -1458,6 +1321,7 @@ export const findProductsByIds = async (ids: string[]) => {
     where: {
       id: { in: ids },
       isActive: true,
+      deletedAt: null,
     },
     select: {
       ...selectProductCard,
@@ -1465,6 +1329,7 @@ export const findProductsByIds = async (ids: string[]) => {
         where: {
           isActive: true,
           isDefault: true,
+          deletedAt: null,
         },
         take: 1,
         select: {
@@ -1475,16 +1340,10 @@ export const findProductsByIds = async (ids: string[]) => {
     },
   });
 
-  // giữ đúng thứ tự user đã xem
   const map = new Map(products.map((p) => [p.id, p]));
-
   return ids.map((id) => map.get(id)).filter((p): p is (typeof products)[number] => p !== undefined);
 };
 
-/**
- * 8. Get new arrival products (for Home)
- * For Home: Sản phẩm mới về
- */
 export const findNewArrivalProducts = async (daysAgo: number = 30, limit: number = 12) => {
   const dateThreshold = new Date();
   dateThreshold.setDate(dateThreshold.getDate() - daysAgo);
@@ -1492,6 +1351,7 @@ export const findNewArrivalProducts = async (daysAgo: number = 30, limit: number
   return prisma.products.findMany({
     where: {
       isActive: true,
+      deletedAt: null,
       createdAt: { gte: dateThreshold },
     },
     select: selectProductCard,
@@ -1500,21 +1360,13 @@ export const findNewArrivalProducts = async (daysAgo: number = 30, limit: number
   });
 };
 
-/**
- * 9. Get active promotions with details (for Home)
- * For Home: Danh sách promotions đang active
- */
 export const findActivePromotions = async (date: Date) => {
   return prisma.promotions.findMany({
     where: {
       isActive: true,
       AND: [
-        {
-          OR: [{ startDate: null }, { startDate: { lte: date } }],
-        },
-        {
-          OR: [{ endDate: null }, { endDate: { gte: date } }],
-        },
+        { OR: [{ startDate: null }, { startDate: { lte: date } }] },
+        { OR: [{ endDate: null }, { endDate: { gte: date } }] },
       ],
     },
     select: {
@@ -1532,4 +1384,47 @@ export const findActivePromotions = async (date: Date) => {
     },
     orderBy: [{ priority: "desc" }, { startDate: "asc" }],
   });
+};
+
+// ==================== TRASH & DELETE REPOSITORY ====================
+
+export const softDeleteProduct = async (id: string, deletedBy: string) => {
+  return prisma.products.update({
+    where: { id },
+    data: { deletedAt: new Date(), deletedBy, isActive: false },
+  });
+};
+
+export const restoreProduct = async (id: string) => {
+  return prisma.products.update({
+    where: { id },
+    data: { deletedAt: null, deletedBy: null },
+  });
+};
+
+export const hardDeleteProduct = async (id: string) => {
+  return prisma.products.delete({ where: { id } });
+};
+
+export const findAllDeletedProducts = async (query: ListProductsQuery) => {
+  const { page = 1, limit = 12, search } = query;
+  const skip = (page - 1) * limit;
+
+  const where: Prisma.productsWhereInput = { deletedAt: { not: null } };
+  if (search) where.name = { contains: search, mode: "insensitive" };
+
+  const [data, total] = await Promise.all([
+    prisma.products.findMany({
+      where, skip, take: limit,
+      select: {
+        id: true, name: true, slug: true, deletedAt: true, deletedBy: true,
+        brand: { select: { name: true } },
+        category: { select: { name: true } }
+      },
+      orderBy: { deletedAt: "desc" }
+    }),
+    prisma.products.count({ where })
+  ]);
+
+  return { data, page, limit, total, totalPages: Math.ceil(total / limit) };
 };

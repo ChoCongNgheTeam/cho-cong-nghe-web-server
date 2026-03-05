@@ -3,10 +3,16 @@ import { CreateBrandInput, UpdateBrandInput, ListBrandsQuery } from "./brand.val
 
 const prisma = new PrismaClient();
 
-const buildBrandWhere = (query: ListBrandsQuery, onlyActive: boolean): Prisma.brandsWhereInput => {
+const buildBrandWhere = (query: ListBrandsQuery, isAdmin: boolean): Prisma.brandsWhereInput => {
   const where: Prisma.brandsWhereInput = {};
 
-  if (onlyActive) {
+  if (isAdmin && query.includeDeleted) {
+    // Không lọc deletedAt (lấy cả active và soft-deleted)
+  } else {
+    where.deletedAt = null; // Mặc định chỉ lấy chưa xóa
+  }
+
+  if (!isAdmin) {
     where.isActive = true;
   } else if (query.isActive !== undefined) {
     where.isActive = query.isActive;
@@ -42,29 +48,27 @@ const buildBrandOrderBy = (query: ListBrandsQuery): Prisma.brandsOrderByWithRela
 
 export class BrandRepository {
   async checkSlugExists(slug: string, excludeId?: string): Promise<boolean> {
-    const brand = await prisma.brands.findUnique({
-      where: { slug },
+    const brand = await prisma.brands.findFirst({
+      where: { 
+        slug,
+        ...(excludeId ? { id: { not: excludeId } } : {})
+      },
     });
-
-    if (!brand) return false;
-    if (excludeId && brand.id === excludeId) return false;
-
-    return true;
+    return !!brand;
   }
 
   async checkNameExists(name: string, excludeId?: string): Promise<boolean> {
-    const brand = await prisma.brands.findUnique({
-      where: { name },
+    const brand = await prisma.brands.findFirst({
+      where: { 
+        name,
+        ...(excludeId ? { id: { not: excludeId } } : {})
+      },
     });
-
-    if (!brand) return false;
-    if (excludeId && brand.id === excludeId) return false;
-
-    return true;
+    return !!brand;
   }
 
   async findAllPublic(query: ListBrandsQuery) {
-    const where = buildBrandWhere(query, true);
+    const where = buildBrandWhere(query, false);
     const orderBy = buildBrandOrderBy(query);
 
     return await prisma.brands.findMany({
@@ -86,7 +90,7 @@ export class BrandRepository {
   }
 
   async findAllAdmin(query: ListBrandsQuery) {
-    const where = buildBrandWhere(query, false);
+    const where = buildBrandWhere(query, true);
     const orderBy = buildBrandOrderBy(query);
 
     return await prisma.brands.findMany({
@@ -102,7 +106,7 @@ export class BrandRepository {
 
   async getActiveBrands() {
     return await prisma.brands.findMany({
-      where: { isActive: true },
+      where: { isActive: true, deletedAt: null },
       orderBy: [{ isFeatured: "desc" }, { name: "asc" }],
       select: {
         id: true,
@@ -120,6 +124,7 @@ export class BrandRepository {
       where: {
         isActive: true,
         isFeatured: true,
+        deletedAt: null
       },
       take: limit,
       orderBy: { name: "asc" },
@@ -134,9 +139,12 @@ export class BrandRepository {
     });
   }
 
-  async getBrandBySlug(slug: string) {
-    return await prisma.brands.findUnique({
-      where: { slug, isActive: true },
+  async getBrandBySlug(slug: string, isAdmin: boolean = false) {
+    return await prisma.brands.findFirst({
+      where: { 
+        slug, 
+        ...(!isAdmin ? { isActive: true, deletedAt: null } : {})
+      },
       include: {
         _count: {
           select: { products: true },
@@ -145,9 +153,12 @@ export class BrandRepository {
     });
   }
 
-  async getBrandById(id: string) {
-    return await prisma.brands.findUnique({
-      where: { id },
+  async getBrandById(id: string, includeDeleted: boolean = false) {
+    return await prisma.brands.findFirst({
+      where: { 
+        id,
+        ...(!includeDeleted ? { deletedAt: null } : {})
+      },
       include: {
         _count: {
           select: { products: true },
@@ -187,7 +198,28 @@ export class BrandRepository {
     });
   }
 
-  async deleteBrand(id: string) {
+  async softDeleteBrand(id: string, deletedBy: string) {
+    return await prisma.brands.update({
+      where: { id },
+      data: {
+        deletedAt: new Date(),
+        deletedBy,
+        isActive: false, 
+      },
+    });
+  }
+
+  async restoreBrand(id: string) {
+    return await prisma.brands.update({
+      where: { id },
+      data: {
+        deletedAt: null,
+        deletedBy: null,
+      },
+    });
+  }
+
+  async hardDeleteBrand(id: string) {
     return await prisma.brands.delete({
       where: { id },
     });
@@ -196,6 +228,27 @@ export class BrandRepository {
   async countProductsByBrandId(id: string): Promise<number> {
     return await prisma.products.count({
       where: { brandId: id },
+    });
+  }
+
+  async findAllDeleted(query: ListBrandsQuery) {
+    const where: Prisma.brandsWhereInput = {
+      deletedAt: { not: null }
+    };
+
+    if (query.search) {
+       where.OR = [
+        { name: { contains: query.search, mode: "insensitive" } },
+        { description: { contains: query.search, mode: "insensitive" } },
+      ];
+    }
+    
+    return await prisma.brands.findMany({
+      where,
+      orderBy: { deletedAt: "desc" },
+      include: {
+        _count: { select: { products: true } }
+      }
     });
   }
 }

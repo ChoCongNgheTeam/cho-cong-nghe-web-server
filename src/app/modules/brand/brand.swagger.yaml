@@ -493,3 +493,83 @@ paths:
           description: Không có quyền
         "500":
           description: Lỗi server
+/brands/admin/trash/brands:
+  get:
+      tags:
+        - Admin - Brands
+      summary: Lấy danh sách thương hiệu trong thùng rác (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BrandCard"
+                  message:
+                    type: string
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+
+  /brands/admin/{id}/restore:
+    post:
+      tags:
+        - Admin - Brands
+      summary: Khôi phục thương hiệu từ thùng rác (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Khôi phục thành công
+        "400":
+          description: Không thể khôi phục
+        "403":
+          description: Không có quyền
+        "404":
+          description: Không tìm thấy
+
+  /brands/admin/{id}/permanent:
+    delete:
+      tags:
+        - Admin - Brands
+      summary: Xóa vĩnh viễn thương hiệu (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Xóa vĩnh viễn thành công
+        "400":
+          description: Phải xóa tạm trước khi xóa vĩnh viễn
+        "403":
+          description: Không có quyền
+        "404":
+          description: Không tìm thấy

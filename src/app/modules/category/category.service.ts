@@ -35,148 +35,127 @@ export const getCategoryTree = async () => {
   return buildCategoryTree(categories);
 };
 
-export const getCategoryBySlug = async (slug: string) => {
-  const category = await categoryRepository.findBySlug(slug);
+export const getCategoryBySlug = async (slug: string, isAdmin: boolean = false) => {
+  const category = await categoryRepository.findBySlug(slug, isAdmin);
   if (!category) throw new NotFoundError("Danh mục");
   return category;
-};
-
-export const getAllCategories = async () => {
-  return categoryRepository.findAll(false);
 };
 
 export const getRootCategoriesForAdmin = async () => {
   return categoryRepository.findRootCategories(false);
 };
 
-export const getCategoryDetail = async (id: string) => {
-  const categories = await categoryRepository.findAllCategoriesForTree(false);
-
-  const current = categories.find((c) => c.id === id);
-  if (!current) throw new NotFoundError("Danh mục");
-
-  const childrenTree = buildCategoryTree(categories, id);
-  const parent = current.parentId ? (categories.find((c) => c.id === current.parentId) ?? null) : null;
-
-  return { ...current, parent, children: childrenTree };
+export const getCategoryDetail = async (id: string, includeDeleted: boolean = false) => {
+  const category = await categoryRepository.findById(id, includeDeleted);
+  if (!category) throw new NotFoundError("Danh mục");
+  return category;
 };
 
-export const createCategory = async (input: CreateCategoryInput) => {
-  const { name, parentId, position, ...rest } = input;
+export const createCategory = async (data: CreateCategoryInput) => {
+  const slug = await generateUniqueSlug(prisma.categories, data.name);
 
-  if (parentId) {
-    const parent = await categoryRepository.findById(parentId);
-    if (!parent) throw new NotFoundError("Danh mục cha");
+  if (data.parentId) {
+    const parent = await categoryRepository.findById(data.parentId);
+    if (!parent) throw new BadRequestError("Danh mục cha không tồn tại");
   }
 
-  const exists = await categoryRepository.existsByNameInParent(name, parentId || null);
-  if (exists) throw new BadRequestError(`Tên danh mục "${name}" đã tồn tại trong cùng cấp`);
+  const categoryData: any = {
+    ...data,
+    slug,
+  };
 
-  const finalPosition = position ?? (await categoryRepository.countSiblings(parentId || null));
-  const slug = await generateUniqueSlug(prisma.categories, name);
-
-  return categoryRepository
-    .create({
-      name,
-      slug,
-      parent: parentId ? { connect: { id: parentId } } : undefined,
-      position: finalPosition,
-      ...rest,
-    })
-    .catch(handlePrismaError);
+  return categoryRepository.create(categoryData).catch(handlePrismaError);
 };
 
-export const updateCategory = async (id: string, input: UpdateCategoryInput) => {
-  const { name, parentId, ...rest } = input;
+export const updateCategory = async (id: string, data: UpdateCategoryInput) => {
+  const existingCategory = await categoryRepository.findById(id);
+  if (!existingCategory) throw new NotFoundError("Danh mục");
 
-  const category = await categoryRepository.findById(id);
-  if (!category) throw new NotFoundError("Danh mục");
+  const updateData: any = { ...data };
 
-  if (parentId !== undefined) {
-    if (parentId === id) throw new BadRequestError("Danh mục không thể là cha của chính nó");
+  if (data.name && data.name !== existingCategory.name) {
+    updateData.slug = await generateUniqueSlug(prisma.categories, data.name);
+  }
 
-    const isChangingParent = parentId !== category.parentId;
-    if (isChangingParent && parentId) {
-      const parent = await categoryRepository.findById(parentId);
-      if (!parent) throw new NotFoundError("Danh mục cha");
-
-      const hasChildren = await categoryRepository.hasChildren(id);
-      if (hasChildren) {
-        throw new BadRequestError("Không thể chuyển danh mục có danh mục con thành danh mục con");
-      }
+  if (data.parentId !== undefined) {
+    if (data.parentId === id) {
+      throw new BadRequestError("Danh mục không thể là cha của chính nó");
+    }
+    if (data.parentId && data.parentId !== "") {
+      const parent = await categoryRepository.findById(data.parentId);
+      if (!parent) throw new BadRequestError("Danh mục cha không tồn tại");
+    } else {
+      updateData.parentId = null;
     }
   }
 
-  if (name) {
-    const newParentId = parentId !== undefined ? parentId : category.parentId;
-    const exists = await categoryRepository.existsByNameInParent(name, newParentId, id);
-    if (exists) throw new BadRequestError(`Tên danh mục "${name}" đã tồn tại trong cùng cấp`);
+  if (data.imagePath && existingCategory.imagePath) {
+    await deleteOldCategoryImage(existingCategory.imagePath);
   }
 
-  let slug = category.slug;
-  if (name && name !== category.name) {
-    slug = await generateUniqueSlug(prisma.categories, name);
+  if (data.removeImage && existingCategory.imagePath) {
+    await deleteOldCategoryImage(existingCategory.imagePath);
+    updateData.imagePath = null;
+    updateData.imageUrl = null;
   }
+  delete updateData.removeImage;
 
-  if (input.imagePath && category.imagePath) {
-    await deleteOldCategoryImage(category.imagePath);
-  }
-
-  if (input.removeImage && category.imagePath) {
-    await deleteOldCategoryImage(category.imagePath);
-    (rest as any).imagePath = null;
-    (rest as any).imageUrl = null;
-  }
-
-  return categoryRepository
-    .update(id, {
-      ...(name && { name, slug }),
-      ...(parentId !== undefined && { parentId }),
-      ...rest,
-    })
-    .catch(handlePrismaError);
+  return categoryRepository.update(id, updateData).catch(handlePrismaError);
 };
 
-export const deleteCategory = async (id: string) => {
+export const softDeleteCategory = async (id: string, userId: string) => {
   const category = await categoryRepository.findById(id);
   if (!category) throw new NotFoundError("Danh mục");
 
-  const hasChildren = await categoryRepository.hasChildren(id);
-  if (hasChildren) {
-    throw new BadRequestError("Không thể xóa danh mục có danh mục con. Vui lòng xóa danh mục con trước.");
+  const productCount = await categoryRepository.countProductsByCategoryId(id);
+  if (productCount > 0) {
+    throw new BadRequestError(`Không thể xóa vì đang có ${productCount} sản phẩm thuộc danh mục này`);
   }
 
-  const hasProducts = await categoryRepository.hasProducts(id);
-  if (hasProducts) {
-    throw new BadRequestError("Không thể xóa danh mục đang có sản phẩm. Vui lòng chuyển sản phẩm sang danh mục khác trước.");
+  const subCount = await categoryRepository.countSubCategories(id);
+  if (subCount > 0) {
+    throw new BadRequestError(`Không thể xóa vì danh mục này đang chứa ${subCount} danh mục con`);
   }
+
+  await categoryRepository.softDeleteCategory(id, userId);
+};
+
+export const restoreCategory = async (id: string) => {
+  const category = await categoryRepository.findById(id, true);
+  if (!category) throw new NotFoundError("Danh mục");
+  if (!category.deletedAt) throw new BadRequestError("Danh mục này chưa bị xóa");
+
+  return categoryRepository.restoreCategory(id);
+};
+
+export const hardDeleteCategory = async (id: string) => {
+  const category = await categoryRepository.findById(id, true);
+  if (!category) throw new NotFoundError("Danh mục");
+  if (!category.deletedAt) throw new BadRequestError("Phải chuyển vào thùng rác trước khi xóa vĩnh viễn");
 
   if (category.imagePath) {
     await deleteOldCategoryImage(category.imagePath);
   }
 
-  return categoryRepository.remove(id);
+  return await categoryRepository.hardDeleteCategory(id).catch(handlePrismaError);
+};
+
+export const getDeletedCategories = async (query: ListCategoriesQuery) => {
+  return categoryRepository.findAllDeleted(query);
 };
 
 export const reorderCategory = async (categoryId: string, newPosition: number) => {
   const category = await categoryRepository.findById(categoryId);
   if (!category) throw new NotFoundError("Danh mục");
 
-  const siblings = await categoryRepository.findSiblings(category.parentId);
+  const siblings = await prisma.categories.findMany({
+    where: { parentId: category.parentId, id: { not: categoryId }, deletedAt: null },
+    orderBy: { position: "asc" },
+  });
 
-  if (newPosition < 0 || newPosition >= siblings.length) {
-    throw new BadRequestError("Vị trí không hợp lệ");
-  }
+  siblings.splice(newPosition, 0, category);
 
-  const updates = siblings
-    .filter((s) => s.id !== categoryId)
-    .map((sibling, index) => {
-      const pos = index >= newPosition ? index + 1 : index;
-      return prisma.categories.update({ where: { id: sibling.id }, data: { position: pos } });
-    });
-
-  updates.push(prisma.categories.update({ where: { id: categoryId }, data: { position: newPosition } }));
-
+  const updates = siblings.map((cat, index) => prisma.categories.update({ where: { id: cat.id }, data: { position: index } }));
   await prisma.$transaction(updates);
 
   return { message: "Sắp xếp thành công" };
@@ -186,7 +165,10 @@ export const getCategoryTemplate = async (categoryId: string) => {
   const category = await categoryRepository.findById(categoryId);
   if (!category) throw new NotFoundError("Danh mục");
 
-  const [attributes, specifications] = await Promise.all([categoryRepository.getCategoryVariantAttributes(categoryId), categoryRepository.getCategorySpecifications(categoryId)]);
+  const [attributes, specifications] = await Promise.all([
+    categoryRepository.getCategoryVariantAttributes(categoryId), 
+    categoryRepository.getCategorySpecifications(categoryId)
+  ]);
 
   const attributesWithOptions = await Promise.all(
     attributes.map(async (attr) => ({
@@ -201,22 +183,16 @@ export const getCategoryTemplate = async (categoryId: string) => {
   };
 };
 
-export const getAllAttributes = async () => {
-  return categoryRepository.getAllAttributes();
-};
+export const getAllAttributes = async () => categoryRepository.getAllAttributes();
 
 export const getAttributeOptions = async (attributeId: string) => {
   const attribute = await prisma.attributes.findUnique({
     where: { id: attributeId },
     select: { id: true, code: true, name: true },
   });
-
   if (!attribute) throw new NotFoundError("Attribute");
-
   const options = await categoryRepository.getAttributeOptions(attributeId);
   return { attribute, options };
 };
 
-export const getAllSpecifications = async () => {
-  return categoryRepository.getAllSpecifications();
-};
+export const getAllSpecifications = async () => categoryRepository.getAllSpecifications();

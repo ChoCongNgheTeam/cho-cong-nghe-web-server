@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const brandParamsSchema = z.object({
-  id: z.uuid({ message: "ID thương hiệu không hợp lệ" }),
+  id: z.string().uuid({ message: "ID thương hiệu không hợp lệ" }),
 });
 
 export const brandSlugParamsSchema = z.object({
@@ -12,6 +12,7 @@ export const listBrandsQuerySchema = z.object({
   search: z.string().optional(),
   isFeatured: z.coerce.boolean().optional(),
   isActive: z.coerce.boolean().optional(),
+  includeDeleted: z.coerce.boolean().optional().default(false),
   sortBy: z.enum(["name", "createdAt", "productCount"]).default("name"),
   sortOrder: z.enum(["asc", "desc"]).default("asc"),
 });

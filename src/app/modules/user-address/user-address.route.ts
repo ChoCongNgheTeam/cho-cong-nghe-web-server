@@ -1,129 +1,49 @@
 import { Router } from "express";
 import { authMiddleware } from "@/app/middlewares/auth.middleware";
+import { requireRole } from "@/app/middlewares/role.middleware";
 import { validate } from "@/app/middlewares/validate.middleware";
 import { asyncHandler } from "@/utils/async-handler";
 import * as c from "./user-address.controller";
 import {
-  createAddressSchema,
-  updateAddressSchema,
-  addressIdSchema,
-  provinceIdSchema,
-  wardSearchSchema,
-  createProvinceSchema,
-  createWardSchema,
+  createAddressSchema, updateAddressSchema, addressIdSchema, provinceIdSchema, 
+  wardSearchSchema, createProvinceSchema, createWardSchema, listAddressesQuerySchema
 } from "./user-address.validation";
 
 const router = Router();
 
-// ==================== LOCATION ROUTES (PUBLIC) ====================
+// ==================== LOCATION ROUTES (PUBLIC & ADMIN) ====================
 
-/**
- * Lấy tất cả tỉnh/thành phố
- * GET /api/v1/locations/provinces
- */
 router.get("/locations/provinces", asyncHandler(c.getProvincesHandler));
+router.get("/locations/:provinceId/wards", validate(provinceIdSchema, "params"), validate(wardSearchSchema, "query"), asyncHandler(c.getWardsByProvinceHandler));
 
-/**
- * Lấy wards theo province
- * GET /api/v1/locations/:provinceId/wards?page=1&perPage=50&q=search
- */
-router.get(
-  "/locations/:provinceId/wards",
-  validate(provinceIdSchema, "params"),
-  validate(wardSearchSchema, "query"),
-  asyncHandler(c.getWardsByProvinceHandler)
-);
-
-/**
- * Tạo mới Tỉnh/Thành phố (Nên dành cho Admin)
- * POST /api/v1/locations/provinces
- */
-router.post(
-  "/locations/provinces",
-  // authMiddleware(),             <--  đăng nhập
-  // authorize(['ADMIN']),       <--  chỉ Admin được tạo
-  validate(createProvinceSchema, "body"),
-  asyncHandler(c.createProvinceHandler)
-);
-
-/**
- * Tạo mới Phường/Xã (Nên dành cho Admin)
- * POST /api/v1/locations/wards
- */
-router.post(
-  "/locations/wards",
-  // authMiddleware(),             <--  đăng nhập
-  // authorize(['ADMIN']),       <--  chỉ Admin được tạo
-  validate(createWardSchema, "body"),
-  asyncHandler(c.createWardHandler)
-);
+// Tạo Location (Admin Only)
+router.post("/locations/provinces", authMiddleware(true), requireRole("ADMIN"), validate(createProvinceSchema, "body"), asyncHandler(c.createProvinceHandler));
+router.post("/locations/wards", authMiddleware(true), requireRole("ADMIN"), validate(createWardSchema, "body"), asyncHandler(c.createWardHandler));
 
 // ==================== ADDRESS ROUTES (PROTECTED) ====================
 
-// Tất cả các route address yêu cầu đăng nhập
-router.use(authMiddleware());
+router.use(authMiddleware(true));
 
-/**
- * Lấy tất cả địa chỉ của user
- * GET /api/v1/addresses
- */
+// User Roles
 router.get("/", asyncHandler(c.getUserAddressesHandler));
-
-/**
- * Lấy địa chỉ mặc định
- * GET /api/v1/addresses/default
- */
 router.get("/default", asyncHandler(c.getDefaultAddressHandler));
+router.get("/:addressId", validate(addressIdSchema, "params"), asyncHandler(c.getAddressHandler));
+router.post("/", validate(createAddressSchema, "body"), asyncHandler(c.createAddressHandler));
+router.patch("/:addressId", validate(addressIdSchema, "params"), validate(updateAddressSchema, "body"), asyncHandler(c.updateAddressHandler));
+router.delete("/:addressId", validate(addressIdSchema, "params"), asyncHandler(c.deleteAddressHandler));
 
-/**
- * Lấy một địa chỉ
- * GET /api/v1/addresses/:addressId
- */
-router.get(
-  "/:addressId",
-  validate(addressIdSchema, "params"),
-  asyncHandler(c.getAddressHandler)
-);
 
-/**
- * Tạo mới địa chỉ
- * POST /api/v1/addresses
- */
-router.post(
-  "/",
-  validate(createAddressSchema, "body"),
-  asyncHandler(c.createAddressHandler)
-);
+router.put("/:addressId/set-default", validate(addressIdSchema, "params"), asyncHandler(c.setDefaultAddressHandler));
 
-/**
- * Cập nhật địa chỉ
- * PATCH /api/v1/addresses/:addressId
- */
-router.patch(
-  "/:addressId",
-  validate(addressIdSchema, "params"),
-  validate(updateAddressSchema, "body"),
-  asyncHandler(c.updateAddressHandler)
-);
+// ==================== STAFF & ADMIN ====================
 
-/**
- * Xóa địa chỉ
- * DELETE /api/v1/addresses/:addressId
- */
-router.delete(
-  "/:addressId",
-  validate(addressIdSchema, "params"),
-  asyncHandler(c.deleteAddressHandler)
-);
+router.get("/admin/all", requireRole("STAFF", "ADMIN"), validate(listAddressesQuerySchema, "query"), asyncHandler(c.getAllAddressesAdminHandler));
+router.delete("/admin/:addressId", requireRole("STAFF", "ADMIN"), validate(addressIdSchema, "params"), asyncHandler(c.softDeleteAddressAdminHandler));
 
-/**
- * Đặt địa chỉ mặc định
- * PUT /api/v1/addresses/:addressId/set-default
- */
-router.put(
-  "/:addressId/set-default",
-  validate(addressIdSchema, "params"),
-  asyncHandler(c.setDefaultAddressHandler)
-);
+// ==================== TRASH & HARD DELETE (ADMIN ONLY) ====================
+
+router.get("/admin/trash/addresses", requireRole("ADMIN"), asyncHandler(c.getDeletedAddressesHandler));
+router.post("/admin/:addressId/restore", requireRole("ADMIN"), validate(addressIdSchema, "params"), asyncHandler(c.restoreAddressHandler));
+router.delete("/admin/:addressId/permanent", requireRole("ADMIN"), validate(addressIdSchema, "params"), asyncHandler(c.hardDeleteAddressHandler));
 
 export default router;

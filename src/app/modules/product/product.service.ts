@@ -6,8 +6,9 @@ import { RawVariant, ReviewStats } from "./product.types";
 import { buildCategoryPath } from "../category/category.helpers";
 import prisma from "prisma/client";
 import { getProductIdsFromPromotions } from "./product.repository";
-import { normalizeVariant } from "./product.helpers";
+import { normalizeVariant, deleteOldImages } from "./product.helpers";
 import { NotFoundError, BadRequestError } from "@/errors";
+import { handlePrismaError } from "@/utils/handle-prisma-error";
 
 // ── Public ────────────────────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
 
   const reviewStats = await repo.getReviewStats(product.id);
 
-  repo.update(product.id, { viewsCount: BigInt(product.viewsCount) + BigInt(1) }).catch(console.error);
+  repo.bulkUpdate([product.id], { viewsCount: BigInt(product.viewsCount) + BigInt(1) }).catch(console.error);
 
   const productDetail = transformProductDetail(product, {
     average: Number(product.ratingAverage) || 0,
@@ -151,7 +152,7 @@ export const getProductsAdmin = async (query: ListProductsQuery) => {
 };
 
 export const getProductById = async (id: string) => {
-  const product = await repo.findById(id);
+  const product = await repo.findById(id, true);
   if (!product) throw new NotFoundError("Sản phẩm");
 
   const reviewStats = await repo.getReviewStats(product.id);
@@ -183,7 +184,7 @@ export const updateProduct = async (id: string, input: UpdateProductInput) => {
   }
 
   if (input.variants) {
-    const defaultCount = input.variants.filter((v) => v.isDefault).length;
+    const defaultCount = input.variants.filter((v) => v.isDefault && !v._delete).length;
     if (defaultCount > 1) throw new BadRequestError("Chỉ được có tối đa 1 biến thể mặc định");
   }
 
@@ -191,17 +192,44 @@ export const updateProduct = async (id: string, input: UpdateProductInput) => {
   return transformProductDetail(product);
 };
 
-export const deleteProduct = async (id: string) => {
-  await getProductById(id);
-  return repo.remove(id);
+export const softDeleteProduct = async (id: string, userId: string) => {
+  const product = await repo.findById(id);
+  if (!product) throw new NotFoundError("Sản phẩm");
+
+  await repo.softDeleteProduct(id, userId);
+};
+
+export const restoreProduct = async (id: string) => {
+  const product = await repo.findById(id, true);
+  if (!product) throw new NotFoundError("Sản phẩm");
+  if (!product.deletedAt) throw new BadRequestError("Sản phẩm này chưa bị xóa");
+
+  return repo.restoreProduct(id);
+};
+
+export const hardDeleteProduct = async (id: string) => {
+  const product = await repo.findById(id, true);
+  if (!product) throw new NotFoundError("Sản phẩm");
+  if (!product.deletedAt) throw new BadRequestError("Phải chuyển vào thùng rác trước khi xóa vĩnh viễn");
+
+  // Xóa ảnh Cloudinary trước khi xóa DB
+  const oldImages = await repo.getColorImagesByProductId(id);
+  if (oldImages.length > 0) {
+    const urls = oldImages.map((img) => img.imageUrl).filter((url): url is string => Boolean(url));
+    await deleteOldImages(urls);
+  }
+
+  return await repo.hardDeleteProduct(id).catch(handlePrismaError);
+};
+
+export const getDeletedProducts = async (query: ListProductsQuery) => {
+  return repo.findAllDeletedProducts(query);
 };
 
 // ── Promotion / Sale ──────────────────────────────────────────────────────────
 
 export const getFlashSaleProducts = async (date: Date = new Date(), options: { limit?: number; categoryId?: string } = {}) => {
   const { products, promotions } = await repo.findProductsOnSaleByDate(date, options);
-
-  console.log(promotions);
 
   const firstPromotion = promotions?.[0];
 

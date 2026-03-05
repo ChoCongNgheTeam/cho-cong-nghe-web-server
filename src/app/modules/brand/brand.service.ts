@@ -2,6 +2,7 @@ import { CreateBrandInput, UpdateBrandInput, ListBrandsQuery } from "./brand.val
 import { brandRepository } from "./brand.repository";
 import { generateUniqueBrandSlug, deleteOldBrandImage } from "./brand.helpers";
 import { NotFoundError, BadRequestError } from "@/errors";
+import { handlePrismaError } from "@/utils/handle-prisma-error";
 
 export class BrandService {
   async getBrandsPublic(query: ListBrandsQuery) {
@@ -20,14 +21,14 @@ export class BrandService {
     return brandRepository.getFeaturedBrands(limit);
   }
 
-  async getBrandBySlug(slug: string) {
-    const brand = await brandRepository.getBrandBySlug(slug);
+  async getBrandBySlug(slug: string, isAdmin: boolean = false) {
+    const brand = await brandRepository.getBrandBySlug(slug, isAdmin);
     if (!brand) throw new NotFoundError("Thương hiệu");
     return brand;
   }
 
-  async getBrandDetail(id: string) {
-    const brand = await brandRepository.getBrandById(id);
+  async getBrandDetail(id: string, includeDeleted: boolean = false) {
+    const brand = await brandRepository.getBrandById(id, includeDeleted);
     if (!brand) throw new NotFoundError("Thương hiệu");
     return brand;
   }
@@ -67,7 +68,7 @@ export class BrandService {
     return brandRepository.updateBrand(id, updateData);
   }
 
-  async deleteBrand(id: string) {
+  async softDeleteBrand(id: string, userId: string) {
     const brand = await brandRepository.getBrandById(id);
     if (!brand) throw new NotFoundError("Thương hiệu");
 
@@ -76,11 +77,31 @@ export class BrandService {
       throw new BadRequestError(`Không thể xóa thương hiệu này vì đang có ${productCount} sản phẩm liên kết`);
     }
 
+    await brandRepository.softDeleteBrand(id, userId);
+  }
+
+  async restoreBrand(id: string) {
+    const brand = await brandRepository.getBrandById(id, true);
+    if (!brand) throw new NotFoundError("Thương hiệu");
+    if (!brand.deletedAt) throw new BadRequestError("Thương hiệu này chưa bị xóa");
+
+    return brandRepository.restoreBrand(id);
+  }
+
+  async hardDeleteBrand(id: string) {
+    const brand = await brandRepository.getBrandById(id, true);
+    if (!brand) throw new NotFoundError("Thương hiệu");
+    if (!brand.deletedAt) throw new BadRequestError("Phải chuyển vào thùng rác trước khi xóa vĩnh viễn");
+
     if (brand.imagePath) {
       await deleteOldBrandImage(brand.imagePath);
     }
 
-    await brandRepository.deleteBrand(id);
+    return await brandRepository.hardDeleteBrand(id).catch(handlePrismaError);
+  }
+
+  async getDeletedBrands(query: ListBrandsQuery) {
+    return brandRepository.findAllDeleted(query);
   }
 }
 

@@ -15,7 +15,10 @@ import {
   getProductDetailHandler,
   createProductHandler,
   updateProductHandler,
-  deleteProductHandler,
+  softDeleteProductHandler,
+  restoreProductHandler,
+  hardDeleteProductHandler,
+  getDeletedProductsHandler,
   getFlashSaleProductsHandler,
   getCategoriesWithSaleProductsHandler,
   getUpcomingPromotionsHandler,
@@ -29,8 +32,6 @@ import { parseJsonFields } from "@/app/middlewares/parse-json-fields.middleware"
 import { asyncHandler } from "@/utils/async-handler";
 
 const router = Router();
-
-const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
 
 // Public — tĩnh trước
 router.get("/", validate(listProductsSchema, "query"), asyncHandler(getProductsPublicHandler));
@@ -53,13 +54,22 @@ router.get("/slug/:slug/reviews", validate(productBySlugParamsSchema, "params"),
 // Public — động
 router.get("/promotion/:promotionId", asyncHandler(getProductsByPromotionHandler));
 
-// Admin
-router.get("/admin/all", ...adminAuth, validate(listProductsSchema, "query"), asyncHandler(getProductsAdminHandler));
-router.post("/admin", ...adminAuth, upload.any(), parseJsonFields, asyncHandler(createProductHandler));
 
-// động sau
-router.get("/admin/:id", ...adminAuth, validate(productParamsSchema, "params"), asyncHandler(getProductDetailHandler));
-router.patch("/admin/:id", ...adminAuth, validate(productParamsSchema, "params"), upload.any(), asyncHandler(updateProductHandler));
-router.delete("/admin/:id", ...adminAuth, validate(productParamsSchema, "params"), asyncHandler(deleteProductHandler));
+// ==================== ADMIN & STAFF ====================
+router.use("/admin", authMiddleware(true));
+
+// 1. Quyền STAFF & ADMIN (Đọc danh sách, Xem chi tiết, Xóa mềm)
+router.get("/admin/all", requireRole("STAFF", "ADMIN"), validate(listProductsSchema, "query"), asyncHandler(getProductsAdminHandler));
+router.get("/admin/:id", requireRole("STAFF", "ADMIN"), validate(productParamsSchema, "params"), asyncHandler(getProductDetailHandler));
+router.delete("/admin/:id", requireRole("STAFF", "ADMIN"), validate(productParamsSchema, "params"), asyncHandler(softDeleteProductHandler));
+
+// 2. Quyền ADMIN ONLY (Tạo, Sửa)
+router.post("/admin", requireRole("ADMIN"), upload.any(), parseJsonFields, asyncHandler(createProductHandler));
+router.patch("/admin/:id", requireRole("ADMIN"), validate(productParamsSchema, "params"), upload.any(), asyncHandler(updateProductHandler));
+
+// 3. THÙNG RÁC & XÓA CỨNG (ADMIN ONLY)
+router.get("/admin/trash/products", requireRole("ADMIN"), validate(listProductsSchema, "query"), asyncHandler(getDeletedProductsHandler));
+router.post("/admin/:id/restore", requireRole("ADMIN"), validate(productParamsSchema, "params"), asyncHandler(restoreProductHandler));
+router.delete("/admin/:id/permanent", requireRole("ADMIN"), validate(productParamsSchema, "params"), asyncHandler(hardDeleteProductHandler));
 
 export default router;

@@ -10,12 +10,14 @@ import {
   getFeaturedCategoriesHandler,
   getCategoryTreeHandler,
   getCategoryBySlugHandler,
-  getAllCategoriesHandler,
   getRootCategoriesForAdminHandler,
   getCategoryDetailHandler,
   createCategoryHandler,
   updateCategoryHandler,
-  deleteCategoryHandler,
+  softDeleteCategoryHandler,
+  restoreCategoryHandler,
+  hardDeleteCategoryHandler,
+  getDeletedCategoriesHandler,
   reorderCategoryHandler,
   getCategoryTemplateHandler,
   getAllAttributesHandler,
@@ -37,37 +39,40 @@ import { asyncHandler } from "@/utils/async-handler";
 
 const router = Router();
 
-const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
-
-// Public
+// ==================== PUBLIC ====================
 router.get("/", validate(listCategoriesQuerySchema, "query"), asyncHandler(getCategoriesPublicHandler));
-
-// Tĩnh trước, động sau — tránh conflict với /:id hay /:categoryId
-router.get("/roots", asyncHandler(getRootCategoriesHandler));
+router.get("/roots", validate(listCategoriesQuerySchema, "query"), asyncHandler(getRootCategoriesHandler));
 router.get("/featured", validate(featuredCategoriesQuerySchema, "query"), asyncHandler(getFeaturedCategoriesHandler));
 router.get("/tree", asyncHandler(getCategoryTreeHandler));
-router.get("/slug/:slug", validate(categorySlugParamsSchema, "params"), asyncHandler(getCategoryBySlugHandler));
+router.get("/slug/:slug", authMiddleware(false), validate(categorySlugParamsSchema, "params"), asyncHandler(getCategoryBySlugHandler));
 
-// Admin
-router.get("/admin/all", ...adminAuth, validate(listCategoriesQuerySchema, "query"), asyncHandler(getCategoriesAdminHandler));
-router.get("/admin/roots", ...adminAuth, asyncHandler(getRootCategoriesForAdminHandler));
+// ==================== STAFF & ADMIN ====================
+router.use("/admin", authMiddleware(true));
 
-router.post("/admin/reorder", ...adminAuth, validate(reorderCategorySchema, "body"), asyncHandler(reorderCategoryHandler));
+// Xem danh sách và chi tiết (Staff + Admin)
+router.get("/admin/all", requireRole("STAFF", "ADMIN"), validate(listCategoriesQuerySchema, "query"), asyncHandler(getCategoriesAdminHandler));
+router.get("/admin/roots", requireRole("STAFF", "ADMIN"), asyncHandler(getRootCategoriesForAdminHandler));
+router.get("/admin/:id", requireRole("STAFF", "ADMIN"), validate(categoryParamsSchema, "params"), asyncHandler(getCategoryDetailHandler));
 
-router.get("/attributes/all", ...adminAuth, asyncHandler(getAllAttributesHandler));
-router.get("/attributes/:attributeId/options", ...adminAuth, validate(attributeIdParamSchema, "params"), asyncHandler(getAttributeOptionsHandler));
+// Xem cấu hình Attributes/Specs (Staff + Admin)
+router.get("/admin/attributes/all", requireRole("STAFF", "ADMIN"), asyncHandler(getAllAttributesHandler));
+router.get("/admin/attributes/:attributeId/options", requireRole("STAFF", "ADMIN"), validate(attributeIdParamSchema, "params"), asyncHandler(getAttributeOptionsHandler));
+router.get("/admin/specifications/all", requireRole("STAFF", "ADMIN"), asyncHandler(getAllSpecificationsHandler));
+router.get("/admin/:categoryId/template", requireRole("STAFF", "ADMIN"), validate(categoryIdParamSchema, "params"), asyncHandler(getCategoryTemplateHandler));
 
-router.get("/specifications/all", ...adminAuth, asyncHandler(getAllSpecificationsHandler));
+// Sắp xếp (Admin Only)
+router.post("/admin/reorder", requireRole("ADMIN"), validate(reorderCategorySchema, "body"), asyncHandler(reorderCategoryHandler));
 
-// Admin — động
-router.get("/admin/:id", ...adminAuth, validate(categoryParamsSchema, "params"), asyncHandler(getCategoryDetailHandler));
+// Tạo và Cập nhật (Admin Only)
+router.post("/admin", requireRole("ADMIN"), categoryUpload.single("imageUrl"), validate(createCategorySchema, "body"), asyncHandler(createCategoryHandler));
+router.patch("/admin/:id", requireRole("ADMIN"), categoryUpload.single("imageUrl"), validate(categoryParamsSchema, "params"), validate(updateCategorySchema, "body"), asyncHandler(updateCategoryHandler));
 
-router.post("/admin", ...adminAuth, categoryUpload.single("imageUrl"), validate(createCategorySchema, "body"), asyncHandler(createCategoryHandler));
+// Soft Delete (Staff + Admin)
+router.delete("/admin/:id", requireRole("STAFF", "ADMIN"), validate(categoryParamsSchema, "params"), asyncHandler(softDeleteCategoryHandler));
 
-router.patch("/admin/:id", ...adminAuth, categoryUpload.single("imageUrl"), validate(categoryParamsSchema, "params"), validate(updateCategorySchema, "body"), asyncHandler(updateCategoryHandler));
-
-router.delete("/admin/:id", ...adminAuth, validate(categoryParamsSchema, "params"), asyncHandler(deleteCategoryHandler));
-
-router.get("/:categoryId/template", ...adminAuth, validate(categoryIdParamSchema, "params"), asyncHandler(getCategoryTemplateHandler));
+// Thùng rác & Xóa vĩnh viễn (Admin Only)
+router.get("/admin/trash/categories", requireRole("ADMIN"), validate(listCategoriesQuerySchema, "query"), asyncHandler(getDeletedCategoriesHandler));
+router.post("/admin/:id/restore", requireRole("ADMIN"), validate(categoryParamsSchema, "params"), asyncHandler(restoreCategoryHandler));
+router.delete("/admin/:id/permanent", requireRole("ADMIN"), validate(categoryParamsSchema, "params"), asyncHandler(hardDeleteCategoryHandler));
 
 export default router;

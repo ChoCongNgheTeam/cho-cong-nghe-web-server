@@ -17,6 +17,9 @@ export const listProductsSchema = z.object({
   categoryId: z.string().uuid().optional(),
   brandId: z.string().uuid().optional(),
   isFeatured: z.coerce.boolean().optional(),
+  
+  // Lọc dữ liệu trong thùng rác (Admin)
+  includeDeleted: z.coerce.boolean().optional().default(false),
 
   // Price range
   minPrice: z.coerce.number().nonnegative().optional(),
@@ -61,7 +64,7 @@ export const variantQuerySchema = z
 // =====================
 
 export const productParamsSchema = z.object({
-  id: z.uuid({ message: "ID sản phẩm không hợp lệ" }),
+  id: z.string().uuid({ message: "ID sản phẩm không hợp lệ" }),
 });
 
 export const productBySlugParamsSchema = z.object({
@@ -72,7 +75,6 @@ export const productBySlugParamsSchema = z.object({
 // === CREATE/UPDATE SCHEMAS ===
 // =====================
 
-// Color image schema - không còn liên kết với variant
 const colorImageSchema = z.object({
   color: z.string().min(1, "Màu sắc không được để trống"),
   altText: z.string().optional(),
@@ -93,8 +95,8 @@ const createVariantSchema = z.object({
 
 export const createProductSchema = z
   .object({
-    brandId: z.uuid("Brand ID không hợp lệ"),
-    categoryId: z.uuid("Category ID không hợp lệ"),
+    brandId: z.string().uuid("Brand ID không hợp lệ"),
+    categoryId: z.string().uuid("Category ID không hợp lệ"),
     name: z.string().min(3, "Tên sản phẩm phải có ít nhất 3 ký tự"),
     description: z.string().optional(),
     variants: z.array(createVariantSchema).min(1, "Sản phẩm phải có ít nhất 1 biến thể"),
@@ -102,7 +104,7 @@ export const createProductSchema = z
     specifications: z
       .array(
         z.object({
-          specificationId: z.uuid(),
+          specificationId: z.string().uuid(),
           value: z.string().min(1, "Giá trị thông số không được để trống"),
           isHighlight: z.boolean().optional().default(false),
         }),

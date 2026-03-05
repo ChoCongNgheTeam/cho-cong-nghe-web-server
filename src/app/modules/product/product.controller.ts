@@ -174,14 +174,33 @@ export const updateProductHandler = async (req: Request, res: Response) => {
   }
 };
 
-export const deleteProductHandler = async (req: Request, res: Response) => {
-  const images = await productRepo.getColorImagesByProductId(req.params.id);
+// 🟢 MỚI: 4 Hàm xử lý Trash & Delete
+export const softDeleteProductHandler = async (req: Request, res: Response) => {
+  await productService.softDeleteProduct(req.params.id, req.user!.id);
+  res.json({ message: "Đã chuyển sản phẩm vào thùng rác" });
+};
 
-  await productService.deleteProduct(req.params.id);
+export const restoreProductHandler = async (req: Request, res: Response) => {
+  await productService.restoreProduct(req.params.id);
+  res.json({ message: "Khôi phục sản phẩm thành công" });
+};
 
-  const imageUrls = images.map((img) => img.imageUrl).filter((url): url is string => Boolean(url));
+export const hardDeleteProductHandler = async (req: Request, res: Response) => {
+  await productService.hardDeleteProduct(req.params.id);
+  res.status(204).send();
+};
 
-  await deleteOldImages(imageUrls);
-
-  res.json({ message: "Xóa sản phẩm thành công" });
+export const getDeletedProductsHandler = async (req: Request, res: Response) => {
+  const result = await productService.getDeletedProducts(req.query as unknown as ListProductsQuery);
+  res.json({
+    success: true,
+    data: result.data,
+    pagination: {
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      totalPages: result.totalPages,
+    },
+    message: "Lấy danh sách sản phẩm đã xóa thành công"
+  });
 };

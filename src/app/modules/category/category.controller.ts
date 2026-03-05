@@ -31,13 +31,9 @@ export const getCategoryTreeHandler = async (req: Request, res: Response) => {
 };
 
 export const getCategoryBySlugHandler = async (req: Request, res: Response) => {
-  const category = await categoryService.getCategoryBySlug(req.params.slug);
+  const isAdmin = req.user?.role === "ADMIN" || req.user?.role === "STAFF";
+  const category = await categoryService.getCategoryBySlug(req.params.slug, isAdmin);
   res.json({ data: category, message: "Lấy chi tiết danh mục thành công" });
-};
-
-export const getAllCategoriesHandler = async (req: Request, res: Response) => {
-  const categories = await categoryService.getAllCategories();
-  res.json({ data: categories, total: categories.length, message: "Lấy danh sách danh mục thành công" });
 };
 
 export const getRootCategoriesForAdminHandler = async (req: Request, res: Response) => {
@@ -57,12 +53,13 @@ export const createCategoryHandler = async (req: Request, res: Response) => {
     const parsedBody = parseMultipartData(req.body);
     const uploadedImage = file ? await uploadCategoryImage(file) : null;
 
-    const category = await categoryService.createCategory({
+    const categoryData = {
       ...parsedBody,
       imageUrl: uploadedImage?.url,
       imagePath: uploadedImage?.publicId,
-    });
+    };
 
+    const category = await categoryService.createCategory(categoryData);
     res.status(201).json({ data: category, message: "Tạo danh mục thành công" });
   } finally {
     cleanupFile(file);
@@ -76,23 +73,39 @@ export const updateCategoryHandler = async (req: Request, res: Response) => {
     const parsedBody = parseMultipartData(req.body);
     const uploadedImage = file ? await uploadCategoryImage(file) : null;
 
-    const category = await categoryService.updateCategory(req.params.id, {
+    const categoryData = {
       ...parsedBody,
       ...(uploadedImage && {
         imageUrl: uploadedImage.url,
         imagePath: uploadedImage.publicId,
       }),
-    });
+    };
 
+    const category = await categoryService.updateCategory(req.params.id, categoryData);
     res.json({ data: category, message: "Cập nhật danh mục thành công" });
   } finally {
     cleanupFile(file);
   }
 };
 
-export const deleteCategoryHandler = async (req: Request, res: Response) => {
-  await categoryService.deleteCategory(req.params.id);
-  res.json({ message: "Xóa danh mục thành công" });
+export const softDeleteCategoryHandler = async (req: Request, res: Response) => {
+  await categoryService.softDeleteCategory(req.params.id, req.user!.id);
+  res.json({ message: "Đã chuyển danh mục vào thùng rác" });
+};
+
+export const restoreCategoryHandler = async (req: Request, res: Response) => {
+  await categoryService.restoreCategory(req.params.id);
+  res.json({ message: "Khôi phục danh mục thành công" });
+};
+
+export const hardDeleteCategoryHandler = async (req: Request, res: Response) => {
+  await categoryService.hardDeleteCategory(req.params.id);
+  res.status(204).send();
+};
+
+export const getDeletedCategoriesHandler = async (req: Request, res: Response) => {
+  const categories = await categoryService.getDeletedCategories(req.query as unknown as ListCategoriesQuery);
+  res.json({ data: categories, message: "Lấy danh sách danh mục đã xóa thành công" });
 };
 
 export const reorderCategoryHandler = async (req: Request, res: Response) => {

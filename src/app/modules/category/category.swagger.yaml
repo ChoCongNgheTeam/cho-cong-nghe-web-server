@@ -1,19 +1,17 @@
 paths:
   # ==================== PUBLIC ENDPOINTS ====================
 
-  /categories/roots:
+  /categories:
     get:
-      summary: Lấy danh sách danh mục gốc (root categories)
-      tags: [Categories - Public]
-      description: Trả về các danh mục cấp 1 (parentId = null) để hiển thị ở trang chủ hoặc menu chính
+      summary: Lấy danh sách tất cả danh mục (Public)
+      tags: [Public - Categories]
       parameters:
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            minimum: 1
-            default: 20
-          description: Giới hạn số lượng trả về (optional)
+        - $ref: "#/components/parameters/SearchQuery"
+        - $ref: "#/components/parameters/ParentIdQuery"
+        - $ref: "#/components/parameters/IsFeaturedQuery"
+        - $ref: "#/components/parameters/IsActiveQuery"
+        - $ref: "#/components/parameters/SortByQuery"
+        - $ref: "#/components/parameters/SortOrderQuery"
       responses:
         "200":
           description: Thành công
@@ -26,6 +24,37 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/Category"
+                  total:
+                    type: integer
+                  message:
+                    type: string
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /categories/roots:
+    get:
+      summary: Lấy danh sách danh mục gốc (Public)
+      tags: [Public - Categories]
+      description: Trả về các danh mục cấp 1 (parentId = null) đang active
+      parameters:
+        - $ref: "#/components/parameters/SearchQuery"
+        - $ref: "#/components/parameters/IsFeaturedQuery"
+        - $ref: "#/components/parameters/SortByQuery"
+        - $ref: "#/components/parameters/SortOrderQuery"
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Category"
+                  total:
+                    type: integer
                   message:
                     type: string
         "500":
@@ -33,16 +62,15 @@ paths:
 
   /categories/featured:
     get:
-      summary: Lấy danh mục nổi bật (featured)
-      tags: [Categories - Public]
-      description: Trả về các danh mục được đánh dấu isFeatured = true
+      summary: Lấy danh mục nổi bật (Public)
+      tags: [Public - Categories]
       parameters:
         - in: query
           name: limit
           schema:
             type: integer
             default: 6
-          description: Số lượng danh mục trả về (mặc định 6)
+            maximum: 50
       responses:
         "200":
           description: Thành công
@@ -55,6 +83,8 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/Category"
+                  total:
+                    type: integer
                   message:
                     type: string
         "500":
@@ -62,9 +92,8 @@ paths:
 
   /categories/tree:
     get:
-      summary: Lấy toàn bộ cây danh mục (nested)
-      tags: [Categories - Public]
-      description: Trả về cấu trúc cây danh mục đầy đủ (dùng cho menu đa cấp)
+      summary: Lấy toàn bộ cây danh mục (Public)
+      tags: [Public - Categories]
       responses:
         "200":
           description: Thành công
@@ -85,8 +114,7 @@ paths:
   /categories/slug/{slug}:
     get:
       summary: Lấy thông tin danh mục theo slug
-      tags: [Categories - Public]
-      description: Trả về chi tiết danh mục + danh sách con trực tiếp (children)
+      tags: [Public - Categories]
       parameters:
         - in: path
           name: slug
@@ -114,11 +142,18 @@ paths:
 
   /categories/admin/all:
     get:
-      summary: Lấy tất cả danh mục (flat list)
-      tags: [Categories - Admin]
+      summary: Lấy tất cả danh mục (Admin/Staff)
+      tags: [Admin - Categories]
       security:
         - bearerAuth: []
-      description: Danh sách phẳng, có thêm _count (số sản phẩm & số con)
+      parameters:
+        - $ref: "#/components/parameters/SearchQuery"
+        - $ref: "#/components/parameters/ParentIdQuery"
+        - $ref: "#/components/parameters/IsFeaturedQuery"
+        - $ref: "#/components/parameters/IsActiveQuery"
+        - $ref: "#/components/parameters/IncludeDeletedQuery"
+        - $ref: "#/components/parameters/SortByQuery"
+        - $ref: "#/components/parameters/SortOrderQuery"
       responses:
         "200":
           description: Thành công
@@ -130,7 +165,7 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/CategoryWithCount"
+                      $ref: "#/components/schemas/Category"
                   total:
                     type: integer
                   message:
@@ -144,11 +179,10 @@ paths:
 
   /categories/admin/roots:
     get:
-      summary: Lấy danh mục gốc cho admin
-      tags: [Categories - Admin]
+      summary: Lấy danh mục gốc (Admin/Staff)
+      tags: [Admin - Categories]
       security:
         - bearerAuth: []
-      description: Chỉ lấy root categories, có _count children & products
       responses:
         "200":
           description: Thành công
@@ -160,133 +194,56 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/CategoryWithCount"
+                      $ref: "#/components/schemas/Category"
+                  total:
+                    type: integer
                   message:
                     type: string
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
           $ref: "#/components/responses/ForbiddenError"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
-  /categories/admin/{id}:
-    get:
-      summary: Chi tiết 1 danh mục (admin)
-      tags: [Categories - Admin]
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      description: Trả về thông tin chi tiết + children (nếu có)
-      responses:
-        "200":
-          description: Thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    $ref: "#/components/schemas/CategoryWithChildren"
-                  message:
-                    type: string
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "403":
-          $ref: "#/components/responses/ForbiddenError"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
-    patch:
-      summary: Cập nhật danh mục
-      tags: [Categories - Admin]
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateCategoryRequest"
-      responses:
-        "200":
-          description: Cập nhật thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    $ref: "#/components/schemas/Category"
-                  message:
-                    type: string
-        "400":
-          $ref: "#/components/responses/ValidationError"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "403":
-          $ref: "#/components/responses/ForbiddenError"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "409":
-          description: Xung đột (tên trùng, parent không hợp lệ,...)
-        "500":
-          $ref: "#/components/responses/ServerError"
-
-    delete:
-      summary: Xóa danh mục
-      tags: [Categories - Admin]
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      description: Chỉ xóa được khi không còn sản phẩm và không còn danh mục con
-      responses:
-        "204":
-          description: Xóa thành công
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "403":
-          $ref: "#/components/responses/ForbiddenError"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "409":
-          description: Không thể xóa (còn sản phẩm hoặc con)
         "500":
           $ref: "#/components/responses/ServerError"
 
   /categories/admin:
     post:
-      summary: Tạo danh mục mới
-      tags: [Categories - Admin]
+      summary: Tạo danh mục mới (Admin Only)
+      tags: [Admin - Categories]
       security:
         - bearerAuth: []
       requestBody:
-        required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
-              $ref: "#/components/schemas/CreateCategoryRequest"
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                parentId:
+                  type: string
+                  format: uuid
+                  description: "UUID của danh mục cha, hoặc bỏ trống"
+                description:
+                  type: string
+                  maxLength: 500
+                imageUrl:
+                  type: string
+                  format: binary
+                  description: File ảnh tải lên
+                position:
+                  type: integer
+                  minimum: 0
+                isFeatured:
+                  type: boolean
+                  default: false
+                isActive:
+                  type: boolean
+                  default: true
       responses:
         "201":
           description: Tạo thành công
@@ -305,56 +262,18 @@ paths:
           $ref: "#/components/responses/UnauthorizedError"
         "403":
           $ref: "#/components/responses/ForbiddenError"
-        "409":
-          description: Tên đã tồn tại
         "500":
           $ref: "#/components/responses/ServerError"
 
-  /categories/admin/reorder:
-    post:
-      summary: Sắp xếp lại thứ tự danh mục (drag & drop)
-      tags: [Categories - Admin]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ReorderCategoryRequest"
-      responses:
-        "200":
-          description: Sắp xếp thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        "400":
-          $ref: "#/components/responses/ValidationError"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "403":
-          $ref: "#/components/responses/ForbiddenError"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
-  # ==================== TEMPLATE & ATTRIBUTE APIs ====================
-
-  /categories/{categoryId}/template:
+  /categories/admin/{id}:
     get:
-      summary: Lấy template thuộc tính của danh mục
-      description: Trả về danh sách attributes + specifications áp dụng cho danh mục này
-      tags: [Categories - Admin]
+      summary: Chi tiết 1 danh mục (Admin/Staff)
+      tags: [Admin - Categories]
       security:
         - bearerAuth: []
       parameters:
         - in: path
-          name: categoryId
+          name: id
           required: true
           schema:
             type: string
@@ -368,71 +287,168 @@ paths:
                 type: object
                 properties:
                   data:
-                    type: object
-                    properties:
-                      attributes:
-                        type: array
-                        items:
-                          type: object
-                          # bạn có thể định nghĩa chi tiết hơn nếu cần
-                      specifications:
-                        type: array
-                        items:
-                          type: object
+                    $ref: "#/components/schemas/Category"
                   message:
                     type: string
         "401":
           $ref: "#/components/responses/UnauthorizedError"
-        "403":
-          $ref: "#/components/responses/ForbiddenError"
         "404":
           $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/ServerError"
 
-  /categories/attributes/all:
+    patch:
+      summary: Cập nhật danh mục (Admin Only)
+      tags: [Admin - Categories]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                parentId:
+                  type: string
+                  format: uuid
+                description:
+                  type: string
+                imageUrl:
+                  type: string
+                  format: binary
+                  description: File ảnh mới
+                position:
+                  type: integer
+                isFeatured:
+                  type: boolean
+                isActive:
+                  type: boolean
+                removeImage:
+                  type: boolean
+                  description: Xóa ảnh hiện tại nếu truyền true
+      responses:
+        "200":
+          description: Cập nhật thành công
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      summary: Chuyển danh mục vào thùng rác (Soft Delete) (Admin/Staff)
+      tags: [Admin - Categories]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Xóa mềm thành công
+        "400":
+          description: Không thể xóa vì đang chứa sản phẩm hoặc danh mục con
+
+  /categories/admin/reorder:
+    post:
+      summary: Sắp xếp lại thứ tự danh mục (Admin Only)
+      tags: [Admin - Categories]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [categoryId, newPosition]
+              properties:
+                categoryId:
+                  type: string
+                  format: uuid
+                newPosition:
+                  type: integer
+                  minimum: 0
+      responses:
+        "200":
+          description: Sắp xếp thành công
+
+  /categories/admin/trash/categories:
     get:
-      summary: Lấy tất cả attributes có trong hệ thống
-      description: Dùng để hiển thị dropdown khi thêm attribute tùy chỉnh cho category
-      tags: [Categories - Admin, Attributes]
+      summary: Lấy danh sách danh mục đã xóa mềm (Admin Only)
+      tags: [Admin - Categories]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SearchQuery"
+      responses:
+        "200":
+          description: Thành công
+
+  /categories/admin/{id}/restore:
+    post:
+      summary: Khôi phục danh mục từ thùng rác (Admin Only)
+      tags: [Admin - Categories]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Khôi phục thành công
+
+  /categories/admin/{id}/permanent:
+    delete:
+      summary: Xóa vĩnh viễn danh mục (Admin Only)
+      tags: [Admin - Categories]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Xóa vĩnh viễn thành công
+        "400":
+          description: Phải chuyển vào thùng rác trước khi xóa vĩnh viễn
+
+  # ==================== TEMPLATE, ATTRIBUTES & SPECS ====================
+
+  /categories/admin/attributes/all:
+    get:
+      summary: Lấy tất cả attributes có trong hệ thống (Admin/Staff)
+      tags: [Admin - Category Attributes & Specs]
       security:
         - bearerAuth: []
       responses:
         "200":
           description: Thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: string
-                        name:
-                          type: string
-                        type:
-                          type: string
-                          enum: [text, number, select, multiselect, boolean, date]
-                        isRequired:
-                          type: boolean
-                  message:
-                    type: string
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "403":
-          $ref: "#/components/responses/ForbiddenError"
-        "500":
-          $ref: "#/components/responses/ServerError"
 
-  /categories/attributes/{attributeId}/options:
+  /categories/admin/attributes/{attributeId}/options:
     get:
-      summary: Lấy danh sách options của một attribute
-      description: Dùng cho attribute loại select/multiselect
-      tags: [Categories - Admin, Attributes]
+      summary: Lấy danh sách options của một attribute (Admin/Staff)
+      tags: [Admin - Category Attributes & Specs]
       security:
         - bearerAuth: []
       parameters:
@@ -444,70 +460,81 @@ paths:
       responses:
         "200":
           description: Thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: string
-                        value:
-                          type: string
-                        label:
-                          type: string
-                  message:
-                    type: string
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "403":
-          $ref: "#/components/responses/ForbiddenError"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/ServerError"
 
-  /categories/specifications/all:
+  /categories/admin/specifications/all:
     get:
-      summary: Lấy tất cả specifications có trong hệ thống
-      description: Dùng để hiển thị dropdown khi thêm specification tùy chỉnh
-      tags: [Categories - Admin, Specifications]
+      summary: Lấy tất cả specifications có trong hệ thống (Admin/Staff)
+      tags: [Admin - Category Attributes & Specs]
       security:
         - bearerAuth: []
       responses:
         "200":
           description: Thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: string
-                        name:
-                          type: string
-                        unit:
-                          type: string
-                          nullable: true
-                  message:
-                    type: string
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "403":
-          $ref: "#/components/responses/ForbiddenError"
-        "500":
-          $ref: "#/components/responses/ServerError"
+
+  /categories/admin/{categoryId}/template:
+    get:
+      summary: Lấy template (attributes + specs) của danh mục (Admin/Staff)
+      tags: [Admin - Category Attributes & Specs]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: categoryId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Thành công
 
 components:
+  parameters:
+    SearchQuery:
+      in: query
+      name: search
+      schema:
+        type: string
+      description: Tìm kiếm theo tên hoặc mô tả
+    ParentIdQuery:
+      in: query
+      name: parentId
+      schema:
+        type: string
+        format: uuid
+      description: Lọc theo danh mục cha
+    IsFeaturedQuery:
+      in: query
+      name: isFeatured
+      schema:
+        type: boolean
+    IsActiveQuery:
+      in: query
+      name: isActive
+      schema:
+        type: boolean
+    IncludeDeletedQuery:
+      in: query
+      name: includeDeleted
+      schema:
+        type: boolean
+        default: false
+      description: Lấy cả những bản ghi đã xóa mềm (Chỉ Admin/Staff)
+    SortByQuery:
+      in: query
+      name: sortBy
+      schema:
+        type: string
+        enum: [name, position, createdAt]
+        default: position
+    SortOrderQuery:
+      in: query
+      name: sortOrder
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: asc
+
   schemas:
     Category:
       type: object
@@ -522,13 +549,17 @@ components:
         description:
           type: string
           nullable: true
+        imageUrl:
+          type: string
+          nullable: true
         imagePath:
           type: string
-          format: uri
           nullable: true
         position:
           type: integer
         isActive:
+          type: boolean
+        isFeatured:
           type: boolean
         parentId:
           type: string
@@ -537,47 +568,16 @@ components:
         createdAt:
           type: string
           format: date-time
-        updatedAt:
-          type: string
-          format: date-time
 
-    CategoryWithCount:
+    CategoryTree:
       allOf:
         - $ref: "#/components/schemas/Category"
         - type: object
           properties:
-            _count:
-              type: object
-              properties:
-                products:
-                  type: integer
-                  description: Số lượng sản phẩm trong category
-                children:
-                  type: integer
-                  description: Số lượng subcategories
-
-    CategoryTree:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        slug:
-          type: string
-        imagePath:
-          type: string
-          format: uri
-          nullable: true
-        position:
-          type: integer
-        isActive:
-          type: boolean
-        children:
-          type: array
-          items:
-            $ref: "#/components/schemas/CategoryTree"
+            children:
+              type: array
+              items:
+                $ref: "#/components/schemas/CategoryTree"
 
     CategoryWithChildren:
       allOf:
@@ -587,73 +587,51 @@ components:
             children:
               type: array
               items:
-                type: object
-                properties:
-                  id:
-                    type: string
-                    format: uuid
-                  name:
-                    type: string
-                  slug:
-                    type: string
-                  position:
-                    type: integer
-                  isActive:
-                    type: boolean
+                $ref: "#/components/schemas/Category"
+            parent:
+              $ref: "#/components/schemas/Category"
 
     ErrorResponse:
       type: object
       properties:
         message:
           type: string
-        errors:
-          type: object
-          additionalProperties:
-            type: string
 
   responses:
     UnauthorizedError:
-      description: Chưa xác thực hoặc token không hợp lệ
+      description: Chưa xác thực
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-          example:
-            message: "Không có token, truy cập bị từ chối"
-
     ForbiddenError:
-      description: Không có quyền truy cập (chỉ ADMIN)
+      description: Không có quyền
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-          example:
-            message: "Bạn không có quyền truy cập tài nguyên này"
-
+    NotFound:
+      description: Không tìm thấy tài nguyên
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     ValidationError:
       description: Dữ liệu không hợp lệ
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-          example:
-            message: "Dữ liệu không hợp lệ"
-            errors:
-              name: "Tên danh mục phải từ 2 ký tự"
-              imagePath: "URL hình ảnh không hợp lệ"
-
     ServerError:
-      description: Lỗi server
+      description: Lỗi máy chủ
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-          example:
-            message: "Đã xảy ra lỗi, vui lòng thử lại sau"
 
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: "Nhập JWT token (không cần thêm 'Bearer ' ở đầu)"
+      description: "Nhập JWT token"
