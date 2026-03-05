@@ -1,0 +1,495 @@
+openapi: 3.0.0
+info:
+  title: Brand API
+  version: 1.0.0
+  description: API quản lý thương hiệu (Brand)
+
+servers:
+  - url: /api/v1/brands
+    description: Brand API endpoints
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Nhập JWT token (không cần thêm 'Bearer ' ở đầu)"
+
+  schemas:
+    BrandStatus:
+      type: string
+      enum: [active, inactive]
+      description: Trạng thái hoạt động của thương hiệu
+
+    BrandCard:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        imageUrl:
+          type: string
+          nullable: true
+        isFeatured:
+          type: boolean
+        isActive:
+          type: boolean
+        productCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    BrandDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        imageUrl:
+          type: string
+          nullable: true
+        imagePath:
+          type: string
+          nullable: true
+        isFeatured:
+          type: boolean
+        isActive:
+          type: boolean
+        productCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+
+tags:
+  - name: Public - Brands
+    description: API công khai cho thương hiệu
+  - name: Admin - Brands
+    description: API quản trị thương hiệu
+
+paths:
+  /brands:
+    get:
+      tags:
+        - Public - Brands
+      summary: Lấy danh sách thương hiệu công khai
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Tìm theo tên thương hiệu
+        - in: query
+          name: isFeatured
+          schema:
+            type: boolean
+        - in: query
+          name: isActive
+          schema:
+            type: boolean
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [name, createdAt, productCount]
+            default: name
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BrandCard"
+                  message:
+                    type: string
+        "500":
+          description: Lỗi server
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /brands/active:
+    get:
+      tags:
+        - Public - Brands
+      summary: Lấy tất cả thương hiệu đang hoạt động (isActive = true)
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BrandCard"
+                  message:
+                    type: string
+        "500":
+          description: Lỗi server
+
+  /brands/featured:
+    get:
+      tags:
+        - Public - Brands
+      summary: Lấy danh sách thương hiệu nổi bật
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 6
+            maximum: 50
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BrandCard"
+                  message:
+                    type: string
+        "500":
+          description: Lỗi server
+
+  /brands/slug/{slug}:
+    get:
+      tags:
+        - Public - Brands
+      summary: Lấy chi tiết thương hiệu theo slug
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/BrandDetail"
+                  message:
+                    type: string
+        "404":
+          description: Không tìm thấy thương hiệu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Lỗi server
+
+  /brands/admin/all:
+    get:
+      tags:
+        - Admin - Brands
+      summary: Lấy danh sách tất cả thương hiệu (dành cho admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: isFeatured
+          schema:
+            type: boolean
+        - in: query
+          name: isActive
+          schema:
+            type: boolean
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [name, createdAt, productCount]
+            default: name
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BrandCard"
+                  message:
+                    type: string
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "500":
+          description: Lỗi server
+
+  /brands/admin/{id}:
+    get:
+      tags:
+        - Admin - Brands
+      summary: Lấy chi tiết thương hiệu theo ID (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/BrandDetail"
+                  message:
+                    type: string
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "404":
+          description: Không tìm thấy
+        "500":
+          description: Lỗi server
+
+    patch:
+      tags:
+        - Admin - Brands
+      summary: Cập nhật thông tin thương hiệu (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                imageUrl:
+                  type: string
+                  format: binary
+                  description: Ảnh thương hiệu mới (tùy chọn)
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                description:
+                  type: string
+                  maxLength: 500
+                isFeatured:
+                  type: boolean
+                isActive:
+                  type: boolean
+                removeImage:
+                  type: boolean
+                  description: Xóa ảnh hiện tại nếu true
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/BrandDetail"
+                  message:
+                    type: string
+        "400":
+          description: Dữ liệu không hợp lệ
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "404":
+          description: Không tìm thấy
+        "500":
+          description: Lỗi server
+
+    delete:
+      tags:
+        - Admin - Brands
+      summary: Xóa thương hiệu (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Xóa thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "404":
+          description: Không tìm thấy
+        "500":
+          description: Lỗi server
+
+  /brands/admin:
+    post:
+      tags:
+        - Admin - Brands
+      summary: Tạo thương hiệu mới (Admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                imageUrl:
+                  type: string
+                  format: binary
+                  description: Ảnh thương hiệu (tùy chọn)
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                description:
+                  type: string
+                  maxLength: 500
+                isFeatured:
+                  type: boolean
+                  default: false
+                isActive:
+                  type: boolean
+                  default: true
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/BrandDetail"
+                  message:
+                    type: string
+        "400":
+          description: Dữ liệu không hợp lệ
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "500":
+          description: Lỗi server

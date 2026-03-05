@@ -1,0 +1,1757 @@
+openapi: 3.0.0
+info:
+  title: Product API
+  version: 1.0.0
+  description: API quản lý sản phẩm cho hệ thống thương mại điện tử
+
+servers:
+  - url: http://localhost:5000/api
+    description: Development server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Brand:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+
+    VariantImage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        imageUrl:
+          type: string
+          format: uri
+        altText:
+          type: string
+        position:
+          type: integer
+
+    Inventory:
+      type: object
+      properties:
+        quantity:
+          type: integer
+        reservedQuantity:
+          type: integer
+        available:
+          type: integer
+
+    ProductVariant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        price:
+          type: number
+        soldCount:
+          type: integer
+        isDefault:
+          type: boolean
+        isActive:
+          type: boolean
+        available:
+          type: boolean
+        stockStatus:
+          type: string
+          enum: [in_stock, low_stock, out_of_stock]
+        inventory:
+          $ref: "#/components/schemas/Inventory"
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/VariantImage"
+
+    ProductCard:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        brand:
+          $ref: "#/components/schemas/Brand"
+        price:
+          type: number
+        thumbnail:
+          type: string
+          format: uri
+        rating:
+          type: object
+          properties:
+            average:
+              type: number
+            count:
+              type: integer
+        isFeatured:
+          type: boolean
+        isNew:
+          type: boolean
+        highlights:
+          type: array
+          items:
+            type: object
+        inStock:
+          type: boolean
+
+    ProductDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        brand:
+          $ref: "#/components/schemas/Brand"
+        category:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+        currentVariant:
+          $ref: "#/components/schemas/ProductVariant"
+        rating:
+          type: object
+        viewsCount:
+          type: integer
+        isFeatured:
+          type: boolean
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Review:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            fullName:
+              type: string
+            avatarImage:
+              type: string
+
+    # --- Filter schemas ---
+
+    FilterOption:
+      type: object
+      description: Một lựa chọn trong bộ lọc dạng ENUM
+      properties:
+        value:
+          type: string
+          example: "256GB"
+        label:
+          type: string
+          example: "256 GB"
+        count:
+          type: integer
+          description: Số sản phẩm có option này
+          example: 42
+
+    FilterGroup:
+      type: object
+      description: Một nhóm bộ lọc (brand, price, storage, RAM, OS, NFC, ...)
+      properties:
+        key:
+          type: string
+          description: Key dùng để gửi lên query param
+          example: "attr_storage"
+        label:
+          type: string
+          description: Tên hiển thị
+          example: "Dung lượng"
+        type:
+          type: string
+          enum: [ENUM, RANGE, BOOLEAN]
+          description: |
+            - ENUM: danh sách checkbox (storage, RAM, OS, ...)
+            - RANGE: khoảng giá trị số (price, screen_size, battery_capacity, ...)
+            - BOOLEAN: bật/tắt (NFC, 5G, ...)
+        options:
+          type: array
+          description: Dùng cho type=ENUM
+          items:
+            $ref: "#/components/schemas/FilterOption"
+        range:
+          type: object
+          description: Dùng cho type=RANGE
+          properties:
+            min:
+              type: number
+              example: 5000000
+            max:
+              type: number
+              example: 50000000
+            unit:
+              type: string
+              example: "VND"
+
+    # --- Promotion / Sale schemas ---
+
+    Promotion:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Flash Sale 12/12"
+        discountType:
+          type: string
+          enum: [percentage, fixed]
+        discountValue:
+          type: number
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+
+    FlashSaleProduct:
+      allOf:
+        - $ref: "#/components/schemas/ProductCard"
+        - type: object
+          properties:
+            salePrice:
+              type: number
+              description: Giá sau giảm
+            originalPrice:
+              type: number
+              description: Giá gốc
+            discountPercent:
+              type: integer
+              description: Phần trăm giảm giá
+            saleEndTime:
+              type: string
+              format: date-time
+              description: Thời gian kết thúc flash sale
+            soldPercent:
+              type: integer
+              description: Phần trăm đã bán trong flash sale (0-100)
+
+    SaleCategory:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        productCount:
+          type: integer
+          description: Số sản phẩm đang sale trong category này
+        maxDiscountPercent:
+          type: integer
+          description: Mức giảm giá cao nhất trong category
+
+    SaleScheduleItem:
+      type: object
+      properties:
+        promotionId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [upcoming, active, ended]
+        productCount:
+          type: integer
+
+    # --- Search Suggest schema ---
+
+    SearchSuggestItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        thumbnail:
+          type: string
+          format: uri
+        price:
+          type: number
+        category:
+          type: string
+          description: Tên category
+        brand:
+          type: string
+          description: Tên brand
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+
+    PaginatedResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items: {}
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+            limit:
+              type: integer
+            total:
+              type: integer
+            totalPages:
+              type: integer
+        message:
+          type: string
+
+paths:
+  # ============================================================
+  # PUBLIC — Static routes (thứ tự quan trọng: tĩnh trước động)
+  # ============================================================
+
+  /products:
+    get:
+      summary: Lấy danh sách sản phẩm (Public)
+      description: |
+        Hỗ trợ dynamic filter keys:
+        - `spec_xxx` — lọc theo specification (vd: `spec_os=Android`, `spec_nfc=true`)
+        - `attr_xxx` — lọc theo variant attribute (vd: `attr_storage=256GB`, `attr_ram=8GB`)
+        - Multi-select OR: lặp lại key (vd: `brandId=xxx&brandId=yyy`)
+        - Range spec: `spec_battery_capacity_min=4000`, `spec_screen_size_max=6.7`
+      tags:
+        - Public - Products
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Trang hiện tại
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 12
+            maximum: 50
+          description: Số lượng items mỗi trang
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Tìm kiếm theo tên hoặc mô tả
+        - in: query
+          name: category
+          schema:
+            type: string
+          description: Filter theo category slug
+        - in: query
+          name: categoryId
+          schema:
+            type: string
+            format: uuid
+          description: Filter theo category ID
+        - in: query
+          name: brandId
+          schema:
+            oneOf:
+              - type: string
+                format: uuid
+              - type: array
+                items:
+                  type: string
+                  format: uuid
+          style: form
+          explode: true
+          description: Filter theo brand ID (hỗ trợ multi-select OR)
+        - in: query
+          name: isFeatured
+          schema:
+            type: boolean
+          description: Filter sản phẩm nổi bật
+        - in: query
+          name: minPrice
+          schema:
+            type: number
+          description: Giá tối thiểu
+        - in: query
+          name: maxPrice
+          schema:
+            type: number
+          description: Giá tối đa
+        - in: query
+          name: minRating
+          schema:
+            type: number
+            minimum: 0
+            maximum: 5
+          description: Rating tối thiểu
+        - in: query
+          name: inStock
+          schema:
+            type: boolean
+          description: Chỉ lấy sản phẩm còn hàng
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, name, price, viewsCount, ratingAverage, soldCount]
+            default: createdAt
+          description: Sắp xếp theo field
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Thứ tự sắp xếp
+        - in: query
+          name: "attr_*"
+          schema:
+            type: string
+          description: |
+            Dynamic variant attribute filter. Thay `*` bằng tên attribute.
+            Vd: `attr_storage=256GB`, `attr_ram=8GB` (multi-select OR được hỗ trợ)
+        - in: query
+          name: "spec_*"
+          schema:
+            type: string
+          description: |
+            Dynamic specification filter. Thay `*` bằng tên spec.
+            - ENUM: `spec_os=Android`
+            - BOOLEAN: `spec_nfc=true`
+            - RANGE: `spec_screen_size_min=6.1`, `spec_screen_size_max=6.7`
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ProductCard"
+              example:
+                success: true
+                data:
+                  - id: "uuid-product-1"
+                    name: "iPhone 15 Pro Max"
+                    slug: "iphone-15-pro-max"
+                    price: 29990000
+                    inStock: true
+                pagination:
+                  page: 1
+                  limit: 12
+                  total: 100
+                  totalPages: 9
+                message: "Lấy danh sách sản phẩm thành công"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /products/filters:
+    get:
+      summary: Lấy bộ lọc động theo category
+      description: |
+        Trả về danh sách FilterGroup để FE render UI lọc sản phẩm.
+        Mỗi group có type:
+        - **ENUM**: render checkbox list (storage, RAM, OS, brand, ...)
+        - **RANGE**: render range slider (price, screen size, battery, ...)
+        - **BOOLEAN**: render toggle/checkbox đơn (NFC, 5G, fast charge, ...)
+
+        Quy trình server:
+        1. Resolve toàn bộ sub-category IDs từ slug
+        2. Song song query brands, price range, variant attributes, filterable specs
+        3. Detect type dựa trên whitelist cứng + heuristic
+      tags:
+        - Public - Products
+      parameters:
+        - in: query
+          name: category
+          required: true
+          schema:
+            type: string
+          description: Category slug
+          example: "dien-thoai"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FilterGroup"
+                  message:
+                    type: string
+              example:
+                success: true
+                data:
+                  - key: "brandId"
+                    label: "Hãng"
+                    type: "ENUM"
+                    options:
+                      - value: "c91c563e-7485-4cdb-985e-9860281f6263"
+                        label: "Apple"
+                        count: 25
+                      - value: "683c3fa2-dff3-4dbb-9fe5-d9c5cb9c7d29"
+                        label: "Samsung"
+                        count: 40
+                  - key: "price"
+                    label: "Giá"
+                    type: "RANGE"
+                    range:
+                      min: 2000000
+                      max: 50000000
+                      unit: "VND"
+                  - key: "attr_storage"
+                    label: "Dung lượng"
+                    type: "ENUM"
+                    options:
+                      - value: "128GB"
+                        label: "128 GB"
+                        count: 30
+                      - value: "256GB"
+                        label: "256 GB"
+                        count: 45
+                  - key: "spec_nfc"
+                    label: "NFC"
+                    type: "BOOLEAN"
+                  - key: "spec_os"
+                    label: "Hệ điều hành"
+                    type: "ENUM"
+                    options:
+                      - value: "iOS"
+                        label: "iOS"
+                        count: 25
+                      - value: "Android"
+                        label: "Android"
+                        count: 60
+                message: "Lấy bộ lọc thành công"
+        "400":
+          description: Missing or invalid category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /products/search-suggest:
+    get:
+      summary: Gợi ý tìm kiếm sản phẩm
+      description: |
+        Trả về danh sách sản phẩm gợi ý dựa trên từ khóa tìm kiếm.
+        Dùng để hiển thị dropdown autocomplete trên search bar.
+      tags:
+        - Public - Products
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          description: Từ khóa tìm kiếm
+          example: "iphone 16"
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 8
+            maximum: 20
+          description: Số lượng gợi ý trả về
+        - in: query
+          name: category
+          schema:
+            type: string
+          description: Giới hạn gợi ý trong category slug
+          example: "dien-thoai"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SearchSuggestItem"
+                  message:
+                    type: string
+              example:
+                success: true
+                data:
+                  - id: "uuid-1"
+                    name: "iPhone 16 Pro Max"
+                    slug: "iphone-16-pro-max"
+                    thumbnail: "https://cdn.example.com/iphone16promax.jpg"
+                    price: 34990000
+                    category: "Điện thoại"
+                    brand: "Apple"
+                  - id: "uuid-2"
+                    name: "iPhone 16 Pro"
+                    slug: "iphone-16-pro"
+                    thumbnail: "https://cdn.example.com/iphone16pro.jpg"
+                    price: 29990000
+                    category: "Điện thoại"
+                    brand: "Apple"
+                message: "Lấy gợi ý tìm kiếm thành công"
+        "400":
+          description: Thiếu từ khóa tìm kiếm
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /products/flash-sale:
+    get:
+      summary: Lấy danh sách sản phẩm flash sale đang diễn ra
+      description: Trả về các sản phẩm đang trong chương trình flash sale active, kèm thông tin giá sale và thời gian kết thúc.
+      tags:
+        - Public - Promotions
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 12
+            maximum: 50
+          description: Số lượng sản phẩm trả về
+        - in: query
+          name: categoryId
+          schema:
+            type: string
+            format: uuid
+          description: Filter theo category
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FlashSaleProduct"
+                  message:
+                    type: string
+              example:
+                success: true
+                data:
+                  - id: "uuid-product-1"
+                    name: "Samsung Galaxy S24"
+                    slug: "samsung-galaxy-s24"
+                    originalPrice: 22990000
+                    salePrice: 17990000
+                    discountPercent: 22
+                    saleEndTime: "2024-12-12T23:59:59Z"
+                    soldPercent: 65
+                    inStock: true
+                message: "Lấy danh sách flash sale thành công"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /products/sale-categories:
+    get:
+      summary: Lấy danh sách category có sản phẩm đang sale
+      description: Trả về các category đang có chương trình khuyến mãi active, kèm số lượng sản phẩm và mức giảm giá cao nhất.
+      tags:
+        - Public - Promotions
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SaleCategory"
+                  message:
+                    type: string
+              example:
+                success: true
+                data:
+                  - id: "uuid-cat-1"
+                    name: "Điện thoại"
+                    slug: "dien-thoai"
+                    productCount: 35
+                    maxDiscountPercent: 40
+                  - id: "uuid-cat-2"
+                    name: "Laptop"
+                    slug: "laptop"
+                    productCount: 20
+                    maxDiscountPercent: 25
+                message: "Lấy danh sách category sale thành công"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /products/upcoming-promotions:
+    get:
+      summary: Lấy danh sách khuyến mãi sắp diễn ra
+      description: Trả về các chương trình khuyến mãi chưa bắt đầu, sắp xếp theo thời gian bắt đầu tăng dần.
+      tags:
+        - Public - Promotions
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 5
+            maximum: 20
+          description: Số lượng khuyến mãi trả về
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Promotion"
+                  message:
+                    type: string
+              example:
+                success: true
+                data:
+                  - id: "uuid-promo-1"
+                    name: "Flash Sale Giáng Sinh"
+                    discountType: "percentage"
+                    discountValue: 30
+                    startDate: "2024-12-24T00:00:00Z"
+                    endDate: "2024-12-25T23:59:59Z"
+                    isActive: false
+                message: "Lấy danh sách khuyến mãi sắp diễn ra thành công"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /products/best-selling:
+    get:
+      summary: Lấy danh sách sản phẩm bán chạy nhất
+      description: Trả về sản phẩm được sắp xếp theo số lượng đã bán (soldCount) giảm dần.
+      tags:
+        - Public - Products
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+          description: Số lượng sản phẩm trả về
+        - in: query
+          name: categoryId
+          schema:
+            type: string
+            format: uuid
+          description: Filter theo category
+        - in: query
+          name: category
+          schema:
+            type: string
+          description: Filter theo category slug
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProductCard"
+                  message:
+                    type: string
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /products/new-arrivals:
+    get:
+      summary: Lấy danh sách sản phẩm mới nhất
+      description: Trả về sản phẩm được sắp xếp theo ngày tạo (createdAt) giảm dần, đánh dấu isNew=true.
+      tags:
+        - Public - Products
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+          description: Số lượng sản phẩm trả về
+        - in: query
+          name: categoryId
+          schema:
+            type: string
+            format: uuid
+          description: Filter theo category
+        - in: query
+          name: category
+          schema:
+            type: string
+          description: Filter theo category slug
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProductCard"
+                  message:
+                    type: string
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /products/sale-schedule:
+    get:
+      summary: Lấy lịch trình khuyến mãi (upcoming + active + recent ended)
+      description: |
+        Trả về timeline các chương trình khuyến mãi bao gồm:
+        - **upcoming**: sắp diễn ra
+        - **active**: đang diễn ra
+        - **ended**: vừa kết thúc (trong 7 ngày gần nhất)
+      tags:
+        - Public - Promotions
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+            maximum: 30
+          description: Số lượng items trả về
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SaleScheduleItem"
+                  message:
+                    type: string
+              example:
+                success: true
+                data:
+                  - promotionId: "uuid-promo-1"
+                    name: "Flash Sale 11.11"
+                    startDate: "2024-11-11T00:00:00Z"
+                    endDate: "2024-11-11T23:59:59Z"
+                    status: "ended"
+                    productCount: 50
+                  - promotionId: "uuid-promo-2"
+                    name: "Sale Cuối Tuần"
+                    startDate: "2024-11-16T00:00:00Z"
+                    endDate: "2024-11-17T23:59:59Z"
+                    status: "upcoming"
+                    productCount: 30
+                message: "Lấy lịch trình khuyến mãi thành công"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # PUBLIC — Slug-based routes
+  # ============================================================
+
+  /products/slug/{slug}:
+    get:
+      summary: Lấy chi tiết sản phẩm theo slug
+      tags:
+        - Public - Products
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+          description: Product slug
+          example: "iphone-15-pro-max"
+      security:
+        - bearerAuth: []
+        - {}
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/ProductDetail"
+                  message:
+                    type: string
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /products/slug/{slug}/variant:
+    get:
+      summary: Lấy chi tiết variant theo slug + thuộc tính
+      description: |
+        Lấy variant cụ thể bằng SKU code hoặc kết hợp dynamic attributes.
+
+        Phải cung cấp ít nhất một trong hai:
+        - `code`: Variant SKU
+        - Dynamic attributes: `color`, `storage`, `ram`, ... (tùy cấu hình sản phẩm)
+      tags:
+        - Public - Products
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+          example: "iphone-15-pro-max"
+        - in: query
+          name: code
+          schema:
+            type: string
+          description: Variant code (SKU)
+          example: "IP15PM-256-BLACK"
+        - in: query
+          name: color
+          schema:
+            type: string
+          description: Dynamic attribute — màu sắc
+          example: "Black Titanium"
+        - in: query
+          name: storage
+          schema:
+            type: string
+          description: Dynamic attribute — dung lượng
+          example: "256GB"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/ProductVariant"
+                  message:
+                    type: string
+        "400":
+          description: Thiếu code hoặc thuộc tính
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Variant not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /products/slug/{slug}/gallery:
+    get:
+      summary: Lấy gallery ảnh của sản phẩm
+      tags:
+        - Public - Products
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VariantImage"
+                  message:
+                    type: string
+
+  /products/slug/{slug}/specifications:
+    get:
+      summary: Lấy thông số kỹ thuật của sản phẩm
+      tags:
+        - Public - Products
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      specifications:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            groupName:
+                              type: string
+                              example: "Thông số cơ bản"
+                            items:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  name:
+                                    type: string
+                                    example: "Chip xử lý"
+                                  value:
+                                    type: string
+                                    example: "A17 Pro"
+                                  isHighlight:
+                                    type: boolean
+                  message:
+                    type: string
+
+  /products/slug/{slug}/related:
+    get:
+      summary: Lấy sản phẩm tương tự
+      tags:
+        - Public - Products
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 8
+            maximum: 12
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProductCard"
+                  message:
+                    type: string
+
+  /products/slug/{slug}/reviews:
+    get:
+      summary: Lấy đánh giá của sản phẩm
+      tags:
+        - Public - Products
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+            maximum: 20
+        - in: query
+          name: rating
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+          description: Filter theo số sao
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, rating]
+            default: createdAt
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Review"
+
+  # ============================================================
+  # PUBLIC — Dynamic routes
+  # ============================================================
+
+  /products/promotion/{promotionId}:
+    get:
+      summary: Lấy danh sách sản phẩm theo chương trình khuyến mãi
+      description: Trả về các sản phẩm thuộc một promotion cụ thể, kèm giá sale.
+      tags:
+        - Public - Promotions
+      parameters:
+        - in: path
+          name: promotionId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Promotion ID
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 12
+            maximum: 50
+        - in: query
+          name: categoryId
+          schema:
+            type: string
+            format: uuid
+          description: Filter theo category trong promotion
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [price, discountPercent, soldCount, createdAt]
+            default: discountPercent
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/FlashSaleProduct"
+              example:
+                success: true
+                data:
+                  - id: "uuid-product-1"
+                    name: "Samsung Galaxy S24"
+                    originalPrice: 22990000
+                    salePrice: 17990000
+                    discountPercent: 22
+                pagination:
+                  page: 1
+                  limit: 12
+                  total: 30
+                  totalPages: 3
+                message: "Lấy danh sách sản phẩm khuyến mãi thành công"
+        "404":
+          description: Promotion not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # ADMIN — Routes (yêu cầu JWT + ADMIN role)
+  # ============================================================
+
+  /products/admin/all:
+    get:
+      summary: Lấy tất cả sản phẩm (Admin)
+      tags:
+        - Admin - Products
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 12
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: categoryId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: brandId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: isFeatured
+          schema:
+            type: boolean
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, name, price, viewsCount, ratingAverage]
+            default: createdAt
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedResponse"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden - Admin role required
+
+  /products/admin:
+    post:
+      summary: Tạo sản phẩm mới
+      tags:
+        - Admin - Products
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - brandId
+                - categoryId
+                - name
+                - variants
+              properties:
+                brandId:
+                  type: string
+                  format: uuid
+                  description: Brand ID
+                  example: df656f59-85c6-4a1e-81c0-c318d9c05fc7
+                categoryId:
+                  type: string
+                  format: uuid
+                  description: Category ID (single category)
+                  example: 90dfb31f-fd25-49db-88c6-0acd531c5eee
+                name:
+                  type: string
+                  minLength: 3
+                  description: Tên sản phẩm
+                  example: iPhone 15 Pro Max
+                description:
+                  type: string
+                  description: Mô tả sản phẩm
+                  example: iPhone 15 Pro Max chính hãng VN/A, chip A17 Pro
+                isFeatured:
+                  type: boolean
+                  description: Sản phẩm nổi bật
+                  default: false
+                  example: true
+                isActive:
+                  type: boolean
+                  description: Kích hoạt sản phẩm
+                  default: true
+                  example: true
+                variants:
+                  type: string
+                  description: |
+                    JSON string của variants array (bắt buộc có ít nhất 1 variant với isDefault=true).
+                    Mỗi variant gồm: code, price, quantity, isDefault, isActive, variantAttributes[].
+                  example: '[{"code":"IP15PM-256-BLACK","price":29990000,"quantity":100,"isDefault":true,"isActive":true,"variantAttributes":[{"attributeOptionId":"c4bed20c-494c-4f90-a54b-c60629fe829e"},{"attributeOptionId":"d08118ab-4aca-4a6e-bdf2-ce4a3fc13792"}]}]'
+                specifications:
+                  type: string
+                  description: JSON string của specifications array
+                  example: '[{"specificationId":"1fa98b73-8238-482f-b5c2-899f02de2cda","value":"A17 Pro","isHighlight":true},{"specificationId":"5243c8ca-464e-4ff6-9c36-497d0ccf54d2","value":"8GB","isHighlight":false}]'
+                variant_0:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Ảnh cho variant đầu tiên (upload nhiều ảnh với cùng field name)
+                variant_1:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Ảnh cho variant thứ 2
+            encoding:
+              variants:
+                contentType: application/json
+              specifications:
+                contentType: application/json
+      responses:
+        "201":
+          description: Created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/ProductDetail"
+                  message:
+                    type: string
+                    example: Tạo sản phẩm thành công
+              examples:
+                success:
+                  summary: Tạo sản phẩm thành công
+                  value:
+                    success: true
+                    data:
+                      id: uuid-product-id
+                      name: iPhone 15 Pro Max
+                      slug: iphone-15-pro-max
+                      brand:
+                        id: df656f59-85c6-4a1e-81c0-c318d9c05fc7
+                        name: Apple
+                        slug: apple
+                      category:
+                        - id: 90dfb31f-fd25-49db-88c6-0acd531c5eee
+                          name: Điện thoại
+                          slug: dien-thoai
+                    message: Tạo sản phẩm thành công
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                  errors:
+                    type: array
+                    items:
+                      type: object
+              examples:
+                validation_error:
+                  summary: Lỗi validation
+                  value:
+                    success: false
+                    message: Dữ liệu không hợp lệ
+                    errors:
+                      - path: [variants]
+                        message: Phải có đúng 1 biến thể mặc định
+                missing_field:
+                  summary: Thiếu field bắt buộc
+                  value:
+                    success: false
+                    message: Dữ liệu không hợp lệ
+                    errors:
+                      - path: [brandId]
+                        message: Required
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /products/admin/{id}:
+    get:
+      summary: Lấy chi tiết sản phẩm theo ID (Admin)
+      tags:
+        - Admin - Products
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/ProductDetail"
+                  message:
+                    type: string
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Product not found
+
+    patch:
+      summary: Cập nhật sản phẩm
+      tags:
+        - Admin - Products
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                brandId:
+                  type: string
+                  format: uuid
+                  description: Brand ID
+                categoryId:
+                  type: string
+                  format: uuid
+                  description: Category ID
+                name:
+                  type: string
+                  minLength: 3
+                  description: Tên sản phẩm
+                description:
+                  type: string
+                  description: Mô tả sản phẩm
+                isFeatured:
+                  type: boolean
+                  description: Sản phẩm nổi bật
+                isActive:
+                  type: boolean
+                  description: Kích hoạt sản phẩm
+                variants:
+                  type: string
+                  description: |
+                    JSON string của variants array. Hỗ trợ:
+                    - Thêm variant mới (không có id)
+                    - Cập nhật variant hiện có (có id)
+                    - Xóa mềm variant (_delete=true)
+                  example: '[{"id":"uuid","price":28990000,"quantity":120},{"id":"uuid-old","_delete":true}]'
+                specifications:
+                  type: string
+                  description: JSON string của specifications array
+                  example: '[{"specificationId":"uuid","value":"A17 Pro","isHighlight":true}]'
+                variant_0:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Ảnh cho variant 0 (có thể upload nhiều ảnh)
+                variant_1:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Ảnh cho variant 1
+            encoding:
+              variants:
+                contentType: application/json
+              specifications:
+                contentType: application/json
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/ProductDetail"
+                  message:
+                    type: string
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Product not found
+
+    delete:
+      summary: Xóa sản phẩm
+      tags:
+        - Admin - Products
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                    example: Xóa sản phẩm thành công
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Product not found
+
+tags:
+  - name: Public - Products
+    description: Public endpoints cho sản phẩm
+  - name: Public - Promotions
+    description: Public endpoints cho khuyến mãi, flash sale, best-selling, new arrivals
+  - name: Admin - Products
+    description: Admin endpoints quản lý sản phẩm (yêu cầu authentication & ADMIN role)
