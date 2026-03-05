@@ -23,17 +23,79 @@ import {
   getBestSellingProductsHandler,
   getNewArrivalProductsHandler,
   getSaleScheduleHandler,
+  getSearchSuggestHandler,
 } from "./product.controller";
-import { listProductsSchema, productBySlugParamsSchema, productParamsSchema, reviewsQuerySchema, variantQuerySchema } from "./product.validation";
+import { listProductsSchema, productBySlugParamsSchema, productParamsSchema, reviewsQuerySchema, searchSuggestSchema, variantQuerySchema } from "./product.validation";
 import { parseJsonFields } from "@/app/middlewares/parse-json-fields.middleware";
 import { asyncHandler } from "@/utils/async-handler";
+
+// Import filter handler
+import { getCategoryFiltersHandler } from "./product_filter.controller";
+import { categoryFiltersQuerySchema } from "./product_filter.validation";
 
 const router = Router();
 
 const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
 
 // Public — tĩnh trước
+// FE goi: GET /products
+//     ↓
+// Service resolve: getProductsPublicHandler
+// Example
+// GET /products
+//   ?category=dien-thoai
+//   &brandId=c91c563e-7485-4cdb-985e-9860281f6263    ← Apple
+//   &brandId=683c3fa2-dff3-4dbb-9fe5-d9c5cb9c7d29    ← Samsung (multi-select OR)
+//   &attr_storage=256GB
+//   &attr_storage=512GB                               ← multi-select OR
+//   &attr_ram=8GB
+//   &spec_os=Android
+//   &spec_nfc=true                                    ← BOOLEAN filter
+//   &minPrice=5000000
+//   &maxPrice=20000000
+//   &inStock=true
+//   &sortBy=price&sortOrder=asc
+
+// GET /products
+//   ?category=laptop
+//   &spec_cpu_series=Intel+Core+i7
+//   &attr_ram=16GB
+//   &attr_ram=32GB
+//   &spec_screen_size_min=14
+//   &spec_screen_size_max=16
+//   &minPrice=20000000
+
+// GET /products
+//   ?category=dien-thoai
+//   &spec_screen_size_min=6.1
+//   &spec_screen_size_max=6.7
+//   &spec_battery_capacity_min=4000
+
 router.get("/", validate(listProductsSchema, "query"), asyncHandler(getProductsPublicHandler));
+
+// FE gọi: GET /products/filters?category=dien-thoai
+//     ↓
+// Service resolve → ["66834516", "c91c563e", "683c3fa2", ...] (toàn bộ sub IDs)
+//     ↓
+// Song song query:
+//   - brands có sản phẩm thực tế         → filter "Hãng"
+//   - price min/max từ variants           → filter "Giá"
+//   - attributes từ category config       → filter "Storage", "RAM"...
+//   - specs có isFilterable=true          → filter "OS", "NFC", "Pin"...
+//     ↓
+// Detect type: RANGE / ENUM / BOOLEAN (kết hợp whitelist cứng + heuristic)
+//     ↓
+// FE nhận FilterGroup[] → render đúng UI cho từng type
+// Dynamic category filter endpoint
+// GET /products/filters?category=dien-thoai
+// GET /products/filters?category=laptop
+// GET /products/filters?category=iphone-16-series
+router.get("/filters", validate(categoryFiltersQuerySchema, "query"), asyncHandler(getCategoryFiltersHandler));
+
+// default 8
+// GET /products/search-suggest?q=iphone+16&limit=8
+// GET /products/search-suggest?q=macbook&category=laptop&limit=5
+router.get("/search-suggest", validate(searchSuggestSchema, "query"), asyncHandler(getSearchSuggestHandler));
 
 router.get("/flash-sale", asyncHandler(getFlashSaleProductsHandler));
 router.get("/sale-categories", asyncHandler(getCategoriesWithSaleProductsHandler));

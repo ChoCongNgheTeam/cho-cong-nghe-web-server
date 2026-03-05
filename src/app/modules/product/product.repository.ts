@@ -2,9 +2,9 @@ import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
 import { ListProductsQuery, ReviewsQuery } from "./product.validation";
 import { OrderStatus } from "@prisma/client";
-import { fa, is } from "zod/v4/locales";
 import { extractVariantOptions } from "@/helpers/variant-options";
 import { HighlightSpecificationGroup } from "./product.types";
+import { buildOrderBy, buildProductWhere } from "./product_filter.where-builder";
 
 const selectBrand = {
   id: true,
@@ -225,54 +225,54 @@ export const getDescendantCategoryIds = async (slug: string) => {
   return result.map((r) => r.id);
 };
 
-const buildProductWhere = async (query: ListProductsQuery, onlyActive: boolean): Promise<Prisma.productsWhereInput> => {
-  const where: Prisma.productsWhereInput = {};
+// const buildProductWhere = async (query: ListProductsQuery, onlyActive: boolean): Promise<Prisma.productsWhereInput> => {
+//   const where: Prisma.productsWhereInput = {};
 
-  if (onlyActive) where.isActive = true;
+//   if (onlyActive) where.isActive = true;
 
-  if (query.search) {
-    where.OR = [{ name: { contains: query.search, mode: "insensitive" } }, { description: { contains: query.search, mode: "insensitive" } }];
-  }
+//   if (query.search) {
+//     where.OR = [{ name: { contains: query.search, mode: "insensitive" } }, { description: { contains: query.search, mode: "insensitive" } }];
+//   }
 
-  if (query.category) {
-    const ids = await getDescendantCategoryIds(query.category);
+//   if (query.category) {
+//     const ids = await getDescendantCategoryIds(query.category);
 
-    where.categoryId = { in: ids };
-  }
+//     where.categoryId = { in: ids };
+//   }
 
-  if (query.categoryId) {
-    where.categoryId = query.categoryId;
-  }
+//   if (query.categoryId) {
+//     where.categoryId = query.categoryId;
+//   }
 
-  if (query.brandId) where.brandId = query.brandId;
+//   if (query.brandId) where.brandId = query.brandId;
 
-  if (query.isFeatured !== undefined) where.isFeatured = query.isFeatured;
+//   if (query.isFeatured !== undefined) where.isFeatured = query.isFeatured;
 
-  if (query.minPrice || query.maxPrice) {
-    where.variants = {
-      some: {
-        isActive: true,
-        ...(query.minPrice && { price: { gte: query.minPrice } }),
-        ...(query.maxPrice && { price: { lte: query.maxPrice } }),
-      },
-    };
-  }
+//   if (query.minPrice || query.maxPrice) {
+//     where.variants = {
+//       some: {
+//         isActive: true,
+//         ...(query.minPrice && { price: { gte: query.minPrice } }),
+//         ...(query.maxPrice && { price: { lte: query.maxPrice } }),
+//       },
+//     };
+//   }
 
-  if (query.minRating) {
-    where.ratingAverage = { gte: query.minRating };
-  }
+//   if (query.minRating) {
+//     where.ratingAverage = { gte: query.minRating };
+//   }
 
-  if (query.inStock) {
-    where.variants = {
-      some: {
-        isActive: true,
-        quantity: { gt: 0 },
-      },
-    };
-  }
+//   if (query.inStock) {
+//     where.variants = {
+//       some: {
+//         isActive: true,
+//         quantity: { gt: 0 },
+//       },
+//     };
+//   }
 
-  return where;
-};
+//   return where;
+// };
 
 export const findAllPublic = async (query: ListProductsQuery) => {
   return findAll(query, true);
@@ -341,27 +341,13 @@ export const findOrderItemForReview = (userId: string, productId: string) => {
   });
 };
 
-const findAll = async (query: ListProductsQuery, onlyActive: boolean) => {
-  const { page, limit, sortBy, sortOrder } = query;
+const findAll = async (query: Record<string, any>, onlyActive: boolean) => {
+  const { page = 1, limit = 12, sortBy, sortOrder } = query;
   const skip = (page - 1) * limit;
 
+  // buildProductWhere giờ xử lý tất cả: built-in + spec_xxx + attr_xxx
   const where = await buildProductWhere(query, onlyActive);
-
-  let orderBy: any;
-
-  if (sortBy === "price") {
-    orderBy = {
-      variants: {
-        _count: sortOrder,
-      },
-    };
-  } else if (sortBy) {
-    orderBy = { [sortBy]: sortOrder };
-  } else {
-    orderBy = [{ totalSoldCount: "desc" }, { ratingAverage: "desc" }, { createdAt: "desc" }, { id: "asc" }];
-  }
-
-  // console.log(orderBy);
+  const orderBy = buildOrderBy(sortBy, sortOrder);
 
   const [data, total] = await Promise.all([
     prisma.products.findMany({
@@ -373,7 +359,6 @@ const findAll = async (query: ListProductsQuery, onlyActive: boolean) => {
     }),
     prisma.products.count({ where }),
   ]);
-  // console.log(data);
 
   return {
     data,
@@ -383,6 +368,114 @@ const findAll = async (query: ListProductsQuery, onlyActive: boolean) => {
     totalPages: Math.ceil(total / limit),
   };
 };
+
+// const findAll = async (query: ListProductsQuery, onlyActive: boolean) => {
+//   const { page, limit, sortBy, sortOrder } = query;
+//   const skip = (page - 1) * limit;
+
+//   const where = await buildProductWhere(query, onlyActive);
+
+//   let orderBy: any;
+
+//   if (sortBy === "price") {
+//     orderBy = {
+//       variants: {
+//         _count: sortOrder,
+//       },
+//     };
+//   } else if (sortBy) {
+//     orderBy = { [sortBy]: sortOrder };
+//   } else {
+//     orderBy = [{ totalSoldCount: "desc" }, { ratingAverage: "desc" }, { createdAt: "desc" }, { id: "asc" }];
+//   }
+
+//   // console.log(orderBy);
+
+//   const [data, total] = await Promise.all([
+//     prisma.products.findMany({
+//       where,
+//       select: selectProductCard,
+//       orderBy,
+//       skip,
+//       take: limit,
+//     }),
+//     prisma.products.count({ where }),
+//   ]);
+//   // console.log(data);
+
+//   return {
+//     data,
+//     page,
+//     limit,
+//     total,
+//     totalPages: Math.ceil(total / limit),
+//   };
+// };
+
+// Search suggest — dùng cho autocomplete khi user đang gõ
+//
+// Trả về tối đa `limit` sản phẩm khớp với từ khóa, kèm thumbnail và price.
+// FE gọi API này với debounce 300ms để hiện dropdown gợi ý.
+
+export const findSearchSuggestions = async (keyword: string, options: { limit?: number; categorySlug?: string } = {}): Promise<SearchSuggestionItem[]> => {
+  const { limit = 8, categorySlug } = options;
+
+  // Resolve category nếu có
+  let categoryIds: string[] | undefined;
+  if (categorySlug) {
+    const ids = await getDescendantCategoryIds(categorySlug);
+
+    if (ids) categoryIds = ids;
+  }
+
+  const products = await prisma.products.findMany({
+    where: {
+      isActive: true,
+      deletedAt: null,
+      name: { contains: keyword.trim(), mode: "insensitive" },
+      ...(categoryIds && { categoryId: { in: categoryIds } }),
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      img: {
+        select: { imageUrl: true },
+        orderBy: [{ color: "asc" }, { position: "asc" }],
+        take: 1,
+      },
+      variants: {
+        where: { isActive: true, isDefault: true },
+        select: { price: true },
+        take: 1,
+      },
+      category: {
+        select: { id: true, name: true, slug: true },
+      },
+    },
+    orderBy: [{ totalSoldCount: "desc" }, { viewsCount: "desc" }],
+    take: limit,
+  });
+
+  return products.map((p) => ({
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    thumbnail: p.img[0]?.imageUrl ?? null,
+    price: p.variants[0] ? Number(p.variants[0].price) : null,
+    category: p.category,
+  }));
+};
+
+// Type cho search suggestion item
+export interface SearchSuggestionItem {
+  id: string;
+  name: string;
+  slug: string;
+  thumbnail: string | null;
+  price: number | null;
+  category: { id: string; name: string; slug: string } | null;
+}
 
 export const findVariantByCode = async (productId: string, code: string) => {
   return prisma.products_variants.findFirst({

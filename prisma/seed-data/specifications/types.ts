@@ -4,6 +4,7 @@ export interface SeedSpecInput {
   unit?: string | null;
   icon?: string | null;
   isFilterable?: boolean;
+  filterType?: "RANGE" | "ENUM" | "BOOLEAN";
   isRequired?: boolean;
   sortOrder?: number;
 }

@@ -14,93 +14,87 @@ export const productSpecificationsData: ProductSpecificationSeed[] = [
       { key: "origin", value: "Trung Quốc" },
       { key: "launch_date", value: "01/2022" },
       { key: "warranty_period", value: "12" },
+      { key: "usage_guide", value: "Để nơi khô ráo, nhẹ tay, dễ vỡ. Xem thêm trong sách HDSD." },
 
       // --- Thiết kế & Trọng lượng ---
       { key: "dimensions", value: "71.5 x 7.4 x 146.7" },
       { key: "weight", value: "164" },
-      { key: "water_resistance", value: "IP68" },
-      { key: "material", value: "Mặt lưng: Kính, Viền: Nhôm nguyên khối" },
+      { key: "water_resistance", value: "IP68" }, // Mặc định iPhone 13 đạt chuẩn này
+      { key: "material", value: "Khung nhôm, mặt lưng kính, Ceramic Shield" },
 
       // --- Bộ xử lý ---
       { key: "cpu_version", value: "Apple A15 Bionic" },
-      { key: "cpu_type", value: "6-Core" },
+      { key: "cpu_type", value: "6-core CPU" },
       { key: "cpu_cores", value: "6" },
+      { key: "cpu_speed", value: "3.22" },
 
-      // --- RAM ---
+      // --- RAM & Lưu trữ ---
       { key: "ram_capacity", value: "4" },
+      { key: "ram_type", value: "LPDDR4X" },
+      { key: "rom_capacity", value: "128" },
+      { key: "external_storage", value: "Không" },
 
       // --- Màn hình ---
       { key: "screen_size", value: "6.1" },
       { key: "screen_tech", value: "OLED" },
       { key: "screen_standard", value: "Super Retina XDR" },
       { key: "screen_resolution", value: "2532 x 1170" },
+      { key: "screen_color", value: "16 Triệu màu, P3 color gamut" },
       { key: "refresh_rate", value: "60" },
-      { key: "screen_glass", value: "Phủ Ceramic (Ceramic Shield)" },
-      { key: "pixel_density", value: "460" }, // Tính toán dựa trên độ phân giải và size
+      { key: "screen_glass", value: "Ceramic Shield" },
+      { key: "pixel_density", value: "460" },
       { key: "max_brightness", value: "800 - 1200" },
       { key: "contrast_ratio", value: "2.000.000:1" },
 
       // --- Đồ họa ---
-      { key: "gpu_chip", value: "Apple GPU 5 nhân" },
-
-      // --- Lưu trữ ---
-      { key: "rom_capacity", value: "128" },
+      { key: "gpu_chip", value: "Apple GPU 4 nhân" },
 
       // --- Camera sau ---
       { key: "rear_camera_count", value: "2" },
-      { key: "rear_cam_1", value: "Wide 12.0 MP" },
-      { key: "rear_cam_2", value: "Ultra Wide 12.0 MP" },
+      { key: "rear_cam_1", value: "12.0 MP (Wide), f/1.6" },
+      { key: "rear_cam_2", value: "12.0 MP (Ultra Wide), f/2.4" },
       { key: "rear_cam_3", value: "Không hỗ trợ" },
-      { key: "rear_video_record", value: "4K @60fps, 1080p @240fps (Slow Motion)" },
+      { key: "rear_video_record", value: "4K@24/30/60fps, 1080p@30/60/120/240fps, HDR Dolby Vision" },
       {
         key: "rear_cam_features",
-        value: "Night Mode, Cinematic Mode, OIS, Panorama, HDR, AF, Zoom kỹ thuật số",
+        value: "Ban đêm (Night Mode), Chống rung quang học (OIS), Cinematic Mode, Deep Fusion, Smart HDR 4, Xóa phông",
       },
 
       // --- Camera Selfie ---
       { key: "selfie_camera_count", value: "1" },
-      { key: "selfie_cam_1", value: "12.0 MP, ƒ/2.2" },
-      { key: "selfie_video_record", value: "4K @60fps, 1080p @60fps" },
-      { key: "selfie_cam_features", value: "FaceID, Retina Flash, Portrait Mode, HDR, Night Mode" },
+      { key: "selfie_cam_1", value: "12.0 MP, f/2.2" },
+      { key: "selfie_video_record", value: "4K@24/25/30/60fps, 1080p@30/60/120fps" },
+      { key: "selfie_cam_features", value: "Xoá phông, Tự động lấy nét (AF), Nhận diện khuôn mặt, HDR, Night Mode" },
 
-      // --- Cảm biến ---
-      {
-        key: "sensors",
-        value:
-          "Gia tốc kế, Cảm biến tiệm cận, Con quay hồi chuyển, Khí áp kế, Cảm biến ánh sáng môi trường",
-      },
-
-      // --- Bảo mật ---
-      { key: "security", value: "FaceID, Mật mã" },
-
-      // --- Others ---
-      { key: "led_notification", value: "Không" },
-      {
-        key: "special_features",
-        value: "MagSafe, Chống nước IP68, Apple Intelligence (Hỗ trợ giới hạn)",
-      },
+      // --- Cảm biến & Bảo mật ---
+      { key: "sensors", value: "Face ID, Áp kế, Gia tốc kế, Tiệm cận, Con quay hồi chuyển, Ánh sáng" },
+      { key: "security", value: "Mở khóa khuôn mặt (Face ID), Mật mã" },
 
       // --- Giao tiếp và kết nối ---
-      { key: "sim_type", value: "1 eSIM và 1 nano SIM" },
+      { key: "sim_type", value: "1 Nano SIM & 1 eSIM" },
       { key: "sim_slots", value: "1" },
       { key: "network_support", value: "5G" },
       { key: "charging_port", value: "Lightning" },
-      { key: "wifi_version", value: "802.11 ax (Wifi 6)" },
-      { key: "gps_tech", value: "GPS, GLONASS, GALILEO, QZSS, A-GPS" },
+      { key: "wifi_version", value: "Wi-Fi 6 (802.11 ax)" },
+      { key: "gps_tech", value: "GPS, GLONASS, Galileo, QZSS, BeiDou" },
       { key: "bluetooth_version", value: "v5.0" },
-      { key: "other_connect", value: "NFC" },
+      { key: "other_connect", value: "NFC, AirDrop" },
 
       // --- Thông tin pin & sạc ---
       { key: "battery_type", value: "Lithium-ion" },
-      { key: "battery_life", value: "3225 mAh (Lên đến 19 giờ xem video)" },
-      { key: "battery_more_info", value: "Sạc nhanh 20W, Sạc không dây MagSafe 15W, Sạc Qi 7.5W" },
+      { key: "battery_capacity", value: "3225" },
+      { key: "battery_life", value: "19" }, // Thời gian xem video tối đa
+      { key: "charger_in_box", value: "Không (Chỉ có cáp)" },
+      { key: "battery_more_info", value: "Sạc nhanh 20W, Sạc không dây MagSafe 15W, Sạc không dây Qi 7.5W" },
 
       // --- Hệ điều hành ---
       { key: "os_name", value: "iOS" },
       { key: "os_version", value: "iOS 15" },
 
-      // --- Phụ kiện ---
-      { key: "in_the_box", value: "Cáp USB-C to Lightning, Sách HDSD, Que lấy SIM" },
+      // --- Tiện ích & Phụ kiện ---
+      { key: "led_notification", value: "Không" },
+      { key: "special_features", value: "Kháng nước IP68, Apple Pay, Cinematic Mode" },
+      { key: "in_the_box", value: "Máy, Cáp USB-C to Lightning, Sách HDSD, Que lấy SIM" },
     ],
   },
   {
@@ -109,97 +103,91 @@ export const productSpecificationsData: ProductSpecificationSeed[] = [
       // --- Thông tin hàng hóa ---
       { key: "origin", value: "Trung Quốc" },
       { key: "launch_date", value: "09/2022" },
-      { key: "warranty_period", value: "12" },
+      { key: "warranty_period", value: "12" }, // Filter: 12 tháng
+      { key: "usage_guide", value: "Để nơi khô ráo, nhẹ tay, dễ vỡ. Xem trong sách hướng dẫn sử dụng" },
 
       // --- Thiết kế & Trọng lượng ---
-      { key: "dimensions", value: "146.7 x 71.5 x 7.8" },
-      { key: "weight", value: "172" },
+      { key: "dimensions", value: "146.7 x 71.5 x 7.8" }, // Bỏ "mm"
+      { key: "weight", value: "172" }, // Bỏ "g" để sau này có thể lọc cân nặng
       { key: "water_resistance", value: "IP68" },
-      { key: "material", value: "Mặt lưng: Kính, Viền: Nhôm nguyên khối" },
+      { key: "material", value: "Khung nhôm, mặt lưng kính" }, // Tự động mapping từ đặc tính iPhone 14
 
       // --- Bộ xử lý ---
       { key: "cpu_version", value: "Apple A15 Bionic" },
-      { key: "cpu_type", value: "6-Core" },
+      { key: "cpu_type", value: "6-core" },
       { key: "cpu_cores", value: "6" },
+      { key: "cpu_speed", value: "3.22" }, // Bỏ "GHz"
 
-      // --- RAM ---
-      { key: "ram_capacity", value: "6" },
+      // --- RAM & Lưu trữ ---
+      { key: "ram_capacity", value: "6" }, // Filter: ENUM "6"
+      { key: "ram_type", value: "LPDDR4X" },
+      { key: "rom_capacity", value: "128" },
+      { key: "external_storage", value: "Không" }, // Filter: ENUM "Không"
 
       // --- Màn hình ---
-      { key: "screen_size", value: "6.1" },
+      { key: "screen_size", value: "6.1" }, // Filter: RANGE 6.1
       { key: "screen_tech", value: "OLED" },
-      { key: "screen_standard", value: "Super Retina XDR" },
+      { key: "screen_standard", value: "Super Retina XDR" }, // Filter: ENUM
       { key: "screen_resolution", value: "2532 x 1170" },
-      { key: "refresh_rate", value: "60" },
+      { key: "screen_color", value: "16 Triệu" },
+      { key: "refresh_rate", value: "60" }, // Filter: ENUM "60"
       { key: "screen_glass", value: "Ceramic Shield" },
       { key: "pixel_density", value: "460" },
-      { key: "max_brightness", value: "800 - 1200" },
+      { key: "max_brightness", value: "1200" }, // Filter: RANGE 1200
       { key: "contrast_ratio", value: "2.000.000:1" },
 
       // --- Đồ họa ---
       { key: "gpu_chip", value: "Apple GPU 5 nhân" },
 
-      // --- Lưu trữ ---
-      { key: "rom_capacity", value: "128" },
-
       // --- Camera sau ---
       { key: "rear_camera_count", value: "2" },
-      { key: "rear_cam_1", value: "Wide 12.0 MP, ƒ/1.5" },
-      { key: "rear_cam_2", value: "Ultra Wide 12.0 MP, ƒ/2.4" },
-      { key: "rear_cam_3", value: "Không hỗ trợ" },
-      { key: "rear_video_record", value: "4K @60fps, 1080p @60fps, Cinematic Mode 4K HDR" },
+      { key: "rear_cam_1", value: "12.0 MP (Wide)" },
+      { key: "rear_cam_2", value: "12.0 MP (Ultra Wide)" },
+      { key: "rear_cam_3", value: "Không có" },
+      {
+        key: "rear_video_record",
+        value: "4K@60fps, 4K@30fps, 4K@24fps, 1080p@60fps, 1080p@30fps, 1080p@25fps, 720p@30fps",
+      },
       {
         key: "rear_cam_features",
-        value: "Photonic Engine, Deep Fusion, Smart HDR 4, Night Mode, Action Mode, OIS",
-      },
+        value: "Chống rung OIS, HDR, Ban đêm (Night Mode), Chụp chân dung, Toàn cảnh (Panorama)",
+      }, // Gộp các tính năng phổ biến để Filter ENUM
 
       // --- Camera Selfie ---
       { key: "selfie_camera_count", value: "1" },
-      { key: "selfie_cam_1", value: "12.0 MP, ƒ/1.9" },
-      { key: "selfie_video_record", value: "4K @60fps, Cinematic Mode 4K HDR" },
-      {
-        key: "selfie_cam_features",
-        value: "Tự động lấy nét (AF), FaceID, Portrait Mode, Night Mode",
-      },
+      { key: "selfie_cam_1", value: "12.0 MP" },
+      { key: "selfie_video_record", value: "4K, FullHD, HD" },
+      { key: "selfie_cam_features", value: "Nhận diện khuôn mặt, HDR, Chụp chân dung" },
 
-      // --- Cảm biến ---
-      {
-        key: "sensors",
-        value:
-          "FaceID, Áp kế, Con quay hồi chuyển dải động cao, Gia tốc kế lực G cao, Tiệm cận, Ánh sáng môi trường kép",
-      },
-
-      // --- Bảo mật ---
-      { key: "security", value: "Mở khóa khuôn mặt (FaceID), Mật mã" },
-
-      // --- Others ---
-      { key: "led_notification", value: "Không" },
-      {
-        key: "special_features",
-        value: "Phát hiện va chạm (Crash Detection), Liên lạc khẩn cấp qua vệ tinh, MagSafe",
-      },
+      // --- Cảm biến & Bảo mật ---
+      { key: "sensors", value: "Cảm biến tiệm cận, Gia tốc kế, Con quay hồi chuyển, Áp kế" },
+      { key: "security", value: "Mở khóa khuôn mặt, Mở khóa bằng mật mã" },
 
       // --- Giao tiếp và kết nối ---
-      { key: "sim_type", value: "1 eSIM và 1 Nano SIM" },
+      { key: "sim_type", value: "1 eSIM, 1 Nano SIM" },
       { key: "sim_slots", value: "1" },
-      { key: "network_support", value: "5G" },
+      { key: "network_support", value: "5G" }, // Filter: ENUM "5G"
       { key: "charging_port", value: "Lightning" },
-      { key: "wifi_version", value: "Wifi 6 (802.11ax)" },
-      { key: "gps_tech", value: "GPS, GLONASS, GALILEO, QZSS, BEIDOU" },
-      { key: "bluetooth_version", value: "v5.3" },
-      { key: "other_connect", value: "NFC" },
+      { key: "wifi_version", value: "802.11 ax" },
+      { key: "gps_tech", value: "BEIDOU, GALILEO, GLONASS, GPS, QZSS" },
+      { key: "bluetooth_version", value: "v5.3" }, // Apple nâng cấp BT trên iP14
+      { key: "other_connect", value: "NFC" }, // Filter: ENUM "NFC"
 
       // --- Thông tin pin & sạc ---
       { key: "battery_type", value: "Lithium-ion" },
-      { key: "battery_life", value: "3279 mAh (Lên đến 20 giờ xem video)" },
-      { key: "battery_more_info", value: "Sạc nhanh 20W, Sạc không dây MagSafe 15W, Sạc Qi 7.5W" },
+      { key: "battery_capacity", value: "3279" }, // Filter: RANGE 3279
+      { key: "battery_life", value: "20" },
+      { key: "charger_in_box", value: "Không (Chỉ có cáp)" },
+      { key: "battery_more_info", value: "Sạc nhanh, Sạc không dây MagSafe" },
 
       // --- Hệ điều hành ---
-      { key: "os_name", value: "iOS" },
+      { key: "os_name", value: "iOS" }, // Filter: ENUM "iOS"
       { key: "os_version", value: "iOS 16" },
 
-      // --- Phụ kiện ---
-      { key: "in_the_box", value: "Cáp USB-C to Lightning, Sách HDSD, Que lấy SIM" },
+      // --- Tiện ích & Phụ kiện ---
+      { key: "led_notification", value: "Không" },
+      { key: "special_features", value: "Phát hiện va chạm, SOS khẩn cấp qua vệ tinh" },
+      { key: "in_the_box", value: "Cáp, Sách HDSD, Que lấy SIM" },
     ],
   },
 

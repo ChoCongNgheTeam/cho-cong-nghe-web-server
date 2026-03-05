@@ -1,15 +1,15 @@
 import { slugify } from "transliteration";
 import * as repo from "./product.repository";
-import { CreateProductInput, UpdateProductInput, ListProductsQuery, ReviewsQuery } from "./product.validation";
+import { CreateProductInput, UpdateProductInput, ListProductsQuery, ReviewsQuery, SearchSuggestQuery } from "./product.validation";
 import { transformProductCard, transformProductDetail, transformProductSpecifications, transformProductHighlights, transformProductVariantResponse } from "./product.transformers";
 import { RawVariant, ReviewStats } from "./product.types";
 import { buildCategoryPath } from "../category/category.helpers";
 import prisma from "prisma/client";
-import { getProductIdsFromPromotions } from "./product.repository";
+import { findSearchSuggestions, getProductIdsFromPromotions } from "./product.repository";
 import { normalizeVariant } from "./product.helpers";
 import { NotFoundError, BadRequestError } from "@/errors";
 
-// ── Public ────────────────────────────────────────────────────────────────────
+//  Public
 
 export const getProductsPublic = async (query: ListProductsQuery) => {
   const result = await repo.findAllPublic(query);
@@ -32,6 +32,13 @@ export const getProductsPublic = async (query: ListProductsQuery) => {
       };
     }),
   };
+};
+
+export const getSearchSuggestions = async (query: SearchSuggestQuery) => {
+  return findSearchSuggestions(query.q, {
+    limit: query.limit,
+    categorySlug: query.category,
+  });
 };
 
 export const getProductBySlug = async (slug: string, userId?: string) => {

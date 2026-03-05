@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import * as productService from "./product.service";
 import * as productRepo from "./product.repository";
-import { ListProductsQuery, reviewsQuerySchema } from "./product.validation";
+import { ListProductsQuery, reviewsQuerySchema, searchSuggestSchema } from "./product.validation";
 import { cleanupTempFiles, parseMultipartData, uploadColorImages, deleteOldImages } from "./product.helpers";
 import { getProductsWithPricing } from "../pricing/use-cases/getProductsWithPricing.service";
 import { getProductDetailWithPricing } from "../pricing/use-cases/getProductDetailWithPricing.service";
@@ -22,11 +22,21 @@ const paginatedResponse = (result: any, message: string) => ({
   message,
 });
 
-// ── Public ────────────────────────────────────────────────────────────────────
+//  Public
 
 export const getProductsPublicHandler = async (req: Request, res: Response) => {
   const result = await getProductsWithPricing(req.query as unknown as ListProductsQuery, req.user?.id);
   res.json(paginatedResponse(result, "Lấy danh sách sản phẩm thành công"));
+};
+
+export const getSearchSuggestHandler = async (req: Request, res: Response) => {
+  const query = searchSuggestSchema.parse(req.query);
+  const suggestions = await productService.getSearchSuggestions(query);
+  res.json({
+    data: suggestions,
+    total: suggestions.length,
+    message: "Gợi ý tìm kiếm thành công",
+  });
 };
 
 export const getProductBySlugHandler = async (req: Request, res: Response) => {

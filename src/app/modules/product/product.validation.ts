@@ -1,37 +1,37 @@
 import { z } from "zod";
 
-// =====================
-// === QUERY SCHEMAS ===
-// =====================
+// listProductsSchema — MỞ RỘNG với passthrough() để hỗ trợ dynamic keys:
+//   spec_xxx  → lọc theo specification (spec_os=Android, spec_nfc=true)
+//   attr_xxx  → lọc theo variant attribute (attr_storage=256GB, attr_ram=8GB)
+//
+// .passthrough() giữ nguyên các key không khai báo thay vì strip chúng.
+// Validation vẫn chạy trên các key đã khai báo, dynamic keys không validate.
+export const listProductsSchema = z
+  .object({
+    // Pagination
+    page: z.coerce.number().positive().default(1),
+    limit: z.coerce.number().positive().max(50).default(12),
 
-export const listProductsSchema = z.object({
-  // Pagination
-  page: z.coerce.number().positive().default(1),
-  limit: z.coerce.number().positive().max(50).default(12),
+    // Search
+    search: z.string().optional(),
 
-  // Search
-  search: z.string().optional(),
+    // Category
+    category: z.string().optional(),
+    categoryId: z.string().uuid().optional(),
 
-  // Filters
-  category: z.string().optional(),
-  categoryId: z.string().uuid().optional(),
-  brandId: z.string().uuid().optional(),
-  isFeatured: z.coerce.boolean().optional(),
+    // Filters cố định
+    brandId: z.union([z.string().uuid(), z.array(z.string().uuid())]).optional(),
+    isFeatured: z.coerce.boolean().optional(),
+    minPrice: z.coerce.number().nonnegative().optional(),
+    maxPrice: z.coerce.number().nonnegative().optional(),
+    minRating: z.coerce.number().min(0).max(5).optional(),
+    inStock: z.coerce.boolean().optional(),
 
-  // Price range
-  minPrice: z.coerce.number().nonnegative().optional(),
-  maxPrice: z.coerce.number().nonnegative().optional(),
-
-  // Rating filter
-  minRating: z.coerce.number().min(0).max(5).optional(),
-
-  // Availability
-  inStock: z.coerce.boolean().optional(),
-
-  // Sort
-  sortBy: z.enum(["createdAt", "name", "price", "viewsCount", "ratingAverage", "soldCount"]).default("createdAt"),
-  sortOrder: z.enum(["asc", "desc"]).default("desc"),
-});
+    // Sort
+    sortBy: z.enum(["createdAt", "name", "price", "viewsCount", "ratingAverage", "soldCount"]).default("createdAt"),
+    sortOrder: z.enum(["asc", "desc"]).default("desc"),
+  })
+  .passthrough(); // ← cho phép spec_xxx, attr_xxx đi qua
 
 export const reviewsQuerySchema = z.object({
   page: z.coerce.number().positive().default(1),
@@ -51,14 +51,8 @@ export const variantQuerySchema = z
       const keys = Object.keys(data).filter((k) => k !== "code");
       return data.code || keys.length > 0;
     },
-    {
-      message: "Phải cung cấp code hoặc ít nhất một thuộc tính sản phẩm",
-    },
+    { message: "Phải cung cấp code hoặc ít nhất một thuộc tính sản phẩm" },
   );
-
-// =====================
-// === PARAMS SCHEMAS ===
-// =====================
 
 export const productParamsSchema = z.object({
   id: z.uuid({ message: "ID sản phẩm không hợp lệ" }),
@@ -68,11 +62,14 @@ export const productBySlugParamsSchema = z.object({
   slug: z.string().min(1, { message: "Slug không được để trống" }),
 });
 
-// =====================
-// === CREATE/UPDATE SCHEMAS ===
-// =====================
+// Search suggest schema — dùng cho endpoint gợi ý tìm kiếm
+// GET /products/search-suggest?q=iphone&limit=8
+export const searchSuggestSchema = z.object({
+  q: z.string().min(1, "Từ khóa không được để trống"),
+  limit: z.coerce.number().positive().max(20).default(8),
+  category: z.string().optional(),
+});
 
-// Color image schema - không còn liên kết với variant
 const colorImageSchema = z.object({
   color: z.string().min(1, "Màu sắc không được để trống"),
   altText: z.string().optional(),
@@ -112,16 +109,7 @@ export const createProductSchema = z
     isFeatured: z.boolean().default(false),
     isActive: z.boolean().default(true),
   })
-  .refine(
-    (data) => {
-      const defaultCount = data.variants.filter((v) => v.isDefault).length;
-      return defaultCount === 1;
-    },
-    {
-      message: "Phải có đúng 1 biến thể mặc định",
-      path: ["variants"],
-    },
-  );
+  .refine((data) => data.variants.filter((v) => v.isDefault).length === 1, { message: "Phải có đúng 1 biến thể mặc định", path: ["variants"] });
 
 const updateVariantSchema = z.object({
   id: z.string().uuid().optional(),
@@ -154,12 +142,9 @@ export const updateProductSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-// =====================
-// === TYPE EXPORTS ===
-// =====================
-
 export type ListProductsQuery = z.infer<typeof listProductsSchema>;
 export type ReviewsQuery = z.infer<typeof reviewsQuerySchema>;
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;
 export type VariantQuery = z.infer<typeof variantQuerySchema>;
+export type SearchSuggestQuery = z.infer<typeof searchSuggestSchema>;
