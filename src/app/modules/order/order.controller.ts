@@ -5,6 +5,7 @@ import {
   getAllOrdersAdmin,
   updateOrderAdmin,
   deleteOrderAdmin,
+  createOrderAdmin,
 } from "./order.service";
 
 // ================== PUBLIC (USER) ==================
@@ -44,6 +45,15 @@ export const getOrderAdminDetailHandler = async (req: Request, res: Response) =>
   res.json({
     data: order,
     message: "Lấy chi tiết đơn hàng thành công",
+  });
+};
+
+export const createOrderAdminHandler = async (req: Request, res: Response) => {
+  const newOrder = await createOrderAdmin(req.body);
+  
+  res.status(201).json({
+    data: newOrder,
+    message: "Admin tạo đơn hàng hộ thành công",
   });
 };
 

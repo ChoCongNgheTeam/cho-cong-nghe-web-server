@@ -9,8 +9,9 @@ import {
   getOrderAdminDetailHandler,
   updateOrderAdminHandler,
   deleteOrderAdminHandler,
+  createOrderAdminHandler
 } from "./order.controller";
-import { updateOrderAdminSchema } from "./order.validation";
+import { updateOrderAdminSchema, createOrderAdminSchema } from "./order.validation";
 
 const router = Router();
 
@@ -21,6 +22,14 @@ router.get("/my/:id", authMiddleware(), getOrderDetailHandler);
 // ================== ADMIN ==================
 router.get("/admin/all", authMiddleware(), requireRole("ADMIN"), getAllOrdersAdminHandler);
 router.get("/admin/:id", authMiddleware(), requireRole("ADMIN"), getOrderAdminDetailHandler);
+// Thêm Route Tạo đơn hàng
+router.post(
+  "/admin",
+  authMiddleware(),
+  requireRole("ADMIN"),
+  validate(createOrderAdminSchema),
+  createOrderAdminHandler
+);
 router.patch(
   "/admin/:id",
   authMiddleware(),

@@ -8,6 +8,11 @@ const orderSelect = {
   paymentMethodId: true,
   voucherId: true,
   shippingAddressId: true,
+  shippingContactName: true,
+  shippingPhone: true,
+  shippingProvince: true,
+  shippingWard: true,
+  shippingDetail: true,
   subtotalAmount: true,
   shippingFee: true,
   voucherDiscount: true,
@@ -39,18 +44,7 @@ const orderSelect = {
       description: true,
     },
   },
-  shippingAddress: {
-    select: {
-      id: true,
-      contactName: true,
-      phone: true,
-      detailAddress: true,
-      provinceId: true,
-      wardId: true,
-      province: { select: { fullName: true } },
-      ward: { select: { fullName: true } }
-    },
-  },
+  
   orderItems: {
     select: {
       id: true,

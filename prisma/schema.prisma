@@ -108,6 +108,13 @@ enum PolicyType {
   PAYMENT
 }
 
+enum FilterType {
+  RANGE
+  ENUM
+  BOOLEAN
+}
+
+
 
 // SOFT DELETE: users là entity chính, staff/admin cần trash
 // deletedBy tham chiếu chính nó (self-ref) — dùng String thay vì Uuid relation để tránh circular
@@ -498,6 +505,7 @@ model specifications {
   unit         String?
   icon         String?
   isFilterable Boolean   @default(false)
+  filterType   FilterType?
   isRequired   Boolean   @default(false)
   sortOrder    Int       @default(0)
   createdAt    DateTime  @default(now())

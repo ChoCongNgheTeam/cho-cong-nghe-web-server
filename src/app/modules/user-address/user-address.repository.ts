@@ -16,7 +16,6 @@ const selectAddressWithRelations = {
   createdAt: true,
   updatedAt: true,
   deletedAt: true, // Quan trọng: Để phục vụ logic thùng rác ở Service
-  deletedBy: true, // Quan trọng: Truy vết người thực hiện xóa
   province: { 
     select: { id: true, code: true, name: true, fullName: true, type: true } 
   },
