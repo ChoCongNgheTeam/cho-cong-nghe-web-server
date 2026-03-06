@@ -49,6 +49,8 @@ const promotionTemplates: {
     description: "Giảm 10% cho tất cả iPhone",
     priority: 20,
     isActive: true, // Mặc định tắt, bật khi cần
+    startDate: new Date("2026-03-05"),
+    endDate: new Date("2026-04-28"),
     notes: "Apply cho brand: Apple (iPhone) - Lấy brand ID và update vào targetId",
     rules: [
       {

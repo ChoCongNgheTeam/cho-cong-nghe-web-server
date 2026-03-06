@@ -52,7 +52,7 @@ const campaignsData: CampaignSeedData[] = [
     slug: "deal-sinh-vien",
     type: "EVENT",
     description: "Combo học tập hoàn hảo cho sinh viên: Laptop mạnh mẽ, phụ kiện tiện lợi với mức giá ưu đãi đặc quyền.",
-    startDate: new Date("2026-03-06"),
+    startDate: new Date("2026-03-05"),
     endDate: new Date("2026-03-20"),
     isActive: true,
     categoryLinks: [
@@ -72,7 +72,7 @@ const campaignsData: CampaignSeedData[] = [
     slug: "le-hoi-smartphone",
     type: "EVENT",
     description: "Đại tiệc công nghệ di động. Quy tụ những mẫu smartphone hot nhất hiện nay từ các thương hiệu hàng đầu.",
-    startDate: new Date("2026-03-21"),
+    startDate: new Date("2026-03-20"),
     endDate: new Date("2026-04-05"),
     isActive: true,
     categoryLinks: [
@@ -92,7 +92,7 @@ const campaignsData: CampaignSeedData[] = [
     slug: "tuan-le-laptop-hieu-nang",
     type: "EVENT",
     description: "Tuần lễ của những 'quái vật' hiệu năng. Những dòng Laptop Gaming và Workstation đỉnh nhất thế giới.",
-    startDate: new Date("2026-04-06"),
+    startDate: new Date("2026-04-05"),
     endDate: new Date("2026-04-20"),
     isActive: true,
     categoryLinks: [
@@ -112,7 +112,7 @@ const campaignsData: CampaignSeedData[] = [
     slug: "sale-dien-may-gia-dinh",
     type: "SEASONAL",
     description: "Nâng cấp không gian sống với ưu đãi điện máy lớn nhất mùa. Tiết kiệm chi phí cho cả gia đình.",
-    startDate: new Date("2026-04-21"),
+    startDate: new Date("2026-04-20"),
     endDate: new Date("2026-05-10"),
     isActive: true,
     categoryLinks: [
