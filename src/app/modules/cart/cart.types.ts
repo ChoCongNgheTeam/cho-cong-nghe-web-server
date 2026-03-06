@@ -44,7 +44,10 @@ export interface CartResponse {
   productId: string;
   productName: string;
   productSlug: string;
+  brandId?: string;
   brandName: string;
+  categoryId?: string;
+  categoryPath?: string[];
   variantCode?: string;
   image?: string;
   color?: string;

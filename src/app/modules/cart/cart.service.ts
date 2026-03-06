@@ -27,15 +27,9 @@ export const validateCartItemStatus = async (variantId: string, quantity: number
 };
 
 export const getCart = async (userId: string) => {
+  // 1. Chỉ đảm nhiệm việc lấy dữ liệu giỏ hàng thô từ DB
   const items = await repo.findByUserId(userId);
-  const formattedItems = items.map(repo.transformToCartResponse);
-
-  return {
-    items: formattedItems,
-    totalItems: formattedItems.length,
-    totalQuantity: formattedItems.reduce((sum, item) => sum + item.quantity, 0),
-    subtotal: formattedItems.reduce((sum, item) => sum + item.totalPrice, 0),
-  };
+  return items.map(repo.transformToCartResponse);
 };
 
 export const addToCart = async (userId: string, input: AddToCartInput) => {

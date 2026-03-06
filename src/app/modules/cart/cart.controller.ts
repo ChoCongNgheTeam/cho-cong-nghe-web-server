@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import * as cartService from "./cart.service";
 import { addToCartSchema, updateCartItemSchema, changeVariantSchema } from "./cart.validation";
 import { UnauthorizedError } from "@/errors"; 
+// 👇 Import Orchestrator Use-case thay vì Service
+import { getCartWithPricing } from "../pricing/use-cases/getCartWithPricing.service";
 
 export const validateItemHandler = async (req: Request, res: Response) => {
   const { productVariantId, quantity } = req.body;
@@ -22,7 +24,8 @@ export const getCartHandler = async (req: Request, res: Response) => {
   const userId = req.user?.id;
   if (!userId) throw new UnauthorizedError("Vui lòng đăng nhập");
 
-  const cart = await cartService.getCart(userId);
+  // 👇 Chuyển sang gọi thẳng Orchestrator
+  const cart = await getCartWithPricing(userId);
   res.json({ data: cart, message: "Lấy giỏ hàng thành công" });
 };
 

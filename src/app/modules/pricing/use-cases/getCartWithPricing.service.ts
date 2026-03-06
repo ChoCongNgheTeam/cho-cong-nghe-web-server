@@ -1,256 +1,145 @@
-import { calculateCartPrice } from "../pricing.service";
-import { PricingProductInput } from "../pricing.types";
+import { getVariantPricing } from "../pricing.service";
+import { mapPricingToSummary } from "../pricing.helpers";
+// 👇 Import data service vào Orchestrator
+import { getCart } from "../../cart/cart.service";
 
 /**
- * Cart Item Input từ database
- */
-export interface CartItemInput {
-  id: string; // cart_item id
-  productId: string;
-  variantId: string;
-  quantity: number;
-  basePrice: number; // Giá gốc từ variant
-
-  // Context for pricing
-  brandId?: string;
-  categoryId?: string;
-  categoryPath?: string[];
-
-  // Product info for display
-  productName?: string;
-  productSlug?: string;
-  variantImage?: string;
-}
-
-/**
- * Cart Summary Response
- */
-export interface CartWithPricingResponse {
-  items: {
-    id: string; // cart_item id
-    productId: string;
-    variantId: string;
-    productName: string;
-    productSlug: string;
-    variantImage?: string;
-    quantity: number;
-
-    // Pricing
-    basePrice: number;
-    finalPrice: number;
-    totalBasePrice: number;
-    totalFinalPrice: number;
-    totalDiscount: number;
-    discountPercentage: number;
-
-    // Promotions
-    appliedPromotions: {
-      id: string;
-      name: string;
-      description: string;
-      discountAmount: number;
-      actionType: string;
-    }[];
-
-    // Gifts
-    gifts?: {
-      variantId: string;
-      quantity: number;
-    }[];
-  }[];
-
-  // Summary
-  subtotal: number;
-  totalPromotionDiscount: number;
-  totalVoucherDiscount: number;
-  totalDiscount: number;
-  finalTotal: number;
-
-  // Applied voucher
-  appliedVoucher?: {
-    id: string;
-    code: string;
-    discountAmount: number;
-    description: string;
-  };
-
-  // Total gifts
-  totalGifts: {
-    variantId: string;
-    quantity: number;
-    productName?: string; // Fetch from DB
-    productImage?: string;
-  }[];
-
-  // Validation
-  isValid: boolean;
-  errors: string[];
-}
-
-/**
- * ===== MAIN USECASE =====
- * Get cart with pricing calculation
- * Dùng cho: Cart page, Mini cart
+ * ===== MAIN USECASE (ORCHESTRATOR) =====
+ * Tính giá giỏ hàng theo ĐÚNG pattern của ProductDetail
  */
 export const getCartWithPricing = async (
-  cartItems: CartItemInput[],
-  userId?: string,
+  userId: string,
   voucherCode?: string,
-): Promise<CartWithPricingResponse> => {
-  // Convert to pricing input format
-  const pricingInput: PricingProductInput[] = cartItems.map((item) => ({
-    productId: item.productId,
-    variantId: item.variantId,
-    basePrice: item.basePrice,
-    quantity: item.quantity,
-    brandId: item.brandId,
-    categoryPath: item.categoryPath,
-  }));
+) => {
+  // 1. LẤY DỮ LIỆU THÔ TỪ CART SERVICE (HƯỚNG 1)
+  const cartItems = await getCart(userId);
 
-  // Calculate pricing (CART MODE)
-  const pricingResult = await calculateCartPrice({
-    items: pricingInput,
-    userId,
-    voucherCode,
-  });
-
-  // Map to response format
-  const items = pricingResult.items.map((pricedItem, index) => {
-    const originalItem = cartItems[index];
-
+  if (cartItems.length === 0) {
     return {
-      id: originalItem.id,
-      productId: pricedItem.productId,
-      variantId: pricedItem.variantId,
-      productName: originalItem.productName || "",
-      productSlug: originalItem.productSlug || "",
-      variantImage: originalItem.variantImage,
-      quantity: pricedItem.quantity,
-
-      // Pricing
-      basePrice: pricedItem.basePrice,
-      finalPrice: pricedItem.finalPrice,
-      totalBasePrice: pricedItem.totalBasePrice,
-      totalFinalPrice: pricedItem.totalFinalPrice,
-      totalDiscount: pricedItem.totalDiscount,
-      discountPercentage: pricedItem.discountPercentage,
-
-      // Promotions
-      appliedPromotions: pricedItem.appliedPromotions.map((p) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        discountAmount: p.discountAmount,
-        actionType: p.actionType?.toString() || "",
-      })),
-
-      // Gifts
-      gifts: pricedItem.giftProducts,
+      items: [],
+      totalItems: 0,
+      totalQuantity: 0,
+      subtotal: 0,
+      totalPromotionDiscount: 0,
+      totalVoucherDiscount: 0,
+      totalDiscount: 0,
+      finalTotal: 0,
+      isValid: true,
+      errors: []
     };
-  });
+  }
+
+  let subtotal = 0;
+  let totalPromotionDiscount = 0;
+  const errors: string[] = [];
+
+  // 2. CHECK GIẢM GIÁ TỪNG ITEM TỪ PRICING LOGIC (HƯỚNG 2)
+  const items = await Promise.all(
+    cartItems.map(async (item) => {
+      // Gọi chung 1 hàm tính giá của hệ thống
+      const fullPricing = await getVariantPricing(
+        item.productId,
+        item.productVariantId,
+        item.unitPrice, 
+        item.brandId,
+        item.categoryPath,
+        userId
+      );
+
+      // Map format chuẩn
+      const priceSummary = mapPricingToSummary(fullPricing);
+      const finalPrice = fullPricing.final ?? fullPricing.base;
+
+      // Tính tổng tiền cho dòng item này
+      const itemTotalBasePrice = item.unitPrice * item.quantity;
+      const itemTotalFinalPrice = finalPrice * item.quantity;
+
+      // Cộng dồn vào tổng giỏ hàng
+      subtotal += itemTotalBasePrice;
+      totalPromotionDiscount += (item.unitPrice - finalPrice) * item.quantity;
+
+      return {
+        ...item, // Gộp lại các trường của CartResponse (id, name, color, storage...)
+        price: priceSummary, // Đè object price
+        totalBasePrice: itemTotalBasePrice,
+        totalFinalPrice: itemTotalFinalPrice,
+      };
+    })
+  );
+
+  let totalVoucherDiscount = 0;
+  let appliedVoucher = undefined;
+  let finalTotal = subtotal - totalPromotionDiscount;
+
+  // 3. TÍCH HỢP VOUCHER
+  // if (voucherCode && finalTotal > 0) {
+  //   const voucherInfo = await checkVoucher(voucherCode, finalTotal, userId);
+  //   if (voucherInfo.isValid) {
+  //     totalVoucherDiscount = voucherInfo.discountAmount;
+  //     finalTotal -= totalVoucherDiscount;
+  //     appliedVoucher = voucherInfo.details;
+  //   } else {
+  //     errors.push("Voucher không hợp lệ hoặc đã hết hạn");
+  //   }
+  // }
 
   return {
     items,
-    subtotal: pricingResult.subtotal,
-    totalPromotionDiscount: pricingResult.totalPromotionDiscount,
-    totalVoucherDiscount: pricingResult.totalVoucherDiscount,
-    totalDiscount: pricingResult.totalDiscount,
-    finalTotal: pricingResult.finalTotal,
-    appliedVoucher: pricingResult.appliedVoucher
-      ? {
-          id: pricingResult.appliedVoucher.id,
-          code: pricingResult.appliedVoucher.name,
-          discountAmount: pricingResult.appliedVoucher.discountAmount,
-          description: pricingResult.appliedVoucher.description,
-        }
-      : undefined,
-    totalGifts: pricingResult.totalGifts.map((gift) => ({
-      variantId: gift.variantId,
-      quantity: gift.quantity,
-      // Note: Fetch product info separately if needed
-    })),
-    isValid: pricingResult.isValid,
-    errors: pricingResult.errors,
+    totalItems: cartItems.length,
+    totalQuantity: cartItems.reduce((sum, item) => sum + item.quantity, 0),
+    subtotal,
+    totalPromotionDiscount,
+    totalVoucherDiscount,
+    totalDiscount: totalPromotionDiscount + totalVoucherDiscount,
+    finalTotal: Math.max(0, finalTotal),
+    appliedVoucher,
+    isValid: errors.length === 0,
+    errors,
   };
 };
 
 /**
- * ===== HELPER USECASE =====
- * Validate cart before checkout
+ * ===== HELPER USECASES =====
  */
 export const validateCartForCheckout = async (
-  cartItems: CartItemInput[],
-  userId?: string,
+  userId: string,
   voucherCode?: string,
-): Promise<{
-  isValid: boolean;
-  errors: string[];
-  warnings: string[];
-}> => {
+) => {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // Check empty cart
-  if (cartItems.length === 0) {
+  const cartWithPricing = await getCartWithPricing(userId, voucherCode);
+
+  if (cartWithPricing.items.length === 0) {
     errors.push("Giỏ hàng trống");
     return { isValid: false, errors, warnings };
   }
 
-  // Check quantity
-  cartItems.forEach((item) => {
+  cartWithPricing.items.forEach((item) => {
     if (item.quantity <= 0) {
       errors.push(`Số lượng không hợp lệ cho sản phẩm ${item.productName}`);
     }
   });
 
-  // Get pricing to validate
-  const cartWithPricing = await getCartWithPricing(cartItems, userId, voucherCode);
+  if (!cartWithPricing.isValid) errors.push(...cartWithPricing.errors);
+  if (cartWithPricing.finalTotal < 0) errors.push("Tổng giá trị đơn hàng không hợp lệ");
 
-  // Collect pricing errors
-  if (!cartWithPricing.isValid) {
-    errors.push(...cartWithPricing.errors);
-  }
-
-  // Check if final total is valid
-  if (cartWithPricing.finalTotal <= 0) {
-    errors.push("Tổng giá trị đơn hàng không hợp lệ");
-  }
-
-  return {
-    isValid: errors.length === 0,
-    errors,
-    warnings,
-  };
+  return { isValid: errors.length === 0, errors, warnings };
 };
 
-/**
- * ===== HELPER USECASE =====
- * Apply voucher to cart
- */
 export const applyVoucherToCart = async (
-  cartItems: CartItemInput[],
+  userId: string,
   voucherCode: string,
-  userId?: string,
-): Promise<{
-  success: boolean;
-  message: string;
-  cart?: CartWithPricingResponse;
-}> => {
+) => {
   try {
-    const cart = await getCartWithPricing(cartItems, userId, voucherCode);
+    const cart = await getCartWithPricing(userId, voucherCode);
 
     if (!cart.isValid && cart.errors.length > 0) {
-      return {
-        success: false,
-        message: cart.errors[0],
-      };
+      return { success: false, message: cart.errors[0] };
     }
 
     if (!cart.appliedVoucher) {
-      return {
-        success: false,
-        message: "Voucher không áp dụng được cho giỏ hàng này",
-      };
+      return { success: false, message: "Voucher không áp dụng được cho giỏ hàng này" };
     }
 
     return {
@@ -259,20 +148,12 @@ export const applyVoucherToCart = async (
       cart,
     };
   } catch (error: any) {
-    return {
-      success: false,
-      message: error.message || "Lỗi khi áp dụng voucher",
-    };
+    return { success: false, message: error.message || "Lỗi khi áp dụng voucher" };
   }
 };
 
-/**
- * ===== HELPER USECASE =====
- * Remove voucher from cart
- */
 export const removeVoucherFromCart = async (
-  cartItems: CartItemInput[],
-  userId?: string,
-): Promise<CartWithPricingResponse> => {
-  return getCartWithPricing(cartItems, userId);
+  userId: string,
+) => {
+  return getCartWithPricing(userId);
 };

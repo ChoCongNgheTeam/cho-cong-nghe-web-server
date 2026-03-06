@@ -9,6 +9,8 @@ tags:
     description: Quản lý dữ liệu địa lý (Tỉnh/Thành phố, Phường/Xã)
   - name: Addresses
     description: Quản lý địa chỉ giao hàng của user
+  - name: Admin - Addresses
+    description: API quản lý địa chỉ dành cho Admin và Staff
 
 paths:
   # ==================== LOCATIONS API ====================
@@ -40,9 +42,11 @@ paths:
           $ref: "#/components/responses/ServerError"
 
     post:
-      summary: Tạo mới Tỉnh/Thành phố (Nên dành cho Admin)
+      summary: Tạo mới Tỉnh/Thành phố (Admin)
       tags:
         - Locations
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -52,21 +56,12 @@ paths:
       responses:
         "201":
           description: Tạo tỉnh/thành phố thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  data:
-                    $ref: "#/components/schemas/Province"
-                  message:
-                    type: string
-                    example: "Tạo tỉnh/thành phố thành công"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/ServerError"
 
@@ -96,7 +91,7 @@ paths:
             type: integer
             minimum: 1
             maximum: 1000
-            default: 1000
+            default: 50
           description: Số lượng items mỗi trang
         - name: q
           in: query
@@ -124,26 +119,17 @@ paths:
                     type: string
                     example: "Lấy danh sách phường/xã thành công"
         "404":
-          description: Tỉnh/Thành phố không tồn tại
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  message:
-                    type: string
-                    example: "Tỉnh/Thành phố không tồn tại"
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/ServerError"
 
   /addresses/locations/wards:
     post:
-      summary: Tạo mới Phường/Xã (Nên dành cho Admin)
+      summary: Tạo mới Phường/Xã (Admin)
       tags:
         - Locations
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -153,29 +139,20 @@ paths:
       responses:
         "201":
           description: Tạo phường/xã thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  data:
-                    $ref: "#/components/schemas/Ward"
-                  message:
-                    type: string
-                    example: "Tạo phường/xã thành công"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/ServerError"
 
-  # ==================== ADDRESSES API ====================
+  # ==================== ADDRESSES API (USER) ====================
   
   /addresses:
     get:
-      summary: Lấy tất cả địa chỉ của user
+      summary: Lấy tất cả địa chỉ của user đang đăng nhập
       tags:
         - Addresses
       security:
@@ -205,7 +182,7 @@ paths:
           $ref: "#/components/responses/Unauthorized"
 
     post:
-      summary: Tạo mới địa chỉ
+      summary: Tạo mới địa chỉ cho user
       tags:
         - Addresses
       security:
@@ -216,17 +193,6 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/CreateAddressInput"
-            examples:
-              example1:
-                summary: Địa chỉ nhà riêng tại Hà Nội
-                value:
-                  contactName: "Nguyễn Văn A"
-                  phone: "0987654321"
-                  provinceId: "550e8400-e29b-41d4-a716-446655440001"
-                  wardId: "550e8400-e29b-41d4-a716-446655440011"
-                  detailAddress: "123 Đường Láng"
-                  type: "HOME"
-                  isDefault: true
       responses:
         "201":
           description: Tạo địa chỉ thành công
@@ -250,7 +216,7 @@ paths:
 
   /addresses/default:
     get:
-      summary: Lấy địa chỉ mặc định
+      summary: Lấy địa chỉ mặc định của user
       tags:
         - Addresses
       security:
@@ -273,23 +239,10 @@ paths:
                     example: "Lấy địa chỉ mặc định thành công"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "404":
-          description: Chưa có địa chỉ mặc định
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  message:
-                    type: string
-                    example: "Chưa có địa chỉ mặc định"
 
   /addresses/{addressId}:
     get:
-      summary: Lấy thông tin một địa chỉ
+      summary: Lấy thông tin một địa chỉ cụ thể
       tags:
         - Addresses
       security:
@@ -309,13 +262,8 @@ paths:
                     example: true
                   data:
                     $ref: "#/components/schemas/AddressResponse"
-                  message:
-                    type: string
-                    example: "Lấy thông tin địa chỉ thành công"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -333,45 +281,18 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/UpdateAddressInput"
-            examples:
-              updateContactInfo:
-                summary: Cập nhật thông tin liên hệ
-                value:
-                  contactName: "Nguyễn Văn B"
-                  phone: "0123456789"
-              updateLocation:
-                summary: Cập nhật địa điểm
-                value:
-                  provinceId: "550e8400-e29b-41d4-a716-446655440002"
-                  wardId: "550e8400-e29b-41d4-a716-446655440022"
-                  detailAddress: "456 Nguyễn Huệ"
       responses:
         "200":
           description: Cập nhật địa chỉ thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  data:
-                    $ref: "#/components/schemas/AddressResponse"
-                  message:
-                    type: string
-                    example: "Cập nhật địa chỉ thành công"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
 
     delete:
-      summary: Xóa địa chỉ
+      summary: Xóa địa chỉ của user (Soft delete ẩn với user)
       tags:
         - Addresses
       security:
@@ -381,33 +302,16 @@ paths:
       responses:
         "200":
           description: Xóa địa chỉ thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  data:
-                    type: object
-                    properties:
-                      message:
-                        type: string
-                        example: "Địa chỉ đã được xóa"
-                  message:
-                    type: string
-                    example: "Xóa địa chỉ thành công"
+        "400":
+          description: Không thể xóa địa chỉ mặc định
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
 
   /addresses/{addressId}/set-default:
     put:
-      summary: Đặt địa chỉ mặc định
+      summary: Đặt địa chỉ làm mặc định
       tags:
         - Addresses
       security:
@@ -417,6 +321,58 @@ paths:
       responses:
         "200":
           description: Đặt địa chỉ mặc định thành công
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ==================== ADMIN & STAFF API ====================
+
+  /addresses/admin/all:
+    get:
+      summary: Lấy danh sách địa chỉ toàn hệ thống (Admin & Staff)
+      tags:
+        - Admin - Addresses
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Tìm kiếm theo tên người nhận hoặc số điện thoại
+        - in: query
+          name: provinceId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: wardId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: includeDeleted
+          schema:
+            type: boolean
+            default: false
+          description: Bao gồm cả địa chỉ đã bị xóa mềm
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: perPage
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Lấy danh sách thành công
           content:
             application/json:
               schema:
@@ -424,12 +380,88 @@ paths:
                 properties:
                   success:
                     type: boolean
-                    example: true
                   data:
-                    $ref: "#/components/schemas/AddressResponse"
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AddressResponse"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
                   message:
                     type: string
-                    example: "Đặt địa chỉ mặc định thành công"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /addresses/admin/{addressId}:
+    delete:
+      summary: Xóa mềm địa chỉ (Admin & Staff)
+      tags:
+        - Admin - Addresses
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/AddressId"
+      responses:
+        "200":
+          description: Xóa mềm thành công
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /addresses/admin/trash/addresses:
+    get:
+      summary: Lấy danh sách địa chỉ đã xóa mềm (Admin Only)
+      tags:
+        - Admin - Addresses
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lấy danh sách thành công
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /addresses/admin/{addressId}/restore:
+    post:
+      summary: Khôi phục địa chỉ từ thùng rác (Admin Only)
+      tags:
+        - Admin - Addresses
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/AddressId"
+      responses:
+        "200":
+          description: Khôi phục thành công
+        "400":
+          description: Địa chỉ chưa bị xóa
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /addresses/admin/{addressId}/permanent:
+    delete:
+      summary: Xóa vĩnh viễn địa chỉ (Admin Only)
+      tags:
+        - Admin - Addresses
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/AddressId"
+      responses:
+        "204":
+          description: Xóa vĩnh viễn thành công
+        "400":
+          description: Phải chuyển vào thùng rác trước khi xóa vĩnh viễn
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -447,23 +479,14 @@ components:
         id:
           type: string
           format: uuid
-          description: ID của tỉnh/thành phố
         code:
           type: string
-          description: Mã tỉnh/thành phố
-          example: "01"
         name:
           type: string
-          description: Tên tỉnh/thành phố
-          example: "Hà Nội"
         fullName:
           type: string
-          description: Tên đầy đủ của tỉnh/thành phố
-          example: "Thành phố Hà Nội"
         type:
           type: string
-          description: Loại (thanh_pho_trung_uong, tinh)
-          example: "thanh_pho_trung_uong"
 
     Ward:
       type: object
@@ -471,27 +494,17 @@ components:
         id:
           type: string
           format: uuid
-          description: ID của phường/xã
         code:
           type: string
-          description: Mã phường/xã
-          example: "00001"
         name:
           type: string
-          description: Tên phường/xã
-          example: "Phúc Xá"
         fullName:
           type: string
-          description: Tên đầy đủ
-          example: "Phường Phúc Xá"
         type:
           type: string
-          description: Loại (phuong, xa, thi_tran)
-          example: "phuong"
         provinceId:
           type: string
           format: uuid
-          description: ID của Tỉnh/Thành phố
 
     CreateProvinceInput:
       type: object
@@ -503,20 +516,12 @@ components:
       properties:
         code:
           type: string
-          description: Mã tỉnh/thành phố
-          example: "01"
         name:
           type: string
-          description: Tên tỉnh/thành phố
-          example: "Hà Nội"
         fullName:
           type: string
-          description: Tên đầy đủ của tỉnh/thành phố
-          example: "Thành phố Hà Nội"
         type:
           type: string
-          description: Loại (thanh_pho_trung_uong, tinh)
-          example: "thanh_pho_trung_uong"
 
     CreateWardInput:
       type: object
@@ -529,25 +534,15 @@ components:
       properties:
         code:
           type: string
-          description: Mã phường/xã
-          example: "00001"
         name:
           type: string
-          description: Tên phường/xã
-          example: "Phúc Xá"
         fullName:
           type: string
-          description: Tên đầy đủ
-          example: "Phường Phúc Xá"
         type:
           type: string
-          description: Loại (phuong, xa, thi_tran)
-          example: "phuong"
         provinceId:
           type: string
           format: uuid
-          description: ID của Tỉnh/Thành phố
-          example: "550e8400-e29b-41d4-a716-446655440001"
 
     AddressResponse:
       type: object
@@ -555,15 +550,10 @@ components:
         id:
           type: string
           format: uuid
-          description: ID duy nhất của địa chỉ
         contactName:
           type: string
-          description: Tên người nhận hàng
-          example: "Nguyễn Văn A"
         phone:
           type: string
-          description: Số điện thoại liên hệ
-          example: "0987654321"
         province:
           type: object
           properties:
@@ -572,10 +562,8 @@ components:
               format: uuid
             name:
               type: string
-              example: "Hà Nội"
             fullName:
               type: string
-              example: "Thành phố Hà Nội"
         ward:
           type: object
           properties:
@@ -584,36 +572,24 @@ components:
               format: uuid
             name:
               type: string
-              example: "Láng Thượng"
             fullName:
               type: string
-              example: "Phường Láng Thượng"
         detailAddress:
           type: string
-          description: Địa chỉ chi tiết (số nhà, đường, tòa nhà...)
-          example: "123 Đường Láng"
         fullAddress:
           type: string
-          description: Địa chỉ đầy đủ (được format tự động)
-          example: "123 Đường Láng, Phường Láng Thượng, Thành phố Hà Nội"
         type:
           type: string
           enum: [HOME, OFFICE, OTHER]
           nullable: true
-          description: Loại địa chỉ
-          example: "HOME"
         isDefault:
           type: boolean
-          description: Đánh dấu địa chỉ mặc định
-          example: true
         createdAt:
           type: string
           format: date-time
-          description: Thời gian tạo địa chỉ
         updatedAt:
           type: string
           format: date-time
-          description: Thời gian cập nhật địa chỉ lần cuối
 
     CreateAddressInput:
       type: object
@@ -628,38 +604,25 @@ components:
           type: string
           minLength: 1
           maxLength: 100
-          description: Tên người nhận hàng
-          example: "Nguyễn Văn A"
         phone:
           type: string
           pattern: '^(\+84|0)[0-9]{9,10}$'
-          description: Số điện thoại liên hệ (format Việt Nam)
-          example: "0987654321"
         provinceId:
           type: string
           format: uuid
-          description: ID của Tỉnh/Thành phố
-          example: "550e8400-e29b-41d4-a716-446655440001"
         wardId:
           type: string
           format: uuid
-          description: ID của Phường/Xã
-          example: "550e8400-e29b-41d4-a716-446655440011"
         detailAddress:
           type: string
           minLength: 1
           maxLength: 500
-          description: Địa chỉ chi tiết (số nhà, tên đường, tòa nhà...)
-          example: "123 Đường Láng"
         type:
           type: string
           enum: [HOME, OFFICE, OTHER]
-          description: Loại địa chỉ
-          example: "HOME"
         isDefault:
           type: boolean
           default: false
-          description: Đặt làm địa chỉ mặc định
 
     UpdateAddressInput:
       type: object
@@ -668,55 +631,37 @@ components:
           type: string
           minLength: 1
           maxLength: 100
-          description: Tên người nhận hàng
-          example: "Nguyễn Văn A"
         phone:
           type: string
           pattern: '^(\+84|0)[0-9]{9,10}$'
-          description: Số điện thoại liên hệ (format Việt Nam)
-          example: "0987654321"
         provinceId:
           type: string
           format: uuid
-          description: ID của Tỉnh/Thành phố
         wardId:
           type: string
           format: uuid
-          description: ID của Phường/Xã
         detailAddress:
           type: string
           minLength: 1
           maxLength: 500
-          description: Địa chỉ chi tiết
-          example: "123 Đường Láng"
         type:
           type: string
           enum: [HOME, OFFICE, OTHER]
           nullable: true
-          description: Loại địa chỉ (có thể để null)
         isDefault:
           type: boolean
-          description: Đặt làm địa chỉ mặc định
 
     PaginationMeta:
       type: object
       properties:
         total:
           type: integer
-          description: Tổng số items
-          example: 500
         page:
           type: integer
-          description: Trang hiện tại
-          example: 1
         perPage:
           type: integer
-          description: Số items mỗi trang
-          example: 1000
         totalPages:
           type: integer
-          description: Tổng số trang
-          example: 1
 
   # ==================== PARAMETERS ====================
   
@@ -728,7 +673,6 @@ components:
       schema:
         type: string
         format: uuid
-      description: ID của địa chỉ
 
   # ==================== RESPONSES ====================
   
@@ -759,7 +703,7 @@ components:
                 example: false
               message:
                 type: string
-                example: "Bạn không có quyền truy cập địa chỉ này"
+                example: "Bạn không có quyền truy cập"
 
     NotFound:
       description: Không tìm thấy
@@ -773,7 +717,7 @@ components:
                 example: false
               message:
                 type: string
-                example: "Địa chỉ không tồn tại"
+                example: "Không tìm thấy dữ liệu"
 
     BadRequest:
       description: Dữ liệu không hợp lệ
@@ -810,4 +754,3 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: "Nhập JWT token (không cần thêm 'Bearer ' ở đầu)"

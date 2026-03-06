@@ -1,22 +1,10 @@
 import prisma from "@/config/db";
 import { CreateAddressInput, UpdateAddressInput } from "./user-address.types";
+import { ListAddressesQuery } from "./user-address.validation";
 
-// ==================== ADDRESS REPOSITORY ====================
-
-const selectAddressSimple = {
-  id: true,
-  userId: true,
-  contactName: true,
-  phone: true,
-  provinceId: true,
-  wardId: true,
-  detailAddress: true,
-  type: true,
-  isDefault: true,
-  createdAt: true,
-  updatedAt: true,
-};
-
+/**
+ * Cấu trúc select đầy đủ bao gồm các quan hệ và metadata xóa mềm
+ */
 const selectAddressWithRelations = {
   id: true,
   userId: true,
@@ -27,349 +15,214 @@ const selectAddressWithRelations = {
   isDefault: true,
   createdAt: true,
   updatedAt: true,
-  province: {
-    select: {
-      id: true,
-      code: true,
-      name: true,
-      fullName: true,
-      type: true,
-    },
+  deletedAt: true, // Quan trọng: Để phục vụ logic thùng rác ở Service
+  province: { 
+    select: { id: true, code: true, name: true, fullName: true, type: true } 
   },
-  ward: {
-    select: {
-      id: true,
-      code: true,
-      name: true,
-      fullName: true,
-      type: true,
-    },
+  ward: { 
+    select: { id: true, code: true, name: true, fullName: true, type: true } 
   },
 };
 
 /**
- * Lấy tất cả địa chỉ của user với province và ward
+ * Lấy tất cả địa chỉ đang hoạt động của một người dùng
  */
 export const findByUserId = async (userId: string) => {
   return prisma.user_addresses.findMany({
-    where: { userId },
+    where: { userId, deletedAt: null },
     select: selectAddressWithRelations,
     orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
   });
 };
 
 /**
- * Lấy một địa chỉ với province và ward
+ * Tìm một địa chỉ theo ID, có tùy chọn bao gồm cả địa chỉ đã xóa (cho Admin)
  */
-export const findById = async (addressId: string) => {
-  return prisma.user_addresses.findUnique({
-    where: { id: addressId },
-    select: selectAddressWithRelations,
-  });
-};
-
-/**
- * Kiểm tra ward có thuộc province không
- */
-export const validateWardProvince = async (wardId: string, provinceId: string) => {
-  const ward = await prisma.wards.findUnique({
-    where: { id: wardId },
-    select: { provinceId: true },
-  });
-
-  if (!ward) {
-    throw new Error("Phường/Xã không tồn tại");
-  }
-
-  if (ward.provinceId !== provinceId) {
-    throw new Error("Phường/Xã không thuộc Tỉnh/Thành phố đã chọn");
-  }
-
-  return true;
-};
-
-/**
- * Tạo mới địa chỉ
- */
-export const create = async (userId: string, data: CreateAddressInput) => {
-  // Validate ward thuộc province
-  await validateWardProvince(data.wardId, data.provinceId);
-
-  // Nếu isDefault = true, set các địa chỉ khác thành false
-  if (data.isDefault) {
-    await prisma.user_addresses.updateMany({
-      where: { userId, isDefault: true },
-      data: { isDefault: false },
-    });
-  }
-
-  return prisma.user_addresses.create({
-    data: {
-      userId,
-      contactName: data.contactName,
-      phone: data.phone,
-      provinceId: data.provinceId,
-      wardId: data.wardId,
-      detailAddress: data.detailAddress,
-      type: data.type || "HOME",
-      isDefault: data.isDefault || false,
+export const findAddressById = async (id: string, userId?: string, includeDeleted = false) => {
+  return prisma.user_addresses.findFirst({
+    where: {
+      id,
+      ...(userId ? { userId } : {}),
+      ...(!includeDeleted ? { deletedAt: null } : {}),
     },
     select: selectAddressWithRelations,
   });
 };
 
 /**
- * Cập nhật địa chỉ
+ * Tìm địa chỉ mặc định hiện tại của người dùng
  */
-export const update = async (
-  addressId: string,
-  userId: string,
-  data: UpdateAddressInput
-) => {
-  // Validate ward thuộc province nếu update
-  if (data.wardId && data.provinceId) {
-    await validateWardProvince(data.wardId, data.provinceId);
-  } else if (data.wardId || data.provinceId) {
-    // Nếu chỉ update 1 trong 2, lấy giá trị còn lại từ DB
-    const currentAddress = await prisma.user_addresses.findUnique({
-      where: { id: addressId },
-      select: { provinceId: true, wardId: true },
-    });
+export const findDefaultAddress = async (userId: string) => {
+  return prisma.user_addresses.findFirst({
+    where: { userId, isDefault: true, deletedAt: null },
+    select: selectAddressWithRelations,
+  });
+};
 
-    if (!currentAddress) {
-      throw new Error("Địa chỉ không tồn tại");
-    }
-
-    const wardIdToCheck = data.wardId || currentAddress.wardId;
-    const provinceIdToCheck = data.provinceId || currentAddress.provinceId;
-    await validateWardProvince(wardIdToCheck, provinceIdToCheck);
-  }
-
-  // Nếu isDefault = true, set các địa chỉ khác thành false
-  if (data.isDefault) {
-    await prisma.user_addresses.updateMany({
-      where: { userId, isDefault: true, id: { not: addressId } },
-      data: { isDefault: false },
-    });
-  }
-
-  return prisma.user_addresses.update({
-    where: { id: addressId },
+/**
+ * Tạo mới địa chỉ - Đã áp dụng CreateAddressInput để fix lỗi import
+ */
+export const createAddress = async (data: CreateAddressInput & { userId: string }) => {
+  return prisma.user_addresses.create({
     data,
     select: selectAddressWithRelations,
   });
 };
 
 /**
- * Xóa địa chỉ
+ * Cập nhật địa chỉ - Đã áp dụng UpdateAddressInput để fix lỗi import
  */
-export const remove = async (addressId: string) => {
-  const address = await prisma.user_addresses.findUnique({
-    where: { id: addressId },
-    select: { isDefault: true, userId: true },
+export const updateAddress = async (id: string, data: UpdateAddressInput) => {
+  return prisma.user_addresses.update({
+    where: { id },
+    data: data as any, // Ép kiểu nhẹ để tương thích với Prisma update input
+    select: selectAddressWithRelations,
   });
-
-  if (!address) {
-    throw new Error("Địa chỉ không tồn tại");
-  }
-
-  await prisma.user_addresses.delete({
-    where: { id: addressId },
-  });
-
-  // Nếu xoá địa chỉ mặc định, set địa chỉ gần đây nhất thành mặc định
-  if (address.isDefault) {
-    const latestAddress = await prisma.user_addresses.findFirst({
-      where: { userId: address.userId },
-      orderBy: { createdAt: "desc" },
-      select: { id: true },
-    });
-
-    if (latestAddress) {
-      await prisma.user_addresses.update({
-        where: { id: latestAddress.id },
-        data: { isDefault: true },
-      });
-    }
-  }
-
-  return { message: "Địa chỉ đã được xóa" };
 };
 
 /**
- * Đặt địa chỉ mặc định
+ * Hủy trạng thái mặc định của tất cả địa chỉ thuộc về người dùng
  */
-export const setDefault = async (addressId: string, userId: string) => {
-  // Set địa chỉ mới là default
-  await prisma.user_addresses.updateMany({
+export const resetDefaultAddress = async (userId: string) => {
+  return prisma.user_addresses.updateMany({
     where: { userId, isDefault: true },
     data: { isDefault: false },
   });
+};
 
+/**
+ * Xóa mềm địa chỉ (Soft Delete)
+ */
+export const softDeleteAddress = async (id: string, deletedBy: string) => {
   return prisma.user_addresses.update({
-    where: { id: addressId },
-    data: { isDefault: true },
-    select: selectAddressWithRelations,
+    where: { id },
+    data: {
+      deletedAt: new Date(),
+      deletedBy,
+      isDefault: false, // Địa chỉ bị xóa thì không được là mặc định
+    },
   });
 };
 
 /**
- * Lấy địa chỉ mặc định
+ * Khôi phục địa chỉ từ thùng rác
  */
-export const findDefaultAddress = async (userId: string) => {
-  return prisma.user_addresses.findFirst({
-    where: { userId, isDefault: true },
-    select: selectAddressWithRelations,
+export const restoreAddress = async (id: string) => {
+  return prisma.user_addresses.update({
+    where: { id },
+    data: { deletedAt: null, deletedBy: null },
   });
 };
 
-// ==================== LOCATION REPOSITORY ====================
+/**
+ * Xóa vĩnh viễn địa chỉ khỏi Database
+ */
+export const hardDeleteAddress = async (id: string) => {
+  return prisma.user_addresses.delete({ where: { id } });
+};
+
+// ==================== ADMIN / STAFF REPOSITORY ====================
 
 /**
- * Lấy tất cả tỉnh/thành phố
+ * Lấy danh sách địa chỉ toàn hệ thống với phân trang và tìm kiếm - Đã áp dụng ListAddressesQuery
  */
+export const findAllAddressesAdmin = async (query: ListAddressesQuery) => {
+  const { search, provinceId, wardId, includeDeleted, page = 1, perPage = 20 } = query;
+  const where: any = {};
+  
+  if (!includeDeleted) where.deletedAt = null;
+  if (provinceId) where.provinceId = provinceId;
+  if (wardId) where.wardId = wardId;
+  if (search) {
+    where.OR = [
+      { contactName: { contains: search, mode: "insensitive" } },
+      { phone: { contains: search } }
+    ];
+  }
+
+  const skip = (page - 1) * perPage;
+  const [data, total] = await Promise.all([
+    prisma.user_addresses.findMany({
+      where,
+      skip,
+      take: perPage,
+      select: selectAddressWithRelations,
+      orderBy: { createdAt: "desc" }
+    }),
+    prisma.user_addresses.count({ where })
+  ]);
+
+  return { data, total, page, perPage };
+};
+
+/**
+ * Lấy danh sách các địa chỉ đang nằm trong thùng rác
+ */
+export const findAllDeletedAddresses = async () => {
+  return prisma.user_addresses.findMany({
+    where: { deletedAt: { not: null } },
+    select: { ...selectAddressWithRelations },
+    orderBy: { deletedAt: "desc" }
+  });
+};
+
+// ==================== LOCATIONS REPOSITORY ====================
+
 export const findAllProvinces = async () => {
   return prisma.provinces.findMany({
-    select: {
-      id: true,
-      code: true,
-      name: true,
-      fullName: true,
-      type: true,
-    },
+    select: { id: true, code: true, name: true, fullName: true, type: true },
     orderBy: { name: "asc" },
   });
 };
 
-/**
- * Lấy province theo ID
- */
 export const findProvinceById = async (provinceId: string) => {
   return prisma.provinces.findUnique({
     where: { id: provinceId },
-    select: {
-      id: true,
-      code: true,
-      name: true,
-      fullName: true,
-      type: true,
-    },
+    select: { id: true, code: true, name: true, fullName: true, type: true },
   });
 };
 
 /**
- * Lấy wards theo province với pagination và search
+ * Lấy danh sách Phường/Xã theo tỉnh, sắp xếp gom nhóm theo loại (Phường trước, Xã sau)
  */
-export const findWardsByProvince = async (
-  provinceId: string,
-  page: number = 1,
-  perPage: number = 50,
-  search?: string
-) => {
+export const findWardsByProvince = async (provinceId: string, page: number, perPage: number, search?: string) => {
   const skip = (page - 1) * perPage;
-
-  const where = {
-    provinceId,
-    ...(search && {
-      name: {
-        contains: search,
-        mode: "insensitive" as const,
-      },
-    }),
-  };
+  const where: any = { provinceId };
+  if (search) where.name = { contains: search, mode: "insensitive" };
 
   const [wards, total] = await Promise.all([
     prisma.wards.findMany({
       where,
-      select: {
-        id: true,
-        code: true,
-        name: true,
-        fullName: true,
-        type: true,
-      },
+      select: { id: true, code: true, name: true, fullName: true, type: true },
       skip,
       take: perPage,
-      orderBy: { name: "asc" },
+      orderBy: [
+        { type: "asc" }, // Gom nhóm Phường/Thị trấn lên trước Xã
+        { name: "asc" }  // Sắp xếp A-Z theo tên bên trong mỗi nhóm
+      ],
     }),
     prisma.wards.count({ where }),
   ]);
 
-  return {
-    data: wards,
-    meta: {
-      total,
-      page,
-      perPage,
-      totalPages: Math.ceil(total / perPage),
-    },
+  return { 
+    data: wards, 
+    meta: { 
+      total, 
+      page, 
+      perPage, 
+      totalPages: Math.ceil(total / perPage) 
+    } 
   };
 };
 
-/**
- * Lấy ward theo ID
- */
 export const findWardById = async (wardId: string) => {
   return prisma.wards.findUnique({
     where: { id: wardId },
-    select: {
-      id: true,
-      code: true,
-      name: true,
-      fullName: true,
-      type: true,
-      provinceId: true,
-    },
+    select: { id: true, code: true, name: true, fullName: true, type: true, provinceId: true },
   });
 };
 
-/**
- * Kiểm tra province code có tồn tại chưa
- */
-export const findProvinceByCode = async (code: string) => {
-  return prisma.provinces.findUnique({
-    where: { code },
-  });
-};
-
-/**
- * Tạo mới Province
- */
-export const createProvince = async (data: any) => {
-  return prisma.provinces.create({
-    data,
-    select: {
-      id: true,
-      code: true,
-      name: true,
-      fullName: true,
-      type: true,
-    },
-  });
-};
-
-/**
- * Kiểm tra ward code có tồn tại chưa
- */
-export const findWardByCode = async (code: string) => {
-  return prisma.wards.findUnique({
-    where: { code },
-  });
-};
-
-/**
- * Tạo mới Ward
- */
-export const createWard = async (data: any) => {
-  return prisma.wards.create({
-    data,
-    select: {
-      id: true,
-      code: true,
-      name: true,
-      fullName: true,
-      type: true,
-      provinceId: true,
-    },
-  });
-};
+export const findProvinceByCode = async (code: string) => prisma.provinces.findUnique({ where: { code } });
+export const createProvince = async (data: any) => prisma.provinces.create({ data });
+export const findWardByCode = async (code: string) => prisma.wards.findUnique({ where: { code } });
+export const createWard = async (data: any) => prisma.wards.create({ data });
