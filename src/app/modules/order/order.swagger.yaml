@@ -21,51 +21,8 @@ paths:
                       $ref: "#/components/schemas/OrderDetail"
                   message:
                     type: string
-              example:
-                data:
-                  - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                    orderCode: "CCN-260227-X4K9P"
-                    subtotalAmount: "1500000.00"
-                    shippingFee: "20000.00"
-                    voucherDiscount: "100000.00"
-                    totalAmount: "1420000.00"
-                    orderStatus: "PENDING"
-                    paymentStatus: "UNPAID"
-                    orderDate: "2026-02-27T10:00:00.000Z"
-                    updatedAt: "2026-02-27T10:00:00.000Z"
-                    user:
-                      id: "user-uuid-123"
-                      fullName: "Nguyễn Văn A"
-                      email: "nguyenvana@example.com"
-                      phone: "0901234567"
-                    paymentMethod:
-                      id: "pm-uuid-001"
-                      name: "Thanh toán khi nhận hàng (COD)"
-                      description: "Khách hàng thanh toán bằng tiền mặt khi nhận hàng"
-                    shippingAddress:
-                      contactName: "Nguyễn Văn A"
-                      phone: "0901234567"
-                      detailAddress: "123 Đường ABC"
-                      provinceId: "01"
-                      districtId: "001"
-                      wardId: "00001"
-                    orderItems:
-                      - quantity: 1
-                        unitPrice: "1500000.00"
-                        productVariant:
-                          code: "IPHONE16-PRO-BLACK"
-                          price: "1500000.00"
-                          product:
-                            name: "iPhone 16 Pro"
-                            slug: "iphone-16-pro"
-                          variantAttributes:
-                            - attributeOption:
-                                value: "Đen"
-                                attribute:
-                                  name: "Màu sắc"
-                          images:
-                            - imageUrl: "https://example.com/iphone16-black.jpg"
-                message: "Lấy danh sách đơn hàng thành công"
+                  total:
+                    type: integer
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "500":
@@ -73,19 +30,18 @@ paths:
 
   /orders/my/{id}:
     get:
-      summary: Lấy chi tiết một đơn hàng của người dùng
+      summary: Xem chi tiết đơn hàng (Của chính user)
       tags: [Orders - Public]
       security:
         - bearerAuth: []
       parameters:
         - in: path
           name: id
+          required: true
           schema:
             type: string
             format: uuid
-          required: true
           description: ID của đơn hàng
-      description: Lấy chi tiết đơn hàng, chỉ cho phép xem đơn hàng thuộc về chính user đó
       responses:
         "200":
           description: Lấy chi tiết đơn hàng thành công
@@ -98,62 +54,60 @@ paths:
                     $ref: "#/components/schemas/OrderDetail"
                   message:
                     type: string
-              example:
-                data:
-                  id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                  orderCode: "CCN-260227-X4K9P"
-                  subtotalAmount: "1500000.00"
-                  shippingFee: "20000.00"
-                  voucherDiscount: "100000.00"
-                  totalAmount: "1420000.00"
-                  orderStatus: "PENDING"
-                  paymentStatus: "UNPAID"
-                  orderDate: "2026-02-27T10:00:00.000Z"
-                  updatedAt: "2026-02-27T10:00:00.000Z"
-                  voucher:
-                    code: "GIAM100K"
-                    description: "Giảm 100k cho đơn từ 1 triệu"
-                  orderItems:
-                    - quantity: 1
-                      unitPrice: "1500000.00"
-                      productVariant:
-                        code: "IPHONE16-PRO-BLACK"
-                        price: "1500000.00"
-                        product:
-                          name: "iPhone 16 Pro"
-                          slug: "iphone-16-pro"
-                message: "Lấy chi tiết đơn hàng thành công"
         "400":
-          description: Không có quyền xem đơn hàng này
-        "404":
-          $ref: "#/components/responses/NotFoundError"
+          description: Bạn không có quyền xem đơn hàng này
         "401":
           $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          description: Không tìm thấy đơn hàng
         "500":
           $ref: "#/components/responses/ServerError"
 
   # ==================== ADMIN ENDPOINTS ====================
+  /orders/admin:
+    post:
+      summary: Tạo đơn hàng hộ (Admin only)
+      tags: [Orders - Admin]
+      security:
+        - bearerAuth: []
+      description: Admin tạo đơn hàng trực tiếp cho khách hàng. Hỗ trợ cả khách đã có tài khoản (gửi userId) và khách mới (gửi customerInfo để tự động tạo user).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderAdminRequest"
+      responses:
+        "201":
+          description: Tạo đơn hàng thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrderDetail"
+                  message:
+                    type: string
+        "400":
+          description: Thiếu thông tin, tồn kho không đủ hoặc sai mã voucher
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
   /orders/admin/all:
     get:
       summary: Lấy tất cả đơn hàng (Admin only)
       tags: [Orders - Admin]
       security:
         - bearerAuth: []
-      parameters:
-        - in: query
-          name: page
-          schema:
-            type: integer
-            default: 1
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 20
-      description: Lấy danh sách tất cả đơn hàng (có phân trang nếu cần mở rộng sau), sắp xếp theo ngày đặt mới nhất
+      description: Quản trị viên lấy danh sách toàn bộ hệ thống đơn hàng
       responses:
         "200":
-          description: Lấy danh sách đơn hàng thành công
+          description: Lấy tất cả đơn hàng thành công
           content:
             application/json:
               schema:
@@ -165,13 +119,8 @@ paths:
                       $ref: "#/components/schemas/OrderDetail"
                   total:
                     type: integer
-                    description: Tổng số đơn hàng (nếu có phân trang)
                   message:
                     type: string
-              example:
-                data: [{ ... }]
-                total: 158
-                message: "Lấy tất cả đơn hàng thành công"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
@@ -181,21 +130,20 @@ paths:
 
   /orders/admin/{id}:
     get:
-      summary: Lấy chi tiết đơn hàng (Admin)
+      summary: Xem chi tiết đơn hàng bất kỳ (Admin only)
       tags: [Orders - Admin]
       security:
         - bearerAuth: []
       parameters:
         - in: path
           name: id
+          required: true
           schema:
             type: string
             format: uuid
-          required: true
-      description: Admin xem chi tiết bất kỳ đơn hàng nào
       responses:
         "200":
-          description: Lấy chi tiết đơn hàng thành công
+          description: Thành công
           content:
             application/json:
               schema:
@@ -206,36 +154,29 @@ paths:
                   message:
                     type: string
         "404":
-          $ref: "#/components/responses/NotFoundError"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "403":
-          $ref: "#/components/responses/ForbiddenError"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
+          description: Không tìm thấy
+    
     patch:
-      summary: Cập nhật đơn hàng (Admin)
+      summary: Cập nhật trạng thái đơn hàng (Admin only)
       tags: [Orders - Admin]
       security:
         - bearerAuth: []
       parameters:
         - in: path
           name: id
+          required: true
           schema:
             type: string
             format: uuid
-          required: true
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/UpdateOrderAdminRequest"
-      description: Admin có thể cập nhật trạng thái đơn hàng, trạng thái thanh toán...
       responses:
         "200":
-          description: Cập nhật đơn hàng thành công
+          description: Cập nhật thành công
           content:
             application/json:
               schema:
@@ -245,67 +186,158 @@ paths:
                     $ref: "#/components/schemas/OrderDetail"
                   message:
                     type: string
-              example:
-                message: "Cập nhật đơn hàng thành công"
         "400":
-          description: Dữ liệu đầu vào không hợp lệ
+          description: Lỗi validation
         "404":
-          $ref: "#/components/responses/NotFoundError"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "403":
-          $ref: "#/components/responses/ForbiddenError"
-        "500":
-          $ref: "#/components/responses/ServerError"
+          description: Không tìm thấy đơn hàng
 
     delete:
-      summary: Xóa đơn hàng (Admin)
+      summary: Xóa đơn hàng và hoàn lại tồn kho (Admin only)
       tags: [Orders - Admin]
       security:
         - bearerAuth: []
       parameters:
         - in: path
           name: id
+          required: true
           schema:
             type: string
             format: uuid
-          required: true
-      description: Xóa đơn hàng và hoàn lại tồn kho (nếu đơn chưa giao)
       responses:
         "200":
-          description: Xóa đơn hàng thành công
+          description: Xóa thành công
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  success:
+                    type: boolean
                   message:
                     type: string
-              example:
-                message: "Xóa đơn hàng thành công"
         "404":
-          $ref: "#/components/responses/NotFoundError"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "403":
-          $ref: "#/components/responses/ForbiddenError"
-        "500":
-          $ref: "#/components/responses/ServerError"
+          description: Không tìm thấy đơn hàng
 
 components:
   schemas:
+    CreateOrderAdminRequest:
+      type: object
+      required:
+        - items
+        - paymentMethodId
+        - paymentStatus
+        - orderStatus
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: "ID khách cũ (Tùy chọn nếu dùng customerInfo)"
+        shippingAddressId:
+          type: string
+          format: uuid
+          description: "ID địa chỉ cũ (Tùy chọn nếu dùng newAddress)"
+        customerInfo:
+          type: object
+          description: "Thông tin khách vãng lai (Bắt buộc nếu không truyền userId)"
+          properties:
+            fullName:
+              type: string
+            phone:
+              type: string
+            email:
+              type: string
+        newAddress:
+          type: object
+          description: "Địa chỉ mới của khách vãng lai (Bắt buộc nếu không truyền shippingAddressId)"
+          properties:
+            provinceId:
+              type: string
+              format: uuid
+            wardId:
+              type: string
+              format: uuid
+            detailAddress:
+              type: string
+        items:
+          type: array
+          items:
+            type: object
+            required:
+              - productVariantId
+              - quantity
+              - unitPrice
+            properties:
+              productVariantId:
+                type: string
+                format: uuid
+              quantity:
+                type: integer
+              unitPrice:
+                type: number
+        voucherCode:
+          type: string
+          description: "Mã giảm giá (Tùy chọn)"
+        shippingFee:
+          type: number
+          default: 0
+        paymentMethodId:
+          type: string
+          format: uuid
+        paymentStatus:
+          type: string
+          enum: [UNPAID, PAID, REFUNDED]
+        orderStatus:
+          type: string
+          enum: [PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED]
+
+    UpdateOrderAdminRequest:
+      type: object
+      properties:
+        orderStatus:
+          type: string
+          enum: [PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED]
+        paymentStatus:
+          type: string
+          enum: [UNPAID, PAID, REFUNDED]
+        shippingFee:
+          type: number
+        voucherDiscount:
+          type: number
+
     OrderDetail:
       type: object
       properties:
         id:
           type: string
           format: uuid
-        orderCode:           
-          type: string      
-          description: "Mã đơn hàng hiển thị cho khách"
+        orderCode:
+          type: string
+        userId:
+          type: string
+          format: uuid
+        paymentMethodId:
+          type: string
+          format: uuid
+        voucherId:
+          type: string
+          format: uuid
+          nullable: true
+        shippingAddressId:
+          type: string
+          format: uuid
+          nullable: true
+        shippingContactName:
+          type: string
+        shippingPhone:
+          type: string
+        shippingProvince:
+          type: string
+        shippingWard:
+          type: string
+        shippingDetail:
+          type: string
         subtotalAmount:
           type: string
-          description: "Tổng tiền sản phẩm (decimal string)"
         shippingFee:
           type: string
         voucherDiscount:
@@ -314,7 +346,7 @@ components:
           type: string
         orderStatus:
           type: string
-          enum: [PENDING, PROCESSING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED, RETURNED]
+          enum: [PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED]
         paymentStatus:
           type: string
           enum: [UNPAID, PAID, REFUNDED]
@@ -354,21 +386,6 @@ components:
               type: string
             description:
               type: string
-        shippingAddress:
-          type: object
-          properties:
-            contactName:
-              type: string
-            phone:
-              type: string
-            detailAddress:
-              type: string
-            provinceId:
-              type: string
-            districtId:
-              type: string
-            wardId:
-              type: string
         orderItems:
           type: array
           items:
@@ -376,6 +393,7 @@ components:
             properties:
               id:
                 type: string
+                format: uuid
               quantity:
                 type: integer
               unitPrice:
@@ -398,6 +416,15 @@ components:
                         type: string
                       slug:
                         type: string
+                      img:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            imageUrl:
+                              type: string
+                            color:
+                              type: string
                   variantAttributes:
                     type: array
                     items:
@@ -413,27 +440,14 @@ components:
                               properties:
                                 name:
                                   type: string
-                  images:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        imageUrl:
-                          type: string
 
-    UpdateOrderAdminRequest:
-      type: object
-      properties:
-        orderStatus:
-          type: string
-          enum: [PENDING, PROCESSING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED, RETURNED]
-        paymentStatus:
-          type: string
-          enum: [UNPAID, PAID, REFUNDED]
-        shippingFee:
-          type: number
-        voucherDiscount:
-          type: number
+  responses:
+    UnauthorizedError:
+      description: Báo lỗi khi thiếu token hoặc token không hợp lệ
+    ForbiddenError:
+      description: Báo lỗi khi user không đủ quyền truy cập (vd không phải Admin)
+    ServerError:
+      description: Báo lỗi nội bộ từ server
 
   securitySchemes:
     bearerAuth:

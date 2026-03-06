@@ -3,142 +3,164 @@ import { CheckoutInput, CartValidationResult, CartItemValidation, CheckoutSummar
 import { BadRequestError, NotFoundError } from "@/errors";
 import { handlePrismaError } from "@/utils/handle-prisma-error";
 import { nanoid } from "nanoid";
+import { getCartWithPricing } from "../pricing/use-cases/getCartWithPricing.service";
 
-// Cart validation
+// =======================================================
+// 1. Cart validation (ĐÃ SỬA ĐỂ GHI NHẬN GIÁ PROMOTION)
+// =======================================================
 
 export const validateCartItems = async (userId: string): Promise<CartValidationResult> => {
-  const cartItems = await repo.findCartItemsWithProduct(userId).catch(handlePrismaError);
+  // Gọi hàm tính giá chung từ module Pricing thay vì gọi trực tiếp DB
+  const cartPricing = await getCartWithPricing(userId);
 
-  if (cartItems.length === 0) {
+  if (cartPricing.items.length === 0) {
     return {
       isValid: false,
       totalItems: 0,
       totalQuantity: 0,
       items: [],
-      errors: ["Cart is empty, please add products"],
+      errors: ["Giỏ hàng trống, vui lòng thêm sản phẩm"],
     };
   }
 
   const errors: string[] = [];
   const validatedItems: CartItemValidation[] = [];
-  let totalQuantity = 0;
 
-  for (const item of cartItems) {
-    const { productVariant, quantity } = item;
-    const itemErrors: string[] = [];
+  if (!cartPricing.isValid && cartPricing.errors) {
+    errors.push(...cartPricing.errors);
+  }
 
-    if (!productVariant) {
-      itemErrors.push("Product does not exist");
-    } else {
-      const { product, quantity: availableQuantity, isActive } = productVariant;
-
-      if (!isActive) itemErrors.push(`${product.name} (variant) is no longer available`);
-      if (!product.isActive) itemErrors.push(`${product.name} is no longer available`);
-      if (availableQuantity < quantity) itemErrors.push(`${product.name} only has ${availableQuantity} items available (you requested ${quantity})`);
-
-      if (itemErrors.length === 0) totalQuantity += quantity;
-    }
+  for (const item of cartPricing.items) {
+    // 🔥 LẤY GIÁ ĐÃ GIẢM TỪ PROMOTION
+    // Công thức: Dùng giá final nếu có, hoặc dùng (Tổng giá cuối / số lượng) cho an toàn tuyệt đối
+    const finalUnitPrice = item.price?.hasPromotion && item.price?.final 
+      ? item.price.final 
+      : (item.totalFinalPrice ? item.totalFinalPrice / item.quantity : item.unitPrice);
 
     validatedItems.push({
-      productVariantId: item.productVariantId,
-      quantity,
-      unitPrice: item.unitPrice,
-      isValid: itemErrors.length === 0,
-      errors: itemErrors,
-      productName: productVariant?.product?.name,
-      variantCode: productVariant?.code || undefined,
+      productVariantId: item.productVariantId as string,
+      quantity: item.quantity,
+      unitPrice: finalUnitPrice, // 🔥 Ghi nhận giá đã giảm vào đây để lưu xuống Bảng Order Items
+      isValid: true, 
+      errors: [],
+      productName: item.productName,
+      variantCode: item.variantCode,
     });
-
-    if (itemErrors.length > 0) errors.push(...itemErrors);
   }
 
   return {
-    isValid: validatedItems.every((item) => item.isValid),
-    totalItems: cartItems.length,
-    totalQuantity,
+    isValid: errors.length === 0,
+    totalItems: cartPricing.totalItems,
+    totalQuantity: cartPricing.totalQuantity,
     items: validatedItems,
     errors,
   };
 };
 
-// Pricing calculations
+// =======================================================
+// 2. Tính phí vận chuyển
+// =======================================================
+export const calculateShippingFee = async (subtotal: number, addressId: string): Promise<number> => {
+  const address = await repo.findAddressWithProvince(addressId).catch(handlePrismaError);
+  if (!address) throw new NotFoundError("Địa chỉ giao hàng");
 
-const SHIPPING_FREE_THRESHOLD = 500_000;
-const SHIPPING_DEFAULT_FEE = 1_000; // đổi lại 30_000 khi production
-const VAT_RATE = 0.1;
+  // Freeship cho đơn từ 5tr
+  if (subtotal >= 5000000) return 0;
 
-export const calculateShippingFee = async (subtotal: number, shippingAddressId: string): Promise<number> => {
-  if (subtotal >= SHIPPING_FREE_THRESHOLD) return 0;
-
-  const address = await repo.findAddressWithProvince(shippingAddressId).catch(handlePrismaError);
-  if (!address) return SHIPPING_DEFAULT_FEE;
-
-  // Mở rộng: map theo province nếu cần
-  const provinceFees: Record<string, number> = {};
-  return provinceFees[address.provinceId ?? ""] ?? SHIPPING_DEFAULT_FEE;
+  // Phí ship: HCM 30k, tỉnh khác 50k
+  return address.province.name.includes("Hồ Chí Minh") ? 30000 : 50000;
 };
 
+// =======================================================
+// 3. Tính Voucher
+// =======================================================
+export const validateAndApplyVoucher = async (
+  voucherId: string | undefined,
+  subtotal: number,
+  userId: string
+): Promise<{ discount: number; id: string | null }> => {
+  if (!voucherId) return { discount: 0, id: null };
+
+  const voucher = await repo.findVoucherWithUser(voucherId, userId).catch(handlePrismaError);
+
+  if (!voucher) throw new NotFoundError("Mã khuyến mãi");
+
+  const now = new Date();
+  if (!voucher.isActive || (voucher.startDate && now < voucher.startDate) || (voucher.endDate && now > voucher.endDate)) {
+    throw new BadRequestError("Voucher đã hết hạn hoặc không khả dụng");
+  }
+
+  if (voucher.maxUses && voucher.usesCount >= voucher.maxUses) {
+    throw new BadRequestError("Voucher đã hết lượt sử dụng trên hệ thống");
+  }
+
+  if (Number(voucher.minOrderValue) > subtotal) {
+    throw new BadRequestError(`Đơn hàng chưa đạt giá trị tối thiểu ${Number(voucher.minOrderValue).toLocaleString()}đ để áp dụng voucher này`);
+  }
+
+  const userUsage = voucher.voucherUsers[0];
+  if (userUsage && voucher.maxUsesPerUser && userUsage.usedCount >= voucher.maxUsesPerUser) {
+    throw new BadRequestError("Bạn đã hết lượt sử dụng mã khuyến mãi này");
+  }
+
+  let discount = 0;
+  if (voucher.discountType === "DISCOUNT_FIXED") {
+    discount = Number(voucher.discountValue);
+  } else if (voucher.discountType === "DISCOUNT_PERCENT") {
+    discount = Math.floor((subtotal * Number(voucher.discountValue)) / 100);
+    if (voucher.maxDiscountValue) discount = Math.min(discount, Number(voucher.maxDiscountValue));
+  }
+
+  // Không giảm quá giá trị đơn hàng
+  discount = Math.min(discount, subtotal);
+
+  return { discount, id: voucher.id };
+};
+
+// =======================================================
+// 4. Tính Thuế
+// =======================================================
+const VAT_RATE = 0.1;
 export const calculateTax = (subtotal: number, shippingFee: number, voucherDiscount: number): number => {
   const taxableAmount = subtotal + shippingFee - voucherDiscount;
   return Math.round(Math.max(taxableAmount, 0) * VAT_RATE);
 };
 
-// Voucher
-
-export const validateAndApplyVoucher = async (voucherId: string | undefined, subtotal: number, userId: string): Promise<{ discount: number; voucherData: any | null }> => {
-  if (!voucherId) return { discount: 0, voucherData: null };
-
-  const voucher = await repo.findVoucherWithUser(voucherId, userId).catch(handlePrismaError);
-  if (!voucher) throw new NotFoundError("Voucher");
-  if (!voucher.isActive) throw new BadRequestError("Voucher is no longer active");
-
-  const now = new Date();
-  if (voucher.startDate && voucher.startDate > now) throw new BadRequestError("Voucher is not yet valid");
-  if (voucher.endDate && voucher.endDate < now) throw new BadRequestError("Voucher has expired");
-  if (voucher.maxUses && voucher.usesCount >= voucher.maxUses) throw new BadRequestError("Voucher has reached maximum usage limit");
-  if (subtotal < Number(voucher.minOrderValue)) throw new BadRequestError(`Minimum order value is ${Number(voucher.minOrderValue).toLocaleString()} VND to use this voucher`);
-
-  const usersCount = await repo.findVoucherUsersCount(voucherId);
-  if (usersCount > 0) {
-    const userVoucher = voucher.voucherUsers[0];
-    if (!userVoucher) throw new BadRequestError("You are not allowed to use this voucher");
-    if (userVoucher.usedCount >= userVoucher.maxUses) throw new BadRequestError("You have reached the maximum usage limit for this voucher");
-  }
-
-  const discount = voucher.discountType === "DISCOUNT_PERCENT" ? (subtotal * Number(voucher.discountValue)) / 100 : Number(voucher.discountValue);
-
-  return { discount: Math.min(discount, subtotal), voucherData: voucher };
-};
-
-// Prepare checkout summary
-// FIX: cartItems chỉ query 1 lần duy nhất
-
+// =======================================================
+// 5. Chuẩn bị dữ liệu Checkout (Gom tất cả lại)
+// =======================================================
 export const prepareCheckoutData = async (userId: string, input: CheckoutInput): Promise<CheckoutSummary> => {
   const { paymentMethodId, shippingAddressId, voucherId } = input;
 
-  // Validate cart (1 lần query)
-  const cartValidation = await validateCartItems(userId);
-  if (!cartValidation.isValid) throw new BadRequestError(`Invalid cart: ${cartValidation.errors.join(", ")}`);
+  const [validation, paymentMethod] = await Promise.all([
+    validateCartItems(userId),
+    repo.findPaymentMethodById(paymentMethodId).catch(handlePrismaError),
+  ]);
 
-  // Validate payment method & address (parallel)
-  const [paymentMethod, shippingAddress] = await Promise.all([repo.findPaymentMethodById(paymentMethodId), repo.findAddressById(shippingAddressId)]);
-  if (!paymentMethod) throw new NotFoundError("Payment method");
-  if (!shippingAddress || shippingAddress.userId !== userId) throw new NotFoundError("Shipping address");
+  if (!validation.isValid) {
+    throw new BadRequestError(`Giỏ hàng không hợp lệ: ${validation.errors.join(", ")}`);
+  }
 
-  // Build items từ validated cart (không query lại)
-  const items = cartValidation.items.map((item) => ({
+  if (!paymentMethod) {
+    throw new NotFoundError("Phương thức thanh toán");
+  }
+
+  const items = validation.items.map((item) => ({
     productVariantId: item.productVariantId,
     quantity: item.quantity,
-    unitPrice: Number(item.unitPrice),
+    unitPrice: Number(item.unitPrice), // 🔥 Tại đây nó sẽ bốc đúng cái giá Promotion đã được gán ở hàm validateCartItems
     subtotal: Number(item.unitPrice) * item.quantity,
-    productName: item.productName ?? "",
+    productName: item.productName || "Unknown Product",
     variantCode: item.variantCode ?? null,
   }));
 
   const subtotalAmount = items.reduce((sum, i) => sum + i.subtotal, 0);
 
   // Parallel: shipping fee + voucher
-  const [shippingFee, { discount: voucherDiscount }] = await Promise.all([calculateShippingFee(subtotalAmount, shippingAddressId), validateAndApplyVoucher(voucherId, subtotalAmount, userId)]);
+  const [shippingFee, { discount: voucherDiscount }] = await Promise.all([
+    calculateShippingFee(subtotalAmount, shippingAddressId), 
+    validateAndApplyVoucher(voucherId, subtotalAmount, userId)
+  ]);
 
   const taxAmount = calculateTax(subtotalAmount, shippingFee, voucherDiscount);
   const totalAmount = subtotalAmount + shippingFee - voucherDiscount + taxAmount;
@@ -161,10 +183,12 @@ export const prepareCheckoutData = async (userId: string, input: CheckoutInput):
   };
 };
 
-// Order actions
-
+// =======================================================
+// 6. DB Transactions
+// =======================================================
 export const createOrderFromCheckout = async (userId: string, checkoutSummary: CheckoutSummary) => {
   try {
+    // Gọi sang hàm lưu Database của Checkout Repository (Đã có Address Snapshot)
     return await repo.executeOrderTransaction(userId, checkoutSummary);
   } catch (error: any) {
     throw new BadRequestError(`Order creation failed: ${error.message}`);
@@ -172,9 +196,9 @@ export const createOrderFromCheckout = async (userId: string, checkoutSummary: C
 };
 
 export const releaseOrderInventory = async (orderId: string) => {
-  return repo.cancelOrderAndRestoreInventory(orderId);
-};
-
-export const confirmOrderAndReduceStock = async (orderId: string) => {
-  return repo.updateOrderStatus(orderId, "PROCESSING");
+  try {
+    await repo.cancelOrderAndRestoreInventory(orderId);
+  } catch (error: any) {
+    throw new BadRequestError(`Failed to restore inventory: ${error.message}`);
+  }
 };
