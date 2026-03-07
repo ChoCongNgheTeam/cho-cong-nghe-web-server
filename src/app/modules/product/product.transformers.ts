@@ -157,7 +157,6 @@ export const transformProductCard = (product: any): ProductCard => {
     })),
     inStock,
     isActive: product.isActive,
-    isFeatured: product.isFeatured,
   };
 };
 

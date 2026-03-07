@@ -1,6 +1,54 @@
 import prisma from "@/config/db";
 import { WishlistItem } from "./wishlist.types";
 
+const productVariantSelect = {
+  id: true,
+  productId: true,
+  code: true,
+  price: true,
+  soldCount: true,
+  isDefault: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+  product: {
+    select: {
+      id: true,
+      brandId: true,
+      name: true,
+      description: true,
+      slug: true,
+      viewsCount: true,
+      ratingAverage: true,
+      ratingCount: true,
+      isActive: true,
+      isFeatured: true,
+      createdAt: true,
+      updatedAt: true,
+      brand: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          imageUrl: true,
+        },
+      },
+      img: {
+        select: {
+          id: true,
+          color: true,
+          imageUrl: true,
+          altText: true,
+          position: true,
+        },
+        orderBy: {
+          position: "asc" as const,
+        },
+      },
+    },
+  },
+};
+
 // Get user's wishlist with product variant details
 export const getWishlistByUserId = async (userId: string): Promise<WishlistItem[]> => {
   return prisma.wishlist.findMany({
@@ -13,53 +61,7 @@ export const getWishlistByUserId = async (userId: string): Promise<WishlistItem[
       productVariantId: true,
       createdAt: true,
       productVariant: {
-        select: {
-          id: true,
-          productId: true,
-          code: true,
-          price: true,
-          soldCount: true,
-          weight: true,
-          isDefault: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
-          product: {
-            select: {
-              id: true,
-              brandId: true,
-              name: true,
-              description: true,
-              slug: true,
-              viewsCount: true,
-              ratingAverage: true,
-              ratingCount: true,
-              isActive: true,
-              isFeatured: true,
-              createdAt: true,
-              updatedAt: true,
-              brand: {
-                select: {
-                  id: true,
-                  name: true,
-                  slug: true,
-                  brandImage: true,
-                },
-              },
-            },
-          },
-          images: {
-            select: {
-              id: true,
-              imageUrl: true,
-              altText: true,
-              position: true,
-            },
-            orderBy: {
-              position: "asc",
-            },
-          },
-        },
+        select: productVariantSelect,
       },
     },
     orderBy: {
@@ -81,53 +83,7 @@ export const addToWishlist = async (userId: string, productVariantId: string): P
       productVariantId: true,
       createdAt: true,
       productVariant: {
-        select: {
-          id: true,
-          productId: true,
-          code: true,
-          price: true,
-          soldCount: true,
-          weight: true,
-          isDefault: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
-          product: {
-            select: {
-              id: true,
-              brandId: true,
-              name: true,
-              description: true,
-              slug: true,
-              viewsCount: true,
-              ratingAverage: true,
-              ratingCount: true,
-              isActive: true,
-              isFeatured: true,
-              createdAt: true,
-              updatedAt: true,
-              brand: {
-                select: {
-                  id: true,
-                  name: true,
-                  slug: true,
-                  brandImage: true,
-                },
-              },
-            },
-          },
-          images: {
-            select: {
-              id: true,
-              imageUrl: true,
-              altText: true,
-              position: true,
-            },
-            orderBy: {
-              position: "asc",
-            },
-          },
-        },
+        select: productVariantSelect,
       },
     },
   }) as Promise<WishlistItem>;

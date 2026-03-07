@@ -256,6 +256,7 @@ model user_addresses {
 
   // --- Soft Delete ---
   deletedAt     DateTime?
+  deletedBy     String?   @db.Uuid
 
   user     users      @relation(fields: [userId], references: [id], onDelete: Cascade)
   province provinces  @relation(fields: [provinceId], references: [id])

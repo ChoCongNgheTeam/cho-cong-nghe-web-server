@@ -10,7 +10,6 @@ export interface WishlistItem {
     code: string | null;
     price: any; // Decimal from Prisma
     soldCount: number;
-    weight: any | null; // Decimal from Prisma
     isDefault: boolean;
     isActive: boolean;
     createdAt: Date;
@@ -32,15 +31,16 @@ export interface WishlistItem {
         id: string;
         name: string;
         slug: string;
-        brandImage: string | null;
+        imageUrl: string | null;
       };
+      img: Array<{
+        id: string;
+        color: string;
+        imageUrl: string | null;
+        altText: string | null;
+        position: number;
+      }>;
     };
-    images: Array<{
-      id: string;
-      imageUrl: string;
-      altText: string | null;
-      position: number;
-    }>;
   };
 }
 

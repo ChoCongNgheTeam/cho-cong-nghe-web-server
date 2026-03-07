@@ -54,10 +54,7 @@ const buildVoucherWhere = (query: ListVouchersQuery): Prisma.vouchersWhereInput 
   const where: Prisma.vouchersWhereInput = {};
 
   if (query.search) {
-    where.OR = [
-      { code: { contains: query.search, mode: "insensitive" } },
-      { description: { contains: query.search, mode: "insensitive" } },
-    ];
+    where.OR = [{ code: { contains: query.search, mode: "insensitive" } }, { description: { contains: query.search, mode: "insensitive" } }];
   }
 
   if (query.discountType) {
@@ -223,11 +220,7 @@ export const remove = async (id: string) => {
 // === ASSIGN TO USERS ===
 // =====================
 
-export const assignToUsers = async (
-  voucherId: string,
-  userIds: string[],
-  maxUsesPerUser: number,
-) => {
+export const assignToUsers = async (voucherId: string, userIds: string[], maxUsesPerUser: number) => {
   // Create voucher_user records
   await prisma.voucher_user.createMany({
     data: userIds.map((userId) => ({
@@ -331,6 +324,7 @@ export const getVoucherByCode = async (code: string, userId?: string) => {
       minOrderValue: true,
       maxUses: true,
       maxUsesPerUser: true,
+      maxDiscountValue: true,
       usesCount: true,
       startDate: true,
       endDate: true,
@@ -390,6 +384,7 @@ export const getVoucherByCode = async (code: string, userId?: string) => {
     minOrderValue: Number(voucher.minOrderValue),
     maxUses: voucher.maxUses,
     maxUsesPerUser: voucher.maxUsesPerUser,
+    maxDiscountValue: voucher.maxDiscountValue ? Number(voucher.maxDiscountValue) : null,
     usesCount: voucher.usesCount,
     startDate: voucher.startDate,
     endDate: voucher.endDate,
