@@ -12,7 +12,7 @@ RUN npx prisma generate
 
 RUN npm run build
 
-COPY tsconfig.json ./
+COPY tsconfig.prod.json ./
 
 ENV TSCONFIG_PATHS_TSCONFIG=tsconfig.prod.json
 
