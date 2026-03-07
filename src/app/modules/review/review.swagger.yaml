@@ -1,0 +1,262 @@
+paths:
+  # ==================== PUBLIC ENDPOINTS ====================
+  /reviews:
+    post:
+      summary: Tạo đánh giá mới (User)
+      tags: [Reviews - Public]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewRequest"
+      responses:
+        "201":
+          description: Tạo đánh giá thành công (chờ duyệt)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ReviewDetail"
+                  message:
+                    type: string
+              example:
+                message: "Tạo đánh giá thành công. Đánh giá sẽ hiển thị sau khi được duyệt."
+        "400":
+          description: Lỗi validate hoặc không đủ điều kiện đánh giá
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /reviews/product/{productId}:
+    get:
+      summary: Lấy danh sách đánh giá của một sản phẩm (Public)
+      tags: [Reviews - Public]
+      parameters:
+        - in: path
+          name: productId
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: ID sản phẩm
+      responses:
+        "200":
+          description: Lấy danh sách đánh giá thành công (chỉ hiển thị đã duyệt)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReviewDetail"
+                  total:
+                    type: integer
+                  message:
+                    type: string
+              example:
+                total: 25
+                message: "Lấy danh sách đánh giá sản phẩm thành công"
+
+  # ==================== ADMIN ENDPOINTS ====================
+  /reviews/admin/all:
+    get:
+      summary: Lấy tất cả đánh giá (Admin only)
+      tags: [Reviews - Admin]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReviewDetail"
+                  total:
+                    type: integer
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /reviews/admin/{id}:
+    patch:
+      summary: Duyệt / từ chối đánh giá (Admin)
+      tags: [Reviews - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReviewAdminRequest"
+      responses:
+        "200":
+          description: Cập nhật trạng thái đánh giá thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ReviewDetail"
+                  message:
+                    type: string
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+    delete:
+      summary: Xóa đánh giá (Admin)
+      tags: [Reviews - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+      responses:
+        "200":
+          description: Xóa thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "Xóa đánh giá thành công"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+components:
+  schemas:
+    ReviewDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          nullable: true
+        isApproved:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED]
+          description: Trạng thái duyệt đánh giá
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            fullName:
+              type: string
+            avatar:
+              type: string
+              nullable: true
+        orderItem:
+          type: object
+          properties:
+            quantity:
+              type: integer
+            unitPrice:
+              type: string
+            productVariant:
+              type: object
+              properties:
+                code:
+                  type: string
+                price:
+                  type: string
+                product:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    slug:
+                      type: string
+                images:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      imageUrl:
+                        type: string
+
+    CreateReviewRequest:
+      type: object
+      required:
+        - orderItemId
+        - rating
+      properties:
+        orderItemId:
+          type: string
+          format: uuid
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          nullable: true
+
+    UpdateReviewAdminRequest:
+      type: object
+      required:
+        - isApproved
+      properties:
+        isApproved:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED]
+          description: Trạng thái mới của đánh giá
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Nhập JWT token (không cần thêm 'Bearer ' ở đầu)"

@@ -8,7 +8,7 @@ import { slugify } from "transliteration";
 export async function generateUniqueSlug(
   model: any, // Prisma delegate, ví dụ: prisma.brands hoặc prisma.products
   name: string,
-  field: string = "slug"
+  field: string = "slug",
 ): Promise<string> {
   const baseSlug = slugify(name, { lowercase: true, separator: "-" }).replace(/[^a-z0-9-]/g, "-");
 
@@ -21,11 +21,4 @@ export async function generateUniqueSlug(
     if (!existing) return slug;
     slug = `${baseSlug}-${++counter}`;
   }
-}
-
-/**
- * Hàm đơn giản nếu bạn không muốn check DB (chỉ dùng cho seed nhỏ)
- */
-export function simpleSlug(name: string): string {
-  return slugify(name, { lowercase: true, separator: "-" }).replace(/[^a-z0-9-]/g, "-");
 }

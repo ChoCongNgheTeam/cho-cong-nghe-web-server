@@ -1,89 +1,129 @@
-import { PrismaClient, AddressType } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { PrismaClient } from "@prisma/client";
+import { provincesData, wardsData, userAddressesData } from "../seed-data/users-addresses";
 
 interface SeedUserAddressesParams {
-  users: { admin: any; customers: any[] };
+  users: {
+    admin: any;
+    staff?: any;
+    customers: any[];
+  };
 }
 
-const addressData = [
-  {
-    userEmail: "customer1@example.com",
-    addresses: [
-      {
-        contactName: "Nguyễn Văn A",
-        phone: "0901234567",
-        provinceId: 1, // Hà Nội
-        districtId: 1,
-        wardId: 1,
-        detailAddress: "123 Đường Láng, Đống Đa",
-        type: AddressType.HOME,
-        isDefault: true,
-      },
-      {
-        contactName: "Công ty ABC",
-        phone: "0281234567",
-        provinceId: 79, // TP.HCM
-        districtId: 760,
-        detailAddress: "456 Nguyễn Trãi, Quận 5",
-        type: AddressType.OFFICE,
-        isDefault: false,
-      },
-    ],
-  },
-  // Cho customer thứ hai
-  {
-    userEmail: "customer2@example.com",
-    addresses: [
-      {
-        contactName: "Trần Thị B",
-        phone: "0909876543",
-        provinceId: 48, // Đà Nẵng
-        districtId: 490,
-        wardId: 20200,
-        detailAddress: "789 Lê Duẩn",
-        type: AddressType.HOME,
-        isDefault: true,
-      },
-    ],
-  },
-];
+export async function seedUserAddresses(prisma: PrismaClient, { users }: SeedUserAddressesParams) {
+  console.log("🌱 Seeding Locations & Addresses...");
 
-export async function seedUserAddresses({ users }: SeedUserAddressesParams) {
-  console.log("Seeding user addresses...");
+  // 1. SEED PROVINCES
+  console.log("  📍 Seeding provinces...");
+  const provinceMap = new Map<string, string>(); // code -> id
 
+  for (const provinceData of provincesData) {
+    const province = await prisma.provinces.upsert({
+      where: { code: provinceData.code },
+      update: {
+        name: provinceData.name,
+        fullName: provinceData.fullName,
+        type: provinceData.type,
+      },
+      create: {
+        code: provinceData.code,
+        name: provinceData.name,
+        fullName: provinceData.fullName,
+        type: provinceData.type,
+      },
+    });
+    provinceMap.set(provinceData.code, province.id);
+  }
+  console.log(`  ✅ Seeded ${provincesData.length} provinces`);
+
+  // 2. SEED WARDS
+  console.log("  🏘️  Seeding wards...");
+  const wardMap = new Map<string, string>(); // code -> id
+
+  for (const wardData of wardsData) {
+    const provinceId = provinceMap.get(wardData.provinceCode);
+    if (!provinceId) {
+      console.warn(`  ⚠️  Province ${wardData.provinceCode} not found, skipping ward ${wardData.code}`);
+      continue;
+    }
+
+    const ward = await prisma.wards.upsert({
+      where: { code: wardData.code },
+      update: {
+        name: wardData.name,
+        fullName: wardData.fullName,
+        type: wardData.type,
+        provinceId,
+      },
+      create: {
+        code: wardData.code,
+        name: wardData.name,
+        fullName: wardData.fullName,
+        type: wardData.type,
+        provinceId,
+      },
+    });
+    wardMap.set(wardData.code, ward.id);
+  }
+  console.log(`  ✅ Seeded ${wardsData.length} wards`);
+
+  // 3. SEED USER ADDRESSES
+  console.log("  📬 Seeding user addresses...");
   let createdCount = 0;
 
-  for (const item of addressData) {
-    const user = users.customers.find((u: any) => u.email === item.userEmail);
-    if (!user) continue;
+  for (const addrData of userAddressesData) {
+    try {
+      // Tìm user (ưu tiên customer, nếu không có thì admin)
+      let targetUser = users.customers?.[0] || users.admin;
 
-    for (const addr of item.addresses) {
+      if (!targetUser) {
+        console.warn("  ⚠️  No users found, skipping addresses");
+        continue;
+      }
+
+      // Lấy provinceId và wardId dari maps
+      const provinceId = provinceMap.get(addrData.provinceCode);
+      const wardId = wardMap.get(addrData.wardCode);
+
+      if (!provinceId || !wardId) {
+        console.warn(
+          `  ⚠️  Province ${addrData.provinceCode} or Ward ${addrData.wardCode} not found, skipping address`
+        );
+        continue;
+      }
+
       await prisma.user_addresses.upsert({
         where: {
-          // Không có unique tự nhiên, dùng combo để tránh duplicate
           userId_detailAddress_phone: {
-            userId: user.id,
-            detailAddress: addr.detailAddress,
-            phone: addr.phone,
+            userId: targetUser.id,
+            detailAddress: addrData.detailAddress,
+            phone: addrData.phone,
           },
         },
-        update: {},
+        update: {
+          contactName: addrData.contactName,
+          phone: addrData.phone,
+          provinceId,
+          wardId,
+          detailAddress: addrData.detailAddress,
+          type: addrData.type,
+          isDefault: addrData.isDefault,
+        },
         create: {
-          userId: user.id,
-          contactName: addr.contactName,
-          phone: addr.phone,
-          provinceId: addr.provinceId,
-          districtId: addr.districtId,
-          wardId: addr.wardId,
-          detailAddress: addr.detailAddress,
-          type: addr.type,
-          isDefault: addr.isDefault,
+          userId: targetUser.id,
+          contactName: addrData.contactName,
+          phone: addrData.phone,
+          provinceId,
+          wardId,
+          detailAddress: addrData.detailAddress,
+          type: addrData.type,
+          isDefault: addrData.isDefault,
         },
       });
       createdCount++;
+    } catch (error) {
+      console.warn(`  ⚠️  Error seeding address for ${addrData.contactName}:`, error);
     }
   }
 
-  console.log(`🚶‍➡️    Đã tạo ${createdCount} địa chỉ người dùng`);
+  console.log(`✅ Seeded ${createdCount} user addresses`);
 }

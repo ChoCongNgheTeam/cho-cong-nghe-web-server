@@ -1,0 +1,247 @@
+import type { SeedSpecificationGroupInput } from "./types";
+
+export const phoneSpecificationGroups: SeedSpecificationGroupInput[] = [
+  {
+    key: "thong-tin-hang-hoa",
+    name: "Thông tin hàng hóa",
+    icon: "package",
+    sortOrder: 1,
+    specifications: [
+      { key: "origin", name: "Xuất xứ", unit: null, icon: "globe" },
+      { key: "launch_date", name: "Thời điểm ra mắt", unit: null, icon: "calendar" },
+      { key: "warranty_period", name: "Thời gian bảo hành", unit: "tháng", icon: "shield-check" },
+      { key: "usage_guide", name: "Hướng dẫn sử dụng/bảo quản", unit: null, icon: "book-open" },
+    ],
+  },
+  {
+    key: "thiet-ke",
+    name: "Thiết kế & Trọng lượng",
+    icon: "maximize",
+    sortOrder: 2,
+    specifications: [
+      { key: "dimensions", name: "Kích thước", unit: "mm", icon: "maximize" },
+      { key: "weight", name: "Trọng lượng sản phẩm", unit: "g", icon: "weight" },
+      { key: "water_resistance", name: "Chuẩn kháng nước / Bụi bẩn", unit: null, icon: "droplets" },
+      { key: "material", name: "Chất liệu khung & mặt lưng", unit: null, icon: "layers" },
+    ],
+  },
+  {
+    key: "bo-xu-ly",
+    name: "Bộ xử lý",
+    icon: "cpu",
+    sortOrder: 3,
+    specifications: [
+      { key: "cpu_version", name: "Phiên bản CPU", unit: null, icon: "cpu" },
+      { key: "cpu_type", name: "Loại CPU (Cấu trúc)", unit: null, icon: "cpu-fill" },
+      { key: "cpu_cores", name: "Số nhân", unit: "nhân", icon: "cpu-chip" },
+      { key: "cpu_speed", name: "Tốc độ tối đa", unit: "GHz", icon: "zap" },
+    ],
+  },
+  {
+    key: "ram-bo-nho",
+    name: "RAM & Lưu trữ",
+    icon: "database",
+    sortOrder: 4,
+    specifications: [
+      {
+        key: "ram_capacity",
+        name: "Dung lượng RAM",
+        unit: "GB",
+        icon: "ram",
+        isFilterable: true,
+        filterType: "ENUM", // Theo mẫu: 16GB, 12GB, 8GB...
+      },
+      { key: "ram_type", name: "Loại RAM", unit: null, icon: "ram-fill" },
+      { key: "rom_capacity", name: "Dung lượng (ROM)", unit: "GB", icon: "storage" }, // Đã có logic riêng nên không set filter ở đây
+      {
+        key: "external_storage",
+        name: "Thẻ nhớ ngoài",
+        unit: null,
+        icon: "sd-card",
+        isFilterable: true,
+        filterType: "ENUM", // Theo mẫu: MicroSD, Không
+      },
+    ],
+  },
+  {
+    key: "man-hinh",
+    name: "Màn hình",
+    icon: "monitor",
+    sortOrder: 5,
+    specifications: [
+      {
+        key: "screen_size",
+        name: "Kích thước màn hình",
+        unit: "inch",
+        icon: "screen",
+        isFilterable: true,
+        filterType: "RANGE", // Lọc theo: Dưới 5, 5-6.5, Trên 6.8...
+      },
+      { key: "screen_tech", name: "Công nghệ màn hình", unit: null, icon: "monitor" },
+      {
+        key: "screen_standard",
+        name: "Chuẩn màn hình",
+        unit: null,
+        icon: "monitor-check",
+        isFilterable: true,
+        filterType: "ENUM", // Retina, 2K, FHD+, HD+...
+      },
+      { key: "screen_resolution", name: "Độ phân giải", unit: "pixel", icon: "grid" },
+      { key: "screen_color", name: "Màu màn hình / Độ phủ màu", unit: null, icon: "palette" },
+      {
+        key: "refresh_rate",
+        name: "Tần số quét",
+        unit: "Hz",
+        icon: "refresh",
+        isFilterable: true,
+        filterType: "ENUM", // 120Hz, 90Hz, 60Hz...
+      },
+      { key: "screen_glass", name: "Chất liệu mặt kính", unit: null, icon: "glass" },
+      { key: "pixel_density", name: "Mật độ điểm ảnh", unit: "ppi", icon: "dot-grid" },
+      { key: "max_brightness", name: "Độ sáng tối đa", unit: "nits", icon: "sun" },
+      { key: "contrast_ratio", name: "Độ tương phản", unit: null, icon: "contrast" },
+    ],
+  },
+  {
+    key: "do-hoa",
+    name: "Đồ họa",
+    icon: "clapperboard",
+    sortOrder: 6,
+    specifications: [{ key: "gpu_chip", name: "Chip đồ hoạ (GPU)", unit: null, icon: "gpu" }],
+  },
+  {
+    key: "camera-sau",
+    name: "Camera sau",
+    icon: "camera",
+    sortOrder: 7,
+    specifications: [
+      { key: "rear_camera_count", name: "Số camera sau", unit: null, icon: "camera" },
+      { key: "rear_cam_1", name: "Camera chính (Main)", unit: null, icon: "camera-1" },
+      { key: "rear_cam_2", name: "Camera góc rộng (Ultra Wide)", unit: null, icon: "camera-2" },
+      { key: "rear_cam_3", name: "Camera Telephoto / Macro", unit: null, icon: "camera-3" },
+      { key: "rear_video_record", name: "Quay phim camera sau", unit: null, icon: "video" },
+      {
+        key: "rear_cam_features",
+        name: "Tính năng camera sau",
+        unit: null,
+        icon: "camera-sparkles",
+        isFilterable: true,
+        filterType: "ENUM", // Lọc: AI Camera, Zoom quang học, Chống rung OIS...
+      },
+    ],
+  },
+  {
+    key: "camera-selfie",
+    name: "Camera Selfie",
+    icon: "camera-user",
+    sortOrder: 8,
+    specifications: [
+      { key: "selfie_camera_count", name: "Số Camera Selfie", unit: null, icon: "camera-user" },
+      { key: "selfie_cam_1", name: "Thông số Selfie", unit: null, icon: "camera-front" },
+      { key: "selfie_video_record", name: "Quay phim camera selfie", unit: null, icon: "video-user" },
+      { key: "selfie_cam_features", name: "Tính năng selfie", unit: null, icon: "sparkles" },
+    ],
+  },
+  {
+    key: "cam-bien-bao-mat",
+    name: "Cảm biến & Bảo mật",
+    icon: "shield-check",
+    sortOrder: 9,
+    specifications: [
+      { key: "sensors", name: "Cảm biến (Vân tay, LiDAR, Gia tốc...)", unit: null, icon: "sensor" },
+      { key: "security", name: "Bảo mật (Khuôn mặt, Mã pin...)", unit: null, icon: "lock" },
+    ],
+  },
+  {
+    key: "ket-noi",
+    name: "Giao tiếp và kết nối",
+    icon: "wifi",
+    sortOrder: 10,
+    specifications: [
+      { key: "sim_type", name: "Thẻ SIM", unit: null, icon: "sim-card" },
+      { key: "sim_slots", name: "Số khe SIM", unit: null, icon: "sim-slots" },
+      {
+        key: "network_support",
+        name: "Hỗ trợ mạng",
+        unit: null,
+        icon: "signal",
+        isFilterable: true,
+        filterType: "ENUM", // 5G, 4G
+      },
+      { key: "charging_port", name: "Cổng giao tiếp", unit: null, icon: "usb-c" },
+      { key: "wifi_version", name: "Wifi", unit: null, icon: "wifi" },
+      { key: "gps_tech", name: "GPS", unit: null, icon: "map-pin" },
+      { key: "bluetooth_version", name: "Bluetooth", unit: null, icon: "bluetooth" },
+      {
+        key: "other_connect",
+        name: "Kết nối khác",
+        unit: null,
+        icon: "link",
+        isFilterable: true,
+        filterType: "ENUM", // NFC, Bluetooth, Hồng ngoại...
+      },
+    ],
+  },
+  {
+    key: "pin-sac",
+    name: "Thông tin pin & sạc",
+    icon: "battery-charging",
+    sortOrder: 11,
+    specifications: [
+      { key: "battery_type", name: "Loại PIN", unit: null, icon: "battery" },
+      {
+        key: "battery_capacity",
+        name: "Dung lượng pin",
+        unit: "mAh",
+        icon: "battery-full",
+        isFilterable: true,
+        filterType: "RANGE", // Dưới 3000, 3000-4000, Trên 5500...
+      },
+      { key: "battery_life", name: "Thời gian sử dụng tối đa", unit: "giờ", icon: "battery-charging" },
+      { key: "charger_in_box", name: "Củ sạc kèm máy", unit: null, icon: "plug" },
+      {
+        key: "battery_more_info",
+        name: "Thông tin thêm về sạc",
+        unit: null,
+        icon: "zap",
+        isFilterable: true,
+        filterType: "BOOLEAN", // Ví dụ: Sạc không dây (Có/Không)
+      },
+    ],
+  },
+  {
+    key: "he-dieu-hanh",
+    name: "Hệ điều hành",
+    icon: "smartphone",
+    sortOrder: 12,
+    specifications: [
+      {
+        key: "os_name",
+        name: "Hệ điều hành",
+        unit: null,
+        icon: "os",
+        isFilterable: true,
+        filterType: "ENUM", // iOS, Android
+      },
+      { key: "os_version", name: "Phiên bản hệ điều hành", unit: null, icon: "os-version" },
+    ],
+  },
+  {
+    key: "tien-ich-khac",
+    name: "Tiện ích & Phụ kiện",
+    icon: "plus-square",
+    sortOrder: 13,
+    specifications: [
+      { key: "led_notification", name: "Thông báo LED", unit: null, icon: "bell" },
+      {
+        key: "special_features",
+        name: "Tính năng đặc biệt",
+        unit: null,
+        icon: "star",
+        isFilterable: true,
+        filterType: "ENUM", // Sạc không dây, Sạc ngược...
+      },
+      { key: "in_the_box", name: "Phụ kiện trong hộp", unit: null, icon: "box" },
+    ],
+  },
+] as const;

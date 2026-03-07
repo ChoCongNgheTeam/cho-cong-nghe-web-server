@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Facebook Login Test</title>
+  </head>
+  <body>
+    <h2>Facebook Login Test</h2>
+
+    <button onclick="loginWithFacebook()">Login with Facebook</button>
+
+    <script>
+      window.fbAsyncInit = function () {
+        FB.init({
+          appId: "1570449574260701", // thay bằng App ID
+          cookie: true,
+          xfbml: true,
+          version: "v19.0",
+        });
+      };
+
+      (function (d, s, id) {
+        var js,
+          fjs = d.getElementsByTagName(s)[0];
+        if (d.getElementById(id)) return;
+        js = d.createElement(s);
+        js.id = id;
+        js.src = "https://connect.facebook.net/en_US/sdk.js";
+        fjs.parentNode.insertBefore(js, fjs);
+      })(document, "script", "facebook-jssdk");
+
+      function loginWithFacebook() {
+        FB.login(
+          function (response) {
+            console.log("FULL RESPONSE:", response);
+
+            if (response.authResponse) {
+              const accessToken = response.authResponse.accessToken;
+              console.log("ACCESS TOKEN:", accessToken);
+            } else {
+              console.log("User cancelled login");
+            }
+          },
+          { scope: "public_profile,email" },
+        );
+      }
+    </script>
+  </body>
+</html>

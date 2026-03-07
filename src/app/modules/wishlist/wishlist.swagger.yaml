@@ -1,0 +1,178 @@
+openapi: 3.0.0
+info:
+  title: Wishlist API
+  version: 1.0.0
+  description: API để quản lý danh sách sản phẩm yêu thích
+
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local server
+
+tags:
+  - name: Wishlist
+    description: Các API liên quan đến danh sách yêu thích
+
+paths:
+  /wishlist:
+    get:
+      tags:
+        - Wishlist
+      summary: Lấy danh sách yêu thích của người dùng
+      description: Lấy tất cả sản phẩm trong danh sách yêu thích của người dùng hiện tại
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lấy danh sách yêu thích thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        userId:
+                          type: string
+                          format: uuid
+                        productVariantId:
+                          type: string
+                          format: uuid
+                        createdAt:
+                          type: string
+                          format: date-time
+                        productVariant:
+                          type: object
+              example:
+                data:
+                  - id: "aaaa1111-aaaa-1111-aaaa-111111111111"
+                    productVariantId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+                message: "Lấy danh sách yêu thích thành công"
+        '401':
+          description: Chưa đăng nhập
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '500':
+          description: Lỗi server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /wishlist/add:
+    post:
+      tags:
+        - Wishlist
+      summary: Thêm sản phẩm vào danh sách yêu thích
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - productVariantId
+              properties:
+                productVariantId:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '400':
+          description: Lỗi dữ liệu
+        '401':
+          description: Chưa đăng nhập
+        '404':
+          description: Không tìm thấy sản phẩm
+        '409':
+          description: Đã tồn tại
+
+  /wishlist/remove:
+    delete:
+      tags:
+        - Wishlist
+      summary: Xoá sản phẩm khỏi danh sách yêu thích
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - productVariantId
+              properties:
+                productVariantId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '404':
+          description: Không tìm thấy sản phẩm
+
+  /wishlist/check/{productVariantId}:
+    get:
+      tags:
+        - Wishlist
+      summary: Kiểm tra sản phẩm có trong danh sách
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: productVariantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      isInWishlist:
+                        type: boolean
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

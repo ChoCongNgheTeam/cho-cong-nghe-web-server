@@ -1,110 +1,107 @@
 import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { variantData } from "../seed-data/variants";
 
 interface SeedVariantsParams {
-  products: any[];
-  attributes: any[];
+  products: Array<{ id: string; name: string; slug: string }>;
 }
 
-const variantData = {
-  "iPhone 15 Pro Max": [
-    { storage: "256GB", color: "Black", price: 34990000, isDefault: true },
-    { storage: "256GB", color: "White", price: 34990000 },
-    { storage: "512GB", color: "Black", price: 39990000 },
-  ],
-  "Samsung Galaxy S24 Ultra": [
-    { storage: "256GB", color: "Black", price: 33990000, isDefault: true },
-    { storage: "512GB", color: "Gray", price: 38990000 },
-  ],
-  "Xiaomi 14": [{ storage: "256GB", color: "Black", price: 21990000, isDefault: true }],
-};
+function buildVariantCode(productSlug: string, v: any) {
+  return [productSlug.toUpperCase(), v.storage?.toUpperCase(), v.color?.toUpperCase()]
+    .filter(Boolean)
+    .join("-")
+    .replace(/\s+/g, "");
+}
 
-const sampleImages = [
-  "https://example.com/iphone15-black-1.jpg",
-  "https://example.com/iphone15-black-2.jpg",
-  "https://example.com/iphone15-black-3.jpg",
-];
+/**
+ * Attach attribute option to a variant
+ */
+async function attachAttributeOption(
+  prisma: PrismaClient,
+  productVariantId: string,
+  attributeCode: string,
+  value?: string,
+) {
+  if (!value) return;
 
-export async function seedVariants({ products, attributes }: SeedVariantsParams) {
-  console.log("Seeding product variants...");
+  const attribute = await prisma.attributes.findUnique({
+    where: { code: attributeCode },
+  });
 
-  const colorAttr = attributes.find((a: any) => a.name === "Color");
-  const storageAttr = attributes.find((a: any) => a.name === "Storage");
+  if (!attribute) return;
 
-  const createdVariants: any[] = [];
+  const option = await prisma.attributes_options.findFirst({
+    where: {
+      attributeId: attribute.id,
+      value: { equals: value, mode: "insensitive" },
+    },
+  });
+
+  if (!option) return;
+
+  await prisma.variants_attributes.upsert({
+    where: {
+      productVariantId_attributeOptionId: {
+        productVariantId,
+        attributeOptionId: option.id,
+      },
+    },
+    update: {},
+    create: {
+      productVariantId,
+      attributeOptionId: option.id,
+    },
+  });
+}
+
+export async function seedVariants(prisma: PrismaClient, { products }: SeedVariantsParams) {
+  console.log("🌱 Seeding product variants...");
+
+  const createdVariants = [];
 
   for (const product of products) {
-    const variantsForProduct = variantData[product.name as keyof typeof variantData];
-    if (!variantsForProduct) continue;
+    const variantsForThisProduct = variantData[product.slug];
 
-    for (const [index, variant] of variantsForProduct.entries()) {
-      const code = `${product.slug.toUpperCase()}-${variant.storage}-${variant.color}`.replace(
-        / /g,
-        ""
-      );
+    if (!variantsForThisProduct || variantsForThisProduct.length === 0) {
+      console.log(`⚠️ Product has no variants: ${product.name}`);
+      continue;
+    }
 
-      const createdVariant = await prisma.products_variants.create({
-        data: {
-          productId: product.id,
-          code,
-          price: variant.price,
-          weight: 220, // gram
-          isDefault: variant.isDefault || false,
-          isActive: true,
-        },
-      });
+    console.log(
+      `  Processing variants for: ${product.name} (${variantsForThisProduct.length} variants)`,
+    );
 
-      // Gắn attributes
-      const colorOption = await prisma.attributes_options.findFirst({
-        where: { attributeId: colorAttr.id, value: variant.color },
-      });
-      const storageOption = await prisma.attributes_options.findFirst({
-        where: { attributeId: storageAttr.id, value: variant.storage },
-      });
+    for (const v of variantsForThisProduct) {
+      const code = buildVariantCode(product.slug, v);
 
-      if (colorOption) {
-        await prisma.variants_attributes.create({
-          data: {
-            productVariantId: createdVariant.id,
-            attributeOptionId: colorOption.id,
+      try {
+        const variant = await prisma.products_variants.upsert({
+          where: { code },
+          update: {
+            price: v.price,
+            isDefault: v.isDefault ?? false,
+            isActive: true,
+          },
+          create: {
+            productId: product.id,
+            code,
+            price: v.price,
+            isDefault: v.isDefault ?? false,
+            isActive: true,
           },
         });
-      }
-      if (storageOption) {
-        await prisma.variants_attributes.create({
-          data: {
-            productVariantId: createdVariant.id,
-            attributeOptionId: storageOption.id,
-          },
-        });
-      }
 
-      // Tạo images
-      for (const [imgIndex, url] of sampleImages.entries()) {
-        await prisma.product_variant_images.create({
-          data: {
-            productVariantId: createdVariant.id,
-            imageUrl: url.replace("iphone15", product.slug),
-            altText: `${product.name} - ${variant.color}`,
-            position: imgIndex,
-          },
-        });
+        // 🔗 Attach attributes
+        await attachAttributeOption(prisma, variant.id, "color", v.color);
+        await attachAttributeOption(prisma, variant.id, "storage", v.storage);
+        // await attachAttributeOption(prisma, variant.id, "size", v.size);
+
+        createdVariants.push(variant);
+      } catch (err) {
+        console.error(`❌ Error seeding variant ${code}:`, err);
       }
-
-      // Tạo inventory
-      await prisma.inventory.create({
-        data: {
-          variantId: createdVariant.id,
-          quantity: 50 + index * 10,
-          reservedQuantity: 0,
-        },
-      });
-
-      createdVariants.push(createdVariant);
     }
   }
 
-  console.log(`🚶‍➡️    Đã tạo ${createdVariants.length} variants`);
+  console.log(`\n✅ Seeded ${createdVariants.length} variants\n`);
   return createdVariants;
 }

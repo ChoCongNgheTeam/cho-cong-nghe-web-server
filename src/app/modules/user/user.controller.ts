@@ -1,113 +1,112 @@
 import { Request, Response } from "express";
-import {
-  getUsers as getUsersService,
-  getUserById as getUserByIdService,
-  createUser as createUserService,
-  updateUser as updateUserService,
-  deleteUser as deleteUserService,
-} from "./user.service";
-
-export const getUsersHandler = async (req: Request, res: Response) => {
-  try {
-    const users = await getUsersService();
-    res.json({
-      data: users,
-      total: users.length,
-      message: "Lấy danh sách người dùng thành công",
-    });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message || "Lỗi server" });
-  }
-};
-
-export const getUserByIdHandler = async (req: Request, res: Response) => {
-  try {
-    const user = await getUserByIdService(req.params.id);
-    if (!user) {
-      return res.status(404).json({ message: "Không tìm thấy người dùng" });
-    }
-    res.json({ data: user, message: "Lấy người dùng thành công" });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message || "Lỗi server" });
-  }
-};
-
-export const createUserHandler = async (req: Request, res: Response) => {
-  try {
-    const user = await createUserService(req.body);
-    res.status(201).json({
-      data: user,
-      message: "Tạo người dùng thành công",
-    });
-  } catch (error: any) {
-    res.status(409).json({
-      message: error.message || "Dữ liệu bị trùng (email hoặc username)",
-    });
-  }
-};
-
-export const updateUserHandler = async (req: Request, res: Response) => {
-  try {
-    const user = await updateUserService(req.params.id, req.body);
-    if (!user) {
-      return res.status(404).json({ message: "Không tìm thấy người dùng" });
-    }
-    res.json({
-      data: user,
-      message: "Cập nhật người dùng thành công",
-    });
-  } catch (error: any) {
-    if (error.message.includes("đã được sử dụng")) {
-      return res.status(409).json({ message: error.message });
-    }
-    res.status(500).json({ message: error.message || "Lỗi server" });
-  }
-};
-
-export const deleteUserHandler = async (req: Request, res: Response) => {
-  try {
-    await deleteUserService(req.params.id);
-    res.status(204).send();
-  } catch (error: any) {
-    if (error.code === "P2025") {
-      return res.status(404).json({ message: "Không tìm thấy người dùng để xóa" });
-    }
-    res.status(500).json({ message: error.message || "Lỗi server" });
-  }
-};
+import * as userService from "./user.service";
+import { getUsersQuerySchema } from "./user.validation";
 
 export const getMeHandler = async (req: Request, res: Response) => {
-  try {
-    if (!req.user?.id) {
-      return res.status(401).json({ message: "Chưa xác thực" });
-    }
-
-    const user = await getUserByIdService(req.user.id);
-    if (!user) {
-      return res.status(404).json({ message: "Không tìm thấy thông tin người dùng" });
-    }
-
-    res.json({ data: user });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message || "Lỗi server" });
-  }
+  const user = await userService.getMe(req.user!.id);
+  res.json({ data: user, message: "Lấy thông tin cá nhân thành công" });
 };
 
 export const updateMeHandler = async (req: Request, res: Response) => {
-  if (!req.user?.id) {
-    return res.status(401).json({ message: "Chưa xác thực" });
+  const user = await userService.updateMe(req.user!.id, req.body);
+  res.json({ data: user, message: "Cập nhật hồ sơ thành công" });
+};
+
+export const changePasswordHandler = async (req: Request, res: Response) => {
+  await userService.changeMyPassword(req.user!.id, req.body);
+  res.json({ message: "Đổi mật khẩu thành công" });
+};
+
+// Staff & Admin
+
+export const getUsersHandler = async (req: Request, res: Response) => {
+  const query = getUsersQuerySchema.parse(req.query);
+  const isAdmin = req.user!.role === "ADMIN";
+
+  console.log(isAdmin);
+
+  const result = await userService.getUsers(query, isAdmin);
+
+  res.json({
+    data: result.users,
+    meta: {
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+      totalPages: Math.ceil(result.total / result.limit),
+    },
+    message: "Lấy danh sách người dùng thành công",
+  });
+};
+
+export const getUserByIdHandler = async (req: Request, res: Response) => {
+  const isAdmin = req.user!.role === "ADMIN";
+  const user = await userService.getUserById(req.params.id, { isAdmin });
+  res.json({ data: user, message: "Lấy người dùng thành công" });
+};
+
+/**
+ * Soft delete — Staff & Admin.
+ * Guard phân quyền chi tiết:
+ *   - Staff: chỉ được xóa CUSTOMER
+ *   - Admin: xóa được mọi role (trừ chính mình — guard trong service)
+ */
+export const deleteUserHandler = async (req: Request, res: Response) => {
+  const requester = req.user!;
+  const targetId = req.params.id;
+
+  const target = await userService.getUserById(targetId);
+
+  if (!target) {
+    return res.status(404).json({ message: "User không tồn tại" });
   }
 
-  try {
-    const user = await updateUserService(req.user.id, req.body);
-    res.json({
-      data: user,
-      message: "Cập nhật hồ sơ cá nhân thành công",
+  if (requester.role === "STAFF" && target.role !== "CUSTOMER") {
+    return res.status(403).json({
+      message: "Staff chỉ được phép xóa tài khoản khách hàng",
     });
-  } catch (error: any) {
-    if (error.message.includes("đã được sử dụng")) {
-      return res.status(409).json({ message: error.message });
-    }
-    res.status(500).json({ message: error.message || "Lỗi server" });
   }
+
+  await userService.softDeleteUser(targetId, requester.id);
+
+  return res.status(204).send();
+};
+
+// Admin only
+
+export const createUserHandler = async (req: Request, res: Response) => {
+  const user = await userService.createUser(req.body);
+  res.status(201).json({ data: user, message: "Tạo người dùng thành công" });
+};
+
+export const updateUserHandler = async (req: Request, res: Response) => {
+  const user = await userService.updateUser(req.params.id, req.body);
+  res.json({ data: user, message: "Cập nhật người dùng thành công" });
+};
+
+export const restoreUserHandler = async (req: Request, res: Response) => {
+  const user = await userService.restoreUser(req.params.id);
+  res.json({ data: user, message: "Khôi phục người dùng thành công" });
+};
+
+export const hardDeleteUserHandler = async (req: Request, res: Response) => {
+  await userService.hardDeleteUser(req.params.id);
+  res.status(204).send();
+};
+
+export const getDeletedUsersHandler = async (req: Request, res: Response) => {
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 20;
+  const result = await userService.getDeletedUsers({ page, limit });
+
+  res.json({
+    data: result.users,
+    meta: {
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+      totalPages: Math.ceil(result.total / result.limit),
+    },
+    message: "Lấy danh sách người dùng đã xóa thành công",
+  });
 };

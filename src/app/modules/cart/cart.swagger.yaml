@@ -1,0 +1,270 @@
+openapi: 3.0.0
+info:
+  title: Cart API
+  version: 1.0.1
+  description: |
+    API quản lý giỏ hàng đã được tối ưu hiệu năng.
+    - Guest: Tự lưu bằng localStorage tại Front-End, KHÔNG gọi API lấy giỏ hàng.
+    - User (Đã login): Lưu DB. Khi mới login sẽ gọi API sync để đồng bộ.
+
+tags:
+  - name: Cart
+    description: Quản lý giỏ hàng DB và đồng bộ
+
+paths:
+  /cart:
+    get:
+      summary: Lấy giỏ hàng từ Database (Bắt buộc Login)
+      description: Dành riêng cho User đã đăng nhập. Guest tự lấy từ localStorage.
+      tags:
+        - Cart
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lấy giỏ hàng thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/CartSummary"
+                  message:
+                    type: string
+        "401":
+          description: Chưa đăng nhập
+
+    post:
+      summary: Thêm sản phẩm vào DB (Chỉ cho User)
+      description: "Rate limit: 10 requests/phút."
+      tags:
+        - Cart
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddToCartInput"
+      responses:
+        "201":
+          description: Thêm thành công
+        "400":
+          description: Vượt số lượng tồn kho
+        "401":
+          description: Chưa đăng nhập
+
+    delete:
+      summary: Xóa sạch giỏ hàng DB (Chỉ cho User)
+      tags:
+        - Cart
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Đã làm trống giỏ hàng
+
+  /cart/validate-item:
+    post:
+      summary: Kiểm tra nhanh 1 sản phẩm trước khi cập nhật localStorage (Guest)
+      description: Dùng chung với cơ chế Debounce tại FE để check lượng tồn kho hiện tại.
+      tags:
+        - Cart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - productVariantId
+                - quantity
+              properties:
+                productVariantId:
+                  type: string
+                  format: uuid
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        "200":
+          description: Sản phẩm hợp lệ
+        "400":
+          description: Hết hàng hoặc sản phẩm ngừng kinh doanh
+
+  /cart/sync:
+    post:
+      summary: Đồng bộ giỏ hàng từ localStorage vào DB (Khi mới Login)
+      description: Tự động điều chỉnh số lượng nếu vượt tồn kho (Soft Validate) và trả về cảnh báo để FE hiển thị.
+      tags:
+        - Cart
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/LocalStorageItem"
+      responses:
+        "200":
+          description: Đồng bộ thành công (Có thể kèm warning)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  hasWarnings: { type: boolean }
+                  warnings:
+                    type: array
+                    items: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      synced: { type: integer }
+                      failed: { type: integer }
+                  success: { type: boolean }
+
+  /cart/{cartItemId}/change-quantity:
+    parameters:
+      - in: path
+        name: cartItemId
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Cập nhật số lượng item trong DB
+      tags:
+        - Cart
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        "200":
+          description: Cập nhật thành công
+
+  /cart/{cartItemId}/change-variant:
+    parameters:
+      - in: path
+        name: cartItemId
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Thay đổi phân loại (Variant) của 1 sản phẩm trong giỏ
+      description: Nếu variant mới đổi đã có sẵn trong giỏ, hệ thống sẽ tự động cộng dồn số lượng và xóa cartItem cũ.
+      tags:
+        - Cart
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - newVariantId
+                - quantity
+              properties:
+                newVariantId:
+                  type: string
+                  format: uuid
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        "200":
+          description: Đổi phân loại thành công (Trả về CartItemResponse đã gộp/cập nhật)
+
+  /cart/{cartItemId}:
+    parameters:
+      - in: path
+        name: cartItemId
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      summary: Xóa 1 sản phẩm khỏi DB
+      tags:
+        - Cart
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Xóa thành công
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    AddToCartInput:
+      type: object
+      required:
+        - productVariantId
+        - quantity
+      properties:
+        productVariantId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+
+    LocalStorageItem:
+      type: object
+      properties:
+        productVariantId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+
+    CartItemResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        productVariantId: { type: string, format: uuid }
+        productName: { type: string }
+        image: { type: string }
+        color: { type: string }
+        colorValue: { type: string }
+        storage: { type: string }
+        storageValue: { type: string }
+        quantity: { type: integer }
+        unitPrice: { type: number }
+        totalPrice: { type: number }
+        availableQuantity: { type: integer }
+
+    CartSummary:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CartItemResponse"
+        totalItems: { type: integer }
+        subtotal: { type: number }

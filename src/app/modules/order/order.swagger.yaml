@@ -1,0 +1,457 @@
+paths:
+  # ==================== PUBLIC ENDPOINTS (USER) ====================
+  /orders/my:
+    get:
+      summary: Lấy danh sách đơn hàng của người dùng hiện tại
+      tags: [Orders - Public]
+      security:
+        - bearerAuth: []
+      description: Lấy tất cả đơn hàng thuộc về user đang đăng nhập, sắp xếp theo ngày đặt hàng mới nhất
+      responses:
+        "200":
+          description: Lấy danh sách đơn hàng thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OrderDetail"
+                  message:
+                    type: string
+                  total:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /orders/my/{id}:
+    get:
+      summary: Xem chi tiết đơn hàng (Của chính user)
+      tags: [Orders - Public]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID của đơn hàng
+      responses:
+        "200":
+          description: Lấy chi tiết đơn hàng thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrderDetail"
+                  message:
+                    type: string
+        "400":
+          description: Bạn không có quyền xem đơn hàng này
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          description: Không tìm thấy đơn hàng
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  # ==================== ADMIN ENDPOINTS ====================
+  /orders/admin:
+    post:
+      summary: Tạo đơn hàng hộ (Admin only)
+      tags: [Orders - Admin]
+      security:
+        - bearerAuth: []
+      description: Admin tạo đơn hàng trực tiếp cho khách hàng. Hỗ trợ cả khách đã có tài khoản (gửi userId) và khách mới (gửi customerInfo để tự động tạo user).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderAdminRequest"
+      responses:
+        "201":
+          description: Tạo đơn hàng thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrderDetail"
+                  message:
+                    type: string
+        "400":
+          description: Thiếu thông tin, tồn kho không đủ hoặc sai mã voucher
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /orders/admin/all:
+    get:
+      summary: Lấy tất cả đơn hàng (Admin only)
+      tags: [Orders - Admin]
+      security:
+        - bearerAuth: []
+      description: Quản trị viên lấy danh sách toàn bộ hệ thống đơn hàng
+      responses:
+        "200":
+          description: Lấy tất cả đơn hàng thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OrderDetail"
+                  total:
+                    type: integer
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /orders/admin/{id}:
+    get:
+      summary: Xem chi tiết đơn hàng bất kỳ (Admin only)
+      tags: [Orders - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrderDetail"
+                  message:
+                    type: string
+        "404":
+          description: Không tìm thấy
+    
+    patch:
+      summary: Cập nhật trạng thái đơn hàng (Admin only)
+      tags: [Orders - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrderAdminRequest"
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrderDetail"
+                  message:
+                    type: string
+        "400":
+          description: Lỗi validation
+        "404":
+          description: Không tìm thấy đơn hàng
+
+    delete:
+      summary: Xóa đơn hàng và hoàn lại tồn kho (Admin only)
+      tags: [Orders - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Xóa thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "404":
+          description: Không tìm thấy đơn hàng
+
+components:
+  schemas:
+    CreateOrderAdminRequest:
+      type: object
+      required:
+        - items
+        - paymentMethodId
+        - paymentStatus
+        - orderStatus
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: "ID khách cũ (Tùy chọn nếu dùng customerInfo)"
+        shippingAddressId:
+          type: string
+          format: uuid
+          description: "ID địa chỉ cũ (Tùy chọn nếu dùng newAddress)"
+        customerInfo:
+          type: object
+          description: "Thông tin khách vãng lai (Bắt buộc nếu không truyền userId)"
+          properties:
+            fullName:
+              type: string
+            phone:
+              type: string
+            email:
+              type: string
+        newAddress:
+          type: object
+          description: "Địa chỉ mới của khách vãng lai (Bắt buộc nếu không truyền shippingAddressId)"
+          properties:
+            provinceId:
+              type: string
+              format: uuid
+            wardId:
+              type: string
+              format: uuid
+            detailAddress:
+              type: string
+        items:
+          type: array
+          items:
+            type: object
+            required:
+              - productVariantId
+              - quantity
+              - unitPrice
+            properties:
+              productVariantId:
+                type: string
+                format: uuid
+              quantity:
+                type: integer
+              unitPrice:
+                type: number
+        voucherCode:
+          type: string
+          description: "Mã giảm giá (Tùy chọn)"
+        shippingFee:
+          type: number
+          default: 0
+        paymentMethodId:
+          type: string
+          format: uuid
+        paymentStatus:
+          type: string
+          enum: [UNPAID, PAID, REFUNDED]
+        orderStatus:
+          type: string
+          enum: [PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED]
+
+    UpdateOrderAdminRequest:
+      type: object
+      properties:
+        orderStatus:
+          type: string
+          enum: [PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED]
+        paymentStatus:
+          type: string
+          enum: [UNPAID, PAID, REFUNDED]
+        shippingFee:
+          type: number
+        voucherDiscount:
+          type: number
+
+    OrderDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderCode:
+          type: string
+        userId:
+          type: string
+          format: uuid
+        paymentMethodId:
+          type: string
+          format: uuid
+        voucherId:
+          type: string
+          format: uuid
+          nullable: true
+        shippingAddressId:
+          type: string
+          format: uuid
+          nullable: true
+        shippingContactName:
+          type: string
+        shippingPhone:
+          type: string
+        shippingProvince:
+          type: string
+        shippingWard:
+          type: string
+        shippingDetail:
+          type: string
+        subtotalAmount:
+          type: string
+        shippingFee:
+          type: string
+        voucherDiscount:
+          type: string
+        totalAmount:
+          type: string
+        orderStatus:
+          type: string
+          enum: [PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED]
+        paymentStatus:
+          type: string
+          enum: [UNPAID, PAID, REFUNDED]
+        orderDate:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            fullName:
+              type: string
+            email:
+              type: string
+            phone:
+              type: string
+        paymentMethod:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            description:
+              type: string
+        voucher:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+            code:
+              type: string
+            description:
+              type: string
+        orderItems:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              quantity:
+                type: integer
+              unitPrice:
+                type: string
+              productVariant:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  code:
+                    type: string
+                  price:
+                    type: string
+                  product:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      slug:
+                        type: string
+                      img:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            imageUrl:
+                              type: string
+                            color:
+                              type: string
+                  variantAttributes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        attributeOption:
+                          type: object
+                          properties:
+                            value:
+                              type: string
+                            attribute:
+                              type: object
+                              properties:
+                                name:
+                                  type: string
+
+  responses:
+    UnauthorizedError:
+      description: Báo lỗi khi thiếu token hoặc token không hợp lệ
+    ForbiddenError:
+      description: Báo lỗi khi user không đủ quyền truy cập (vd không phải Admin)
+    ServerError:
+      description: Báo lỗi nội bộ từ server
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Nhập JWT token (không cần thêm 'Bearer ' ở đầu)"

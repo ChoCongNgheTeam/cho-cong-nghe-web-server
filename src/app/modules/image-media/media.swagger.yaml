@@ -1,0 +1,483 @@
+openapi: 3.0.0
+info:
+  title: Media API
+  version: 1.0.0
+  description: API quản lý media (hình ảnh, banner, slider, popup, v.v.)
+
+servers:
+  - url: /api/v1/media
+    description: Media API endpoints
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Nhập JWT token (không cần thêm 'Bearer ' ở đầu)"
+
+  schemas:
+    MediaType:
+      type: string
+      enum: [BANNER, SLIDER, HERO, POPUP, ADVERTISEMENT, GALLERY, FEATURED, PROMOTION]
+      description: Loại media (banner, slider, hero section, popup, quảng cáo, v.v.)
+
+    MediaPosition:
+      type: string
+      enum:
+        [
+          HOME_TOP,
+          HOME_MIDDLE,
+          HOME_BOTTOM,
+          PRODUCT_PAGE,
+          CATEGORY_PAGE,
+          BLOG_PAGE,
+          SIDEBAR,
+          FOOTER,
+        ]
+      description: Vị trí hiển thị của media trên website
+
+    MediaCard:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          $ref: "#/components/schemas/MediaType"
+        position:
+          $ref: "#/components/schemas/MediaPosition"
+        title:
+          type: string
+          nullable: true
+        imageUrl:
+          type: string
+          nullable: true
+        linkUrl:
+          type: string
+          nullable: true
+        order:
+          type: integer
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    MediaDetail:
+      allOf:
+        - $ref: "#/components/schemas/MediaCard"
+        - type: object
+          properties:
+            imagePath:
+              type: string
+              nullable: true
+            updatedAt:
+              type: string
+              format: date-time
+
+    ReorderMediaItem:
+      type: object
+      required:
+        - mediaId
+        - newOrder
+      properties:
+        mediaId:
+          type: string
+          format: uuid
+        newOrder:
+          type: integer
+          minimum: 0
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+
+tags:
+  - name: Public - Media
+    description: API công khai cho media (hiển thị trên frontend)
+  - name: Admin - Media
+    description: API quản trị media
+
+paths:
+  /media/all:
+    get:
+      tags:
+        - Public - Media
+      summary: Lấy tất cả media đang hoạt động (isActive = true)
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MediaCard"
+                  message:
+                    type: string
+        "500":
+          description: Lỗi server
+
+  /media/type/{type}:
+    get:
+      tags:
+        - Public - Media
+      summary: Lấy media theo loại (type)
+      parameters:
+        - in: path
+          name: type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaType"
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MediaCard"
+                  message:
+                    type: string
+        "400":
+          description: Tham số không hợp lệ
+        "500":
+          description: Lỗi server
+
+  /media/position/{position}:
+    get:
+      tags:
+        - Public - Media
+      summary: Lấy media theo vị trí (position)
+      parameters:
+        - in: path
+          name: position
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaPosition"
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MediaCard"
+                  message:
+                    type: string
+        "400":
+          description: Tham số không hợp lệ
+        "500":
+          description: Lỗi server
+
+  /media/filter:
+    get:
+      tags:
+        - Public - Media
+      summary: Lấy media theo loại và vị trí kết hợp
+      parameters:
+        - in: query
+          name: type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaType"
+        - in: query
+          name: position
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaPosition"
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MediaCard"
+                  message:
+                    type: string
+        "400":
+          description: Tham số không hợp lệ
+        "500":
+          description: Lỗi server
+
+  /media/admin/all:
+    get:
+      tags:
+        - Admin - Media
+      summary: Lấy tất cả media (bao gồm không active) - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MediaCard"
+                  message:
+                    type: string
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "500":
+          description: Lỗi server
+
+  /media/admin/{id}:
+    get:
+      tags:
+        - Admin - Media
+      summary: Lấy chi tiết media theo ID (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/MediaDetail"
+                  message:
+                    type: string
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "404":
+          description: Không tìm thấy
+        "500":
+          description: Lỗi server
+
+    patch:
+      tags:
+        - Admin - Media
+      summary: Cập nhật media (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                imageUrl:
+                  type: string
+                  format: binary
+                  description: Ảnh media mới (tùy chọn)
+                type:
+                  $ref: "#/components/schemas/MediaType"
+                position:
+                  $ref: "#/components/schemas/MediaPosition"
+                title:
+                  type: string
+                  maxLength: 200
+                linkUrl:
+                  type: string
+                order:
+                  type: integer
+                  minimum: 0
+                isActive:
+                  type: boolean
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/MediaDetail"
+                  message:
+                    type: string
+        "400":
+          description: Dữ liệu không hợp lệ
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "404":
+          description: Không tìm thấy
+        "500":
+          description: Lỗi server
+
+    delete:
+      tags:
+        - Admin - Media
+      summary: Xóa media (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Xóa thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "404":
+          description: Không tìm thấy
+        "500":
+          description: Lỗi server
+
+  /media/admin:
+    post:
+      tags:
+        - Admin - Media
+      summary: Tạo media mới (Admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                imageUrl:
+                  type: string
+                  format: binary
+                  description: Ảnh media (tùy chọn nhưng thường cần)
+                type:
+                  $ref: "#/components/schemas/MediaType"
+                position:
+                  $ref: "#/components/schemas/MediaPosition"
+                title:
+                  type: string
+                  maxLength: 200
+                linkUrl:
+                  type: string
+                order:
+                  type: integer
+                  minimum: 0
+                isActive:
+                  type: boolean
+                  default: true
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/MediaDetail"
+                  message:
+                    type: string
+        "400":
+          description: Dữ liệu không hợp lệ
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "500":
+          description: Lỗi server
+
+  /media/admin/reorder:
+    post:
+      tags:
+        - Admin - Media
+      summary: Sắp xếp lại thứ tự media (reorder)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/ReorderMediaItem"
+      responses:
+        "200":
+          description: Sắp xếp lại thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Dữ liệu không hợp lệ
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "500":
+          description: Lỗi server

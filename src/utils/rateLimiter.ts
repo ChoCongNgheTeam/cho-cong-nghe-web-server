@@ -1,4 +1,5 @@
 import { Request } from "express";
+import rateLimit from "express-rate-limit";
 
 const requests = new Map<string, number[]>();
 
@@ -22,3 +23,45 @@ export const forgotPasswordRateLimit = (req: Request): void => {
   validRequests.push(now);
   requests.set(ip, validRequests);
 };
+
+export const refreshTokenLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 phút
+  max: 59, // 10 lần / IP
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+export const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 50, // 5 lần / IP
+});
+
+export const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+});
+
+export const getCartLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+});
+
+export const addToCartLimiter = rateLimit({
+  windowMs: 30 * 1000,
+  max: 10,
+});
+
+export const updateCartLimiter = rateLimit({
+  windowMs: 30 * 1000,
+  max: 20,
+});
+
+export const removeCartLimiter = rateLimit({
+  windowMs: 30 * 1000,
+  max: 15,
+});
+
+export const generalCartLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 50,
+});

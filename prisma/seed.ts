@@ -1,40 +1,42 @@
 import { PrismaClient } from "@prisma/client";
-import {
-  seedBrands,
-  seedCategories,
-  seedAttributes,
-  seedHighlights,
-  seedPaymentMethods,
-  seedUsers,
-  seedProducts,
-  seedVariants,
-  seedUserAddresses,
-  seedVouchers,
-} from "./seeds";
+import { seedBrands, seedCategories, seedAttributesAndOptions, seedSpecifications, seedProductSpecifications, seedProductHighlights, seedPaymentMethods, seedUsers, seedProducts, seedVariants, seedProductColorImages, seedUserAddresses, seedVouchers, seedPromotions, seedBlogs, seedComments, seedImageMedia, seedCategoryVariantAttributes, seedCampaigns } from "./seeds";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("Bắt đầu seeding dữ liệu...");
+  console.log("🚀 Start seeding...");
 
-  const brands = await seedBrands();
-  const categories = await seedCategories();
-  const attributes = await seedAttributes();
-  const highlights = await seedHighlights();
-  await seedPaymentMethods();
-  const users = await seedUsers();
-  await seedVouchers();
-  await seedUserAddresses({ users });
+  const brands = await seedBrands(prisma);
 
-  const products = await seedProducts({ brands, categories, highlights });
-  await seedVariants({ products, attributes });
+  const categories = await seedCategories(prisma);
 
-  console.log("Seeding hoàn tất thành công!");
+  await seedCampaigns(prisma);
+
+  const users = await seedUsers(prisma);
+
+  await seedUserAddresses(prisma, { users });
+
+  console.log("Seeding attribute options and specifications...");
+
+  await seedAttributesAndOptions(prisma);
+
+  await seedCategoryVariantAttributes(prisma);
+
+  await seedSpecifications(prisma);
+
+  const products = await seedProducts(prisma, {
+    brands,
+    categories,
+  });
+
+  (await seedProductSpecifications(prisma), await seedProductHighlights(prisma), await seedVariants(prisma, { products }), await seedProductColorImages(prisma, { products }), await Promise.all([seedPaymentMethods(prisma), seedVouchers(prisma), seedPromotions(prisma), seedBlogs(prisma), seedComments(prisma), seedImageMedia(prisma)]));
+
+  console.log("✅ Seeding completed successfully!");
 }
 
 main()
-  .catch((e) => {
-    console.error("Lỗi khi seeding:", e);
+  .catch((error) => {
+    console.error("❌ Seeding failed:", error);
     process.exit(1);
   })
   .finally(async () => {
