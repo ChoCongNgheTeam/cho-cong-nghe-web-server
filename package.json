@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "ts-node-dev -r tsconfig-paths/register --respawn --transpile-only src/server.ts",
     "build": "tsc",
-    "start": "node dist/src/server.js",
+    "start": "node -r tsconfig-paths/register dist/src/server.js",
     "cleanup:refresh-token": "ts-node src/scripts/cleanup-refresh-token.ts",
     "upload:assets": "ts-node scripts/upload-assets.ts",
     "upload:content": "ts-node scripts/upload-content.ts"
