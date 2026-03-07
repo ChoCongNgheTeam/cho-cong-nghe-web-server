@@ -13,8 +13,7 @@ const app = express();
 
 app.use(
   cors({
-    // origin: process.env.FRONTEND_URL || ["http://localhost:3000", "http://127.0.0.1:5500",],
-    origin: true,
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -37,6 +36,13 @@ app.use(cookieParser());
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+app.get("/", (req, res) => {
+  res.json({
+    message: "Xin chào 👋",
+    service: "ChoCongNghe API",
+    docs: "https://api.chocongnghe.id.vn/api-docs",
+  });
+});
 app.use("/api/v1", routes);
 
 app.use(errorMiddleware);
