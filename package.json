@@ -11,9 +11,6 @@
     "upload:assets": "ts-node scripts/upload-assets.ts",
     "upload:content": "ts-node scripts/upload-content.ts"
   },
-  "_moduleAliases": {
-    "@": "dist/src"
-  },
   "prisma": {
     "seed": "ts-node -r tsconfig-paths/register prisma/seed.ts"
   },
