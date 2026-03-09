@@ -1,25 +1,25 @@
 import { Request, Response } from "express";
 import * as wishlistService from "./wishlist.service";
 
-// Get user's wishlist
 export const getWishlistHandler = async (req: Request, res: Response) => {
   const userId = req.user!.id;
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
 
-  const wishlist = await wishlistService.getWishlist(userId);
+  const result = await wishlistService.getWishlist(userId, page, limit);
 
   res.json({
-    data: wishlist,
-    total: wishlist.length,
+    data: result.items,
+    meta: result.meta,
     message: "Lấy danh sách yêu thích thành công",
   });
 };
 
-// Add product to wishlist
 export const addToWishlistHandler = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const { productVariantId } = req.body;
+  const { productId } = req.body;
 
-  const wishlistItem = await wishlistService.addToWishlist(userId, productVariantId);
+  const wishlistItem = await wishlistService.addToWishlist(userId, productId);
 
   res.status(201).json({
     data: wishlistItem,
@@ -27,29 +27,25 @@ export const addToWishlistHandler = async (req: Request, res: Response) => {
   });
 };
 
-// Remove product from wishlist
 export const removeFromWishlistHandler = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const { productVariantId } = req.body;
+  const { productId } = req.body;
 
-  await wishlistService.removeFromWishlist(userId, productVariantId);
+  await wishlistService.removeFromWishlist(userId, productId);
 
   res.json({
     message: "Xoá sản phẩm khỏi danh sách yêu thích thành công",
   });
 };
 
-// Check if product is in wishlist
 export const checkWishlistHandler = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const { productVariantId } = req.params;
+  const { productId } = req.params;
 
-  const isInWishlist = await wishlistService.checkInWishlist(userId, productVariantId);
+  const isInWishlist = await wishlistService.checkInWishlist(userId, productId);
 
   res.json({
-    data: {
-      isInWishlist,
-    },
+    data: { isInWishlist },
     message: "Kiểm tra danh sách yêu thích thành công",
   });
 };
