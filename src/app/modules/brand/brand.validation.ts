@@ -1,11 +1,11 @@
 import { z } from "zod";
 
 export const brandParamsSchema = z.object({
-  id: z.uuid({ message: "ID thương hiệu không hợp lệ" }),
+  id: z.string().uuid("ID thương hiệu không hợp lệ"),
 });
 
 export const brandSlugParamsSchema = z.object({
-  slug: z.string().min(1, { message: "Slug không được để trống" }),
+  slug: z.string().min(1, "Slug không được để trống"),
 });
 
 export const listBrandsQuerySchema = z.object({
@@ -14,6 +14,8 @@ export const listBrandsQuerySchema = z.object({
   isActive: z.coerce.boolean().optional(),
   sortBy: z.enum(["name", "createdAt", "productCount"]).default("name"),
   sortOrder: z.enum(["asc", "desc"]).default("asc"),
+  // Admin only: xem cả brand đã soft delete
+  includeDeleted: z.coerce.boolean().optional().default(false),
 });
 
 export const featuredBrandsQuerySchema = z.object({
@@ -21,37 +23,21 @@ export const featuredBrandsQuerySchema = z.object({
 });
 
 export const createBrandSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(2, "Tên thương hiệu phải từ 2 ký tự")
-    .max(100, "Tên thương hiệu tối đa 100 ký tự"),
-
+  name: z.string().trim().min(2, "Tên thương hiệu phải từ 2 ký tự").max(100, "Tên thương hiệu tối đa 100 ký tự"),
   description: z.string().trim().max(500, "Mô tả tối đa 500 ký tự").optional().or(z.literal("")),
-
   imageUrl: z.string().url().optional(),
   imagePath: z.string().optional(),
-
   isFeatured: z.coerce.boolean().optional().default(false),
   isActive: z.coerce.boolean().optional().default(true),
 });
 
 export const updateBrandSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(2, "Tên thương hiệu phải từ 2 ký tự")
-    .max(100, "Tên thương hiệu tối đa 100 ký tự")
-    .optional(),
-
+  name: z.string().trim().min(2, "Tên thương hiệu phải từ 2 ký tự").max(100, "Tên thương hiệu tối đa 100 ký tự").optional(),
   description: z.string().trim().max(500, "Mô tả tối đa 500 ký tự").optional().or(z.literal("")),
-
   imageUrl: z.string().url().optional(),
   imagePath: z.string().optional(),
-
-  isFeatured: z.coerce.boolean().optional().default(false),
-  isActive: z.coerce.boolean().optional().default(true),
-
+  isFeatured: z.coerce.boolean().optional(),
+  isActive: z.coerce.boolean().optional(),
   removeImage: z.boolean().optional(),
 });
 

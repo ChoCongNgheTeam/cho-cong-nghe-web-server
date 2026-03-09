@@ -16,39 +16,30 @@ import {
   hardDeleteUserHandler,
   getDeletedUsersHandler,
 } from "./user.controller";
-import { createUserSchema, updateUserSchema, updateProfileSchema, changePasswordSchema } from "./user.validation";
+import { createUserSchema, updateUserSchema, updateProfileSchema, changePasswordSchema, getUsersQuerySchema } from "./user.validation";
 
 const router = Router();
 
-router.get("/me", authMiddleware(true), asyncHandler(getMeHandler));
+const staffAdminAuth = [authMiddleware(), requireRole("STAFF", "ADMIN")] as const;
+const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
 
-router.patch("/me", authMiddleware(true), validate(updateProfileSchema), asyncHandler(updateMeHandler));
+// Self — static
+router.get("/me", authMiddleware(), asyncHandler(getMeHandler));
+router.patch("/me", authMiddleware(), validate(updateProfileSchema, "body"), asyncHandler(updateMeHandler));
+router.patch("/me/change-password", authMiddleware(), validate(changePasswordSchema, "body"), asyncHandler(changePasswordHandler));
 
-router.patch("/me/change-password", authMiddleware(true), validate(changePasswordSchema), asyncHandler(changePasswordHandler));
+// Admin — static
+router.get("/admin", ...staffAdminAuth, validate(getUsersQuerySchema, "query"), asyncHandler(getUsersHandler));
+router.post("/admin", ...adminAuth, validate(createUserSchema, "body"), asyncHandler(createUserHandler));
+router.get("/admin/trash", ...adminAuth, asyncHandler(getDeletedUsersHandler));
 
-//  Staff & Admin: xem danh sách / chi tiết / soft delete
+// Admin — param + suffix
+router.post("/admin/:id/restore", ...adminAuth, asyncHandler(restoreUserHandler));
+router.delete("/admin/:id/permanent", ...adminAuth, asyncHandler(hardDeleteUserHandler));
 
-router.get("/admin", authMiddleware(true), requireRole("STAFF", "ADMIN"), asyncHandler(getUsersHandler));
-
-router.get("/admin/:id", authMiddleware(true), requireRole("STAFF", "ADMIN"), asyncHandler(getUserByIdHandler));
-
-//   Staff → chỉ xóa được CUSTOMER (guard trong controller)
-//   Admin → xóa mọi role (trừ chính mình — guard trong service)
-router.delete("/admin/:id", authMiddleware(true), requireRole("STAFF", "ADMIN"), asyncHandler(deleteUserHandler));
-
-// Admin only
-
-router.post("/admin", authMiddleware(true), requireRole("ADMIN"), validate(createUserSchema), asyncHandler(createUserHandler));
-
-router.patch("/admin/:id", authMiddleware(true), requireRole("ADMIN"), validate(updateUserSchema), asyncHandler(updateUserHandler));
-
-// Khôi phục từ trash
-router.post("/admin/:id/restore", authMiddleware(true), requireRole("ADMIN"), asyncHandler(restoreUserHandler));
-
-// Hard delete (chỉ sau khi đã soft delete)
-router.delete("/admin/:id/permanent", authMiddleware(true), requireRole("ADMIN"), asyncHandler(hardDeleteUserHandler));
-
-// Danh sách user trong trash
-router.get("/admin/trash/users", authMiddleware(true), requireRole("ADMIN"), asyncHandler(getDeletedUsersHandler));
+// Admin — param only
+router.get("/admin/:id", ...staffAdminAuth, asyncHandler(getUserByIdHandler));
+router.patch("/admin/:id", ...adminAuth, validate(updateUserSchema, "body"), asyncHandler(updateUserHandler));
+router.delete("/admin/:id", ...staffAdminAuth, asyncHandler(deleteUserHandler));
 
 export default router;

@@ -13,7 +13,7 @@ const assertUserExists = async (id: string, options: { includeDeleted?: boolean;
   return user;
 };
 
-//  Self (user đang đăng nhập)
+// Self (user đang đăng nhập)
 
 export const getMe = async (userId: string) => {
   return assertUserExists(userId);
@@ -45,23 +45,14 @@ export const changeMyPassword = async (userId: string, input: ChangePasswordInpu
 // Staff & Admin: danh sách, chi tiết
 
 export const getUsers = async (query: GetUsersQuery, isAdmin: boolean) => {
-  // Staff không được phép xem includeDeleted dù có truyền lên
-  const includeDeleted = isAdmin
-    ? (query.includeDeleted ?? true) // default true for admin
-    : false;
-
-  return userRepository.findAll({
-    ...query,
-    includeDeleted,
-    isAdmin,
-  });
+  return userRepository.findAll({ ...query, isAdmin });
 };
 
 export const getUserById = async (id: string, options: { includeDeleted?: boolean; isAdmin?: boolean } = {}) => {
   return assertUserExists(id, options);
 };
 
-//  Admin: tạo / cập nhật
+// Admin: tạo / cập nhật
 
 export const createUser = async (input: CreateUserInput) => {
   const { password, ...rest } = input;
@@ -81,13 +72,9 @@ export const updateUser = async (id: string, input: UpdateUserInput) => {
   return userRepository.update(id, data).catch(handlePrismaError);
 };
 
-//  Soft delete — Staff & Admin
+// Soft delete — Staff & Admin
+// Guard role target (staff chỉ xóa customer) được thực hiện ở controller
 
-/**
- * Không cho phép tự xóa bản thân.
- * Việc kiểm tra role target (staff chỉ xóa customer) được thực hiện ở controller
- * vì cần query target trước — tránh duplicate query trong service.
- */
 export const softDeleteUser = async (targetId: string, requesterId: string) => {
   if (targetId === requesterId) {
     throw new ForbiddenError("Không thể tự xóa tài khoản của chính mình");
@@ -105,27 +92,15 @@ export const restoreUser = async (id: string) => {
   return userRepository.restore(id).catch(handlePrismaError);
 };
 
-/**
- * Hard delete chỉ cho phép sau khi đã soft delete trước.
- * Điều này bắt buộc workflow: soft delete → review → hard delete.
- */
 export const hardDeleteUser = async (id: string) => {
-  const user = (await userRepository.findById(id, {
-    includeDeleted: true,
-    isAdmin: true,
-  })) as any;
-
+  const user = (await userRepository.findById(id, { includeDeleted: true, isAdmin: true })) as any;
   if (!user) throw new NotFoundError("Người dùng");
 
   if (!user.deletedAt) {
     throw new ForbiddenError("Phải soft delete trước khi xóa vĩnh viễn. Dùng DELETE /admin/users/:id");
   }
 
-  try {
-    return await userRepository.hardDelete(id);
-  } catch (err) {
-    await handlePrismaError(err, { deletingUserId: id });
-  }
+  return userRepository.hardDelete(id).catch(handlePrismaError);
 };
 
 export const getDeletedUsers = async (query: Pick<GetUsersQuery, "page" | "limit">) => {

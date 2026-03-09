@@ -1,6 +1,4 @@
-// =====================
-// === ENUMS ===
-// =====================
+// ─── Enums ────────────────────────────────────────────────────────────────────
 
 export enum BlogStatus {
   DRAFT = "DRAFT",
@@ -8,9 +6,7 @@ export enum BlogStatus {
   ARCHIVED = "ARCHIVED",
 }
 
-// =====================
-// === SHARED TYPES ===
-// =====================
+// ─── Shared ───────────────────────────────────────────────────────────────────
 
 export interface Author {
   id: string;
@@ -19,23 +15,23 @@ export interface Author {
   avatarImage?: string;
 }
 
-// =====================
-// === BLOG TYPES ===
-// =====================
+// ─── Response shapes ─────────────────────────────────────────────────────────
 
 export interface BlogCard {
   id: string;
   title: string;
   slug: string;
   thumbnail?: string;
-  excerpt: string; // First 200 chars of content
+  excerpt: string;
   viewCount: number;
   status: BlogStatus;
   author: Author;
   createdAt: Date;
   publishedAt?: Date;
-  // Placeholder for comments count (will be populated by orchestrator)
   commentsCount?: number;
+  // Soft delete — chỉ xuất hiện trong response admin/trash
+  deletedAt?: Date;
+  deletedBy?: string;
 }
 
 export interface BlogDetail {
@@ -50,26 +46,25 @@ export interface BlogDetail {
   createdAt: Date;
   updatedAt: Date;
   publishedAt?: Date;
-  // Placeholder for comments (will be populated by orchestrator)
   comments?: any[];
   commentsCount?: number;
+  // Soft delete — chỉ xuất hiện trong response admin/trash
+  deletedAt?: Date;
+  deletedBy?: string;
 }
 
-// =====================
-// === RAW DB TYPES ===
-// =====================
+// ─── Raw DB shapes ────────────────────────────────────────────────────────────
 
-export interface RawBlog {
+export interface RawBlogBase {
   id: string;
-  authorId: string;
   title: string;
   slug: string;
   content: string;
-  thumbnail: string | null;
+  imageUrl: string | null;
+  imagePath: string | null;
   viewCount: number;
   status: BlogStatus;
   createdAt: Date;
-  updatedAt: Date;
   publishedAt: Date | null;
   author: {
     id: string;
@@ -79,39 +74,17 @@ export interface RawBlog {
   };
 }
 
-// =====================
-// === REQUEST TYPES ===
-// =====================
-
-export interface CreateBlogInput {
-  title: string;
-  content: string;
-  thumbnail?: string;
-  status?: BlogStatus;
-  publishedAt?: Date;
+export interface RawBlogDetail extends RawBlogBase {
+  updatedAt: Date;
 }
 
-export interface UpdateBlogInput {
-  title?: string;
-  content?: string;
-  thumbnail?: string;
-  status?: BlogStatus;
-  publishedAt?: Date;
+// Admin raw — thêm soft delete fields
+export interface RawBlogAdmin extends RawBlogDetail {
+  deletedAt: Date | null;
+  deletedBy: string | null;
 }
 
-export interface ListBlogsQuery {
-  page: number;
-  limit: number;
-  search?: string;
-  status?: BlogStatus;
-  authorId?: string;
-  sortBy: "createdAt" | "publishedAt" | "viewCount" | "title";
-  sortOrder: "asc" | "desc";
-}
-
-// =====================
-// === RESPONSE TYPES ===
-// =====================
+// ─── Pagination ───────────────────────────────────────────────────────────────
 
 export interface PaginatedResponse<T> {
   data: T[];

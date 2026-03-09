@@ -3,6 +3,16 @@ import { transformComment, transformCommentsList } from "./comment.transformers"
 import { CreateCommentInput, UpdateCommentInput, ListCommentsQuery, CommentTargetType } from "./comment.validation";
 import { NotFoundError, BadRequestError, ForbiddenError } from "@/errors";
 
+//  Helper
+
+const assertCommentExists = async (id: string, options: { includeDeleted?: boolean; isAdmin?: boolean } = {}) => {
+  const comment = await repo.findById(id, options);
+  if (!comment) throw new NotFoundError("Comment");
+  return comment;
+};
+
+//  Public
+
 export const getCommentsPublic = async (query: ListCommentsQuery) => {
   const result = await repo.findAllPublic(query);
   return { ...result, data: transformCommentsList(result.data) };
@@ -21,9 +31,13 @@ export const getCommentsCountByTargets = async (targetType: CommentTargetType, t
 };
 
 export const getCommentReplies = async (parentId: string) => {
+  // Kiểm tra parent tồn tại và chưa bị xóa
+  await assertCommentExists(parentId);
   const replies = await repo.findReplies(parentId, true);
   return transformCommentsList(replies);
 };
+
+//  Authenticated user: tạo, tự xóa comment của mình
 
 export const createComment = async (userId: string, input: CreateCommentInput) => {
   const targetExists = await repo.validateTarget(input.targetType, input.targetId);
@@ -31,47 +45,102 @@ export const createComment = async (userId: string, input: CreateCommentInput) =
 
   if (input.parentId) {
     const parentValid = await repo.validateParentComment(input.parentId, input.targetType, input.targetId);
-    if (!parentValid) throw new BadRequestError("Parent comment không hợp lệ hoặc không tồn tại");
+    if (!parentValid) {
+      throw new BadRequestError("Parent comment không hợp lệ, đã bị xóa, hoặc không thuộc cùng target");
+    }
   }
 
   const comment = await repo.create(userId, input);
   return transformComment(comment);
 };
 
+/**
+ * User tự xóa comment của mình — soft delete, KHÔNG xóa replies.
+ * Replies của người khác vẫn hiển thị dù parent bị ẩn.
+ */
+export const deleteOwnComment = async (id: string, userId: string) => {
+  const comment = await assertCommentExists(id);
+
+  if ((comment as any).userId !== userId) {
+    throw new ForbiddenError("Bạn không có quyền xóa comment này");
+  }
+
+  return repo.softDeleteOwn(id, userId);
+};
+
+//  Staff & Admin: list, detail, approve
+
 export const getCommentsAdmin = async (query: ListCommentsQuery) => {
   const result = await repo.findAllAdmin(query);
   return { ...result, data: transformCommentsList(result.data) };
 };
 
-export const getCommentById = async (id: string) => {
-  const comment = await repo.findById(id);
-  if (!comment) throw new NotFoundError("Comment");
+export const getCommentById = async (id: string, options: { includeDeleted?: boolean; isAdmin?: boolean } = {}) => {
+  const comment = await assertCommentExists(id, options);
   return transformComment(comment);
 };
 
 export const updateComment = async (id: string, input: UpdateCommentInput) => {
-  await getCommentById(id);
+  await assertCommentExists(id);
   const comment = await repo.update(id, input);
   return transformComment(comment);
 };
 
 export const updateCommentApproval = async (id: string, isApproved: boolean) => {
-  await getCommentById(id);
+  await assertCommentExists(id);
   const comment = await repo.update(id, { isApproved });
   return transformComment(comment);
-};
-
-export const deleteComment = async (id: string) => {
-  await getCommentById(id);
-  return repo.remove(id);
 };
 
 export const bulkApproveComments = async (commentIds: string[], isApproved: boolean) => {
   return repo.bulkApprove(commentIds, isApproved);
 };
 
-export const deleteOwnComment = async (id: string, userId: string) => {
-  const comment = await getCommentById(id);
-  if (comment.userId !== userId) throw new ForbiddenError("Bạn không có quyền xóa comment này");
-  return repo.remove(id);
+//  Soft delete — Staff & Admin
+
+/**
+ * Soft delete — replies cũng bị soft delete theo.
+ */
+export const softDeleteComment = async (id: string, deletedById: string) => {
+  await assertCommentExists(id);
+  return repo.softDelete(id, deletedById);
+};
+
+export const bulkSoftDeleteComments = async (ids: string[], deletedById: string) => {
+  return repo.bulkSoftDelete(ids, deletedById);
+};
+
+//  Admin only: restore, hard delete, trash
+
+export const restoreComment = async (id: string) => {
+  const comment = (await repo.findById(id, { includeDeleted: true, isAdmin: true })) as any;
+  if (!comment) throw new NotFoundError("Comment");
+  if (!comment.deletedAt) throw new BadRequestError("Comment này chưa bị xóa");
+
+  const restored = await repo.restore(id);
+  return transformComment(restored);
+};
+
+export const bulkRestoreComments = async (ids: string[]) => {
+  return repo.bulkRestore(ids);
+};
+
+/**
+ * Hard delete — Admin only, CHỈ sau khi đã soft delete.
+ * Hard delete replies trước, rồi mới hard delete comment.
+ */
+export const hardDeleteComment = async (id: string) => {
+  const comment = (await repo.findById(id, { includeDeleted: true, isAdmin: true })) as any;
+  if (!comment) throw new NotFoundError("Comment");
+
+  if (!comment.deletedAt) {
+    throw new ForbiddenError("Phải soft delete trước khi xóa vĩnh viễn. Dùng DELETE /admin/comments/:id");
+  }
+
+  return repo.hardDelete(id);
+};
+
+export const getDeletedComments = async (query: Pick<ListCommentsQuery, "page" | "limit">) => {
+  const result = await repo.findAllDeleted(query);
+  return { ...result, data: transformCommentsList(result.data) };
 };
