@@ -10,7 +10,16 @@ const productSelect = {
   categoryId: true,
   ratingAverage: true,
   ratingCount: true,
-  // Thêm mảng hình ảnh vào đây
+  variants: {
+    where: {
+      isDefault: true,
+      isActive: true, // Chỉ lấy biến thể còn đang bán
+    },
+    select: {
+      price: true,
+    },
+    take: 1, // Lấy 1 cái đại diện để hiển thị giá
+  },
   img: {
     select: {
       id: true,

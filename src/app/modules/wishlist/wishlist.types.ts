@@ -12,7 +12,9 @@ export interface WishlistItem {
     categoryId: string;
     ratingAverage: any; // Decimal from Prisma
     ratingCount: number;
-    // Bổ sung kiểu dữ liệu cho mảng ảnh
+    variants: Array<{
+      price: any; // Decimal
+    }>;
     img: Array<{
       id: string;
       color: string;
