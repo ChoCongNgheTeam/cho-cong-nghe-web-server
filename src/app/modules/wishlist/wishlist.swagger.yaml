@@ -4,10 +4,6 @@ info:
   version: 1.0.0
   description: API để quản lý danh sách sản phẩm yêu thích
 
-servers:
-  - url: http://localhost:5000/api/v1
-    description: Local server
-
 tags:
   - name: Wishlist
     description: Các API liên quan đến danh sách yêu thích
@@ -17,61 +13,37 @@ paths:
     get:
       tags:
         - Wishlist
-      summary: Lấy danh sách yêu thích của người dùng
-      description: Lấy tất cả sản phẩm trong danh sách yêu thích của người dùng hiện tại
+      summary: Lấy danh sách yêu thích của người dùng (Có phân trang)
       security:
         - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Số trang hiện tại (Mặc định là 1)
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Số lượng sản phẩm trên mỗi trang (Mặc định là 10)
+          required: false
+          schema:
+            type: integer
+            default: 10
       responses:
         '200':
-          description: Lấy danh sách yêu thích thành công
+          description: Thành công
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: string
-                          format: uuid
-                        userId:
-                          type: string
-                          format: uuid
-                        productVariantId:
-                          type: string
-                          format: uuid
-                        createdAt:
-                          type: string
-                          format: date-time
-                        productVariant:
-                          type: object
               example:
-                data:
-                  - id: "aaaa1111-aaaa-1111-aaaa-111111111111"
-                    productVariantId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+                data: []
+                meta:
+                  total: 25
+                  page: 1
+                  limit: 10
+                  totalPages: 3
                 message: "Lấy danh sách yêu thích thành công"
-        '401':
-          description: Chưa đăng nhập
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        '500':
-          description: Lỗi server
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-
   /wishlist/add:
     post:
       tags:
@@ -86,30 +58,20 @@ paths:
             schema:
               type: object
               required:
-                - productVariantId
+                - productId
               properties:
-                productVariantId:
+                productId:
                   type: string
                   format: uuid
       responses:
         '201':
           description: Thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
         '400':
-          description: Lỗi dữ liệu
-        '401':
-          description: Chưa đăng nhập
+          description: Lỗi dữ liệu hoặc sản phẩm ngừng kinh doanh
         '404':
           description: Không tìm thấy sản phẩm
         '409':
-          description: Đã tồn tại
-
+          description: Sản phẩm đã có trong wishlist
   /wishlist/remove:
     delete:
       tags:
@@ -124,25 +86,15 @@ paths:
             schema:
               type: object
               required:
-                - productVariantId
+                - productId
               properties:
-                productVariantId:
+                productId:
                   type: string
                   format: uuid
       responses:
         '200':
           description: Thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        '404':
-          description: Không tìm thấy sản phẩm
-
-  /wishlist/check/{productVariantId}:
+  /wishlist/check/{productId}:
     get:
       tags:
         - Wishlist
@@ -150,7 +102,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - name: productVariantId
+        - name: productId
           in: path
           required: true
           schema:
@@ -159,16 +111,6 @@ paths:
       responses:
         '200':
           description: Thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      isInWishlist:
-                        type: boolean
 
 components:
   securitySchemes:

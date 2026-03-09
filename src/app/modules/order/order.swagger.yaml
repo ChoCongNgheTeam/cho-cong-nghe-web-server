@@ -1,15 +1,28 @@
+openapi: 3.0.0
+info:
+  title: Order API
+  version: 4.0.0
+  description: API quản lý Đơn hàng. Hỗ trợ Hủy Đơn (Cancel), Mua Lại (Re-order) và cơ chế Lưu Trữ (Archive) an toàn tuyệt đối cho Kho.
+
+tags:
+  - name: Orders - Public
+    description: API dành cho người dùng cuối (Customer)
+  - name: Orders - Staff/Admin
+    description: API quản trị chung (Xem, Cập nhật trạng thái, Hủy đơn)
+  - name: Orders - Admin Only
+    description: API độc quyền của Admin (Tạo đơn hộ, Lưu trữ - Archive, Xóa cứng)
+
 paths:
   # ==================== PUBLIC ENDPOINTS (USER) ====================
   /orders/my:
     get:
-      summary: Lấy danh sách đơn hàng của người dùng hiện tại
+      summary: Lấy danh sách đơn hàng của tôi
       tags: [Orders - Public]
       security:
         - bearerAuth: []
-      description: Lấy tất cả đơn hàng thuộc về user đang đăng nhập, sắp xếp theo ngày đặt hàng mới nhất
       responses:
         "200":
-          description: Lấy danh sách đơn hàng thành công
+          description: Thành công
           content:
             application/json:
               schema:
@@ -19,18 +32,12 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/OrderDetail"
-                  message:
-                    type: string
                   total:
                     type: integer
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "500":
-          $ref: "#/components/responses/ServerError"
 
   /orders/my/{id}:
     get:
-      summary: Xem chi tiết đơn hàng (Của chính user)
+      summary: Xem chi tiết đơn hàng của tôi
       tags: [Orders - Public]
       security:
         - bearerAuth: []
@@ -41,97 +48,35 @@ paths:
           schema:
             type: string
             format: uuid
-          description: ID của đơn hàng
       responses:
         "200":
-          description: Lấy chi tiết đơn hàng thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    $ref: "#/components/schemas/OrderDetail"
-                  message:
-                    type: string
-        "400":
-          description: Bạn không có quyền xem đơn hàng này
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "404":
-          description: Không tìm thấy đơn hàng
-        "500":
-          $ref: "#/components/responses/ServerError"
+          description: Thành công
 
-  # ==================== ADMIN ENDPOINTS ====================
-  /orders/admin:
+  /orders/my/{id}/cancel:
     post:
-      summary: Tạo đơn hàng hộ (Admin only)
-      tags: [Orders - Admin]
+      summary: User Hủy đơn hàng
+      description: Khách tự hủy đơn (chỉ được phép khi đang PENDING hoặc PROCESSING). Hệ thống tự động hoàn Kho.
+      tags: [Orders - Public]
       security:
         - bearerAuth: []
-      description: Admin tạo đơn hàng trực tiếp cho khách hàng. Hỗ trợ cả khách đã có tài khoản (gửi userId) và khách mới (gửi customerInfo để tự động tạo user).
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateOrderAdminRequest"
-      responses:
-        "201":
-          description: Tạo đơn hàng thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    $ref: "#/components/schemas/OrderDetail"
-                  message:
-                    type: string
-        "400":
-          description: Thiếu thông tin, tồn kho không đủ hoặc sai mã voucher
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "403":
-          $ref: "#/components/responses/ForbiddenError"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
-  /orders/admin/all:
-    get:
-      summary: Lấy tất cả đơn hàng (Admin only)
-      tags: [Orders - Admin]
-      security:
-        - bearerAuth: []
-      description: Quản trị viên lấy danh sách toàn bộ hệ thống đơn hàng
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
       responses:
         "200":
-          description: Lấy tất cả đơn hàng thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/OrderDetail"
-                  total:
-                    type: integer
-                  message:
-                    type: string
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "403":
-          $ref: "#/components/responses/ForbiddenError"
-        "500":
-          $ref: "#/components/responses/ServerError"
+          description: Hủy thành công
+        "400":
+          description: Đơn không thỏa điều kiện hủy
 
-  /orders/admin/{id}:
-    get:
-      summary: Xem chi tiết đơn hàng bất kỳ (Admin only)
-      tags: [Orders - Admin]
+  /orders/my/{id}/reorder:
+    post:
+      summary: Mua lại (Re-order)
+      description: Quét sản phẩm đơn cũ và tự động thêm vào Giỏ hàng hiện tại (có check tồn kho thực tế).
+      tags: [Orders - Public]
       security:
         - bearerAuth: []
       parameters:
@@ -149,16 +94,82 @@ paths:
               schema:
                 type: object
                 properties:
+                  success:
+                    type: boolean
                   data:
-                    $ref: "#/components/schemas/OrderDetail"
+                    type: object
+                    properties:
+                      addedCount:
+                        type: integer
+                      outOfStockCount:
+                        type: integer
                   message:
                     type: string
-        "404":
-          description: Không tìm thấy
-    
+
+  # ==================== STAFF & ADMIN ENDPOINTS ====================
+  /orders/admin/all:
+    get:
+      summary: Lấy danh sách toàn bộ đơn hàng
+      tags: [Orders - Staff/Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Tìm theo mã đơn, sđt hoặc tên người nhận
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED]
+        - in: query
+          name: paymentStatus
+          schema:
+            type: string
+            enum: [UNPAID, PAID, REFUNDED]
+        - in: query
+          name: includeDeleted
+          schema:
+            type: boolean
+            default: false
+          description: Nếu true sẽ lấy cả các đơn hàng đã bị lưu trữ (Archived)
+      responses:
+        "200":
+          description: Thành công
+
+  /orders/admin/{id}:
+    get:
+      summary: Xem chi tiết đơn hàng
+      tags: [Orders - Staff/Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Thành công
+
     patch:
-      summary: Cập nhật trạng thái đơn hàng (Admin only)
-      tags: [Orders - Admin]
+      summary: Cập nhật thông tin đơn hàng
+      description: Không dùng API này để Hủy đơn. Hãy gọi API `/orders/admin/{id}/cancel` để được xử lý trả lại Tồn kho an toàn.
+      tags: [Orders - Staff/Admin]
       security:
         - bearerAuth: []
       parameters:
@@ -173,27 +184,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateOrderAdminRequest"
+              $ref: "#/components/schemas/UpdateOrderInput"
       responses:
         "200":
-          description: Cập nhật thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    $ref: "#/components/schemas/OrderDetail"
-                  message:
-                    type: string
-        "400":
-          description: Lỗi validation
-        "404":
-          description: Không tìm thấy đơn hàng
+          description: Thành công
 
-    delete:
-      summary: Xóa đơn hàng và hoàn lại tồn kho (Admin only)
-      tags: [Orders - Admin]
+  /orders/admin/{id}/cancel:
+    post:
+      summary: Admin Hủy đơn hàng (Cancel)
+      description: Admin hủy đơn hàng, hệ thống sẽ tự động hoàn lại số lượng Tồn Kho cho sản phẩm.
+      tags: [Orders - Staff/Admin]
       security:
         - bearerAuth: []
       parameters:
@@ -205,40 +205,134 @@ paths:
             format: uuid
       responses:
         "200":
-          description: Xóa thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
-        "404":
-          description: Không tìm thấy đơn hàng
+          description: Hủy thành công
+
+  # ==================== ADMIN ONLY ENDPOINTS ====================
+  /orders/admin:
+    post:
+      summary: Tạo đơn hàng (Tạo hộ khách)
+      tags: [Orders - Admin Only]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderInput"
+      responses:
+        "201":
+          description: Tạo thành công
+
+  /orders/admin/archive/orders:
+    get:
+      summary: Lấy danh sách đơn hàng đã lưu trữ (Archived)
+      tags: [Orders - Admin Only]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Thành công
+
+  /orders/admin/{id}/archive:
+    post:
+      summary: Lưu trữ đơn hàng (Archive)
+      description: Ẩn đơn hàng khỏi danh sách chính (Soft Delete). **Chỉ áp dụng cho đơn đã CANCELLED hoặc DELIVERED.** Không ảnh hưởng đến tồn kho.
+      tags: [Orders - Admin Only]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Archive thành công
+        "400":
+          description: Lỗi nếu đơn hàng đang ở trạng thái xử lý
+
+  /orders/admin/{id}/unarchive:
+    post:
+      summary: Khôi phục đơn hàng đã lưu trữ (Unarchive)
+      description: Đưa đơn hàng trở lại danh sách quản lý chính.
+      tags: [Orders - Admin Only]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Khôi phục thành công
+
+  /orders/admin/{id}/permanent:
+    delete:
+      summary: Xóa vĩnh viễn đơn hàng
+      description: Đơn hàng phải nằm trong danh sách Archive (đã lưu trữ) trước khi được xóa cứng khỏi cơ sở dữ liệu.
+      tags: [Orders - Admin Only]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Xóa cứng thành công
 
 components:
   schemas:
-    CreateOrderAdminRequest:
+    UpdateOrderInput:
       type: object
-      required:
-        - items
-        - paymentMethodId
-        - paymentStatus
-        - orderStatus
+      properties:
+        orderStatus:
+          type: string
+          enum: [PENDING, PROCESSING, SHIPPED, DELIVERED]
+        paymentStatus:
+          type: string
+          enum: [UNPAID, PAID, REFUNDED]
+        shippingFee:
+          type: number
+        voucherDiscount:
+          type: number
+
+    CreateOrderInput:
+      type: object
+      description: "Phải cung cấp userId & shippingAddressId CÓ SẴN, HOẶC customerInfo & newAddress ĐỂ TẠO MỚI"
       properties:
         userId:
           type: string
           format: uuid
-          description: "ID khách cũ (Tùy chọn nếu dùng customerInfo)"
         shippingAddressId:
           type: string
           format: uuid
-          description: "ID địa chỉ cũ (Tùy chọn nếu dùng newAddress)"
         customerInfo:
           type: object
-          description: "Thông tin khách vãng lai (Bắt buộc nếu không truyền userId)"
           properties:
             fullName:
               type: string
@@ -248,7 +342,6 @@ components:
               type: string
         newAddress:
           type: object
-          description: "Địa chỉ mới của khách vãng lai (Bắt buộc nếu không truyền shippingAddressId)"
           properties:
             provinceId:
               type: string
@@ -262,10 +355,6 @@ components:
           type: array
           items:
             type: object
-            required:
-              - productVariantId
-              - quantity
-              - unitPrice
             properties:
               productVariantId:
                 type: string
@@ -276,10 +365,8 @@ components:
                 type: number
         voucherCode:
           type: string
-          description: "Mã giảm giá (Tùy chọn)"
         shippingFee:
           type: number
-          default: 0
         paymentMethodId:
           type: string
           format: uuid
@@ -289,169 +376,31 @@ components:
         orderStatus:
           type: string
           enum: [PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED]
-
-    UpdateOrderAdminRequest:
-      type: object
-      properties:
-        orderStatus:
-          type: string
-          enum: [PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED]
-        paymentStatus:
-          type: string
-          enum: [UNPAID, PAID, REFUNDED]
-        shippingFee:
-          type: number
-        voucherDiscount:
-          type: number
+      required:
+        - items
+        - shippingFee
+        - paymentMethodId
+        - paymentStatus
+        - orderStatus
 
     OrderDetail:
       type: object
       properties:
         id:
           type: string
-          format: uuid
         orderCode:
-          type: string
-        userId:
-          type: string
-          format: uuid
-        paymentMethodId:
-          type: string
-          format: uuid
-        voucherId:
-          type: string
-          format: uuid
-          nullable: true
-        shippingAddressId:
-          type: string
-          format: uuid
-          nullable: true
-        shippingContactName:
-          type: string
-        shippingPhone:
-          type: string
-        shippingProvince:
-          type: string
-        shippingWard:
-          type: string
-        shippingDetail:
-          type: string
-        subtotalAmount:
-          type: string
-        shippingFee:
-          type: string
-        voucherDiscount:
-          type: string
-        totalAmount:
           type: string
         orderStatus:
           type: string
-          enum: [PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED]
-        paymentStatus:
-          type: string
-          enum: [UNPAID, PAID, REFUNDED]
-        orderDate:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        user:
-          type: object
-          properties:
-            id:
-              type: string
-            fullName:
-              type: string
-            email:
-              type: string
-            phone:
-              type: string
-        paymentMethod:
-          type: object
-          properties:
-            id:
-              type: string
-            name:
-              type: string
-            description:
-              type: string
-        voucher:
-          type: object
-          nullable: true
-          properties:
-            id:
-              type: string
-            code:
-              type: string
-            description:
-              type: string
+        totalAmount:
+          type: number
         orderItems:
           type: array
           items:
             type: object
-            properties:
-              id:
-                type: string
-                format: uuid
-              quantity:
-                type: integer
-              unitPrice:
-                type: string
-              productVariant:
-                type: object
-                properties:
-                  id:
-                    type: string
-                  code:
-                    type: string
-                  price:
-                    type: string
-                  product:
-                    type: object
-                    properties:
-                      id:
-                        type: string
-                      name:
-                        type: string
-                      slug:
-                        type: string
-                      img:
-                        type: array
-                        items:
-                          type: object
-                          properties:
-                            imageUrl:
-                              type: string
-                            color:
-                              type: string
-                  variantAttributes:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        attributeOption:
-                          type: object
-                          properties:
-                            value:
-                              type: string
-                            attribute:
-                              type: object
-                              properties:
-                                name:
-                                  type: string
-
-  responses:
-    UnauthorizedError:
-      description: Báo lỗi khi thiếu token hoặc token không hợp lệ
-    ForbiddenError:
-      description: Báo lỗi khi user không đủ quyền truy cập (vd không phải Admin)
-    ServerError:
-      description: Báo lỗi nội bộ từ server
 
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: "Nhập JWT token (không cần thêm 'Bearer ' ở đầu)"

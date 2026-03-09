@@ -1,73 +1,89 @@
 import { Request, Response } from "express";
-import {
-  getMyOrders,
-  getOrderDetail,
-  getAllOrdersAdmin,
-  updateOrderAdmin,
-  deleteOrderAdmin,
-  createOrderAdmin,
-} from "./order.service";
+import * as service from "./order.service";
+import { orderQuerySchema } from "./order.validation";
 
 // ================== PUBLIC (USER) ==================
 export const getMyOrdersHandler = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const orders = await getMyOrders(userId);
+  const orders = await service.getMyOrders(userId);
+  res.json({ data: orders, total: orders.length, message: "Lấy danh sách đơn hàng thành công" });
+};
+
+export const getOrderDetailHandler = async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const order = await service.getOrderDetail(req.params.id, userId);
+  res.json({ data: order, message: "Lấy chi tiết đơn hàng thành công" });
+};
+
+export const cancelOrderUserHandler = async (req: Request, res: Response) => {
+  await service.cancelOrderUser(req.params.id, req.user!.id);
+  res.json({ success: true, message: "Hủy đơn hàng thành công" });
+};
+
+export const reorderUserHandler = async (req: Request, res: Response) => {
+  const result = await service.reorderUser(req.params.id, req.user!.id);
+  res.json({ 
+    success: true, 
+    data: result,
+    message: result.outOfStockCount > 0 
+      ? `Đã thêm ${result.addedCount} sản phẩm vào giỏ. Có ${result.outOfStockCount} sản phẩm đã hết hàng hoặc ngưng bán.` 
+      : "Đã thêm toàn bộ sản phẩm vào giỏ hàng." 
+  });
+};
+
+// ================== STAFF & ADMIN ==================
+export const getAllOrdersAdminHandler = async (req: Request, res: Response) => {
+  const query = orderQuerySchema.parse(req.query);
+  const result = await service.getAllOrdersAdmin(query);
   res.json({
-    data: orders,
-    total: orders.length,
+    data: result.data,
+    meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
     message: "Lấy danh sách đơn hàng thành công",
   });
 };
 
-export const getOrderDetailHandler = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const userId = req.user?.id;
-  const order = await getOrderDetail(id, userId);
-  res.json({
-    data: order,
-    message: "Lấy chi tiết đơn hàng thành công",
-  });
-};
-
-// ================== ADMIN ==================
-export const getAllOrdersAdminHandler = async (req: Request, res: Response) => {
-  const orders = await getAllOrdersAdmin();
-  res.json({
-    data: orders,
-    total: orders.length,
-    message: "Lấy tất cả đơn hàng thành công",
-  });
-};
-
 export const getOrderAdminDetailHandler = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const order = await getOrderDetail(id);
-  res.json({
-    data: order,
-    message: "Lấy chi tiết đơn hàng thành công",
-  });
-};
-
-export const createOrderAdminHandler = async (req: Request, res: Response) => {
-  const newOrder = await createOrderAdmin(req.body);
-  
-  res.status(201).json({
-    data: newOrder,
-    message: "Admin tạo đơn hàng hộ thành công",
-  });
+  const order = await service.getOrderDetail(req.params.id);
+  res.json({ data: order, message: "Lấy chi tiết đơn hàng thành công" });
 };
 
 export const updateOrderAdminHandler = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const order = await updateOrderAdmin(id, req.body);
+  const order = await service.updateOrderAdmin(req.params.id, req.body);
+  res.json({ data: order, message: "Cập nhật trạng thái đơn hàng thành công" });
+};
+
+export const cancelOrderAdminHandler = async (req: Request, res: Response) => {
+  await service.cancelOrderAdmin(req.params.id);
+  res.json({ success: true, message: "Đã hủy đơn hàng và hoàn lại tồn kho" });
+};
+
+// ================== ADMIN ONLY ==================
+export const createOrderAdminHandler = async (req: Request, res: Response) => {
+  const newOrder = await service.createOrderAdmin(req.body);
+  res.status(201).json({ data: newOrder, message: "Tạo đơn hàng hộ thành công" });
+};
+
+export const getArchivedOrdersAdminHandler = async (req: Request, res: Response) => {
+  const query = orderQuerySchema.parse(req.query);
+  const result = await service.getArchivedOrdersAdmin(query);
   res.json({
-    data: order,
-    message: "Cập nhật đơn hàng thành công",
+    data: result.data,
+    meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
+    message: "Lấy danh sách đơn hàng đã lưu trữ thành công",
   });
 };
 
-export const deleteOrderAdminHandler = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  await deleteOrderAdmin(id);
-  res.json({ message: "Xóa đơn hàng thành công" });
+export const archiveOrderAdminHandler = async (req: Request, res: Response) => {
+  await service.archiveOrderAdmin(req.params.id, req.user!.id);
+  res.json({ success: true, message: "Đã đưa đơn hàng vào bộ nhớ lưu trữ (Archive)" });
+};
+
+export const unarchiveOrderAdminHandler = async (req: Request, res: Response) => {
+  await service.unarchiveOrderAdmin(req.params.id);
+  res.json({ success: true, message: "Đã khôi phục đơn hàng khỏi bộ nhớ lưu trữ" });
+};
+
+export const hardDeleteOrderAdminHandler = async (req: Request, res: Response) => {
+  await service.hardDeleteOrderAdmin(req.params.id);
+  res.status(204).send();
 };

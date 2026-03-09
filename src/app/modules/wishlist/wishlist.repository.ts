@@ -1,132 +1,95 @@
 import prisma from "@/config/db";
 import { WishlistItem } from "./wishlist.types";
 
-const productVariantSelect = {
+const productSelect = {
   id: true,
-  productId: true,
-  code: true,
-  price: true,
-  soldCount: true,
-  isDefault: true,
-  isActive: true,
-  createdAt: true,
-  updatedAt: true,
-  product: {
+  name: true,
+  slug: true,
+  isActive: true, 
+  brandId: true,
+  categoryId: true,
+  ratingAverage: true,
+  ratingCount: true,
+  // Thêm mảng hình ảnh vào đây
+  img: {
     select: {
       id: true,
-      brandId: true,
-      name: true,
-      description: true,
-      slug: true,
-      viewsCount: true,
-      ratingAverage: true,
-      ratingCount: true,
-      isActive: true,
-      isFeatured: true,
-      createdAt: true,
-      updatedAt: true,
-      brand: {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          imageUrl: true,
-        },
-      },
-      img: {
-        select: {
-          id: true,
-          color: true,
-          imageUrl: true,
-          altText: true,
-          position: true,
-        },
-        orderBy: {
-          position: "asc" as const,
-        },
-      },
+      color: true,
+      imageUrl: true,
+      altText: true,
+      position: true,
+    },
+    orderBy: {
+      position: "asc" as const, // Sắp xếp để Frontend dễ lấy ảnh đại diện đầu tiên
     },
   },
 };
 
-// Get user's wishlist with product variant details
-export const getWishlistByUserId = async (userId: string): Promise<WishlistItem[]> => {
+export const getWishlistByUserId = async (userId: string, skip: number, take: number): Promise<WishlistItem[]> => {
   return prisma.wishlist.findMany({
-    where: {
-      userId,
-    },
+    where: { userId },
+    skip,
+    take,
     select: {
       id: true,
       userId: true,
-      productVariantId: true,
+      productId: true,
       createdAt: true,
-      productVariant: {
-        select: productVariantSelect,
+      product: {
+        select: productSelect,
       },
     },
-    orderBy: {
-      createdAt: "desc",
-    },
-  }) as Promise<WishlistItem[]>;
+    orderBy: { createdAt: "desc" },
+  }) as unknown as Promise<WishlistItem[]>;
 };
 
-// Add product variant to wishlist
-export const addToWishlist = async (userId: string, productVariantId: string): Promise<WishlistItem> => {
+export const countWishlistByUserId = async (userId: string): Promise<number> => {
+  return prisma.wishlist.count({
+    where: { userId },
+  });
+};
+
+export const addToWishlist = async (userId: string, productId: string): Promise<WishlistItem> => {
   return prisma.wishlist.create({
     data: {
       userId,
-      productVariantId,
+      productId,
     },
     select: {
       id: true,
       userId: true,
-      productVariantId: true,
+      productId: true,
       createdAt: true,
-      productVariant: {
-        select: productVariantSelect,
+      product: {
+        select: productSelect,
       },
     },
-  }) as Promise<WishlistItem>;
+  }) as unknown as Promise<WishlistItem>;
 };
 
-// Remove product variant from wishlist
-export const removeFromWishlist = async (userId: string, productVariantId: string) => {
+export const removeFromWishlist = async (userId: string, productId: string) => {
   return prisma.wishlist.delete({
     where: {
-      userId_productVariantId: {
+      userId_productId: {
         userId,
-        productVariantId,
+        productId,
       },
     },
   });
 };
 
-// Check if product variant exists in wishlist
-export const isInWishlist = async (userId: string, productVariantId: string): Promise<boolean> => {
-  const wishlistItem = await prisma.wishlist.findUnique({
+export const isInWishlist = async (userId: string, productId: string): Promise<boolean> => {
+  const item = await prisma.wishlist.findUnique({
     where: {
-      userId_productVariantId: {
-        userId,
-        productVariantId,
-      },
+      userId_productId: { userId, productId },
     },
   });
-
-  return !!wishlistItem;
+  return !!item;
 };
 
-// Check if product variant exists and is active
-export const checkProductVariantExists = async (productVariantId: string) => {
-  return prisma.products_variants.findUnique({
-    where: {
-      id: productVariantId,
-    },
-    include: {
-      product: {
-        select: {
-          isActive: true,
-        },
-      },
-    },
+export const checkProductExists = async (productId: string) => {
+  return prisma.products.findUnique({
+    where: { id: productId },
+    select: { isActive: true },
   });
 };

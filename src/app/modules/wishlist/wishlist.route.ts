@@ -3,14 +3,22 @@ import { authMiddleware } from "@/app/middlewares/auth.middleware";
 import { validate } from "@/app/middlewares/validate.middleware";
 import { asyncHandler } from "@/utils/async-handler";
 import * as c from "./wishlist.controller";
-import { addToWishlistSchema, removeFromWishlistSchema, wishlistParamsSchema } from "./wishlist.validation";
+import { 
+  addToWishlistSchema, 
+  removeFromWishlistSchema, 
+  wishlistParamsSchema,
+  getWishlistQuerySchema
+} from "./wishlist.validation";
 
 const router = Router();
 
-// Get user's wishlist
-router.get("/", authMiddleware(), asyncHandler(c.getWishlistHandler));
+router.get(
+  "/", 
+  authMiddleware(), 
+  validate(getWishlistQuerySchema, "query"),
+  asyncHandler(c.getWishlistHandler)
+);
 
-// Add product to wishlist
 router.post(
   "/add",
   authMiddleware(),
@@ -18,7 +26,6 @@ router.post(
   asyncHandler(c.addToWishlistHandler)
 );
 
-// Remove product from wishlist
 router.delete(
   "/remove",
   authMiddleware(),
@@ -26,9 +33,8 @@ router.delete(
   asyncHandler(c.removeFromWishlistHandler)
 );
 
-// Check if product is in wishlist
 router.get(
-  "/check/:productVariantId",
+  "/check/:productId",
   authMiddleware(),
   validate(wishlistParamsSchema, "params"),
   asyncHandler(c.checkWishlistHandler)

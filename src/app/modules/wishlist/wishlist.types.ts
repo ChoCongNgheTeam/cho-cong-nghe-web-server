@@ -1,52 +1,38 @@
-// Wishlist Response Types
 export interface WishlistItem {
   id: string;
   userId: string;
-  productVariantId: string;
+  productId: string;
   createdAt: Date;
-  productVariant: {
+  product: {
     id: string;
-    productId: string;
-    code: string | null;
-    price: any; // Decimal from Prisma
-    soldCount: number;
-    isDefault: boolean;
+    name: string;
+    slug: string;
     isActive: boolean;
-    createdAt: Date;
-    updatedAt: Date;
-    product: {
+    brandId: string;
+    categoryId: string;
+    ratingAverage: any; // Decimal from Prisma
+    ratingCount: number;
+    // Bổ sung kiểu dữ liệu cho mảng ảnh
+    img: Array<{
       id: string;
-      brandId: string;
-      name: string;
-      description: string | null;
-      slug: string;
-      viewsCount: any; // BigInt from Prisma
-      ratingAverage: any; // Decimal from Prisma
-      ratingCount: number;
-      isActive: boolean;
-      isFeatured: boolean;
-      createdAt: Date;
-      updatedAt: Date;
-      brand: {
-        id: string;
-        name: string;
-        slug: string;
-        imageUrl: string | null;
-      };
-      img: Array<{
-        id: string;
-        color: string;
-        imageUrl: string | null;
-        altText: string | null;
-        position: number;
-      }>;
-    };
+      color: string;
+      imageUrl: string | null;
+      altText: string | null;
+      position: number;
+    }>;
   };
+}
+
+export interface WishlistPaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface WishlistResponse {
   data: WishlistItem[];
-  total: number;
+  meta: WishlistPaginationMeta;
   message: string;
 }
 
@@ -57,12 +43,4 @@ export interface AddToWishlistResponse {
 
 export interface RemoveFromWishlistResponse {
   message: string;
-}
-
-export interface AddToWishlistInput {
-  productVariantId: string;
-}
-
-export interface RemoveFromWishlistInput {
-  productVariantId: string;
 }

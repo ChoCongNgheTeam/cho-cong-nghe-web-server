@@ -389,6 +389,7 @@ model products {
   img                   product_color_images[]
   variants              products_variants[]
   productSpecifications product_specifications[]
+  wishlist              wishlist[]
 
   @@index([isActive, totalSoldCount])
   @@index([deletedAt])
@@ -449,7 +450,7 @@ model products_variants {
   variantAttributes variants_attributes[]
   cartItems         cart_items[]
   orderItems        order_items[]
-  wishlist          wishlist[]
+  
 
   @@index([deletedAt])
 }
@@ -534,13 +535,13 @@ model product_specifications {
 model wishlist {
   id               String   @id @default(uuid()) @db.Uuid
   userId           String   @db.Uuid
-  productVariantId String   @db.Uuid
+  productId String   @db.Uuid
   createdAt        DateTime @default(now())
 
   user           users             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  productVariant products_variants @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+  product        products          @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, productVariantId])
+  @@unique([userId, productId])
 }
 
 // CASCADE theo user; giỏ hàng không cần soft delete
