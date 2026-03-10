@@ -9,28 +9,58 @@ import { findSearchSuggestions, getProductIdsFromPromotions } from "./product.re
 import { normalizeVariant } from "./product.helpers";
 import { NotFoundError, BadRequestError } from "@/errors";
 
+/**
+ * Từ danh sách variants của 1 product, chọn ra variants để tạo card:
+ * - Nếu có bất kỳ variant nào displayCard = true → lấy tất cả variant đó
+ * - Nếu không có → lấy 1 variant isDefault (fallback first)
+ * Logic này phản ánh đúng dữ liệu seed: displayCard=true = nhiều cấu hình RAM khác nhau cần card riêng
+ */
+const getVariantsForCards = (variants: any[]): any[] => {
+  const displayCardVariants = variants.filter((v) => v.displayCard === true);
+  if (displayCardVariants.length > 0) return displayCardVariants;
+
+  // Không có displayCard → 1 card đại diện bằng isDefault
+  const defaultVariant = variants.find((v) => v.isDefault) ?? variants[0];
+  return defaultVariant ? [defaultVariant] : [];
+};
+
+/**
+ * Build 1 card entry từ product + 1 variant cụ thể
+ */
+const buildCardEntry = (product: any, variant: any) => {
+  const card = transformProductCard({ ...product, variants: [variant] });
+  if (!card) return null;
+  return {
+    card,
+    pricingContext: {
+      productId: product.id,
+      variantId: variant.id,
+      price: Number(variant.price),
+      brandId: product.brand?.id,
+      categoryPath: buildCategoryPath(product.category),
+    },
+  };
+};
+
 //  Public
 
 export const getProductsPublic = async (query: ListProductsQuery) => {
   const result = await repo.findAllPublic(query);
 
+  const cards = result.data.flatMap((product) => {
+    const variantsForCards = getVariantsForCards(product.variants);
+    return variantsForCards.flatMap((variant) => {
+      const entry = buildCardEntry(product, variant);
+      return entry ? [entry] : [];
+    });
+  });
+
   return {
-    ...result,
-    data: result.data.map((product) => {
-      const defaultVariant = product.variants?.[0];
-      return {
-        card: { ...transformProductCard(product) },
-        pricingContext: defaultVariant
-          ? {
-              productId: product.id,
-              variantId: defaultVariant.id,
-              price: Number(defaultVariant.price),
-              brandId: product.brand?.id,
-              categoryPath: buildCategoryPath(product.category),
-            }
-          : null,
-      };
-    }),
+    data: cards,
+    page: result.page,
+    limit: result.limit,
+    total: result.total,
+    totalPages: result.totalPages,
   };
 };
 
@@ -127,20 +157,12 @@ export const getRelatedProducts = async (slug: string, limit = 8) => {
 
   const related = await repo.findRelatedProducts(product.id, limit);
 
-  return related.map((p) => {
-    const defaultVariant = p.variants?.[0];
-    return {
-      card: { ...transformProductCard(p) },
-      pricingContext: defaultVariant
-        ? {
-            productId: p.id,
-            variantId: defaultVariant.id,
-            price: Number(defaultVariant.price),
-            brandId: p.brand?.id,
-            categoryPath: buildCategoryPath(p.category),
-          }
-        : null,
-    };
+  return related.flatMap((p) => {
+    const variantsForCards = getVariantsForCards(p.variants);
+    return variantsForCards.flatMap((variant) => {
+      const entry = buildCardEntry(p, variant);
+      return entry ? [entry] : [];
+    });
   });
 };
 
@@ -154,7 +176,7 @@ export const getProductReviews = async (slug: string, query: ReviewsQuery) => {
 
 export const getProductsAdmin = async (query: ListProductsQuery) => {
   const result = await repo.findAllAdmin(query);
-  return { ...result, data: result.data.map(transformProductCard) };
+  return { ...result, data: result.data.map(transformProductCard).filter(Boolean) };
 };
 
 export const getProductById = async (id: string) => {
@@ -208,25 +230,17 @@ export const deleteProduct = async (id: string) => {
 export const getFlashSaleProducts = async (date: Date = new Date(), options: { limit?: number; categoryId?: string } = {}) => {
   const { products, promotions } = await repo.findProductsOnSaleByDate(date, options);
 
-  console.log(promotions);
+  // console.log(promotions);
 
   const firstPromotion = promotions?.[0];
 
   return {
-    data: products.map((product) => {
-      const defaultVariant = product.variants?.[0];
-      return {
-        card: { ...transformProductCard(product) },
-        pricingContext: defaultVariant
-          ? {
-              productId: product.id,
-              variantId: defaultVariant.id,
-              price: Number(defaultVariant.price),
-              brandId: product.brand?.id,
-              categoryPath: buildCategoryPath(product.category),
-            }
-          : null,
-      };
+    data: products.flatMap((product) => {
+      const variantsForCards = getVariantsForCards(product.variants);
+      return variantsForCards.flatMap((variant) => {
+        const entry = buildCardEntry(product, variant);
+        return entry ? [entry] : [];
+      });
     }),
     total: products.length,
     date,
@@ -278,20 +292,12 @@ export const getFeaturedProductsByCategories = async (options: { limit?: number;
 
   return results.map((result) => ({
     category: result.category,
-    products: result.products.map((product) => {
-      const defaultVariant = product.variants?.[0];
-      return {
-        card: { ...transformProductCard(product) },
-        pricingContext: defaultVariant
-          ? {
-              productId: product.id,
-              variantId: defaultVariant.id,
-              price: Number(defaultVariant.price),
-              brandId: product.brand?.id,
-              categoryPath: buildCategoryPath(product.category),
-            }
-          : null,
-      };
+    products: result.products.flatMap((product) => {
+      const variantsForCards = getVariantsForCards(product.variants);
+      return variantsForCards.flatMap((variant) => {
+        const entry = buildCardEntry(product, variant);
+        return entry ? [entry] : [];
+      });
     }),
     total: result.products.length,
   }));
@@ -316,84 +322,59 @@ export const getProductsByPromotion = async (promotionId: string, limit = 20) =>
 
   return {
     promotion: result.promotion,
-    products: result.products.map(transformProductCard),
+    products: result.products.flatMap((product) => {
+      const variantsForCards = getVariantsForCards(product.variants);
+      return variantsForCards.flatMap((variant) => {
+        const entry = buildCardEntry(product, variant);
+        return entry ? [entry] : [];
+      });
+    }),
     total: result.total,
   };
 };
 
 export const getFeaturedProducts = async (limit = 12) => {
   const products = await repo.findFeaturedProducts(limit);
-  return products.map((product) => {
-    const defaultVariant = product.variants?.[0];
-    return {
-      card: { ...transformProductCard(product) },
-      pricingContext: defaultVariant
-        ? {
-            productId: product.id,
-            variantId: defaultVariant.id,
-            price: Number(defaultVariant.price),
-            brandId: product.brand?.id,
-            categoryPath: buildCategoryPath(product.category),
-          }
-        : null,
-    };
+
+  return products.flatMap((product) => {
+    const variantsForCards = getVariantsForCards(product.variants);
+    return variantsForCards.flatMap((variant) => {
+      const entry = buildCardEntry(product, variant);
+      return entry ? [entry] : [];
+    });
   });
 };
 
 export const getBestSellingProducts = async (limit = 12) => {
   const products = await repo.findBestSellingProducts(limit);
-  return products.map((product) => {
-    const defaultVariant = product.variants?.[0];
-    return {
-      card: { ...transformProductCard(product) },
-      pricingContext: defaultVariant
-        ? {
-            productId: product.id,
-            variantId: defaultVariant.id,
-            price: Number(defaultVariant.price),
-            brandId: product.brand?.id,
-            categoryPath: buildCategoryPath(product.category),
-          }
-        : null,
-    };
+  return products.flatMap((product) => {
+    const variantsForCards = getVariantsForCards(product.variants);
+    return variantsForCards.flatMap((variant) => {
+      const entry = buildCardEntry(product, variant);
+      return entry ? [entry] : [];
+    });
   });
 };
 
 export const getRecentlyViewedProducts = async (productIds: string[]) => {
   const products = await repo.findProductsByIds(productIds);
-  return products.map((product) => {
-    const defaultVariant = product.variants?.[0];
-    return {
-      card: { ...transformProductCard(product) },
-      pricingContext: defaultVariant
-        ? {
-            productId: product.id,
-            variantId: defaultVariant.id,
-            price: Number(defaultVariant.price),
-            brandId: product.brand?.id,
-            categoryPath: buildCategoryPath(product.category),
-          }
-        : null,
-    };
+  return products.flatMap((product) => {
+    const variantsForCards = getVariantsForCards(product.variants);
+    return variantsForCards.flatMap((variant) => {
+      const entry = buildCardEntry(product, variant);
+      return entry ? [entry] : [];
+    });
   });
 };
 
 export const getNewArrivalProducts = async (daysAgo = 30, limit = 12) => {
   const products = await repo.findNewArrivalProducts(daysAgo, limit);
-  return products.map((product) => {
-    const defaultVariant = product.variants?.[0];
-    return {
-      card: { ...transformProductCard(product) },
-      pricingContext: defaultVariant
-        ? {
-            productId: product.id,
-            variantId: defaultVariant.id,
-            price: Number(defaultVariant.price),
-            brandId: product.brand?.id,
-            categoryPath: buildCategoryPath(product.category),
-          }
-        : null,
-    };
+  return products.flatMap((product) => {
+    const variantsForCards = getVariantsForCards(product.variants);
+    return variantsForCards.flatMap((variant) => {
+      const entry = buildCardEntry(product, variant);
+      return entry ? [entry] : [];
+    });
   });
 };
 

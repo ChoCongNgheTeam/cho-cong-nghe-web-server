@@ -1,6 +1,6 @@
 export interface SeedProductInput {
   name: string;
-  slug?: string;
+  slug: string;
   description: string;
   brandName: string;
   categoryNames: string[];

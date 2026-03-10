@@ -1,5 +1,4 @@
 import { PrismaClient } from "@prisma/client";
-import { generateUniqueSlug } from "@/utils/generate-unique-slug";
 import { allProducts } from "../seed-data/products";
 
 interface SeedProductsParams {
@@ -7,10 +6,7 @@ interface SeedProductsParams {
   categories: any[];
 }
 
-export async function seedProducts(
-  prisma: PrismaClient,
-  { brands, categories }: SeedProductsParams,
-) {
+export async function seedProducts(prisma: PrismaClient, { brands, categories }: SeedProductsParams) {
   console.log("🌱 Seeding products...");
 
   const createdProducts = [];
@@ -22,9 +18,10 @@ export async function seedProducts(
       continue;
     }
 
-    const slug = await generateUniqueSlug(prisma.products, data.name);
+    // ← THAY ĐỔI: dùng slug từ data thay vì generate từ name
+    // Đảm bảo slug trong product file = key trong variantData
+    const slug = data.slug;
 
-    // Lấy category chính (hiện tại bạn chỉ dùng 1, nên lấy phần tử đầu)
     const mainCategoryName = data.categoryNames[0];
     const category = categories.find((c) => c.name === mainCategoryName);
 
@@ -54,7 +51,7 @@ export async function seedProducts(
     });
 
     createdProducts.push(product);
-    console.log(`Seeded ${product.name}`);
+    console.log(`Seeded: ${product.name} (${product.slug})`);
   }
 
   console.log(`\n Seeded ${createdProducts.length} products\n`);

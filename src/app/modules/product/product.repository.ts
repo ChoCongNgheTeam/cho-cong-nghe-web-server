@@ -63,6 +63,7 @@ const selectVariant = {
   soldCount: true,
   isDefault: true,
   isActive: true,
+  displayCard: true,
   variantAttributes: {
     select: selectVariantAttribute,
   },
@@ -87,10 +88,14 @@ const selectProductCard = {
   isFeatured: true,
   isActive: true,
   variants: {
-    where: { isActive: true },
+    where: {
+      isActive: true,
+    },
     select: selectVariant,
-    take: 1,
-    orderBy: { isDefault: "desc" as const },
+    orderBy: [
+      { displayCard: "desc" as const }, // displayCard: true lên trước
+      { isDefault: "desc" as const },
+    ],
   },
   productSpecifications: {
     where: { isHighlight: true },
@@ -1461,26 +1466,9 @@ export const getSaleProductsCountByCategories = async (date: Date) => {
 
 export const findFeaturedProducts = async (limit: number = 12) => {
   return prisma.products.findMany({
-    where: {
-      isActive: true,
-    },
-    select: {
-      ...selectProductCard,
-      variants: {
-        where: {
-          isActive: true,
-          isDefault: true,
-        },
-        take: 1,
-        select: {
-          id: true,
-          price: true,
-        },
-      },
-    },
-    orderBy: {
-      viewsCount: "desc",
-    },
+    where: { isActive: true },
+    select: selectProductCard,
+    orderBy: { viewsCount: "desc" },
     take: limit,
   });
 };
@@ -1519,27 +1507,13 @@ export const findBestSellingProducts = async (limit: number = 12) => {
   return prisma.products.findMany({
     where: {
       isActive: true,
-      variants: {
-        some: { isActive: true },
-      },
+      variants: { some: { isActive: true } },
     },
-    orderBy: {
-      totalSoldCount: "desc",
-    },
+    orderBy: { totalSoldCount: "desc" },
     take: limit,
     select: {
       ...selectProductCard,
       totalSoldCount: true,
-      variants: {
-        where: { isActive: true },
-        orderBy: { isDefault: "desc" },
-        take: 1,
-        select: {
-          id: true,
-          price: true,
-          quantity: true,
-        },
-      },
     },
   });
 };
@@ -1548,24 +1522,8 @@ export const findProductsByIds = async (ids: string[]) => {
   if (ids.length === 0) return [];
 
   const products = await prisma.products.findMany({
-    where: {
-      id: { in: ids },
-      isActive: true,
-    },
-    select: {
-      ...selectProductCard,
-      variants: {
-        where: {
-          isActive: true,
-          isDefault: true,
-        },
-        take: 1,
-        select: {
-          id: true,
-          price: true,
-        },
-      },
-    },
+    where: { id: { in: ids }, isActive: true },
+    select: selectProductCard,
   });
 
   // giữ đúng thứ tự user đã xem
