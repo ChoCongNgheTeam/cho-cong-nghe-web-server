@@ -12,32 +12,9 @@ import {
 
 const router = Router();
 
-router.get(
-  "/", 
-  authMiddleware(), 
-  validate(getWishlistQuerySchema, "query"),
-  asyncHandler(c.getWishlistHandler)
-);
-
-router.post(
-  "/add",
-  authMiddleware(),
-  validate(addToWishlistSchema, "body"),
-  asyncHandler(c.addToWishlistHandler)
-);
-
-router.delete(
-  "/remove",
-  authMiddleware(),
-  validate(removeFromWishlistSchema, "body"),
-  asyncHandler(c.removeFromWishlistHandler)
-);
-
-router.get(
-  "/check/:productId",
-  authMiddleware(),
-  validate(wishlistParamsSchema, "params"),
-  asyncHandler(c.checkWishlistHandler)
-);
+router.get("/", authMiddleware(), validate(getWishlistQuerySchema, "query"), asyncHandler(c.getWishlistHandler));
+router.post("/add", authMiddleware(), validate(addToWishlistSchema, "body"), asyncHandler(c.addToWishlistHandler));
+router.delete("/remove", authMiddleware(), validate(removeFromWishlistSchema, "body"), asyncHandler(c.removeFromWishlistHandler));
+router.get("/check/:productId", authMiddleware(), validate(wishlistParamsSchema, "params"), asyncHandler(c.checkWishlistHandler));
 
 export default router;

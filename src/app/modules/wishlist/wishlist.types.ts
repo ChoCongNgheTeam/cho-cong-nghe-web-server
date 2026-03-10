@@ -9,12 +9,34 @@ export interface WishlistItem {
     slug: string;
     isActive: boolean;
     brandId: string;
-    categoryId: string;
-    ratingAverage: any; // Decimal from Prisma
+    ratingAverage: any; // Decimal từ Prisma
     ratingCount: number;
+    
+    // Cây danh mục để tính giá
+    category?: {
+      id: string;
+      parent?: {
+        id: string;
+        parent?: { id: string } | null;
+      } | null;
+    } | null;
+
+    // Lấy ID và Giá gốc của variant mặc định
     variants: Array<{
+      id: string;
       price: any; // Decimal
     }>;
+
+    // Thông số nổi bật (Highlight)
+    productSpecifications: Array<{
+      value: string;
+      specification: {
+        name: string;
+        unit: string | null;
+      };
+    }>;
+
+    // Hình ảnh sản phẩm
     img: Array<{
       id: string;
       color: string;
@@ -23,6 +45,7 @@ export interface WishlistItem {
       position: number;
     }>;
   };
+  price?: any; // Sẽ được Orchestrator tính toán và gán vào sau
 }
 
 export interface WishlistPaginationMeta {
@@ -33,16 +56,6 @@ export interface WishlistPaginationMeta {
 }
 
 export interface WishlistResponse {
-  data: WishlistItem[];
+  items: WishlistItem[];
   meta: WishlistPaginationMeta;
-  message: string;
-}
-
-export interface AddToWishlistResponse {
-  data: WishlistItem;
-  message: string;
-}
-
-export interface RemoveFromWishlistResponse {
-  message: string;
 }
