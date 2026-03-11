@@ -22,18 +22,26 @@ export const allProducts = [
   Apple.iphone17ProMax,
 
   // MacBook Air 13 inch
-  Apple.macbookAir13M4,
   Apple.macbookAir13M2,
+  Apple.macbookAir13M3,
+  Apple.macbookAir13M5,
 
   // MacBook Air 15 inch
-  Apple.macbookAir15M4,
-  Apple.macbookAir15M2,
+  Apple.macbookAir15M3,
+  Apple.macbookAir15M5,
 
   // MacBook Pro 14 inch
+  Apple.macbookPro14M4,
   Apple.macbookPro14M4Pro,
-  Apple.macbookPro14M3Pro,
   Apple.macbookPro14M4Max,
-  Apple.macbookPro14M5,
+  Apple.macbookPro14M5Pro,
+  Apple.macbookPro14M5Max,
+
+  // MacBook Pro 16 inch
+  Apple.macbookPro16M4Pro,
+  Apple.macbookPro16M4Max,
+  Apple.macbookPro16M5Pro,
+  Apple.macbookPro16M5Max,
 
   // MacBook Pro 16 inch
   Apple.macbookPro16M4Pro,

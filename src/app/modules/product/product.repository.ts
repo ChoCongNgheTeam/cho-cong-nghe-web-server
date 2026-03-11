@@ -63,7 +63,6 @@ const selectVariant = {
   soldCount: true,
   isDefault: true,
   isActive: true,
-  displayCard: true,
   variantAttributes: {
     select: selectVariantAttribute,
   },
@@ -87,15 +86,13 @@ const selectProductCard = {
   ratingCount: true,
   isFeatured: true,
   isActive: true,
+  variantDisplay: true,
   variants: {
     where: {
       isActive: true,
     },
     select: selectVariant,
-    orderBy: [
-      { displayCard: "desc" as const }, // displayCard: true lên trước
-      { isDefault: "desc" as const },
-    ],
+    orderBy: { isDefault: "desc" as const },
   },
   productSpecifications: {
     where: { isHighlight: true },

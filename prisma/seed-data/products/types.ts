@@ -5,5 +5,6 @@ export interface SeedProductInput {
   brandName: string;
   categoryNames: string[];
   isFeatured?: boolean;
+  variantDisplay?: "CARD" | "SELECTOR";
   highlights?: Array<{ key: string }>;
 }

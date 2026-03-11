@@ -139,6 +139,17 @@ const attributeOptionsData: Record<
     ],
   },
 
+  cpu: {
+    name: "CPU",
+    options: [
+      { value: "8core", label: "8-core CPU" },
+      { value: "10core", label: "10-core CPU" },
+      { value: "12core", label: "12-core CPU" },
+      { value: "14core", label: "14-core CPU" },
+      { value: "16core", label: "16-core CPU" },
+    ],
+  },
+
   // ------------------------------------------------------------------
   // DÙNG CHO: Tivi
   // Lưu ý: Chỉ dùng khi cùng model code khác inch (VD: Q60D 43"/55"/65")

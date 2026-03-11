@@ -3,7 +3,7 @@ const ATTR_ORDER = ["ram", "storage", "gpu", "capacity_cooling", "capacity_washi
 const ATTR_FORMAT: Record<string, (label: string) => string> = {
   ram: (label) => label.toUpperCase(), // "8gb" → "8GB"
   storage: (label) => label.toUpperCase(), // "256gb" → "256GB"
-  gpu: (label) => `${label}-core GPU`, // "8core" → "8-core GPU"
+  gpu: (label) => `${label}`, // "8core" → "8-core GPU"
   capacity_cooling: (label) => label, // "1HP" → "1HP"
   capacity_washing: (label) => label, // "9kg" → "9kg"
   capacity_fridge: (label) => label,

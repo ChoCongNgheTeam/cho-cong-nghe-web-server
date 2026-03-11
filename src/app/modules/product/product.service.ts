@@ -10,16 +10,19 @@ import { normalizeVariant } from "./product.helpers";
 import { NotFoundError, BadRequestError } from "@/errors";
 
 /**
- * Từ danh sách variants của 1 product, chọn ra variants để tạo card:
- * - Nếu có bất kỳ variant nào displayCard = true → lấy tất cả variant đó
- * - Nếu không có → lấy 1 variant isDefault (fallback first)
- * Logic này phản ánh đúng dữ liệu seed: displayCard=true = nhiều cấu hình RAM khác nhau cần card riêng
+ * Từ product, chọn ra variants để tạo card:
+ * - variantDisplay = CARD  → mỗi variant là 1 card riêng (oppo-a3, macbook-air-13-m4...)
+ * - variantDisplay = SELECTOR → 1 card đại diện bằng isDefault (iphone, samsung...)
  */
-const getVariantsForCards = (variants: any[]): any[] => {
-  const displayCardVariants = variants.filter((v) => v.displayCard === true);
-  if (displayCardVariants.length > 0) return displayCardVariants;
+const getVariantsForCards = (product: any): any[] => {
+  const variants: any[] = product.variants ?? [];
+  if (variants.length === 0) return [];
 
-  // Không có displayCard → 1 card đại diện bằng isDefault
+  if (product.variantDisplay === "CARD") {
+    return variants; // mỗi variant → 1 card
+  }
+
+  // SELECTOR: 1 card đại diện
   const defaultVariant = variants.find((v) => v.isDefault) ?? variants[0];
   return defaultVariant ? [defaultVariant] : [];
 };
@@ -48,7 +51,7 @@ export const getProductsPublic = async (query: ListProductsQuery) => {
   const result = await repo.findAllPublic(query);
 
   const cards = result.data.flatMap((product) => {
-    const variantsForCards = getVariantsForCards(product.variants);
+    const variantsForCards = getVariantsForCards(product);
     return variantsForCards.flatMap((variant) => {
       const entry = buildCardEntry(product, variant);
       return entry ? [entry] : [];
@@ -158,7 +161,7 @@ export const getRelatedProducts = async (slug: string, limit = 8) => {
   const related = await repo.findRelatedProducts(product.id, limit);
 
   return related.flatMap((p) => {
-    const variantsForCards = getVariantsForCards(p.variants);
+    const variantsForCards = getVariantsForCards(p);
     return variantsForCards.flatMap((variant) => {
       const entry = buildCardEntry(p, variant);
       return entry ? [entry] : [];
@@ -236,7 +239,7 @@ export const getFlashSaleProducts = async (date: Date = new Date(), options: { l
 
   return {
     data: products.flatMap((product) => {
-      const variantsForCards = getVariantsForCards(product.variants);
+      const variantsForCards = getVariantsForCards(product);
       return variantsForCards.flatMap((variant) => {
         const entry = buildCardEntry(product, variant);
         return entry ? [entry] : [];
@@ -293,7 +296,7 @@ export const getFeaturedProductsByCategories = async (options: { limit?: number;
   return results.map((result) => ({
     category: result.category,
     products: result.products.flatMap((product) => {
-      const variantsForCards = getVariantsForCards(product.variants);
+      const variantsForCards = getVariantsForCards(product);
       return variantsForCards.flatMap((variant) => {
         const entry = buildCardEntry(product, variant);
         return entry ? [entry] : [];
@@ -323,7 +326,7 @@ export const getProductsByPromotion = async (promotionId: string, limit = 20) =>
   return {
     promotion: result.promotion,
     products: result.products.flatMap((product) => {
-      const variantsForCards = getVariantsForCards(product.variants);
+      const variantsForCards = getVariantsForCards(product);
       return variantsForCards.flatMap((variant) => {
         const entry = buildCardEntry(product, variant);
         return entry ? [entry] : [];
@@ -337,7 +340,7 @@ export const getFeaturedProducts = async (limit = 12) => {
   const products = await repo.findFeaturedProducts(limit);
 
   return products.flatMap((product) => {
-    const variantsForCards = getVariantsForCards(product.variants);
+    const variantsForCards = getVariantsForCards(product);
     return variantsForCards.flatMap((variant) => {
       const entry = buildCardEntry(product, variant);
       return entry ? [entry] : [];
@@ -348,7 +351,7 @@ export const getFeaturedProducts = async (limit = 12) => {
 export const getBestSellingProducts = async (limit = 12) => {
   const products = await repo.findBestSellingProducts(limit);
   return products.flatMap((product) => {
-    const variantsForCards = getVariantsForCards(product.variants);
+    const variantsForCards = getVariantsForCards(product);
     return variantsForCards.flatMap((variant) => {
       const entry = buildCardEntry(product, variant);
       return entry ? [entry] : [];
@@ -359,7 +362,7 @@ export const getBestSellingProducts = async (limit = 12) => {
 export const getRecentlyViewedProducts = async (productIds: string[]) => {
   const products = await repo.findProductsByIds(productIds);
   return products.flatMap((product) => {
-    const variantsForCards = getVariantsForCards(product.variants);
+    const variantsForCards = getVariantsForCards(product);
     return variantsForCards.flatMap((variant) => {
       const entry = buildCardEntry(product, variant);
       return entry ? [entry] : [];
@@ -370,7 +373,7 @@ export const getRecentlyViewedProducts = async (productIds: string[]) => {
 export const getNewArrivalProducts = async (daysAgo = 30, limit = 12) => {
   const products = await repo.findNewArrivalProducts(daysAgo, limit);
   return products.flatMap((product) => {
-    const variantsForCards = getVariantsForCards(product.variants);
+    const variantsForCards = getVariantsForCards(product);
     return variantsForCards.flatMap((variant) => {
       const entry = buildCardEntry(product, variant);
       return entry ? [entry] : [];

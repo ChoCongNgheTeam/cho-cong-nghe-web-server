@@ -22,5 +22,6 @@ export const oppoFindX9: SeedProductInput = {
   brandName: "OPPO",
   categoryNames: ["OPPO Find Series"],
   isFeatured: false,
+  variantDisplay: "CARD",
   highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
 };

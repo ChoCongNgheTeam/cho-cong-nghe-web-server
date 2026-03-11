@@ -22,5 +22,6 @@ export const oppoA6T: SeedProductInput = {
   brandName: "OPPO",
   categoryNames: ["OPPO A Series"],
   isFeatured: false,
+  variantDisplay: "CARD",
   highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
 };

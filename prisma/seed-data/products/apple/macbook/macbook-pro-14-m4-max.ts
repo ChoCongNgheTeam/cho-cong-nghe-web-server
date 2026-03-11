@@ -17,5 +17,5 @@ export const macbookPro14M4Max: SeedProductInput = {
   brandName: "Apple",
   categoryNames: ["MacBook Pro 14 inch"],
   isFeatured: false,
-  highlights: [{ key: "chip_m4_max" }, { key: "xdr_display" }, { key: "thunderbolt5" }],
+  highlights: [{ key: "chip_m2" }, { key: "battery_life" }, { key: "no_fan_design" }],
 };

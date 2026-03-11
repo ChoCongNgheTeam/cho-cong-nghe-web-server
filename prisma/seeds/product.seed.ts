@@ -38,6 +38,7 @@ export async function seedProducts(prisma: PrismaClient, { brands, categories }:
         categoryId: category.id,
         brandId: brand.id,
         isFeatured: data.isFeatured ?? false,
+        variantDisplay: data.variantDisplay,
       },
       create: {
         name: data.name,
@@ -47,6 +48,7 @@ export async function seedProducts(prisma: PrismaClient, { brands, categories }:
         categoryId: category.id,
         isActive: true,
         isFeatured: data.isFeatured ?? false,
+        variantDisplay: data.variantDisplay,
       },
     });
 

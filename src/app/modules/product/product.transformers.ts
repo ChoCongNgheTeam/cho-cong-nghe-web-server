@@ -115,7 +115,7 @@ const buildAvailableOptionsWithStatus = (variants: RawVariant[], colorImages: an
 };
 
 /**
- * Build danh sách "configuration bundles" cho các sản phẩm displayCard = true.
+ * Build danh sách "configuration bundles" cho product có variantDisplay = CARD.
  *
  * Thay vì cho chọn ram/storage riêng lẻ, FE sẽ thấy 1 selector dạng:
  *   - "6GB / 128GB"  ← variant id: xxx
@@ -215,8 +215,8 @@ export const transformProductDetail = (product: any, reviewStats?: ReviewStats):
 
   const currentVariant = validVariants.find((v: { isDefault: boolean }) => v.isDefault) ?? validVariants[0];
 
-  // Detect bundle mode: có ít nhất 1 variant với displayCard = true
-  const isBundleMode = validVariants.some((v: any) => v.displayCard === true);
+  // Bundle mode khi product.variantDisplay = CARD
+  const isBundleMode = product.variantDisplay === "CARD";
 
   // Build availableOptions theo mode
   let availableOptions: AvailableOption[];
@@ -282,7 +282,7 @@ export const transformVariant = (variant: RawVariant, colorImages: any[]): Produ
 export const transformProductVariantResponse = (product: any, variant: RawVariant) => {
   const validVariants: RawVariant[] = product.variants.filter((v: { isActive: boolean }) => v.isActive).map(normalizeVariant);
 
-  const isBundleMode = validVariants.some((v: any) => v.displayCard === true);
+  const isBundleMode = product.variantDisplay === "CARD";
 
   let availableOptions: AvailableOption[];
   if (isBundleMode) {
@@ -296,7 +296,11 @@ export const transformProductVariantResponse = (product: any, variant: RawVarian
     availableOptions = buildAvailableOptionsWithStatus(validVariants, product.img || [], selectedOptions);
   }
 
+  // Build name theo variant đang được chọn
+  const displayName = variant.variantAttributes?.length ? buildVariantDisplayName(product.name, variant.variantAttributes) : product.name;
+
   return {
+    name: displayName,
     variant: transformVariant(variant, product.img),
     availableOptions,
   };

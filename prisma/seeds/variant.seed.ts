@@ -66,7 +66,6 @@ export async function seedVariants(prisma: PrismaClient, { products }: SeedVaria
             price: v.price,
             isDefault: v.isDefault ?? false,
             isActive: true,
-            displayCard: v.displayCard ?? false, // ← lưu displayCard vào DB
           },
           create: {
             productId: product.id,
@@ -74,7 +73,6 @@ export async function seedVariants(prisma: PrismaClient, { products }: SeedVaria
             price: v.price,
             isDefault: v.isDefault ?? false,
             isActive: true,
-            displayCard: v.displayCard ?? false,
           },
         });
 
