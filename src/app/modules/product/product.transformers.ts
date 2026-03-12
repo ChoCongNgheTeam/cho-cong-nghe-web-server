@@ -1,3 +1,4 @@
+import { buildVariantDisplayName } from "@/utils/build-variant-display-name";
 import { normalizeVariant } from "./product.helpers";
 import { ProductCard, ProductDetail, ProductVariant, ReviewStats, PriceRange, AvailableOption, Highlight, ProductSpecificationGroup, RawVariant, ColorImage } from "./product.types";
 
@@ -113,6 +114,47 @@ const buildAvailableOptionsWithStatus = (variants: RawVariant[], colorImages: an
   }));
 };
 
+/**
+ * Build danh sách "configuration bundles" cho product có variantDisplay = CARD.
+ *
+ * Thay vì cho chọn ram/storage riêng lẻ, FE sẽ thấy 1 selector dạng:
+ *   - "6GB / 128GB"  ← variant id: xxx
+ *   - "8GB / 128GB"  ← variant id: yyy
+ *   - "8GB / 256GB"  ← variant id: zzz
+ *
+ * Trả về AvailableOption[] với type = "bundle" để FE phân biệt mode.
+ */
+const buildVariantBundles = (variants: RawVariant[], selectedVariantId: string): AvailableOption[] => {
+  const BUNDLE_ATTR_ORDER = ["ram", "storage", "gpu", "capacity_cooling", "capacity_washing", "capacity_fridge", "connection"];
+
+  const bundleValues = variants
+    .filter((v) => v.isActive)
+    .map((v) => {
+      // Build label theo thứ tự ưu tiên
+      const attrMap = new Map(v.variantAttributes.map((va) => [va.attributeOption.attribute.code, va.attributeOption.label]));
+
+      const labelParts: string[] = [];
+      for (const code of BUNDLE_ATTR_ORDER) {
+        const label = attrMap.get(code);
+        if (label) labelParts.push(label.toUpperCase());
+      }
+
+      const label = labelParts.length > 0 ? labelParts.join(" / ") : v.code || v.id;
+
+      return {
+        id: v.id, // dùng variantId làm id để FE navigate
+        value: v.id, // value = variantId
+        label,
+        enabled: v.isActive,
+        selected: v.id === selectedVariantId,
+        price: Number(v.price),
+        image: null,
+      };
+    });
+
+  return [{ type: "bundle", values: bundleValues }];
+};
+
 export const calculateOverallStockStatus = (variants: RawVariant[]): "in_stock" | "low_stock" | "out_of_stock" | "pre_order" => {
   const activeVariants = variants.filter((v) => v.isActive);
 
@@ -126,20 +168,28 @@ export const calculateOverallStockStatus = (variants: RawVariant[]): "in_stock" 
   return "in_stock";
 };
 
-export const transformProductCard = (product: any): ProductCard => {
-  const defaultVariant = product.variants?.[0];
+export const transformProductCard = (product: any): ProductCard | null => {
+  const allVariants: any[] = product.variants ?? [];
 
-  if (!defaultVariant) {
-    throw new Error(`Product ${product.id} has no active variant but was sent to ProductCard`);
+  // Nếu không có variant nào active → skip
+  if (allVariants.length === 0) {
+    console.warn(`[transformProductCard] Product ${product.id} (${product.slug}) has no active variant — skipped`);
+    return null;
   }
+
+  // Chọn variant đại diện: ưu tiên isDefault, fallback về first
+  const defaultVariant = allVariants.find((v: any) => v.isDefault) ?? allVariants[0];
 
   const firstColorImage = product.img?.[0];
   const thumbnail = firstColorImage?.imageUrl || "";
   const inStock = defaultVariant.quantity > 0;
 
+  // Build display name từ variant attributes (fallback về product.name nếu thiếu data)
+  const displayName = defaultVariant.variantAttributes?.length ? buildVariantDisplayName(product.name, defaultVariant.variantAttributes) : product.name;
+
   return {
     id: product.id,
-    name: product.name,
+    name: displayName,
     priceOrigin: Number(defaultVariant.price),
     slug: product.slug,
     thumbnail,
@@ -165,22 +215,37 @@ export const transformProductDetail = (product: any, reviewStats?: ReviewStats):
 
   const currentVariant = validVariants.find((v: { isDefault: boolean }) => v.isDefault) ?? validVariants[0];
 
-  const selectedOptions: Record<string, string> = {};
-  for (const va of currentVariant.variantAttributes) {
-    const type = va.attributeOption.attribute.code;
-    selectedOptions[type] = va.attributeOption.value;
+  // Bundle mode khi product.variantDisplay = CARD
+  const isBundleMode = product.variantDisplay === "CARD";
+
+  // Build availableOptions theo mode
+  let availableOptions: AvailableOption[];
+  if (isBundleMode) {
+    // Bundle mode: FE chọn theo cụm cấu hình (6GB/128GB, 8GB/256GB...)
+    availableOptions = buildVariantBundles(validVariants, currentVariant.id);
+  } else {
+    // Individual mode: FE chọn riêng từng attribute (color, storage...)
+    const selectedOptions: Record<string, string> = {};
+    for (const va of currentVariant.variantAttributes) {
+      const type = va.attributeOption.attribute.code;
+      selectedOptions[type] = va.attributeOption.value;
+    }
+    availableOptions = buildAvailableOptionsWithStatus(validVariants, product.img || [], selectedOptions);
   }
+
+  // Display name cho trang detail dùng currentVariant
+  const displayName = currentVariant.variantAttributes?.length ? buildVariantDisplayName(product.name, currentVariant.variantAttributes) : product.name;
 
   return {
     id: product.id,
-    name: product.name,
+    name: displayName,
     slug: product.slug,
     description: product.description,
     brand: product.brand,
     category: product.category || [],
     priceRange: calculatePriceRange(product.variants),
     currentVariant: transformVariant(currentVariant, product.img),
-    availableOptions: buildAvailableOptionsWithStatus(validVariants, product.img || [], selectedOptions),
+    availableOptions,
     warranty: "12 tháng chính hãng",
     stockStatus: calculateOverallStockStatus(product.variants),
     rating: reviewStats!,
@@ -217,15 +282,27 @@ export const transformVariant = (variant: RawVariant, colorImages: any[]): Produ
 export const transformProductVariantResponse = (product: any, variant: RawVariant) => {
   const validVariants: RawVariant[] = product.variants.filter((v: { isActive: boolean }) => v.isActive).map(normalizeVariant);
 
-  const selectedOptions: Record<string, string> = {};
-  for (const va of variant.variantAttributes) {
-    const type = va.attributeOption.attribute.code;
-    selectedOptions[type] = va.attributeOption.value;
+  const isBundleMode = product.variantDisplay === "CARD";
+
+  let availableOptions: AvailableOption[];
+  if (isBundleMode) {
+    availableOptions = buildVariantBundles(validVariants, variant.id);
+  } else {
+    const selectedOptions: Record<string, string> = {};
+    for (const va of variant.variantAttributes) {
+      const type = va.attributeOption.attribute.code;
+      selectedOptions[type] = va.attributeOption.value;
+    }
+    availableOptions = buildAvailableOptionsWithStatus(validVariants, product.img || [], selectedOptions);
   }
 
+  // Build name theo variant đang được chọn
+  const displayName = variant.variantAttributes?.length ? buildVariantDisplayName(product.name, variant.variantAttributes) : product.name;
+
   return {
+    name: displayName,
     variant: transformVariant(variant, product.img),
-    availableOptions: buildAvailableOptionsWithStatus(validVariants, product.img || [], selectedOptions),
+    availableOptions,
   };
 };
 

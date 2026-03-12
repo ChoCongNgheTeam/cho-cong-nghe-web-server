@@ -2,6 +2,7 @@ import { SeedProductInput } from "../../types";
 
 export const iphone15: SeedProductInput = {
   name: "iPhone 15",
+  slug: "iphone-15",
   description: `
     <h2 class="mt-2 text-base sm:text-xl font-semibold text-primary">
       iPhone 15 – Bước nhảy vọt với Dynamic Island và Camera 48MP

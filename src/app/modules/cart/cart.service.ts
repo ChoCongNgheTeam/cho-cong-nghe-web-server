@@ -1,6 +1,22 @@
 import * as repo from "./cart.repository";
+import { getVariantPricing } from "../pricing/pricing.service";
+import { mapPricingToSummary } from "../pricing/pricing.helpers";
 import { AddToCartInput, UpdateCartItemInput, LocalStorageCartItem, SyncCartResult, ChangeVariantInput } from "./cart.types";
 import { NotFoundError, BadRequestError } from "@/errors";
+
+export const enrichItemWithPricing = async (item: ReturnType<typeof repo.transformToCartResponse>, userId?: string) => {
+  const fullPricing = await getVariantPricing(item.productId, item.productVariantId, item.unitPrice, item.brandId, item.categoryPath, userId);
+
+  const priceSummary = mapPricingToSummary(fullPricing);
+  const finalPrice = fullPricing.final ?? fullPricing.base;
+
+  return {
+    ...item,
+    price: priceSummary,
+    totalBasePrice: item.unitPrice * item.quantity,
+    totalFinalPrice: finalPrice * item.quantity,
+  };
+};
 
 export const validateCartItemStatus = async (variantId: string, quantity: number) => {
   const variant = await repo.findVariantWithProductById(variantId);
@@ -41,10 +57,10 @@ export const addToCart = async (userId: string, input: AddToCartInput) => {
   if (existing) {
     const newQty = existing.quantity + input.quantity;
     if (check.availableQuantity < newQty) throw new BadRequestError("Vượt quá số lượng tồn kho");
-    
-    const updated = await repo.update(existing.id, { 
-      quantity: newQty, 
-      unitPrice: check.currentPrice 
+
+    const updated = await repo.update(existing.id, {
+      quantity: newQty,
+      unitPrice: check.currentPrice,
     });
     return repo.transformToCartResponse(updated);
   }
@@ -64,7 +80,7 @@ export const syncLocalStorageToDatabase = async (userId: string, items: LocalSto
   for (const item of items) {
     try {
       const check = await validateCartItemStatus(item.productVariantId, item.quantity);
-      
+
       if (check.availableQuantity === 0 || check.errors.includes("Sản phẩm ngừng kinh doanh")) {
         result.failed++;
         result.warnings.push(`"${check.productName}" đã hết hàng hoặc ngừng kinh doanh.`);
@@ -111,28 +127,29 @@ export const changeCartItemVariant = async (userId: string, cartItemId: string, 
 
   const existingNewVariantItem = await repo.findByUserAndVariant(userId, input.newVariantId);
 
+  let updatedRaw: any;
+
   if (existingNewVariantItem && existingNewVariantItem.id !== cartItemId) {
     const newQty = existingNewVariantItem.quantity + input.quantity;
     const safeQty = Math.min(newQty, check.availableQuantity);
-    
-    const updated = await repo.update(existingNewVariantItem.id, { 
-      quantity: safeQty, 
-      unitPrice: check.currentPrice 
+
+    updatedRaw = await repo.update(existingNewVariantItem.id, {
+      quantity: safeQty,
+      unitPrice: check.currentPrice,
     });
-    
     await repo.remove(cartItemId);
-    
-    return repo.transformToCartResponse(updated);
   } else {
     const safeQty = Math.min(input.quantity, check.availableQuantity);
-    const updated = await repo.update(cartItemId, { 
-      productVariantId: input.newVariantId, 
-      quantity: safeQty, 
-      unitPrice: check.currentPrice 
+    updatedRaw = await repo.update(cartItemId, {
+      productVariantId: input.newVariantId,
+      quantity: safeQty,
+      unitPrice: check.currentPrice,
     });
-    
-    return repo.transformToCartResponse(updated);
   }
+
+  // Enrich với pricing trước khi trả về — cùng cấu trúc với getCart
+  const cartResponse = repo.transformToCartResponse(updatedRaw);
+  return enrichItemWithPricing(cartResponse, userId);
 };
 
 export const removeFromCart = (userId: string, id: string) => repo.remove(id);

@@ -2,6 +2,7 @@ import { SeedProductInput } from "../../types";
 
 export const iphone17Pro: SeedProductInput = {
   name: "iPhone 17 Pro",
+  slug: "iphone-17-pro",
   description: `
     <h2 class="mt-2 text-base sm:text-xl font-semibold text-primary">
       iPhone 17 Pro – Sức mạnh đột phá từ chip A19 Pro 2nm

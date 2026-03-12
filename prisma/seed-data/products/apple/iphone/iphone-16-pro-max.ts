@@ -2,6 +2,7 @@ import { SeedProductInput } from "../../types";
 
 export const iphone16ProMax: SeedProductInput = {
   name: "iPhone 16 Pro Max",
+  slug: "iphone-16-pro-max",
   description: `
     <h2 class="mt-2 text-base sm:text-xl font-semibold text-primary">
       iPhone 16 Pro Max – Đỉnh cao công nghệ Titanium và Chip A18 Pro

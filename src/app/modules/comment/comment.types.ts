@@ -4,6 +4,8 @@ export enum CommentTargetType {
   PAGE = "PAGE",
 }
 
+//  Shared
+
 export interface CommentUser {
   id: string;
   fullName?: string;
@@ -11,26 +13,33 @@ export interface CommentUser {
   avatarImage?: string;
 }
 
+//  Response shapes
+
 export interface Comment {
   id: string;
-  userId: string;
+  userId: string | null; // nullable vì user có thể bị SetNull khi xóa
   content: string;
   targetType: CommentTargetType;
   targetId: string;
   parentId?: string;
   isApproved: boolean;
   createdAt: Date;
-  user: CommentUser;
+  user: CommentUser | null; // null khi user bị xóa (SetNull)
   repliesCount?: number;
+  // Soft delete — chỉ xuất hiện trong response admin/trash
+  deletedAt?: Date;
+  deletedBy?: string;
 }
 
 export interface CommentWithReplies extends Comment {
   replies: Comment[];
 }
 
+//  Raw DB shapes
+
 export interface RawComment {
   id: string;
-  userId: string;
+  userId: string | null;
   content: string;
   targetType: CommentTargetType;
   targetId: string;
@@ -42,31 +51,16 @@ export interface RawComment {
     fullName: string | null;
     email: string;
     avatarImage: string | null;
-  };
+  } | null;
 }
 
-export interface CreateCommentInput {
-  content: string;
-  targetType: CommentTargetType;
-  targetId: string;
-  parentId?: string;
+// Admin raw — thêm soft delete fields
+export interface RawCommentAdmin extends RawComment {
+  deletedAt: Date | null;
+  deletedBy: string | null;
 }
 
-export interface UpdateCommentInput {
-  content?: string;
-  isApproved?: boolean;
-}
-
-export interface ListCommentsQuery {
-  page: number;
-  limit: number;
-  targetType?: CommentTargetType;
-  targetId?: string;
-  isApproved?: boolean;
-  parentId?: string | null;
-  sortBy: "createdAt";
-  sortOrder: "asc" | "desc";
-}
+//  Pagination
 
 export interface PaginatedResponse<T> {
   data: T[];

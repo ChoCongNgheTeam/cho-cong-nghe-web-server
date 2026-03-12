@@ -114,6 +114,10 @@ enum FilterType {
   BOOLEAN
 }
 
+enum VariantDisplayType {
+  SELECTOR
+  CARD
+}
 
 
 // SOFT DELETE: users là entity chính, staff/admin cần trash
@@ -377,6 +381,7 @@ model products {
   ratingCount    Int       @default(0)
   isActive       Boolean   @default(true)
   isFeatured     Boolean   @default(false)
+  variantDisplay VariantDisplayType @default(SELECTOR)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -434,7 +439,7 @@ model products_variants {
   id        String    @id @default(uuid()) @db.Uuid
   productId String    @db.Uuid
   code      String?   @unique // SKU
-  price     Decimal   @db.Decimal(10, 2)
+  price     Decimal   @db.Decimal(12, 2)
   quantity  Int       @default(10)
   soldCount Int       @default(0)
   isDefault Boolean   @default(false)

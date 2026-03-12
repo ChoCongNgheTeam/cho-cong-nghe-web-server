@@ -2,6 +2,7 @@ import { SeedProductInput } from "../../types";
 
 export const iphone17: SeedProductInput = {
   name: "iPhone 17",
+  slug: "iphone-17",
   description: `
     <h2 class="mt-2 text-base sm:text-xl font-semibold text-primary">
       iPhone 17 – Chuẩn mực mới với màn hình ProMotion 120Hz

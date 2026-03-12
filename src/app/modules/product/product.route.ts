@@ -24,6 +24,7 @@ import {
   getNewArrivalProductsHandler,
   getSaleScheduleHandler,
   getSearchSuggestHandler,
+  getProductVariantOptionsHandler,
 } from "./product.controller";
 import { listProductsSchema, productBySlugParamsSchema, productParamsSchema, reviewsQuerySchema, searchSuggestSchema, variantQuerySchema } from "./product.validation";
 import { parseJsonFields } from "@/app/middlewares/parse-json-fields.middleware";
@@ -107,6 +108,12 @@ router.get("/sale-schedule", asyncHandler(getSaleScheduleHandler));
 // slug-based — tĩnh trước động
 router.get("/slug/:slug", validate(productBySlugParamsSchema, "params"), authMiddleware(false), asyncHandler(getProductBySlugHandler));
 router.get("/slug/:slug/variant", validate(productBySlugParamsSchema, "params"), validate(variantQuerySchema, "query"), asyncHandler(getProductVariantHandler));
+router.get(
+  "/slug/:slug/variant-options",
+  validate(productBySlugParamsSchema, "params"),
+  authMiddleware(false), // optional auth — để tính giá user-specific nếu có
+  asyncHandler(getProductVariantOptionsHandler),
+);
 router.get("/slug/:slug/gallery", validate(productBySlugParamsSchema, "params"), asyncHandler(getProductGalleryHandler));
 router.get("/slug/:slug/specifications", validate(productBySlugParamsSchema, "params"), asyncHandler(getProductBySpecificationsHandler));
 router.get("/slug/:slug/related", validate(productBySlugParamsSchema, "params"), asyncHandler(getRelatedProductsHandler));

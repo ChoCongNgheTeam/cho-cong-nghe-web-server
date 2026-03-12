@@ -2,6 +2,7 @@ import { SeedProductInput } from "../../types";
 
 export const iphone17ProMax: SeedProductInput = {
   name: "iPhone 17 Pro Max",
+  slug: "iphone-17-pro-max",
   description: `
     <h2 class="mt-2 text-base sm:text-xl font-semibold text-primary">
       iPhone 17 Pro Max – Nhiếp ảnh điện toán với ống kính Tele 48MP

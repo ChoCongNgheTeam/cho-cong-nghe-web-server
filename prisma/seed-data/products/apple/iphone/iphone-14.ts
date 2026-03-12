@@ -2,6 +2,7 @@ import type { SeedProductInput } from "../../types";
 
 export const iphone14: SeedProductInput = {
   name: "iPhone 14",
+  slug: "iphone-14",
   description: `
     <h2 class="mt-2 text-base sm:text-xl font-semibold text-primary">
       iPhone 14 – Tuyệt tác công nghệ và khả năng quay phim hành động đỉnh cao

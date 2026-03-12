@@ -1,19 +1,19 @@
 import { z } from "zod";
 
 export const categoryParamsSchema = z.object({
-  id: z.uuid({ message: "ID danh mục không hợp lệ" }),
+  id: z.string().uuid("ID danh mục không hợp lệ"),
 });
 
 export const categorySlugParamsSchema = z.object({
-  slug: z.string().min(1, { message: "Slug không được để trống" }),
+  slug: z.string().min(1, "Slug không được để trống"),
 });
 
 export const categoryIdParamSchema = z.object({
-  categoryId: z.string().uuid({ message: "Category ID không hợp lệ" }),
+  categoryId: z.string().uuid("Category ID không hợp lệ"),
 });
 
 export const attributeIdParamSchema = z.object({
-  attributeId: z.string().min(1, { message: "Attribute ID không hợp lệ" }),
+  attributeId: z.string().min(1, "Attribute ID không hợp lệ"),
 });
 
 export const listCategoriesQuerySchema = z.object({
@@ -23,6 +23,8 @@ export const listCategoriesQuerySchema = z.object({
   isActive: z.coerce.boolean().optional(),
   sortBy: z.enum(["name", "position", "createdAt"]).default("position"),
   sortOrder: z.enum(["asc", "desc"]).default("asc"),
+  // Admin only: xem cả category đã soft delete
+  includeDeleted: z.coerce.boolean().optional().default(false),
 });
 
 export const featuredCategoriesQuerySchema = z.object({
@@ -30,50 +32,30 @@ export const featuredCategoriesQuerySchema = z.object({
 });
 
 export const createCategorySchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(2, "Tên danh mục phải từ 2 ký tự")
-    .max(100, "Tên danh mục tối đa 100 ký tự"),
-
-  parentId: z.uuid("Parent ID không hợp lệ").optional().or(z.literal("")),
-
+  name: z.string().trim().min(2, "Tên danh mục phải từ 2 ký tự").max(100, "Tên danh mục tối đa 100 ký tự"),
+  parentId: z.string().uuid("Parent ID không hợp lệ").optional().or(z.literal("")),
   description: z.string().trim().max(500, "Mô tả tối đa 500 ký tự").optional().or(z.literal("")),
-
   imageUrl: z.string().url().optional(),
   imagePath: z.string().optional(),
-
   position: z.coerce.number().int().min(0).optional(),
-
   isFeatured: z.coerce.boolean().optional().default(false),
   isActive: z.coerce.boolean().optional().default(true),
 });
 
 export const updateCategorySchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(2, "Tên danh mục phải từ 2 ký tự")
-    .max(100, "Tên danh mục tối đa 100 ký tự")
-    .optional(),
-
-  parentId: z.uuid("Parent ID không hợp lệ").optional().or(z.literal("")),
-
+  name: z.string().trim().min(2, "Tên danh mục phải từ 2 ký tự").max(100, "Tên danh mục tối đa 100 ký tự").optional(),
+  parentId: z.string().uuid("Parent ID không hợp lệ").optional().or(z.literal("")),
   description: z.string().trim().max(500, "Mô tả tối đa 500 ký tự").optional().or(z.literal("")),
-
   imageUrl: z.string().url().optional(),
   imagePath: z.string().optional(),
-
   position: z.coerce.number().int().min(0).optional(),
-
-  isFeatured: z.coerce.boolean().optional().default(false),
-  isActive: z.coerce.boolean().optional().default(true),
-
+  isFeatured: z.coerce.boolean().optional(),
+  isActive: z.coerce.boolean().optional(),
   removeImage: z.boolean().optional(),
 });
 
 export const reorderCategorySchema = z.object({
-  categoryId: z.uuid("Category ID không hợp lệ"),
+  categoryId: z.string().uuid("Category ID không hợp lệ"),
   newPosition: z.number().int().min(0, "Position phải >= 0"),
 });
 

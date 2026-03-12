@@ -1,22 +1,22 @@
 import { Request, Response } from "express";
 import * as cartService from "./cart.service";
 import { addToCartSchema, updateCartItemSchema, changeVariantSchema } from "./cart.validation";
-import { UnauthorizedError } from "@/errors"; 
+import { UnauthorizedError } from "@/errors";
 // 👇 Import Orchestrator Use-case thay vì Service
 import { getCartWithPricing } from "../pricing/use-cases/getCartWithPricing.service";
 
 export const validateItemHandler = async (req: Request, res: Response) => {
   const { productVariantId, quantity } = req.body;
   const check = await cartService.validateCartItemStatus(productVariantId, quantity);
-  
+
   res.json({
     success: check.isValid,
     data: {
       availableQuantity: check.availableQuantity,
       isValid: check.isValid,
-      errors: check.errors
+      errors: check.errors,
     },
-    message: check.isValid ? "Sản phẩm hợp lệ" : "Sản phẩm không đủ điều kiện"
+    message: check.isValid ? "Sản phẩm hợp lệ" : "Sản phẩm không đủ điều kiện",
   });
 };
 
@@ -35,10 +35,10 @@ export const syncCartHandler = async (req: Request, res: Response) => {
   if (!userId) throw new UnauthorizedError("Vui lòng đăng nhập");
 
   const result = await cartService.syncLocalStorageToDatabase(userId, items);
-  res.json({ 
-    data: result, 
+  res.json({
+    data: result,
     message: result.warnings.length > 0 ? "Cập nhật theo tồn kho" : "Đồng bộ thành công",
-    success: true 
+    success: true,
   });
 };
 
@@ -68,7 +68,11 @@ export const changeCartItemVariantHandler = async (req: Request, res: Response) 
 
   const input = changeVariantSchema.parse(req.body);
   const data = await cartService.changeCartItemVariant(userId, cartItemId, input);
-  res.json({ data, message: "Đổi phân loại thành công" });
+  res.json({
+    success: true,
+    data,
+    message: "Đổi phân loại thành công",
+  });
 };
 
 export const removeFromCartHandler = async (req: Request, res: Response) => {

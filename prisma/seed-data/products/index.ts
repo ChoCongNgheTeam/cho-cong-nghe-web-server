@@ -4,9 +4,12 @@ import * as OPPO from "./oppo";
 import * as Xiaomi from "./xiaomi";
 import * as AirConditioner from "./air-conditioner";
 import * as EarPods from "./earpod";
+import * as Lenovo from "./lenovo";
 
 export const allProducts = [
-  // --- Apple ---
+  // ================================================================
+  // APPLE
+  // ================================================================
 
   // iPhone
   Apple.iphone13,
@@ -19,104 +22,156 @@ export const allProducts = [
   Apple.iphone17Pro,
   Apple.iphone17ProMax,
 
-  // Samsung
+  // MacBook Air 13 inch
+  Apple.macbookAir13M2,
+  Apple.macbookAir13M3,
+  Apple.macbookAir13M5,
+
+  // MacBook Air 15 inch
+  Apple.macbookAir15M3,
+  Apple.macbookAir15M5,
+
+  // MacBook Pro 14 inch
+  Apple.macbookPro14M4,
+  Apple.macbookPro14M4Pro,
+  Apple.macbookPro14M4Max,
+  Apple.macbookPro14M5Pro,
+  Apple.macbookPro14M5Max,
+
+  // MacBook Pro 16 inch
+  Apple.macbookPro16M4Pro,
+  Apple.macbookPro16M4Max,
+  Apple.macbookPro16M5Pro,
+  Apple.macbookPro16M5Max,
+
+  // MacBook Pro 16 inch
+  Apple.macbookPro16M4Pro,
+  Apple.macbookPro16M4Max,
+
+  // Lenovo
+  Lenovo.lenovoLOQ15IAX9E,
+  Lenovo.lenovoLOQ15IRP9,
+  Lenovo.lenovoIdeaPad1_15AMN7,
+  Lenovo.lenovoIdeaPadSlim3_15IAU7,
+  Lenovo.lenovoIdeaPadSlim5_14IML9,
+  Lenovo.lenovoLegion5_16IRX9,
+  Lenovo.lenovoLegionSlim5_16APH8,
+  Lenovo.lenovoLegionPro7_16IRX9H,
+  Lenovo.lenovoThinkBook14G6,
+  Lenovo.lenovoThinkBook16G6,
+  Lenovo.lenovoThinkPadE14Gen5,
+  Lenovo.lenovoThinkPadL13Gen4,
+  Lenovo.lenovoThinkPadX1CarbonGen12,
+  Lenovo.lenovoV15G4,
+  Lenovo.lenovoYoga7_14ITP8,
+  Lenovo.lenovoYogaSlim7_14IMH9,
+  Lenovo.lenovoYogaBook9,
+
+  // EarPods & AirPods
+  EarPods.appleEarPodsUSBC,
+  EarPods.appleEarPodsLightning_MW,
+  EarPods.appleEarPodsLightning_MM,
+  EarPods.appleAirPodsPro3,
+
+  // ================================================================
+  // SAMSUNG
+  // ================================================================
+
+  // Galaxy AI (S series, Z series, A26/36/56)
+  Samsung.galaxyS25Ultra,
+  Samsung.galaxyS25Plus,
+  Samsung.galaxyS25,
+  Samsung.galaxyS25Edge,
+  Samsung.galaxyS25FE,
+  Samsung.galaxyS24Ultra,
+  Samsung.galaxyS24FE,
   Samsung.galaxyZFold7,
+  Samsung.galaxyZFold6,
   Samsung.galaxyZFlip7,
   Samsung.galaxyA56,
   Samsung.galaxyA36,
-  Samsung.galaxyS25Ultra,
-  Samsung.galaxyS25,
-  Samsung.galaxyS25Plus,
-  Samsung.galaxyS25FE,
   Samsung.galaxyA26,
-  Samsung.galaxyZFold6,
-  Samsung.galaxyS24FE,
-  Samsung.galaxyS25Edge,
-  Samsung.galaxyS24Ultra,
 
-  // OPPO Reno Series
+  // Galaxy A Series (phổ thông)
+  Samsung.galaxyA17_5G,
+  Samsung.galaxyA17,
+  Samsung.galaxyA16_5G,
+  Samsung.galaxyA16,
+  Samsung.galaxyA07_5G,
+  Samsung.galaxyA07,
+  Samsung.galaxyA06_5G,
+  Samsung.galaxyA06,
+
+  // Galaxy M Series
+  Samsung.galaxyM55,
+
+  // Galaxy XCover
+  Samsung.galaxyXCover7Pro,
+
+  // ================================================================
+  // OPPO
+  // ================================================================
+
+  // Reno Series
   OPPO.oppoReno15_5G,
   OPPO.oppoReno15F_5G,
   OPPO.oppoReno14_5G,
   OPPO.oppoReno14F_5G,
-  OPPO.oppoReno13F_12GB,
+  OPPO.oppoReno13F_5G,
   OPPO.oppoReno12F_5G,
   OPPO.oppoReno11F_5G,
 
-  // OPPO A Series
+  // A Series (gộp model)
   OPPO.oppoA6Pro,
   OPPO.oppoA5iPro,
-  OPPO.oppoA6T_6GB,
-  OPPO.oppoA6T_4GB,
-  OPPO.oppoA5i_6GB,
-  OPPO.oppoA5i_4GB,
-  OPPO.oppoA3_8GB,
-  OPPO.oppoA3_6GB,
-  OPPO.oppoA58_8GB,
-  OPPO.oppoA58_6GB,
+  OPPO.oppoA6T,
+  OPPO.oppoA5i,
+  OPPO.oppoA3,
+  OPPO.oppoA58,
   OPPO.oppoA18,
 
-  // OPPO Find Series
+  // Find Series
   OPPO.oppoFindX9Pro,
-  OPPO.oppoFindX9_16GB,
-  OPPO.oppoFindX9_12GB,
+  OPPO.oppoFindX9,
   OPPO.oppoFindN5,
   OPPO.oppoFindN3,
 
-  // Xiaomi Poco
+  // ================================================================
+  // XIAOMI
+  // ================================================================
+
+  // Xiaomi Series (Flagship)
+  Xiaomi.xiaomi15Ultra,
+  Xiaomi.xiaomi15,
+  Xiaomi.xiaomi15TPro,
+  Xiaomi.xiaomi15T,
+
+  // Poco Series
   Xiaomi.pocoF8Pro,
   Xiaomi.pocoX7,
   Xiaomi.pocoM7Pro,
   Xiaomi.pocoM6Pro,
   Xiaomi.pocoC71,
 
+  // Redmi Note Series
   Xiaomi.redmiNote15Pro_5G,
+  Xiaomi.redmiNote15Pro,
   Xiaomi.redmiNote15_5G,
-  Xiaomi.redmiNote15_6GB,
+  Xiaomi.redmiNote15,
   Xiaomi.redmiNote14ProPlus,
-  Xiaomi.redmiNote14_5G_8GB,
-  Xiaomi.redmiNote14_6GB,
+  Xiaomi.redmiNote14_5G,
+  Xiaomi.redmiNote14,
 
+  // Redmi Series
   Xiaomi.redmi15_5G,
   Xiaomi.redmi14C,
   Xiaomi.redmi13X,
 
-  // MacBook Air 13 inch
-  Apple.macbookAir13M4_256,
-  Apple.macbookAir13M2_2024,
-  Apple.macbookAir13M4_512_16,
-  Apple.macbookAir13M4_512_24,
-
-  // MacBook Air 15 inch
-  Apple.macbookAir15M4_512,
-  Apple.macbookAir15M4_256,
-  Apple.macbookAir15M2_2023,
-
-  // MacBook Pro 14 inch (M3 & M4 Series)
-  Apple.macbookPro14M4Pro_512,
-  Apple.macbookPro14M4Pro_1TB,
-  Apple.macbookPro14M3Pro_1TB,
-  Apple.macbookPro14M4Max_1TB,
-
-  // MacBook Pro 14 inch (M5 Series - 2025)
-  Apple.macbookPro14M5_16_512,
-  Apple.macbookPro14M5_24_512,
-
-  // MacBook Pro 16 inch
-  Apple.macbookPro16M4Pro_24_512,
-  Apple.macbookPro16M4Pro_48_512,
-  Apple.macbookPro16M4Max_36_1TB,
-  Apple.macbookPro16M4Max_48_1TB,
-
-  // --- Air Conditioner ---
+  // ================================================================
+  // AIR CONDITIONER
+  // ================================================================
   AirConditioner.comfeeInverter15_CFS13,
   AirConditioner.casperInverter15_GC12IB36,
   AirConditioner.casperInverter1_TC09IS35,
   AirConditioner.casperInverter15_GC12IS35,
-
-  // --- EarPods ---
-  EarPods.appleEarPodsUSBC,
-  EarPods.appleEarPodsLightning_MW,
-  EarPods.appleEarPodsLightning_MM,
-  EarPods.appleAirPodsPro3,
 ] as const;

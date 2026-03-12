@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import * as userService from "./user.service";
 import { getUsersQuerySchema } from "./user.validation";
+import { ForbiddenError } from "@/errors";
+
+// Self
 
 export const getMeHandler = async (req: Request, res: Response) => {
   const user = await userService.getMe(req.user!.id);
@@ -22,14 +25,11 @@ export const changePasswordHandler = async (req: Request, res: Response) => {
 export const getUsersHandler = async (req: Request, res: Response) => {
   const query = getUsersQuerySchema.parse(req.query);
   const isAdmin = req.user!.role === "ADMIN";
-
-  console.log(isAdmin);
-
   const result = await userService.getUsers(query, isAdmin);
 
   res.json({
     data: result.users,
-    meta: {
+    pagination: {
       total: result.total,
       page: result.page,
       limit: result.limit,
@@ -45,31 +45,18 @@ export const getUserByIdHandler = async (req: Request, res: Response) => {
   res.json({ data: user, message: "Lấy người dùng thành công" });
 };
 
-/**
- * Soft delete — Staff & Admin.
- * Guard phân quyền chi tiết:
- *   - Staff: chỉ được xóa CUSTOMER
- *   - Admin: xóa được mọi role (trừ chính mình — guard trong service)
- */
+// Staff: chỉ xóa được CUSTOMER
+// Admin: xóa mọi role (trừ chính mình — guard trong service)
 export const deleteUserHandler = async (req: Request, res: Response) => {
   const requester = req.user!;
-  const targetId = req.params.id;
-
-  const target = await userService.getUserById(targetId);
-
-  if (!target) {
-    return res.status(404).json({ message: "User không tồn tại" });
-  }
+  const target = await userService.getUserById(req.params.id);
 
   if (requester.role === "STAFF" && target.role !== "CUSTOMER") {
-    return res.status(403).json({
-      message: "Staff chỉ được phép xóa tài khoản khách hàng",
-    });
+    throw new ForbiddenError("Staff chỉ được phép xóa tài khoản khách hàng");
   }
 
-  await userService.softDeleteUser(targetId, requester.id);
-
-  return res.status(204).send();
+  await userService.softDeleteUser(req.params.id, requester.id);
+  res.json({ message: "Xóa người dùng thành công" });
 };
 
 // Admin only
@@ -91,7 +78,7 @@ export const restoreUserHandler = async (req: Request, res: Response) => {
 
 export const hardDeleteUserHandler = async (req: Request, res: Response) => {
   await userService.hardDeleteUser(req.params.id);
-  res.status(204).send();
+  res.json({ message: "Xóa vĩnh viễn người dùng thành công" });
 };
 
 export const getDeletedUsersHandler = async (req: Request, res: Response) => {
@@ -101,7 +88,7 @@ export const getDeletedUsersHandler = async (req: Request, res: Response) => {
 
   res.json({
     data: result.users,
-    meta: {
+    pagination: {
       total: result.total,
       page: result.page,
       limit: result.limit,

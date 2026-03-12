@@ -1,32 +1,23 @@
 import { PrismaClient } from "@prisma/client";
-import { variantData } from "../seed-data/variants";
+import { variantData } from "../seed-data/variantData";
 
 interface SeedVariantsParams {
   products: Array<{ id: string; name: string; slug: string }>;
 }
 
 function buildVariantCode(productSlug: string, v: any) {
-  return [productSlug.toUpperCase(), v.storage?.toUpperCase(), v.color?.toUpperCase()]
+  return [productSlug.toUpperCase(), v.ram?.toUpperCase(), v.gpu?.toUpperCase(), v.storage?.toUpperCase(), v.size?.toUpperCase(), v.capacity_cooling?.toUpperCase(), v.color?.toUpperCase()]
     .filter(Boolean)
     .join("-")
     .replace(/\s+/g, "");
 }
 
-/**
- * Attach attribute option to a variant
- */
-async function attachAttributeOption(
-  prisma: PrismaClient,
-  productVariantId: string,
-  attributeCode: string,
-  value?: string,
-) {
+async function attachAttributeOption(prisma: PrismaClient, productVariantId: string, attributeCode: string, value?: string) {
   if (!value) return;
 
   const attribute = await prisma.attributes.findUnique({
     where: { code: attributeCode },
   });
-
   if (!attribute) return;
 
   const option = await prisma.attributes_options.findFirst({
@@ -35,7 +26,6 @@ async function attachAttributeOption(
       value: { equals: value, mode: "insensitive" },
     },
   });
-
   if (!option) return;
 
   await prisma.variants_attributes.upsert({
@@ -46,10 +36,7 @@ async function attachAttributeOption(
       },
     },
     update: {},
-    create: {
-      productVariantId,
-      attributeOptionId: option.id,
-    },
+    create: { productVariantId, attributeOptionId: option.id },
   });
 }
 
@@ -59,16 +46,15 @@ export async function seedVariants(prisma: PrismaClient, { products }: SeedVaria
   const createdVariants = [];
 
   for (const product of products) {
+    // slug trong DB = key trong variantData vì cả 2 đều lấy từ data.slug
     const variantsForThisProduct = variantData[product.slug];
 
     if (!variantsForThisProduct || variantsForThisProduct.length === 0) {
-      console.log(`⚠️ Product has no variants: ${product.name}`);
+      console.warn(`⚠️  No variants found for: ${product.name} (slug: ${product.slug})`);
       continue;
     }
 
-    console.log(
-      `  Processing variants for: ${product.name} (${variantsForThisProduct.length} variants)`,
-    );
+    console.log(`  Processing: ${product.name} → ${variantsForThisProduct.length} variants`);
 
     for (const v of variantsForThisProduct) {
       const code = buildVariantCode(product.slug, v);
@@ -90,10 +76,13 @@ export async function seedVariants(prisma: PrismaClient, { products }: SeedVaria
           },
         });
 
-        // 🔗 Attach attributes
+        // Attach tất cả attribute types
         await attachAttributeOption(prisma, variant.id, "color", v.color);
         await attachAttributeOption(prisma, variant.id, "storage", v.storage);
-        // await attachAttributeOption(prisma, variant.id, "size", v.size);
+        await attachAttributeOption(prisma, variant.id, "ram", v.ram);
+        await attachAttributeOption(prisma, variant.id, "gpu", v.gpu);
+        await attachAttributeOption(prisma, variant.id, "size", v.size);
+        await attachAttributeOption(prisma, variant.id, "capacity_cooling", v.capacity_cooling);
 
         createdVariants.push(variant);
       } catch (err) {

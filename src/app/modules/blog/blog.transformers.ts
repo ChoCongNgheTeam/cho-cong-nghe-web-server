@@ -1,73 +1,77 @@
-import { BlogCard, BlogDetail, Author, RawBlog } from "./blog.types";
+import { BlogCard, BlogDetail, Author } from "./blog.types";
 
 // Fix BigInt serialization
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
 };
 
-/**
- * Transform author data
- */
+//  Helpers
+
 const transformAuthor = (author: any): Author => ({
   id: author.id,
-  fullName: author.fullName || undefined,
+  fullName: author.fullName ?? undefined,
   email: author.email,
-  avatarImage: author.avatarImage || undefined,
+  avatarImage: author.avatarImage ?? undefined,
 });
 
 /**
- * Extract excerpt from content (first 200 chars, strip HTML if any)
+ * Strip HTML tags và cắt excerpt tại word boundary
  */
-const extractExcerpt = (content: string, maxLength: number = 200): string => {
-  // Strip HTML tags (basic)
-  const strippedContent = content.replace(/<[^>]*>/g, "");
+const extractExcerpt = (content: string, maxLength = 200): string => {
+  const stripped = content.replace(/<[^>]*>/g, "");
+  if (stripped.length <= maxLength) return stripped;
 
-  if (strippedContent.length <= maxLength) {
-    return strippedContent;
-  }
-
-  // Cut at word boundary
-  const excerpt = strippedContent.substring(0, maxLength);
-  const lastSpace = excerpt.lastIndexOf(" ");
-
-  return lastSpace > 0 ? excerpt.substring(0, lastSpace) + "..." : excerpt + "...";
+  const cut = stripped.substring(0, maxLength);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > 0 ? cut.substring(0, lastSpace) : cut) + "...";
 };
 
-/**
- * Transform blog card for list display
- */
-export const transformBlogCard = (blog: any): BlogCard => {
-  return {
-    id: blog.id,
-    title: blog.title,
-    slug: blog.slug,
-    thumbnail: blog.imageUrl || undefined,
-    excerpt: extractExcerpt(blog.content),
-    viewCount: blog.viewCount,
-    status: blog.status,
-    author: transformAuthor(blog.author),
-    createdAt: blog.createdAt,
-    publishedAt: blog.publishedAt || undefined,
-    // commentsCount will be added by orchestrator if needed
-  };
-};
+//  Transformers
 
 /**
- * Transform blog detail
+ * BlogCard — dùng cho list view (public & admin)
+ * Admin response sẽ có thêm deletedAt/deletedBy nếu includeDeleted
  */
-export const transformBlogDetail = (blog: any): BlogDetail => {
-  return {
-    id: blog.id,
-    title: blog.title,
-    slug: blog.slug,
-    content: blog.content,
-    thumbnail: blog.imageUrl || undefined,
-    viewCount: blog.viewCount,
-    status: blog.status,
-    author: transformAuthor(blog.author),
-    createdAt: blog.createdAt,
-    updatedAt: blog.updatedAt,
-    publishedAt: blog.publishedAt || undefined,
-    // comments and commentsCount will be added by orchestrator
-  };
+export const transformBlogCard = (blog: any): BlogCard => ({
+  id: blog.id,
+  title: blog.title,
+  slug: blog.slug,
+  thumbnail: blog.imageUrl ?? undefined,
+  excerpt: extractExcerpt(blog.content),
+  viewCount: blog.viewCount,
+  status: blog.status,
+  author: transformAuthor(blog.author),
+  createdAt: blog.createdAt,
+  publishedAt: blog.publishedAt ?? undefined,
+  // Soft delete metadata — chỉ có khi admin query với select admin
+  ...(blog.deletedAt !== undefined && { deletedAt: blog.deletedAt ?? undefined }),
+  ...(blog.deletedBy !== undefined && { deletedBy: blog.deletedBy ?? undefined }),
+});
+
+/**
+ * BlogDetail — dùng cho single blog view
+ */
+export const transformBlogDetail = (blog: any): BlogDetail => ({
+  id: blog.id,
+  title: blog.title,
+  slug: blog.slug,
+  content: blog.content,
+  thumbnail: blog.imageUrl ?? undefined,
+  viewCount: blog.viewCount,
+  status: blog.status,
+  author: transformAuthor(blog.author),
+  createdAt: blog.createdAt,
+  updatedAt: blog.updatedAt,
+  publishedAt: blog.publishedAt ?? undefined,
+  // Soft delete metadata
+  ...(blog.deletedAt !== undefined && { deletedAt: blog.deletedAt ?? undefined }),
+  ...(blog.deletedBy !== undefined && { deletedBy: blog.deletedBy ?? undefined }),
+});
+
+/**
+ * Lấy imagePath từ raw blog để delete ảnh cũ trên Cloudinary
+ * (imagePath không expose ra ngoài response)
+ */
+export const extractImagePath = (blog: any): string | undefined => {
+  return blog.imagePath ?? undefined;
 };
