@@ -23,6 +23,7 @@ export interface OrderItemResponse {
   subtotal: number; // calculated
   productName?: string;
   variantCode?: string;
+  image?: string | null;
 }
 
 /**
