@@ -18,20 +18,66 @@ export const orderSelect = {
       productVariant: {
         select: {
           id: true, code: true, price: true,
-          product: { select: { id: true, name: true, slug: true, img: { take: 1, select: { imageUrl: true, color: true } } } },
-          variantAttributes: { select: { attributeOption: { select: { value: true, attribute: { select: { name: true } } } } } },
+          product: { 
+            select: { 
+              id: true, 
+              name: true, 
+              slug: true, 
+              // Đã gỡ bỏ take: 1 để lấy toàn bộ ảnh phục vụ so khớp màu
+              img: { select: { imageUrl: true, color: true } } 
+            } 
+          },
+          variantAttributes: { 
+            select: { 
+              attributeOption: { 
+                select: { value: true, attribute: { select: { name: true } } } 
+              } 
+            } 
+          },
         },
       },
     },
   },
 } satisfies Prisma.ordersSelect;
 
+// Hàm nội bộ: Xử lý chọn đúng hình ảnh theo variant màu sắc
+export const formatOrderResponse = (order: any) => {
+  if (!order) return order;
+  
+  return {
+    ...order,
+    orderItems: order.orderItems.map((item: any) => {
+      // 1. Tìm màu sắc của variant
+      const colorAttr = item.productVariant.variantAttributes.find((attr: any) => {
+        const name = (attr.attributeOption.attribute?.name || "").toLowerCase();
+        return ["color", "màu", "màu sắc"].includes(name);
+      });
+
+      const colorValue = colorAttr?.attributeOption.value;
+
+      // 2. Tìm ảnh khớp với màu đó
+      const matchingImage = item.productVariant.product.img.find(
+        (img: any) => img.color === colorValue
+      );
+
+      // 3. Fallback: Nếu không có ảnh đúng màu, lấy ảnh đầu tiên của sản phẩm
+      const finalImageUrl = matchingImage?.imageUrl || item.productVariant.product.img[0]?.imageUrl || null;
+
+      // Trả về item gốc, nhét thêm trường `image` để FE sử dụng
+      return {
+        ...item,
+        image: finalImageUrl 
+      };
+    })
+  };
+};
+
 export const findAllOrders = async (query: OrderQuery) => {
   const { page = 1, limit = 20, search, status, paymentStatus, includeDeleted } = query;
   const skip = (page - 1) * limit;
   const where: Prisma.ordersWhereInput = {};
 
-  if (!includeDeleted) where.deletedAt = null; // Ẩn đơn đã lưu trữ
+  if (!includeDeleted) where.deletedAt = null;
   if (status) where.orderStatus = status;
   if (paymentStatus) where.paymentStatus = paymentStatus;
   
@@ -48,7 +94,10 @@ export const findAllOrders = async (query: OrderQuery) => {
     prisma.orders.count({ where }),
   ]);
 
-  return { data, page, limit, total, totalPages: Math.ceil(total / limit) };
+  // Map lại dữ liệu
+  const formattedData = data.map(formatOrderResponse);
+
+  return { data: formattedData, page, limit, total, totalPages: Math.ceil(total / limit) };
 };
 
 export const findAllArchivedOrders = async (query: OrderQuery) => {
@@ -68,26 +117,36 @@ export const findAllArchivedOrders = async (query: OrderQuery) => {
     prisma.orders.count({ where }),
   ]);
 
-  return { data, page, limit, total, totalPages: Math.ceil(total / limit) };
+  // Map lại dữ liệu
+  const formattedData = data.map(formatOrderResponse);
+
+  return { data: formattedData, page, limit, total, totalPages: Math.ceil(total / limit) };
 };
 
 export const findOrdersByUserId = async (userId: string) => {
-  return prisma.orders.findMany({
-    where: { userId, deletedAt: null }, // User không thấy đơn đã bị Admin archive
+  const orders = await prisma.orders.findMany({
+    where: { userId, deletedAt: null },
     select: orderSelect,
     orderBy: { orderDate: "desc" },
   });
+
+  // Map lại mảng đơn hàng
+  return orders.map(formatOrderResponse);
 };
 
 export const findOrderById = async (id: string, includeDeleted = false) => {
-  return prisma.orders.findUnique({
+  const order = await prisma.orders.findUnique({
     where: { id, ...(!includeDeleted ? { deletedAt: null } : {}) },
     select: orderSelect,
   });
+
+  // Format object đơn lẻ
+  return formatOrderResponse(order);
 };
 
 export const updateOrder = async (id: string, data: any) => {
-  return prisma.orders.update({ where: { id }, data, select: orderSelect });
+  const order = await prisma.orders.update({ where: { id }, data, select: orderSelect });
+  return formatOrderResponse(order);
 };
 
 // --- Archive & Delete ---
