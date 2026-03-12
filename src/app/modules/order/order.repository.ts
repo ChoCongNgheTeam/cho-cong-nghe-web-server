@@ -55,17 +55,32 @@ export const formatOrderResponse = (order: any) => {
 
       const colorValue = colorAttr?.attributeOption.value;
 
-      // 2. Tìm ảnh khớp với màu đó
-      const matchingImage = item.productVariant.product.img.find(
-        (img: any) => img.color === colorValue
-      );
+      // 2. Lọc ra MẢNG ẢNH chỉ chứa đúng màu của biến thể
+      let filteredImages = item.productVariant.product.img;
+      if (colorValue) {
+        filteredImages = item.productVariant.product.img.filter(
+          (img: any) => img.color === colorValue
+        );
+      }
 
-      // 3. Fallback: Nếu không có ảnh đúng màu, lấy ảnh đầu tiên của sản phẩm
-      const finalImageUrl = matchingImage?.imageUrl || item.productVariant.product.img[0]?.imageUrl || null;
+      // Fallback: Nếu lọc xong không có ảnh nào khớp, giữ lại 1 ảnh đầu tiên làm đại diện
+      if (filteredImages.length === 0 && item.productVariant.product.img.length > 0) {
+        filteredImages = [item.productVariant.product.img[0]];
+      }
 
-      // Trả về item gốc, nhét thêm trường `image` để FE sử dụng
+      // 3. Lấy link ảnh đầu tiên trong mảng đã lọc để gán cho trường `image` bên ngoài (FE tiện dùng)
+      const finalImageUrl = filteredImages.length > 0 ? filteredImages[0].imageUrl : null;
+
+      // 4. Trả về data đã được ghi đè mảng `img`
       return {
         ...item,
+        productVariant: {
+          ...item.productVariant,
+          product: {
+            ...item.productVariant.product,
+            img: filteredImages // 👈 Ghi đè mảng 30 ảnh thành mảng chỉ có ảnh đúng màu
+          }
+        },
         image: finalImageUrl 
       };
     })
