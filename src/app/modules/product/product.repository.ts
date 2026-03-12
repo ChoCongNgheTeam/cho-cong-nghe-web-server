@@ -508,6 +508,17 @@ export const findVariantByOptions = async (productId: string, options: Record<st
   return matchedVariant || null;
 };
 
+export const findAllActiveVariants = async (productId: string) => {
+  return prisma.products_variants.findMany({
+    where: {
+      productId,
+      isActive: true,
+    },
+    select: selectVariant,
+    orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+  });
+};
+
 // UPDATE: findById - không include inventory
 export const findById = async (id: string) => {
   return prisma.products.findUnique({

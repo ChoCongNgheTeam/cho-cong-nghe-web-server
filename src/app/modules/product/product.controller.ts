@@ -10,6 +10,7 @@ import { getRelatedProductsWithPricing } from "../pricing/use-cases/getRelatedPr
 import { getFlashSaleProductsWithPricing } from "../pricing/use-cases/getFlashSaleProductsWithPricing.service";
 import { getNewArrivalProductsWithPricing } from "../pricing/use-cases/getNewArrivalProductsWithPricing.service";
 import { getBestSellingProductsWithPricing } from "../pricing/use-cases/getBestSellingProductsWithPricing.service";
+import { getProductVariantOptions } from "../pricing/use-cases/product.variant-pricing.orchestrator";
 
 const paginatedResponse = (result: any, message: string) => ({
   data: result.data,
@@ -47,6 +48,14 @@ export const getProductBySlugHandler = async (req: Request, res: Response) => {
 export const getProductVariantHandler = async (req: Request, res: Response) => {
   const result = await getProductVariantWithPricing(req.params.slug, req.query as Record<string, string>, req.user?.id);
   res.json({ data: result, message: "Lấy chi tiết variant thành công" });
+};
+
+export const getProductVariantOptionsHandler = async (req: Request, res: Response) => {
+  const result = await getProductVariantOptions(req.params.slug, req.user?.id);
+  res.json({
+    data: result,
+    message: "Lấy danh sách variant thành công",
+  });
 };
 
 export const getProductGalleryHandler = async (req: Request, res: Response) => {

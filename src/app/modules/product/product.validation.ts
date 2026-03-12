@@ -142,6 +142,10 @@ export const updateProductSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+export const variantOptionsQuerySchema = z.object({
+  // không cần query params, chỉ cần slug từ params
+});
+
 export type ListProductsQuery = z.infer<typeof listProductsSchema>;
 export type ReviewsQuery = z.infer<typeof reviewsQuerySchema>;
 export type CreateProductInput = z.infer<typeof createProductSchema>;

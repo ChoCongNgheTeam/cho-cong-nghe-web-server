@@ -134,6 +134,21 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
   };
 };
 
+export const getAllProductVariants = async (slug: string) => {
+  const product = await repo.findBySlug(slug);
+  if (!product || !product.isActive) throw new NotFoundError("Sản phẩm");
+
+  const rawVariants = await repo.findAllActiveVariants(product.id);
+
+  return {
+    productId: product.id,
+    brandId: product.brand?.id,
+    categoryPath: buildCategoryPath(product.category),
+    variants: rawVariants.map(normalizeVariant),
+    images: product.img ?? [],
+  };
+};
+
 export const getProductSpecificationsBySlug = async (slug: string) => {
   const product = await repo.findSpecificationsBySlug(slug);
   if (!product || !product.isActive) throw new NotFoundError("Thông số sản phẩm");
