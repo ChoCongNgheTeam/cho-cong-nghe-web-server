@@ -1,8 +1,12 @@
 openapi: 3.0.0
 info:
   title: Wishlist API
-  version: 1.0.0
-  description: API để quản lý danh sách sản phẩm yêu thích
+  version: 1.1.0
+  description: |
+    API quản lý danh sách sản phẩm yêu thích.
+    - Hỗ trợ phân trang (Pagination).
+    - Tích hợp Pricing Orchestrator để tự động tính giá khuyến mãi.
+    - Lấy kèm hình ảnh đại diện và các thông số nổi bật (Highlights) của sản phẩm.
 
 tags:
   - name: Wishlist
@@ -13,7 +17,7 @@ paths:
     get:
       tags:
         - Wishlist
-      summary: Lấy danh sách yêu thích của người dùng (Có phân trang)
+      summary: Lấy danh sách yêu thích của người dùng (Có phân trang & Tính giá khuyến mãi)
       security:
         - bearerAuth: []
       parameters:
@@ -33,17 +37,22 @@ paths:
             default: 10
       responses:
         '200':
-          description: Thành công
+          description: Lấy danh sách yêu thích thành công
           content:
             application/json:
-              example:
-                data: []
-                meta:
-                  total: 25
-                  page: 1
-                  limit: 10
-                  totalPages: 3
-                message: "Lấy danh sách yêu thích thành công"
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WishlistItem'
+                  meta:
+                    $ref: '#/components/schemas/WishlistPaginationMeta'
+                  message:
+                    type: string
+                    example: "Lấy danh sách yêu thích thành công"
+
   /wishlist/add:
     post:
       tags:
@@ -65,13 +74,24 @@ paths:
                   format: uuid
       responses:
         '201':
-          description: Thành công
+          description: Thêm thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/WishlistItem'
+                  message:
+                    type: string
+                    example: "Thêm thành công"
         '400':
-          description: Lỗi dữ liệu hoặc sản phẩm ngừng kinh doanh
+          description: Lỗi dữ liệu hoặc sản phẩm đã ngừng kinh doanh
         '404':
           description: Không tìm thấy sản phẩm
         '409':
           description: Sản phẩm đã có trong wishlist
+
   /wishlist/remove:
     delete:
       tags:
@@ -93,12 +113,23 @@ paths:
                   format: uuid
       responses:
         '200':
-          description: Thành công
+          description: Xoá thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Xoá thành công"
+        '404':
+          description: Không tìm thấy sản phẩm trong danh sách yêu thích
+
   /wishlist/check/{productId}:
     get:
       tags:
         - Wishlist
-      summary: Kiểm tra sản phẩm có trong danh sách
+      summary: Kiểm tra sản phẩm có trong danh sách yêu thích hay không
       security:
         - bearerAuth: []
       parameters:
@@ -110,7 +141,20 @@ paths:
             format: uuid
       responses:
         '200':
-          description: Thành công
+          description: Kiểm tra thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      isInWishlist:
+                        type: boolean
+                  message:
+                    type: string
+                    example: "Kiểm tra thành công"
 
 components:
   securitySchemes:
@@ -118,3 +162,123 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+
+  schemas:
+    WishlistPaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+          example: 25
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        totalPages:
+          type: integer
+          example: 3
+
+    WishlistItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        price:
+          type: object
+          description: Thông tin giá đã được tính toán qua hệ thống khuyến mãi (Orchestrator). Có thể null nếu không có biến thể.
+        product:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+              example: "Laptop Gaming ASUS ROG"
+            slug:
+              type: string
+              example: "laptop-gaming-asus-rog"
+            isActive:
+              type: boolean
+              example: true
+            brandId:
+              type: string
+              format: uuid
+            ratingAverage:
+              type: number
+              example: 4.8
+            ratingCount:
+              type: integer
+              example: 156
+            category:
+              type: object
+              description: Cây danh mục để tính giá
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                parent:
+                  type: object
+            variants:
+              type: array
+              description: Biến thể mặc định của sản phẩm
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  price:
+                    type: number
+            productSpecifications:
+              type: array
+              description: Các thông số kỹ thuật nổi bật (Highlights)
+              items:
+                type: object
+                properties:
+                  value:
+                    type: string
+                    example: "16GB"
+                  specification:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                        example: "RAM"
+                      unit:
+                        type: string
+                        nullable: true
+                        example: "GB"
+            img:
+              type: array
+              description: Danh sách hình ảnh của sản phẩm
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  color:
+                    type: string
+                    example: "Đen"
+                  imageUrl:
+                    type: string
+                    nullable: true
+                  altText:
+                    type: string
+                    nullable: true
+                  position:
+                    type: integer
+                    example: 0
