@@ -2,6 +2,7 @@ import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
 import { OrderQuery } from "./order.validation";
 
+// 1. CẬP NHẬT QUERY: Thêm brand, code, label và sắp xếp ảnh y hệt Cart
 export const orderSelect = {
   id: true, orderCode: true, userId: true, paymentMethodId: true, voucherId: true,
   shippingAddressId: true, shippingContactName: true, shippingPhone: true,
@@ -23,14 +24,16 @@ export const orderSelect = {
               id: true, 
               name: true, 
               slug: true, 
-              // Đã gỡ bỏ take: 1 để lấy toàn bộ ảnh phục vụ so khớp màu
-              img: { select: { imageUrl: true, color: true } } 
+              brand: { select: { id: true, name: true } }, // Bổ sung brand
+              // Bổ sung sắp xếp ảnh để fallback luôn lấy đúng ảnh bìa
+              img: { select: { imageUrl: true, color: true }, orderBy: { position: "asc" as any } } 
             } 
           },
           variantAttributes: { 
             select: { 
               attributeOption: { 
-                select: { value: true, attribute: { select: { name: true } } } 
+                // Bổ sung label và code để so khớp giống Cart
+                select: { label: true, value: true, attribute: { select: { name: true, code: true } } } 
               } 
             } 
           },
@@ -40,48 +43,54 @@ export const orderSelect = {
   },
 } satisfies Prisma.ordersSelect;
 
-// Hàm nội bộ: Xử lý chọn đúng hình ảnh theo variant màu sắc
+// 2. HÀM FORMAT: Đập phẳng dữ liệu Order Item cho giống hệt Cart Item
 export const formatOrderResponse = (order: any) => {
   if (!order) return order;
   
   return {
     ...order,
     orderItems: order.orderItems.map((item: any) => {
-      // 1. Tìm màu sắc của variant
+      // Logic quét màu sắc y hệt Cart
       const colorAttr = item.productVariant.variantAttributes.find((attr: any) => {
+        const code = (attr.attributeOption.attribute?.code || "").toLowerCase();
         const name = (attr.attributeOption.attribute?.name || "").toLowerCase();
-        return ["color", "màu", "màu sắc"].includes(name);
+        return ["color", "màu", "màu sắc"].includes(code || name);
+      });
+
+      // Logic quét dung lượng y hệt Cart (nếu FE cần hiển thị)
+      const storageAttr = item.productVariant.variantAttributes.find((attr: any) => {
+        const code = (attr.attributeOption.attribute?.code || "").toLowerCase();
+        const name = (attr.attributeOption.attribute?.name || "").toLowerCase();
+        return ["storage", "dung lượng", "rom", "rom_capacity"].includes(code || name);
       });
 
       const colorValue = colorAttr?.attributeOption.value;
 
-      // 2. Lọc ra MẢNG ẢNH chỉ chứa đúng màu của biến thể
-      let filteredImages = item.productVariant.product.img;
-      if (colorValue) {
-        filteredImages = item.productVariant.product.img.filter(
-          (img: any) => img.color === colorValue
-        );
-      }
+      // Tìm ảnh khớp màu
+      const matchingImage = item.productVariant.product.img.find(
+        (img: any) => img.color === colorValue
+      );
 
-      // Fallback: Nếu lọc xong không có ảnh nào khớp, giữ lại 1 ảnh đầu tiên làm đại diện
-      if (filteredImages.length === 0 && item.productVariant.product.img.length > 0) {
-        filteredImages = [item.productVariant.product.img[0]];
-      }
+      // Fallback: Lấy ảnh bìa đầu tiên (đã được sắp xếp bằng position asc)
+      const finalImageUrl = matchingImage?.imageUrl || item.productVariant.product.img[0]?.imageUrl || null;
 
-      // 3. Lấy link ảnh đầu tiên trong mảng đã lọc để gán cho trường `image` bên ngoài (FE tiện dùng)
-      const finalImageUrl = filteredImages.length > 0 ? filteredImages[0].imageUrl : null;
-
-      // 4. Trả về data đã được ghi đè mảng `img`
+      // TRẢ VỀ CẤU TRÚC PHẲNG (Flattened) GIỐNG HỆT CART
       return {
-        ...item,
-        productVariant: {
-          ...item.productVariant,
-          product: {
-            ...item.productVariant.product,
-            img: filteredImages // 👈 Ghi đè mảng 30 ảnh thành mảng chỉ có ảnh đúng màu
-          }
-        },
-        image: finalImageUrl 
+        id: item.id,
+        productVariantId: item.productVariantId,
+        productId: item.productVariant.product.id,
+        productName: item.productVariant.product.name,
+        productSlug: item.productVariant.product.slug,
+        brandName: item.productVariant.product.brand?.name,
+        variantCode: item.productVariant.code || undefined,
+        image: finalImageUrl,
+        color: colorAttr?.attributeOption.label || colorAttr?.attributeOption.value,
+        colorValue: colorValue,
+        storage: storageAttr?.attributeOption.label || storageAttr?.attributeOption.value,
+        storageValue: storageAttr?.attributeOption.value,
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice),
+        subtotal: item.quantity * Number(item.unitPrice),
       };
     })
   };
@@ -109,10 +118,7 @@ export const findAllOrders = async (query: OrderQuery) => {
     prisma.orders.count({ where }),
   ]);
 
-  // Map lại dữ liệu
-  const formattedData = data.map(formatOrderResponse);
-
-  return { data: formattedData, page, limit, total, totalPages: Math.ceil(total / limit) };
+  return { data: data.map(formatOrderResponse), page, limit, total, totalPages: Math.ceil(total / limit) };
 };
 
 export const findAllArchivedOrders = async (query: OrderQuery) => {
@@ -132,10 +138,7 @@ export const findAllArchivedOrders = async (query: OrderQuery) => {
     prisma.orders.count({ where }),
   ]);
 
-  // Map lại dữ liệu
-  const formattedData = data.map(formatOrderResponse);
-
-  return { data: formattedData, page, limit, total, totalPages: Math.ceil(total / limit) };
+  return { data: data.map(formatOrderResponse), page, limit, total, totalPages: Math.ceil(total / limit) };
 };
 
 export const findOrdersByUserId = async (userId: string) => {
@@ -144,8 +147,6 @@ export const findOrdersByUserId = async (userId: string) => {
     select: orderSelect,
     orderBy: { orderDate: "desc" },
   });
-
-  // Map lại mảng đơn hàng
   return orders.map(formatOrderResponse);
 };
 
@@ -154,8 +155,6 @@ export const findOrderById = async (id: string, includeDeleted = false) => {
     where: { id, ...(!includeDeleted ? { deletedAt: null } : {}) },
     select: orderSelect,
   });
-
-  // Format object đơn lẻ
   return formatOrderResponse(order);
 };
 
