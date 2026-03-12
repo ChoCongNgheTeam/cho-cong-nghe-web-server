@@ -94,6 +94,8 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
   let canReview = false;
   let orderItemId: string | null = null;
 
+  console.log(userId);
+
   if (userId) {
     const orderItem = await repo.findOrderItemForReview(userId, product.id);
     canReview = !!orderItem && !orderItem.review;

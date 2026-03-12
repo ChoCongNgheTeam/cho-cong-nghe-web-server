@@ -4,6 +4,7 @@ import * as OPPO from "./oppo";
 import * as Xiaomi from "./xiaomi";
 import * as AirConditioner from "./air-conditioner";
 import * as EarPods from "./earpod";
+import * as Lenovo from "./lenovo";
 
 export const allProducts = [
   // ================================================================
@@ -46,6 +47,25 @@ export const allProducts = [
   // MacBook Pro 16 inch
   Apple.macbookPro16M4Pro,
   Apple.macbookPro16M4Max,
+
+  // Lenovo
+  Lenovo.lenovoLOQ15IAX9E,
+  Lenovo.lenovoLOQ15IRP9,
+  Lenovo.lenovoIdeaPad1_15AMN7,
+  Lenovo.lenovoIdeaPadSlim3_15IAU7,
+  Lenovo.lenovoIdeaPadSlim5_14IML9,
+  Lenovo.lenovoLegion5_16IRX9,
+  Lenovo.lenovoLegionSlim5_16APH8,
+  Lenovo.lenovoLegionPro7_16IRX9H,
+  Lenovo.lenovoThinkBook14G6,
+  Lenovo.lenovoThinkBook16G6,
+  Lenovo.lenovoThinkPadE14Gen5,
+  Lenovo.lenovoThinkPadL13Gen4,
+  Lenovo.lenovoThinkPadX1CarbonGen12,
+  Lenovo.lenovoV15G4,
+  Lenovo.lenovoYoga7_14ITP8,
+  Lenovo.lenovoYogaSlim7_14IMH9,
+  Lenovo.lenovoYogaBook9,
 
   // EarPods & AirPods
   EarPods.appleEarPodsUSBC,

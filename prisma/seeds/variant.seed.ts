@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { variantData } from "../seed-data/variants";
+import { variantData } from "../seed-data/variantData";
 
 interface SeedVariantsParams {
   products: Array<{ id: string; name: string; slug: string }>;
