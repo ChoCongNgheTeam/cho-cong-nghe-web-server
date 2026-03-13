@@ -46,7 +46,8 @@
     <div id="payment-info"></div>
 
     <script>
-      const TOKEN = "..."; // thay token
+      const TOKEN =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJlMTc4YmZiNS0xNzVlLTQ3ZjItYTA0Mi1kNmNhNjlhNGU3OTMiLCJyb2xlIjoiQURNSU4iLCJpYXQiOjE3NzMzMjg5ODksImV4cCI6MTc3MzMyOTg4OX0.pzEmSo_0NVyLNYzSYXeMhhBJK_s-N99wn1L0E3ibkvc"; // thay token
 
       let stripeInstance, stripeElements;
 
@@ -58,8 +59,8 @@
             Authorization: "Bearer " + TOKEN,
           },
           body: JSON.stringify({
-            paymentMethodId: "e8b89dae-85e9-43ce-b5f9-aad2e11b0dbb",
-            shippingAddressId: "f3c12d89-431c-4f79-965f-e983524ce857",
+            paymentMethodId: "7bc5a217-ba3b-46d1-acf6-af5310e0836a",
+            shippingAddressId: "4800b463-0c87-478d-b085-c5e0c29ddb98",
             voucherId: "",
           }),
         });

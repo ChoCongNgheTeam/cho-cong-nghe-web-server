@@ -1,5 +1,4 @@
 /**
- *
  * Xử lý toàn bộ logic MoMo: tạo payment URL (sandbox) và xử lý IPN.
  */
 
@@ -13,10 +12,11 @@ import { momoIpnSchema } from "../../payment.validation";
 import { redirectToFrontend } from "../../payment.service";
 
 // Signature helpers
-
 const buildMomoSignature = (rawStr: string): string => crypto.createHmac("sha256", process.env.MOMO_SECRET_KEY!).update(rawStr).digest("hex");
 
-// Create payment URL (sandbox)
+// ─── Create payment URL (sandbox) ────────────────────────────────────────────
+// ⚠️  Không còn gọi prisma.orders.update ở đây nữa.
+//     momoOrderId được trả về → lưu vào DB trong executeOrderTransaction (atomic).
 
 export const createMomoPaymentUrl = async (orderId: string, amount: number, orderInfo: string) => {
   const partnerCode = process.env.MOMO_PARTNER_CODE!;
@@ -75,12 +75,7 @@ export const createMomoPaymentUrl = async (orderId: string, amount: number, orde
     throw new BadRequestError(`MoMo error: ${data.message}`);
   }
 
-  // Lưu momoOrderId vào order để sau IPN tìm lại
-  await prisma.orders.update({
-    where: { id: orderId },
-    data: { momoOrderId },
-  });
-
+  // Trả momoOrderId về để builder ghi vào paymentFields → lưu trong transaction
   return {
     paymentUrl: data.payUrl,
     momoOrderId,
@@ -88,14 +83,14 @@ export const createMomoPaymentUrl = async (orderId: string, amount: number, orde
   };
 };
 
-// Return handler (redirect FE, không xử lý logic)
+// ─── Return handler (redirect FE, không xử lý logic) ─────────────────────────
 
 export const momoReturnHandler = (req: Request, res: Response): void => {
   const { orderId } = req.query as { orderId: string };
   redirectToFrontend(res, orderId);
 };
 
-// IPN handler
+// ─── IPN handler ──────────────────────────────────────────────────────────────
 
 export const handleMomoIpn = async (rawPayload: unknown) => {
   const payload = momoIpnSchema.parse(rawPayload);

@@ -17,6 +17,34 @@ export const getOrderDetail = async (orderId: string, userId?: string) => {
   return order;
 };
 
+export const getOrderPaymentInfo = async (orderCode: string, userId: string) => {
+  const order = await repo.findOrderPaymentInfoByCode(orderCode, userId);
+  if (!order) throw new NotFoundError("Đơn hàng");
+
+  // Normalize: "Bank Transfer" → "BANK_TRANSFER", "COD" → "COD"
+  const methodCode = (order.paymentMethod?.name ?? "").toUpperCase().replace(/\s+/g, "_");
+  const isBankTransfer = methodCode.includes("BANK_TRANSFER");
+
+  // Fix image null: lấy imageUrl đầu tiên khác null trong mảng img
+  const orderItems = (order.orderItems ?? []).map((item: any) => {
+    if (item.image !== null) return item;
+    const firstValidImg = item.productVariant?.product?.img?.find((img: any) => img.imageUrl !== null);
+    return { ...item, image: firstValidImg?.imageUrl ?? null };
+  });
+
+  return {
+    ...order,
+    orderItems,
+    // Normalize code cho FE dùng nhất quán
+    paymentMethodCode: methodCode,
+    ...(isBankTransfer && {
+      bankName: process.env.BANK_NAME ?? null,
+      bankAccount: process.env.BANK_ACCOUNT ?? null,
+      bankHolder: process.env.BANK_HOLDER ?? null,
+    }),
+  };
+};
+
 export const cancelOrderUser = async (orderId: string, userId: string) => {
   const order = await repo.findOrderById(orderId);
   if (!order) throw new NotFoundError("Đơn hàng");
@@ -56,11 +84,11 @@ export const reorderUser = async (orderId: string, userId: string) => {
         if (existingCartItem) {
           await tx.cart_items.update({
             where: { id: existingCartItem.id },
-            data: { quantity: existingCartItem.quantity + addQty }
+            data: { quantity: existingCartItem.quantity + addQty },
           });
         } else {
           await tx.cart_items.create({
-            data: { userId, productVariantId: variant.id, quantity: addQty, unitPrice: variant.price }
+            data: { userId, productVariantId: variant.id, quantity: addQty, unitPrice: variant.price },
           });
         }
         addedCount++;
@@ -108,10 +136,7 @@ export const cancelOrderAdmin = async (orderId: string) => {
 
 export const createOrderAdmin = async (input: CreateOrderAdminInput) => {
   // ... (Giữ nguyên toàn bộ logic tạo đơn như ở tin nhắn trước) ...
-  const {
-    userId, shippingAddressId, customerInfo, newAddress, items,
-    voucherCode, shippingFee, paymentMethodId, paymentStatus, orderStatus,
-  } = input;
+  const { userId, shippingAddressId, customerInfo, newAddress, items, voucherCode, shippingFee, paymentMethodId, paymentStatus, orderStatus } = input;
 
   return prisma.$transaction(async (tx) => {
     let finalUserId = userId;
@@ -122,7 +147,10 @@ export const createOrderAdmin = async (input: CreateOrderAdminInput) => {
       const newUser = await tx.users.create({
         data: {
           email: customerInfo.email || `guest_${Date.now()}@noemail.com`,
-          fullName: customerInfo.fullName, phone: customerInfo.phone, role: "CUSTOMER", isActive: true,
+          fullName: customerInfo.fullName,
+          phone: customerInfo.phone,
+          role: "CUSTOMER",
+          isActive: true,
         },
       });
       finalUserId = newUser.id;
@@ -134,23 +162,35 @@ export const createOrderAdmin = async (input: CreateOrderAdminInput) => {
 
       const newAddr = await tx.user_addresses.create({
         data: {
-          userId: finalUserId, contactName: customerInfo!.fullName, phone: customerInfo!.phone,
-          provinceId: newAddress.provinceId, wardId: newAddress.wardId, detailAddress: newAddress.detailAddress, isDefault: true,
+          userId: finalUserId,
+          contactName: customerInfo!.fullName,
+          phone: customerInfo!.phone,
+          provinceId: newAddress.provinceId,
+          wardId: newAddress.wardId,
+          detailAddress: newAddress.detailAddress,
+          isDefault: true,
         },
       });
       finalShippingAddressId = newAddr.id;
       addressSnapshot = {
-        shippingContactName: customerInfo!.fullName, shippingPhone: customerInfo!.phone,
-        shippingProvince: province?.fullName || "", shippingWard: ward?.fullName || "", shippingDetail: newAddress.detailAddress,
+        shippingContactName: customerInfo!.fullName,
+        shippingPhone: customerInfo!.phone,
+        shippingProvince: province?.fullName || "",
+        shippingWard: ward?.fullName || "",
+        shippingDetail: newAddress.detailAddress,
       };
     } else if (finalShippingAddressId) {
       const existingAddr = await tx.user_addresses.findUnique({
-        where: { id: finalShippingAddressId }, include: { province: true, ward: true },
+        where: { id: finalShippingAddressId },
+        include: { province: true, ward: true },
       });
       if (existingAddr) {
         addressSnapshot = {
-          shippingContactName: existingAddr.contactName, shippingPhone: existingAddr.phone,
-          shippingProvince: existingAddr.province.fullName, shippingWard: existingAddr.ward.fullName, shippingDetail: existingAddr.detailAddress,
+          shippingContactName: existingAddr.contactName,
+          shippingPhone: existingAddr.phone,
+          shippingProvince: existingAddr.province.fullName,
+          shippingWard: existingAddr.ward.fullName,
+          shippingDetail: existingAddr.detailAddress,
         };
       }
     }
@@ -193,8 +233,17 @@ export const createOrderAdmin = async (input: CreateOrderAdminInput) => {
     return tx.orders.create({
       data: {
         orderCode: `ORD${Date.now().toString().slice(-6)}`,
-        userId: finalUserId!, paymentMethodId, voucherId: appliedVoucherId, shippingAddressId: finalShippingAddressId,
-        ...addressSnapshot, subtotalAmount, shippingFee, voucherDiscount: finalVoucherDiscount, totalAmount, orderStatus, paymentStatus,
+        userId: finalUserId!,
+        paymentMethodId,
+        voucherId: appliedVoucherId,
+        shippingAddressId: finalShippingAddressId,
+        ...addressSnapshot,
+        subtotalAmount,
+        shippingFee,
+        voucherDiscount: finalVoucherDiscount,
+        totalAmount,
+        orderStatus,
+        paymentStatus,
         orderItems: { create: orderItemsData },
       },
       include: { orderItems: true },
@@ -209,7 +258,7 @@ export const getArchivedOrdersAdmin = async (query: OrderQuery) => repo.findAllA
 export const archiveOrderAdmin = async (orderId: string, adminId: string) => {
   const order = await repo.findOrderById(orderId);
   if (!order) throw new NotFoundError("Đơn hàng");
-  
+
   // LOGIC CHỐNG LỆCH KHO: Chỉ được archive những đơn đã chốt (Hủy hoặc Giao thành công)
   if (order.orderStatus !== "DELIVERED" && order.orderStatus !== "CANCELLED") {
     throw new BadRequestError("Chỉ được phép Lưu trữ (Archive) các đơn hàng đã GIAO THÀNH CÔNG hoặc ĐÃ HỦY. Nếu đây là đơn rác, hãy Hủy đơn trước để hoàn kho.");

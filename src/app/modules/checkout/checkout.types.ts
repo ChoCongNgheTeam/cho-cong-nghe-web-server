@@ -1,4 +1,5 @@
 import { Decimal } from "@prisma/client/runtime/library";
+import { PaymentFields } from "./payment-info.builder";
 
 /**
  * Checkout request
@@ -34,8 +35,9 @@ export interface CartValidationResult {
 }
 
 /**
- * Checkout summary with calculated totals
- * 🔥 UPDATED: Added taxAmount field
+ * Checkout summary with calculated totals.
+ * paymentFields được merge vào trước khi gọi executeOrderTransaction
+ * → tất cả ghi vào DB trong 1 transaction duy nhất (atomic).
  */
 export interface CheckoutSummary {
   items: Array<{
@@ -56,6 +58,10 @@ export interface CheckoutSummary {
   shippingAddressId: string;
   voucherId?: string;
   bankTransferCode?: string;
+  // orderCode pre-generated in controller to use as payment provider ref
+  orderCode?: string;
+  // Payment fields — populated by buildPaymentInfo() TRƯỚC transaction
+  paymentFields?: PaymentFields;
 }
 
 /**

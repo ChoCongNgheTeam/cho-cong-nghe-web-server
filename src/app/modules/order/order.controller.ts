@@ -15,6 +15,12 @@ export const getOrderDetailHandler = async (req: Request, res: Response) => {
   res.json({ data: order, message: "Lấy chi tiết đơn hàng thành công" });
 };
 
+export const getOrderPaymentInfoHandler = async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const data = await service.getOrderPaymentInfo(req.params.orderCode, userId);
+  res.json({ success: true, data, message: "Lấy thông tin thanh toán thành công" });
+};
+
 export const cancelOrderUserHandler = async (req: Request, res: Response) => {
   await service.cancelOrderUser(req.params.id, req.user!.id);
   res.json({ success: true, message: "Hủy đơn hàng thành công" });
@@ -22,12 +28,10 @@ export const cancelOrderUserHandler = async (req: Request, res: Response) => {
 
 export const reorderUserHandler = async (req: Request, res: Response) => {
   const result = await service.reorderUser(req.params.id, req.user!.id);
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     data: result,
-    message: result.outOfStockCount > 0 
-      ? `Đã thêm ${result.addedCount} sản phẩm vào giỏ. Có ${result.outOfStockCount} sản phẩm đã hết hàng hoặc ngưng bán.` 
-      : "Đã thêm toàn bộ sản phẩm vào giỏ hàng." 
+    message: result.outOfStockCount > 0 ? `Đã thêm ${result.addedCount} sản phẩm vào giỏ. Có ${result.outOfStockCount} sản phẩm đã hết hàng hoặc ngưng bán.` : "Đã thêm toàn bộ sản phẩm vào giỏ hàng.",
   });
 };
 

@@ -602,6 +602,12 @@ model orders {
   orderDate         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
+  bankTransferQrUrl     String?
+  bankTransferContent   String?
+  bankTransferExpiredAt DateTime?
+  paymentExpiredAt      DateTime?
+  paymentRedirectUrl    String?
+
   // --- Soft Delete (admin trash) ---
   deletedAt         DateTime?
   deletedBy         String?       @db.Uuid
