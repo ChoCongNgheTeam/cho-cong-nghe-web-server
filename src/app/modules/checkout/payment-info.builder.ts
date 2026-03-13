@@ -16,6 +16,11 @@ export interface PaymentFields {
   bankTransferExpiredAt?: Date;
   paymentExpiredAt?: Date;
   paymentRedirectUrl?: string;
+  // Provider-specific IDs — lưu vào DB để IPN webhook tìm lại order
+  momoOrderId?: string;
+  vnpayTxnRef?: string;
+  zaloPayTransId?: string;
+  stripePaymentIntentId?: string;
 }
 
 /**
@@ -96,6 +101,7 @@ export const buildPaymentInfo = async (req: Request, orderRef: string, methodCod
       paymentFields: {
         paymentRedirectUrl: momo.paymentUrl,
         paymentExpiredAt: new Date(Date.now() + REDIRECT_TTL_MS),
+        momoOrderId: momo.momoOrderId, // lưu vào DB qua transaction
       },
       paymentInfo: { type: "MOMO", ...momo },
     };
@@ -108,6 +114,7 @@ export const buildPaymentInfo = async (req: Request, orderRef: string, methodCod
       paymentFields: {
         paymentRedirectUrl: vnpay.paymentUrl,
         paymentExpiredAt: new Date(Date.now() + REDIRECT_TTL_MS),
+        vnpayTxnRef: vnpay.txnRef, // lưu vào DB qua transaction
       },
       paymentInfo: { type: "VNPAY", ...vnpay },
     };
@@ -120,6 +127,7 @@ export const buildPaymentInfo = async (req: Request, orderRef: string, methodCod
       paymentFields: {
         paymentRedirectUrl: zalopay.paymentUrl,
         paymentExpiredAt: new Date(Date.now() + REDIRECT_TTL_MS),
+        zaloPayTransId: zalopay.appTransId, // lưu vào DB qua transaction
       },
       paymentInfo: { type: "ZALOPAY", ...zalopay },
     };
@@ -131,6 +139,7 @@ export const buildPaymentInfo = async (req: Request, orderRef: string, methodCod
     return {
       paymentFields: {
         paymentExpiredAt: new Date(Date.now() + REDIRECT_TTL_MS),
+        stripePaymentIntentId: stripe.paymentIntentId,
       },
       paymentInfo: { type: "STRIPE", ...stripe },
     };

@@ -21,16 +21,22 @@ export const getOrderPaymentInfo = async (orderCode: string, userId: string) => 
   const order = await repo.findOrderPaymentInfoByCode(orderCode, userId);
   if (!order) throw new NotFoundError("Đơn hàng");
 
-  const methodCode = (order.paymentMethod?.name ?? "").toUpperCase();
+  // Normalize: "Bank Transfer" → "BANK_TRANSFER", "COD" → "COD"
+  const methodCode = (order.paymentMethod?.name ?? "").toUpperCase().replace(/\s+/g, "_");
   const isBankTransfer = methodCode.includes("BANK_TRANSFER");
 
-  // Trả về toàn bộ thông tin đơn hàng (giống shape của getMyOrders)
-  // + thêm payment fields cho trang /order/{orderCode}/payment
+  // Fix image null: lấy imageUrl đầu tiên khác null trong mảng img
+  const orderItems = (order.orderItems ?? []).map((item: any) => {
+    if (item.image !== null) return item;
+    const firstValidImg = item.productVariant?.product?.img?.find((img: any) => img.imageUrl !== null);
+    return { ...item, image: firstValidImg?.imageUrl ?? null };
+  });
+
   return {
-    // ── Full order detail (same as getMyOrders) ──────────────────────────────
     ...order,
-    // ── Payment-specific fields ──────────────────────────────────────────────
-    paymentMethodCode: order.paymentMethod?.name ?? "",
+    orderItems,
+    // Normalize code cho FE dùng nhất quán
+    paymentMethodCode: methodCode,
     ...(isBankTransfer && {
       bankName: process.env.BANK_NAME ?? null,
       bankAccount: process.env.BANK_ACCOUNT ?? null,

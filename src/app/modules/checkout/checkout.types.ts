@@ -58,6 +58,8 @@ export interface CheckoutSummary {
   shippingAddressId: string;
   voucherId?: string;
   bankTransferCode?: string;
+  // orderCode pre-generated in controller to use as payment provider ref
+  orderCode?: string;
   // Payment fields — populated by buildPaymentInfo() TRƯỚC transaction
   paymentFields?: PaymentFields;
 }

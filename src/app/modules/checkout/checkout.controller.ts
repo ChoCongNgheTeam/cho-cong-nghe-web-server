@@ -66,17 +66,24 @@ export const checkoutHandler = async (req: Request, res: Response) => {
   // Bước 1: Chuẩn bị dữ liệu (validate, tính tiền)
   const checkoutSummary = await prepareCheckoutData(userId, req.body);
 
+  // Generate orderCode sớm — dùng làm orderRef cho payment providers
+  // để orderId trong Momo/VNPay/ZaloPay khớp với orderCode thực trong DB
+  const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, "");
+  const randomPart = Math.random().toString(36).substring(2, 7).toUpperCase();
+  const orderCode = `CCN-${datePart}-${randomPart}`;
+
   // Bước 2: Build payment info — HTTP calls ra ngoài, TRƯỚC transaction
+  // orderRef = orderCode thực (không phải REF-timestamp nữa)
   const { paymentFields, paymentInfo } = await buildPaymentInfo(
     req,
-    checkoutSummary.bankTransferCode ?? `REF-${Date.now()}`,
+    checkoutSummary.bankTransferCode ?? orderCode,
     checkoutSummary.paymentMethodCode,
     checkoutSummary.totalAmount,
     checkoutSummary.bankTransferCode,
   );
 
-  // Bước 3: Merge paymentFields vào summary
-  const summaryWithPayment = { ...checkoutSummary, paymentFields };
+  // Bước 3: Merge paymentFields + orderCode đã generate vào summary
+  const summaryWithPayment = { ...checkoutSummary, paymentFields, orderCode };
 
   // Bước 4: 1 transaction duy nhất — order được tạo đã có đủ QR/URL ngay từ đầu
   const order = await createOrderFromCheckout(userId, summaryWithPayment);

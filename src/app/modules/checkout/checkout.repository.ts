@@ -57,12 +57,24 @@ export const findVoucherUsersCount = async (voucherId: string) => {
  * Không cần gọi updateOrderPaymentFields sau.
  */
 export const executeOrderTransaction = async (userId: string, checkoutSummary: CheckoutSummary, isFromCart: boolean = true) => {
+  // Dùng orderCode đã generate từ controller (để khớp với ref gửi lên payment provider)
+  // Fallback: generate mới nếu không có (e.g. COD, Bank Transfer)
   const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, "");
   const randomPart = Math.random().toString(36).substring(2, 7).toUpperCase();
-  const orderCode = `CCN-${datePart}-${randomPart}`;
+  const orderCode = checkoutSummary.orderCode ?? `CCN-${datePart}-${randomPart}`;
 
   // Destructure payment fields một lần để dùng trong transaction
-  const { bankTransferQrUrl = null, bankTransferContent = null, bankTransferExpiredAt = null, paymentExpiredAt = null, paymentRedirectUrl = null } = checkoutSummary.paymentFields ?? {};
+  const {
+    bankTransferQrUrl = null,
+    bankTransferContent = null,
+    bankTransferExpiredAt = null,
+    paymentExpiredAt = null,
+    paymentRedirectUrl = null,
+    momoOrderId = null,
+    vnpayTxnRef = null,
+    zaloPayTransId = null,
+    stripePaymentIntentId = null,
+  } = checkoutSummary.paymentFields ?? {};
 
   return prisma.$transaction(async (tx) => {
     // 0. LẤY THÔNG TIN ĐỊA CHỈ ĐỂ LÀM SNAPSHOT
@@ -104,6 +116,11 @@ export const executeOrderTransaction = async (userId: string, checkoutSummary: C
         bankTransferExpiredAt,
         paymentExpiredAt,
         paymentRedirectUrl,
+        // Provider IDs cho IPN webhook
+        momoOrderId,
+        vnpayTxnRef,
+        zaloPayTransId,
+        stripePaymentIntentId,
 
         orderItems: {
           create: checkoutSummary.items.map((item) => ({
