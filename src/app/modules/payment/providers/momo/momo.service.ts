@@ -18,7 +18,7 @@ const buildMomoSignature = (rawStr: string): string => crypto.createHmac("sha256
 
 // Create payment URL (sandbox)
 
-export const createMomoPaymentUrl = async (orderId: string, amount: number, orderInfo: string) => {
+export const createMomoPaymentUrl = async (orderId: string, orderCode: string, amount: number, orderInfo: string) => {
   const partnerCode = process.env.MOMO_PARTNER_CODE!;
   const accessKey = process.env.MOMO_ACCESS_KEY!;
   const redirectUrl = process.env.MOMO_REDIRECT_URL!;
@@ -77,8 +77,12 @@ export const createMomoPaymentUrl = async (orderId: string, amount: number, orde
 
   // Lưu momoOrderId vào order để sau IPN tìm lại
   await prisma.orders.update({
-    where: { id: orderId },
-    data: { momoOrderId },
+    where: {
+      id: orderId,
+    },
+    data: {
+      momoOrderId: momoOrderId,
+    },
   });
 
   return {

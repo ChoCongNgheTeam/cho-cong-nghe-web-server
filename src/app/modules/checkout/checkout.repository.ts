@@ -50,29 +50,32 @@ export const findVoucherUsersCount = async (voucherId: string) => {
 };
 
 /**
- * Transaction: Khởi tạo đơn hàng, trừ tồn kho, xóa giỏ hàng, cập nhật voucher
+ * Transaction: Khởi tạo đơn hàng, trừ tồn kho, xóa giỏ hàng, cập nhật voucher.
+ *
+ * Nhận checkoutSummary đã được merge paymentFields từ buildPaymentInfo()
+ * → ghi tất cả vào DB trong 1 transaction duy nhất (atomic).
+ * Không cần gọi updateOrderPaymentFields sau.
  */
-export const executeOrderTransaction = async (
-  userId: string,
-  checkoutSummary: CheckoutSummary,
-  isFromCart: boolean = true
-) => {
+export const executeOrderTransaction = async (userId: string, checkoutSummary: CheckoutSummary, isFromCart: boolean = true) => {
   const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, "");
   const randomPart = Math.random().toString(36).substring(2, 7).toUpperCase();
   const orderCode = `CCN-${datePart}-${randomPart}`;
+
+  // Destructure payment fields một lần để dùng trong transaction
+  const { bankTransferQrUrl = null, bankTransferContent = null, bankTransferExpiredAt = null, paymentExpiredAt = null, paymentRedirectUrl = null } = checkoutSummary.paymentFields ?? {};
 
   return prisma.$transaction(async (tx) => {
     // 0. LẤY THÔNG TIN ĐỊA CHỈ ĐỂ LÀM SNAPSHOT
     const address = await tx.user_addresses.findUnique({
       where: { id: checkoutSummary.shippingAddressId },
-      include: { province: true, ward: true }
+      include: { province: true, ward: true },
     });
 
     if (!address) {
       throw new Error("Không tìm thấy thông tin địa chỉ giao hàng");
     }
 
-    // 1. Tạo order mới
+    // 1. Tạo order mới — payment fields đã có sẵn, không cần update thêm sau
     const newOrder = await tx.orders.create({
       data: {
         orderCode,
@@ -80,8 +83,7 @@ export const executeOrderTransaction = async (
         paymentMethodId: checkoutSummary.paymentMethodId,
         voucherId: checkoutSummary.voucherId,
         shippingAddressId: checkoutSummary.shippingAddressId,
-        
-        // 🔥 BỔ SUNG 5 TRƯỜNG ADDRESS SNAPSHOT NÀY
+
         shippingContactName: address.contactName,
         shippingPhone: address.phone,
         shippingProvince: address.province.fullName,
@@ -95,6 +97,14 @@ export const executeOrderTransaction = async (
         orderStatus: OrderStatus.PENDING,
         paymentStatus: PaymentStatus.UNPAID,
         bankTransferCode: checkoutSummary.bankTransferCode,
+
+        // Payment fields — đã được build bởi payment-info.builder.ts trước khi vào đây
+        bankTransferQrUrl,
+        bankTransferContent,
+        bankTransferExpiredAt,
+        paymentExpiredAt,
+        paymentRedirectUrl,
+
         orderItems: {
           create: checkoutSummary.items.map((item) => ({
             productVariantId: item.productVariantId,
@@ -191,5 +201,12 @@ export const updateOrderStatus = async (orderId: string, status: OrderStatus) =>
   return prisma.orders.update({
     where: { id: orderId },
     data: { orderStatus: status },
+  });
+};
+
+export const updateOrderPaymentFields = async (orderId: string, data: Record<string, any>) => {
+  return prisma.orders.update({
+    where: { id: orderId },
+    data,
   });
 };

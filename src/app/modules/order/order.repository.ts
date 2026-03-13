@@ -3,36 +3,61 @@ import { Prisma } from "@prisma/client";
 import { OrderQuery } from "./order.validation";
 
 export const orderSelect = {
-  id: true, orderCode: true, userId: true, paymentMethodId: true, voucherId: true,
-  shippingAddressId: true, shippingContactName: true, shippingPhone: true,
-  shippingProvince: true, shippingWard: true, shippingDetail: true,
-  subtotalAmount: true, shippingFee: true, voucherDiscount: true, totalAmount: true,
-  orderStatus: true, paymentStatus: true, orderDate: true, updatedAt: true,
-  deletedAt: true, deletedBy: true,
+  id: true,
+  orderCode: true,
+  userId: true,
+  paymentMethodId: true,
+  voucherId: true,
+  shippingAddressId: true,
+  shippingContactName: true,
+  shippingPhone: true,
+  shippingProvince: true,
+  shippingWard: true,
+  shippingDetail: true,
+  subtotalAmount: true,
+  shippingFee: true,
+  voucherDiscount: true,
+  totalAmount: true,
+  orderStatus: true,
+  paymentStatus: true,
+  orderDate: true,
+  updatedAt: true,
+  deletedAt: true,
+  deletedBy: true,
   user: { select: { id: true, fullName: true, email: true, phone: true } },
   paymentMethod: { select: { id: true, name: true, description: true } },
   voucher: { select: { id: true, code: true, description: true } },
+  bankTransferCode: true,
+  bankTransferQrUrl: true,
+  bankTransferContent: true,
+  bankTransferExpiredAt: true,
+  paymentExpiredAt: true,
+  paymentRedirectUrl: true,
   orderItems: {
     select: {
-      id: true, quantity: true, unitPrice: true,
+      id: true,
+      quantity: true,
+      unitPrice: true,
       productVariant: {
         select: {
-          id: true, code: true, price: true,
-          product: { 
-            select: { 
-              id: true, 
-              name: true, 
-              slug: true, 
+          id: true,
+          code: true,
+          price: true,
+          product: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
               // Đã gỡ bỏ take: 1 để lấy toàn bộ ảnh phục vụ so khớp màu
-              img: { select: { imageUrl: true, color: true } } 
-            } 
+              img: { select: { imageUrl: true, color: true } },
+            },
           },
-          variantAttributes: { 
-            select: { 
-              attributeOption: { 
-                select: { value: true, attribute: { select: { name: true } } } 
-              } 
-            } 
+          variantAttributes: {
+            select: {
+              attributeOption: {
+                select: { value: true, attribute: { select: { name: true } } },
+              },
+            },
           },
         },
       },
@@ -43,7 +68,7 @@ export const orderSelect = {
 // Hàm nội bộ: Xử lý chọn đúng hình ảnh theo variant màu sắc
 export const formatOrderResponse = (order: any) => {
   if (!order) return order;
-  
+
   return {
     ...order,
     orderItems: order.orderItems.map((item: any) => {
@@ -58,9 +83,7 @@ export const formatOrderResponse = (order: any) => {
       // 2. Lọc ra MẢNG ẢNH chỉ chứa đúng màu của biến thể
       let filteredImages = item.productVariant.product.img;
       if (colorValue) {
-        filteredImages = item.productVariant.product.img.filter(
-          (img: any) => img.color === colorValue
-        );
+        filteredImages = item.productVariant.product.img.filter((img: any) => img.color === colorValue);
       }
 
       // Fallback: Nếu lọc xong không có ảnh nào khớp, giữ lại 1 ảnh đầu tiên làm đại diện
@@ -78,12 +101,12 @@ export const formatOrderResponse = (order: any) => {
           ...item.productVariant,
           product: {
             ...item.productVariant.product,
-            img: filteredImages // 👈 Ghi đè mảng 30 ảnh thành mảng chỉ có ảnh đúng màu
-          }
+            img: filteredImages, // 👈 Ghi đè mảng 30 ảnh thành mảng chỉ có ảnh đúng màu
+          },
         },
-        image: finalImageUrl 
+        image: finalImageUrl,
       };
-    })
+    }),
   };
 };
 
@@ -95,19 +118,12 @@ export const findAllOrders = async (query: OrderQuery) => {
   if (!includeDeleted) where.deletedAt = null;
   if (status) where.orderStatus = status;
   if (paymentStatus) where.paymentStatus = paymentStatus;
-  
+
   if (search) {
-    where.OR = [
-      { orderCode: { contains: search, mode: "insensitive" } },
-      { shippingPhone: { contains: search } },
-      { shippingContactName: { contains: search, mode: "insensitive" } },
-    ];
+    where.OR = [{ orderCode: { contains: search, mode: "insensitive" } }, { shippingPhone: { contains: search } }, { shippingContactName: { contains: search, mode: "insensitive" } }];
   }
 
-  const [data, total] = await Promise.all([
-    prisma.orders.findMany({ where, skip, take: limit, select: orderSelect, orderBy: { orderDate: "desc" } }),
-    prisma.orders.count({ where }),
-  ]);
+  const [data, total] = await Promise.all([prisma.orders.findMany({ where, skip, take: limit, select: orderSelect, orderBy: { orderDate: "desc" } }), prisma.orders.count({ where })]);
 
   // Map lại dữ liệu
   const formattedData = data.map(formatOrderResponse);
@@ -121,16 +137,10 @@ export const findAllArchivedOrders = async (query: OrderQuery) => {
   const where: Prisma.ordersWhereInput = { deletedAt: { not: null } };
 
   if (search) {
-    where.OR = [
-      { orderCode: { contains: search, mode: "insensitive" } },
-      { shippingPhone: { contains: search } },
-    ];
+    where.OR = [{ orderCode: { contains: search, mode: "insensitive" } }, { shippingPhone: { contains: search } }];
   }
 
-  const [data, total] = await Promise.all([
-    prisma.orders.findMany({ where, skip, take: limit, select: orderSelect, orderBy: { deletedAt: "desc" } }),
-    prisma.orders.count({ where }),
-  ]);
+  const [data, total] = await Promise.all([prisma.orders.findMany({ where, skip, take: limit, select: orderSelect, orderBy: { deletedAt: "desc" } }), prisma.orders.count({ where })]);
 
   // Map lại dữ liệu
   const formattedData = data.map(formatOrderResponse);
@@ -156,6 +166,27 @@ export const findOrderById = async (id: string, includeDeleted = false) => {
   });
 
   // Format object đơn lẻ
+  return formatOrderResponse(order);
+};
+
+// Payment info select — chỉ lấy những field cần cho trang /order/{orderCode}/payment
+const orderPaymentInfoSelect = {
+  orderCode: true,
+  totalAmount: true,
+  paymentStatus: true,
+  orderStatus: true,
+  bankTransferQrUrl: true,
+  bankTransferContent: true,
+  bankTransferExpiredAt: true,
+  paymentMethod: { select: { name: true, description: true } },
+} satisfies Prisma.ordersSelect;
+
+export const findOrderPaymentInfoByCode = async (orderCode: string, userId: string) => {
+  // Dùng orderSelect đầy đủ để trả về đủ thông tin đơn hàng (giống getMyOrders)
+  const order = await prisma.orders.findFirst({
+    where: { orderCode, userId, deletedAt: null },
+    select: orderSelect,
+  });
   return formatOrderResponse(order);
 };
 

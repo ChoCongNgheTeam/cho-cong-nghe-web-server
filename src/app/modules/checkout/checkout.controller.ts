@@ -1,60 +1,8 @@
 import { Request, Response } from "express";
 import { prepareCheckoutData, createOrderFromCheckout, validateCartItems } from "./checkout.service";
+import { buildPaymentInfo } from "./payment-info.builder";
 
-// Payment providers
-import { createMomoPaymentUrl } from "../payment/providers/momo/momo.service";
-import { createVnpayPaymentUrl, getClientIp } from "../payment/providers/vnpay/vnpay.service";
-import { createZaloPayPaymentUrl } from "../payment/providers/zalopay/zalopay.service";
-
-import { CheckoutSummary } from "./checkout.types";
-import { createStripePaymentIntent } from "../payment/providers/stripe/stripe.service";
-
-// Payment info builder
-// Tách riêng để dễ test và mở rộng thêm provider mới
-
-const buildPaymentInfo = async (req: Request, orderId: string, orderCode: string, summary: CheckoutSummary): Promise<Record<string, any> | null> => {
-  const methodCode = summary.paymentMethodCode.toUpperCase();
-  const orderInfo = `Thanh toan don hang ${orderCode}`;
-
-  if (methodCode.includes("BANK_TRANSFER") && summary.bankTransferCode) {
-    return {
-      type: "BANK_TRANSFER",
-      bankName: process.env.BANK_NAME,
-      accountNumber: process.env.BANK_ACCOUNT,
-      accountName: process.env.BANK_HOLDER,
-      amount: summary.totalAmount,
-      content: summary.bankTransferCode,
-      qrCode: `https://img.vietqr.io/image/${process.env.BANK_BIN}-${process.env.BANK_ACCOUNT}-compact2.png?amount=${summary.totalAmount}&addInfo=${summary.bankTransferCode}`,
-    };
-  }
-
-  if (methodCode.includes("MOMO")) {
-    const momo = await createMomoPaymentUrl(orderId, summary.totalAmount, orderInfo);
-    return { type: "MOMO", ...momo };
-  }
-
-  if (methodCode.includes("VNPAY")) {
-    const ipAddr = getClientIp(req);
-    const vnpay = await createVnpayPaymentUrl(orderId, summary.totalAmount, orderInfo, ipAddr);
-    return { type: "VNPAY", ...vnpay };
-  }
-
-  if (methodCode.includes("ZALOPAY")) {
-    const zalopay = await createZaloPayPaymentUrl(orderId, summary.totalAmount, orderInfo);
-    return { type: "ZALOPAY", ...zalopay };
-  }
-
-  if (methodCode.includes("STRIPE") || methodCode.includes("CREDIT_CARD")) {
-    const stripe = await createStripePaymentIntent(orderId, summary.totalAmount);
-    return { type: "STRIPE", ...stripe };
-    // FE nhận clientSecret + publishableKey để render Payment Element
-  }
-
-  // COD hoặc payment method không cần redirect
-  return null;
-};
-
-// Handlers
+// ─── Handlers ────────────────────────────────────────────────────────────────
 
 /**
  * GET /checkout/validate
@@ -85,7 +33,6 @@ export const checkoutPreviewHandler = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { paymentMethodId, shippingAddressId, voucherId } = req.query;
 
-  // Normalize voucherId: bỏ qua empty string
   const input = {
     paymentMethodId: paymentMethodId as string,
     shippingAddressId: shippingAddressId as string,
@@ -104,15 +51,35 @@ export const checkoutPreviewHandler = async (req: Request, res: Response) => {
 /**
  * POST /checkout
  * Tạo đơn hàng từ giỏ hàng
+ *
+ * Flow (đúng thứ tự, atomic):
+ *  1. prepareCheckoutData    — validate cart, tính tiền, tạo bankTransferCode
+ *  2. buildPaymentInfo       — HTTP calls ra external providers (VietQR/Momo/VNPay...)
+ *                              Chạy NGOÀI transaction vì Prisma không cho HTTP bên trong
+ *  3. Merge paymentFields    — gộp kết quả vào summary
+ *  4. createOrderFromCheckout — 1 Prisma transaction: tạo order (ĐÃ có QR/URL), trừ kho, xóa cart
+ *                               Không cần updateOrderPaymentFields sau — hoàn toàn atomic
  */
 export const checkoutHandler = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const input = req.body;
 
-  const checkoutSummary = await prepareCheckoutData(userId, input);
-  const order = await createOrderFromCheckout(userId, checkoutSummary);
+  // Bước 1: Chuẩn bị dữ liệu (validate, tính tiền)
+  const checkoutSummary = await prepareCheckoutData(userId, req.body);
 
-  const paymentInfo = await buildPaymentInfo(req, order.id, order.orderCode, checkoutSummary);
+  // Bước 2: Build payment info — HTTP calls ra ngoài, TRƯỚC transaction
+  const { paymentFields, paymentInfo } = await buildPaymentInfo(
+    req,
+    checkoutSummary.bankTransferCode ?? `REF-${Date.now()}`,
+    checkoutSummary.paymentMethodCode,
+    checkoutSummary.totalAmount,
+    checkoutSummary.bankTransferCode,
+  );
+
+  // Bước 3: Merge paymentFields vào summary
+  const summaryWithPayment = { ...checkoutSummary, paymentFields };
+
+  // Bước 4: 1 transaction duy nhất — order được tạo đã có đủ QR/URL ngay từ đầu
+  const order = await createOrderFromCheckout(userId, summaryWithPayment);
 
   res.status(201).json({
     success: true,
@@ -121,6 +88,7 @@ export const checkoutHandler = async (req: Request, res: Response) => {
       orderCode: order.orderCode,
       orderStatus: order.orderStatus,
       paymentStatus: order.paymentStatus,
+      paymentMethodCode: checkoutSummary.paymentMethodCode.toUpperCase(),
       summary: {
         subtotalAmount: checkoutSummary.subtotalAmount,
         shippingFee: checkoutSummary.shippingFee,
@@ -129,7 +97,7 @@ export const checkoutHandler = async (req: Request, res: Response) => {
         totalAmount: checkoutSummary.totalAmount,
         itemCount: checkoutSummary.items.length,
       },
-      paymentInfo, // FE dùng paymentInfo.paymentUrl để redirect
+      paymentInfo,
     },
     message: "Order created successfully",
   });

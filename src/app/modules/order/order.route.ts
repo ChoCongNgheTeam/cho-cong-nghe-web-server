@@ -11,6 +11,7 @@ const router = Router();
 // ================== PUBLIC (USER) ==================
 router.get("/my", authMiddleware(true), asyncHandler(c.getMyOrdersHandler));
 router.get("/my/:id", authMiddleware(true), asyncHandler(c.getOrderDetailHandler));
+router.get("/by-code/:orderCode/payment-info", authMiddleware(true), asyncHandler(c.getOrderPaymentInfoHandler));
 router.post("/my/:id/cancel", authMiddleware(true), asyncHandler(c.cancelOrderUserHandler));
 router.post("/my/:id/reorder", authMiddleware(true), asyncHandler(c.reorderUserHandler));
 
