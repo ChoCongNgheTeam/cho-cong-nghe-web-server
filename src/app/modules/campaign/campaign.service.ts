@@ -1,10 +1,12 @@
 import { CampaignType } from "@prisma/client";
-import { CreateCampaignInput, UpdateCampaignInput, ListCampaignsQuery, CampaignCategoryInput, UpdateCampaignCategoryInput } from "./campaign.validation";
+import { CreateCampaignInput, UpdateCampaignInput, ListCampaignsQuery, CampaignCategoryInput, UpdateCampaignCategoryInput, BulkDeleteCampaignsInput } from "./campaign.validation";
 import { campaignRepository } from "./campaign.repository";
 import { generateUniqueCampaignSlug, deleteCampaignCategoryImage } from "./campaign.helpers";
 import { NotFoundError, BadRequestError } from "@/errors";
 
 export class CampaignService {
+  // ── Public reads ────────────────────────────────────────────────────────────
+
   async getCampaignsPublic(query: ListCampaignsQuery) {
     return campaignRepository.findAllPublic(query);
   }
@@ -28,6 +30,13 @@ export class CampaignService {
     if (!campaign) throw new NotFoundError("Chiến dịch");
     return campaign;
   }
+
+  /** Danh sách đã xoá mềm (thùng rác) */
+  async getDeletedCampaigns() {
+    return campaignRepository.findDeleted();
+  }
+
+  // ── Mutates ─────────────────────────────────────────────────────────────────
 
   async createCampaign(data: CreateCampaignInput) {
     if (data.startDate && data.endDate && data.startDate > data.endDate) {
@@ -65,18 +74,62 @@ export class CampaignService {
     return campaignRepository.updateCampaign(id, updateData);
   }
 
-  async deleteCampaign(id: string) {
+  /**
+   * Soft delete — campaign vẫn còn trong DB, chỉ đánh dấu deletedAt.
+   * Đồng thời cascade: không xoá categories vì có thể restore lại.
+   */
+  async deleteCampaign(id: string, deletedBy: string) {
     const campaign = await campaignRepository.getCampaignById(id);
     if (!campaign) throw new NotFoundError("Chiến dịch");
 
+    return campaignRepository.softDelete(id, deletedBy);
+  }
+
+  /** Bulk soft delete nhiều chiến dịch cùng lúc */
+  async bulkDeleteCampaigns(input: BulkDeleteCampaignsInput, deletedBy: string) {
+    return campaignRepository.bulkSoftDelete(input.ids, deletedBy);
+  }
+
+  /**
+   * Khôi phục campaign đã bị soft-delete.
+   * Cần tìm kể cả deleted (includeDeleted = true).
+   */
+  async restoreCampaign(id: string) {
+    const campaign = await campaignRepository.getCampaignById(id, true);
+    if (!campaign) throw new NotFoundError("Chiến dịch");
+    if (!campaign.deletedAt) throw new BadRequestError("Chiến dịch chưa bị xoá");
+
+    // Kiểm tra slug / name trùng sau khi đã xoá
+    const nameConflict = await campaignRepository.checkNameExists(campaign.name, id);
+    if (nameConflict) {
+      throw new BadRequestError(`Tên "${campaign.name}" đã tồn tại ở chiến dịch khác. Vui lòng đổi tên trước khi khôi phục.`);
+    }
+
+    return campaignRepository.restore(id);
+  }
+
+  /**
+   * Xoá vĩnh viễn — xoá hết ảnh cloudinary của categories trước.
+   * Chỉ cho phép hard delete sau khi đã soft-delete.
+   */
+  async hardDeleteCampaign(id: string) {
+    const campaign = await campaignRepository.getCampaignById(id, true);
+    if (!campaign) throw new NotFoundError("Chiến dịch");
+    if (!campaign.deletedAt) {
+      throw new BadRequestError("Chỉ có thể xoá vĩnh viễn chiến dịch đã chuyển vào thùng rác");
+    }
+
+    // Dọn ảnh cloudinary
     if (campaign.categories?.length > 0) {
       for (const cat of campaign.categories) {
         if (cat.imagePath) await deleteCampaignCategoryImage(cat.imagePath);
       }
     }
 
-    await campaignRepository.deleteCampaign(id);
+    return campaignRepository.hardDelete(id);
   }
+
+  // ── Campaign Categories ─────────────────────────────────────────────────────
 
   async addCategoriesToCampaign(campaignId: string, categories: CampaignCategoryInput[]) {
     const campaign = await campaignRepository.getCampaignById(campaignId);
@@ -84,9 +137,7 @@ export class CampaignService {
 
     for (const category of categories) {
       const categoryExists = await campaignRepository.checkCategoryExists(category.categoryId);
-      if (!categoryExists) {
-        throw new NotFoundError(`Danh mục với ID: ${category.categoryId}`);
-      }
+      if (!categoryExists) throw new NotFoundError(`Danh mục với ID: ${category.categoryId}`);
 
       const alreadyInCampaign = await campaignRepository.checkCategoryInCampaign(campaignId, category.categoryId);
       if (alreadyInCampaign) {

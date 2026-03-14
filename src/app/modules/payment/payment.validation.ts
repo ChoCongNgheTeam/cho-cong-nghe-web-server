@@ -19,6 +19,7 @@ export const createPaymentMethodSchema = z.object({
 
 export const updatePaymentMethodSchema = z.object({
   name: z.string().min(1).optional(),
+  code: z.string().min(1).optional(),
   description: z.string().optional(),
   isActive: z.boolean().optional(),
 });

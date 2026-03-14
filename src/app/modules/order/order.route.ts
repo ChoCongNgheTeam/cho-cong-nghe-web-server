@@ -18,7 +18,6 @@ router.post("/my/:id/reorder", authMiddleware(true), asyncHandler(c.reorderUserH
 // ================== STAFF & ADMIN ==================
 router.use("/admin", authMiddleware(true));
 
-// 1. Quyền chung STAFF & ADMIN
 router.get("/admin/all", requireRole("STAFF", "ADMIN"), validate(orderQuerySchema, "query"), asyncHandler(c.getAllOrdersAdminHandler));
 router.get("/admin/:id", requireRole("STAFF", "ADMIN"), asyncHandler(c.getOrderAdminDetailHandler));
 router.patch("/admin/:id", requireRole("STAFF", "ADMIN"), validate(updateOrderAdminSchema, "body"), asyncHandler(c.updateOrderAdminHandler));
@@ -26,11 +25,5 @@ router.post("/admin/:id/cancel", requireRole("STAFF", "ADMIN"), asyncHandler(c.c
 
 // ================== ADMIN ONLY ==================
 router.post("/admin", requireRole("ADMIN"), validate(createOrderAdminSchema, "body"), asyncHandler(c.createOrderAdminHandler));
-
-// Archive (Lưu trữ rác)
-router.get("/admin/archive/orders", requireRole("ADMIN"), validate(orderQuerySchema, "query"), asyncHandler(c.getArchivedOrdersAdminHandler));
-router.post("/admin/:id/archive", requireRole("ADMIN"), asyncHandler(c.archiveOrderAdminHandler));
-router.post("/admin/:id/unarchive", requireRole("ADMIN"), asyncHandler(c.unarchiveOrderAdminHandler));
-router.delete("/admin/:id/permanent", requireRole("ADMIN"), asyncHandler(c.hardDeleteOrderAdminHandler));
 
 export default router;

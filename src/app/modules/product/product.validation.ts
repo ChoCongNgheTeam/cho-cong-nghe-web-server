@@ -1,37 +1,37 @@
 import { z } from "zod";
 
-// listProductsSchema — MỞ RỘNG với passthrough() để hỗ trợ dynamic keys:
-//   spec_xxx  → lọc theo specification (spec_os=Android, spec_nfc=true)
-//   attr_xxx  → lọc theo variant attribute (attr_storage=256GB, attr_ram=8GB)
-//
-// .passthrough() giữ nguyên các key không khai báo thay vì strip chúng.
-// Validation vẫn chạy trên các key đã khai báo, dynamic keys không validate.
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Chuyển "true"/"false" string → boolean (dùng cho query params) */
+const queryBoolean = z.preprocess((v) => (v === "true" ? true : v === "false" ? false : v), z.boolean().optional());
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLIC SCHEMAS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * listProductsSchema — public product listing.
+ * .passthrough() giữ dynamic keys: spec_xxx, attr_xxx
+ */
 export const listProductsSchema = z
   .object({
-    // Pagination
     page: z.coerce.number().positive().default(1),
     limit: z.coerce.number().positive().max(50).default(12),
-
-    // Search
     search: z.string().optional(),
-
-    // Category
     category: z.string().optional(),
     categoryId: z.string().uuid().optional(),
-
-    // Filters cố định
     brandId: z.union([z.string().uuid(), z.array(z.string().uuid())]).optional(),
     isFeatured: z.coerce.boolean().optional(),
     minPrice: z.coerce.number().nonnegative().optional(),
     maxPrice: z.coerce.number().nonnegative().optional(),
     minRating: z.coerce.number().min(0).max(5).optional(),
     inStock: z.coerce.boolean().optional(),
-
-    // Sort
     sortBy: z.enum(["createdAt", "name", "price", "viewsCount", "ratingAverage", "soldCount"]).default("createdAt"),
     sortOrder: z.enum(["asc", "desc"]).default("desc"),
   })
-  .passthrough(); // ← cho phép spec_xxx, attr_xxx đi qua
+  .passthrough();
 
 export const reviewsQuerySchema = z.object({
   page: z.coerce.number().positive().default(1),
@@ -42,9 +42,7 @@ export const reviewsQuerySchema = z.object({
 });
 
 export const variantQuerySchema = z
-  .object({
-    code: z.string().optional(),
-  })
+  .object({ code: z.string().optional() })
   .passthrough()
   .refine(
     (data) => {
@@ -62,13 +60,46 @@ export const productBySlugParamsSchema = z.object({
   slug: z.string().min(1, { message: "Slug không được để trống" }),
 });
 
-// Search suggest schema — dùng cho endpoint gợi ý tìm kiếm
-// GET /products/search-suggest?q=iphone&limit=8
 export const searchSuggestSchema = z.object({
   q: z.string().min(1, "Từ khóa không được để trống"),
   limit: z.coerce.number().positive().max(20).default(8),
   category: z.string().optional(),
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN SCHEMAS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * adminListProductsSchema — admin product listing.
+ * Thêm: isActive, isFeatured, includeDeleted, dateFrom, dateTo
+ */
+export const adminListProductsSchema = z.object({
+  page: z.coerce.number().positive().default(1),
+  limit: z.coerce.number().positive().max(500).default(20),
+  search: z.string().optional(),
+  brandId: z.union([z.string().uuid(), z.array(z.string().uuid())]).optional(),
+  categoryId: z.string().uuid().optional(),
+  isActive: queryBoolean,
+  isFeatured: queryBoolean,
+  includeDeleted: queryBoolean,
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  sortBy: z.enum(["createdAt", "updatedAt", "name", "viewsCount", "ratingAverage", "totalSoldCount"]).default("createdAt"),
+  sortOrder: z.enum(["asc", "desc"]).default("desc"),
+});
+
+/**
+ * bulkActionSchema — dùng cho POST /admin/bulk
+ */
+export const bulkActionSchema = z.object({
+  action: z.enum(["delete", "activate", "deactivate", "feature", "unfeature"]),
+  ids: z.array(z.string().uuid()).min(1, "Cần ít nhất 1 sản phẩm"),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CREATE / UPDATE SCHEMAS
+// ─────────────────────────────────────────────────────────────────────────────
 
 const colorImageSchema = z.object({
   color: z.string().min(1, "Màu sắc không được để trống"),
@@ -142,13 +173,17 @@ export const updateProductSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-export const variantOptionsQuerySchema = z.object({
-  // không cần query params, chỉ cần slug từ params
-});
+export const variantOptionsQuerySchema = z.object({});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INFERRED TYPES
+// ─────────────────────────────────────────────────────────────────────────────
 
 export type ListProductsQuery = z.infer<typeof listProductsSchema>;
+export type AdminListProductsQuery = z.infer<typeof adminListProductsSchema>;
 export type ReviewsQuery = z.infer<typeof reviewsQuerySchema>;
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;
 export type VariantQuery = z.infer<typeof variantQuerySchema>;
 export type SearchSuggestQuery = z.infer<typeof searchSuggestSchema>;
+export type BulkActionInput = z.infer<typeof bulkActionSchema>;

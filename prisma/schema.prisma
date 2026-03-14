@@ -404,6 +404,7 @@ model attributes {
   id        String   @id @default(uuid())
   code      String   @unique // color, storage, inch
   name      String           // Màu sắc, Bộ nhớ, Kích thước
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
   options    attributes_options[]
@@ -415,6 +416,7 @@ model attributes_options {
   attributeId String
   value       String
   label       String
+   isActive    Boolean  @default(true) 
 
   attribute         attributes          @relation(fields: [attributeId], references: [id])
   variantAttributes variants_attributes[]
@@ -511,6 +513,7 @@ model specifications {
   group        String    @default("Thông số khác")
   unit         String?
   icon         String?
+  isActive     Boolean    @default(true)
   isFilterable Boolean   @default(false)
   filterType   FilterType?
   isRequired   Boolean   @default(false)
@@ -608,10 +611,6 @@ model orders {
   paymentExpiredAt      DateTime?
   paymentRedirectUrl    String?
 
-  // --- Soft Delete (admin trash) ---
-  deletedAt         DateTime?
-  deletedBy         String?       @db.Uuid
-
   // ===== RELATIONS =====
   user            users                  @relation(fields: [userId], references: [id])
   paymentMethod   payment_methods        @relation(fields: [paymentMethodId], references: [id])
@@ -621,7 +620,6 @@ model orders {
   voucherUsages   voucher_usages[]
   transactions    payment_transactions[]
 
-  @@index([deletedAt])
   @@index([userId])
   @@index([orderStatus])
   @@index([orderDate])

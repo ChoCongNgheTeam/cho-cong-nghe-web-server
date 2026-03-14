@@ -8,8 +8,12 @@ import { listBrandsQuerySchema, featuredBrandsQuerySchema } from "./brand.valida
 
 export const getBrandsPublicHandler = async (req: Request, res: Response) => {
   const query = listBrandsQuerySchema.parse(req.query);
-  const brands = await brandService.getBrandsPublic(query);
-  res.json({ data: brands, message: "Lấy danh sách thương hiệu thành công" });
+  const result = await brandService.getBrandsPublic(query);
+  res.json({
+    data: result.data,
+    meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
+    message: "Lấy danh sách thương hiệu thành công",
+  });
 };
 
 export const getActiveBrandsHandler = async (req: Request, res: Response) => {
@@ -32,8 +36,12 @@ export const getBrandBySlugHandler = async (req: Request, res: Response) => {
 
 export const getBrandsAdminHandler = async (req: Request, res: Response) => {
   const query = listBrandsQuerySchema.parse(req.query);
-  const brands = await brandService.getBrandsAdmin(query);
-  res.json({ data: brands, message: "Lấy danh sách thương hiệu thành công" });
+  const result = await brandService.getBrandsAdmin(query);
+  res.json({
+    data: result.data,
+    meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
+    message: "Lấy danh sách thương hiệu thành công",
+  });
 };
 
 export const getBrandDetailHandler = async (req: Request, res: Response) => {
@@ -101,7 +109,7 @@ export const getDeletedBrandsHandler = async (req: Request, res: Response) => {
   const result = await brandService.getDeletedBrands({ page, limit });
   res.json({
     data: result.data,
-    pagination: {
+    meta: {
       page: result.page,
       limit: result.limit,
       total: result.total,

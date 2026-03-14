@@ -1,8 +1,5 @@
 import { Decimal } from "@prisma/client/runtime/library";
 
-/**
- * Order Item in database
- */
 export interface OrderItem {
   id: string;
   orderId: string;
@@ -12,23 +9,17 @@ export interface OrderItem {
   createdAt: Date;
 }
 
-/**
- * Order Item for API response
- */
 export interface OrderItemResponse {
   id: string;
   productVariantId: string;
   quantity: number;
   unitPrice: number;
-  subtotal: number; // calculated
+  subtotal: number;
   productName?: string;
   variantCode?: string;
   image?: string | null;
 }
 
-/**
- * Order for database
- */
 export interface Order {
   id: string;
   orderCode: string;
@@ -45,8 +36,8 @@ export interface Order {
   shippingFee: Decimal | number;
   voucherDiscount: Decimal | number;
   totalAmount: Decimal | number;
-  orderStatus: string; // OrderStatus enum
-  paymentStatus: string; // PaymentStatus enum
+  orderStatus: string;
+  paymentStatus: string;
   bankTransferCode?: string | null;
   momoOrderId?: string | null;
   vnpayTxnRef?: string | null;
@@ -54,14 +45,9 @@ export interface Order {
   stripePaymentIntentId?: string | null;
   orderDate: Date;
   updatedAt: Date;
-  deletedAt?: Date | null;
-  deletedBy?: string | null;
   orderItems?: OrderItem[];
 }
 
-/**
- * Order for API response
- */
 export interface OrderResponse {
   id: string;
   orderCode: string;
@@ -82,9 +68,6 @@ export interface OrderResponse {
   items?: OrderItemResponse[];
 }
 
-/**
- * Order list for dashboard/admin
- */
 export interface OrderListItem {
   id: string;
   orderCode: string;
@@ -96,9 +79,6 @@ export interface OrderListItem {
   itemCount?: number;
 }
 
-/**
- * Order statistics
- */
 export interface OrderStatistics {
   totalOrders: number;
   pendingOrders: number;

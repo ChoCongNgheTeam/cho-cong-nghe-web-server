@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+// Helper: parse query string boolean đúng cách
+// z.coerce.boolean() sẽ coerce string "false" → true vì string non-empty là truthy
+const queryBoolean = z.preprocess((v) => (v === "true" ? true : v === "false" ? false : v), z.boolean().optional());
+
 export const brandParamsSchema = z.object({
   id: z.string().uuid("ID thương hiệu không hợp lệ"),
 });
@@ -9,13 +13,25 @@ export const brandSlugParamsSchema = z.object({
 });
 
 export const listBrandsQuerySchema = z.object({
+  // Pagination
+  page: z.coerce.number().min(1).default(1).optional(),
+  limit: z.coerce.number().min(1).max(100).default(20).optional(),
+
+  // Search & filter
   search: z.string().optional(),
-  isFeatured: z.coerce.boolean().optional(),
-  isActive: z.coerce.boolean().optional(),
+  isFeatured: queryBoolean,
+  isActive: queryBoolean,
+
+  // Date range filter (ISO string hoặc YYYY-MM-DD)
+  dateFrom: z.coerce.date().optional(),
+  dateTo: z.coerce.date().optional(),
+
+  // Sort
   sortBy: z.enum(["name", "createdAt", "productCount"]).default("name"),
   sortOrder: z.enum(["asc", "desc"]).default("asc"),
+
   // Admin only: xem cả brand đã soft delete
-  includeDeleted: z.coerce.boolean().optional().default(false),
+  includeDeleted: queryBoolean.pipe(z.boolean().optional().default(false)),
 });
 
 export const featuredBrandsQuerySchema = z.object({

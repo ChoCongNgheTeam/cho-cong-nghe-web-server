@@ -5,31 +5,24 @@ import { transformProductCard, transformProductDetail, transformProductSpecifica
 import { RawVariant, ReviewStats } from "./product.types";
 import { buildCategoryPath } from "../category/category.helpers";
 import prisma from "prisma/client";
-import { findSearchSuggestions, getProductIdsFromPromotions } from "./product.repository";
+import { getProductIdsFromPromotions } from "./product.repository";
 import { normalizeVariant } from "./product.helpers";
-import { NotFoundError, BadRequestError } from "@/errors";
+import { NotFoundError, BadRequestError, ConflictError } from "@/errors";
 
-/**
- * Từ product, chọn ra variants để tạo card:
- * - variantDisplay = CARD  → mỗi variant là 1 card riêng (oppo-a3, macbook-air-13-m4...)
- * - variantDisplay = SELECTOR → 1 card đại diện bằng isDefault (iphone, samsung...)
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// INTERNAL HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
 const getVariantsForCards = (product: any): any[] => {
   const variants: any[] = product.variants ?? [];
   if (variants.length === 0) return [];
 
-  if (product.variantDisplay === "CARD") {
-    return variants; // mỗi variant → 1 card
-  }
+  if (product.variantDisplay === "CARD") return variants;
 
-  // SELECTOR: 1 card đại diện
   const defaultVariant = variants.find((v) => v.isDefault) ?? variants[0];
   return defaultVariant ? [defaultVariant] : [];
 };
 
-/**
- * Build 1 card entry từ product + 1 variant cụ thể
- */
 const buildCardEntry = (product: any, variant: any) => {
   const card = transformProductCard({ ...product, variants: [variant] });
   if (!card) return null;
@@ -45,7 +38,19 @@ const buildCardEntry = (product: any, variant: any) => {
   };
 };
 
-//  Public
+/**
+ * Assert product tồn tại + chưa bị xóa mềm (mặc định).
+ * includeDeleted = true → chỉ check tồn tại (dùng cho restore/hardDelete).
+ */
+const assertProductExists = async (id: string, options: { includeDeleted?: boolean } = {}) => {
+  const product = await repo.findById(id, options);
+  if (!product) throw new NotFoundError("Sản phẩm");
+  return product;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLIC
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const getProductsPublic = async (query: ListProductsQuery) => {
   const result = await repo.findAllPublic(query);
@@ -68,7 +73,7 @@ export const getProductsPublic = async (query: ListProductsQuery) => {
 };
 
 export const getSearchSuggestions = async (query: SearchSuggestQuery) => {
-  return findSearchSuggestions(query.q, {
+  return repo.findSearchSuggestions(query.q, {
     limit: query.limit,
     categorySlug: query.category,
   });
@@ -94,22 +99,13 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
   let canReview = false;
   let orderItemId: string | null = null;
 
-  console.log(userId);
-
   if (userId) {
     const orderItem = await repo.findOrderItemForReview(userId, product.id);
     canReview = !!orderItem && !orderItem.review;
     orderItemId = orderItem?.id ?? null;
   }
 
-  return {
-    ...productDetail,
-    categoryPath: buildCategoryPath(product.category),
-    highlights,
-    highlightGroups,
-    canReview,
-    orderItemId,
-  };
+  return { ...productDetail, categoryPath: buildCategoryPath(product.category), highlights, highlightGroups, canReview, orderItemId };
 };
 
 export const getProductVariant = async (slug: string, options?: Record<string, string>) => {
@@ -176,7 +172,6 @@ export const getRelatedProducts = async (slug: string, limit = 8) => {
   if (!product) throw new NotFoundError("Sản phẩm");
 
   const related = await repo.findRelatedProducts(product.id, limit);
-
   return related.flatMap((p) => {
     const variantsForCards = getVariantsForCards(p);
     return variantsForCards.flatMap((variant) => {
@@ -192,43 +187,87 @@ export const getProductReviews = async (slug: string, query: ReviewsQuery) => {
   return repo.findProductReviews(product.id, query);
 };
 
-// ── Admin ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN — LIST & DETAIL
+// ─────────────────────────────────────────────────────────────────────────────
 
-export const getProductsAdmin = async (query: ListProductsQuery) => {
+export const getProductsAdmin = async (query: Record<string, any>) => {
   const result = await repo.findAllAdmin(query);
   return { ...result, data: result.data.map(transformProductCard).filter(Boolean) };
 };
 
-export const getProductById = async (id: string) => {
-  const product = await repo.findById(id);
+export const getDeletedProducts = async (query: Record<string, any> = {}) => {
+  const result = await repo.findAllDeleted(query);
+  return { ...result, data: result.data.map(transformProductCard).filter(Boolean) };
+};
+
+// export const getProductById = async (id: string, options: { includeDeleted?: boolean } = {}) => {
+//   const product = await repo.findById(id, options);
+//   if (!product) throw new NotFoundError("Sản phẩm");
+
+//   const reviewStats = await repo.getReviewStats(product.id);
+//   const stats: ReviewStats = {
+//     average: Number(product.ratingAverage) || 0,
+//     total: reviewStats.total,
+//     distribution: reviewStats.distribution as any,
+//   };
+
+//   return transformProductDetail(product, stats);
+// };
+export const getProductById = async (id: string, options: { includeDeleted?: boolean } = {}) => {
+  const product = await repo.findById(id, options);
   if (!product) throw new NotFoundError("Sản phẩm");
 
-  const reviewStats = await repo.getReviewStats(product.id);
-  const stats: ReviewStats = {
-    average: Number(product.ratingAverage) || 0,
-    total: reviewStats.total,
-    distribution: reviewStats.distribution as any,
+  // Trả về raw data để admin có thể edit variants, img, specifications
+  return {
+    ...product,
+    // Normalize Decimal → number để JSON serialize đúng
+    ratingAverage: Number(product.ratingAverage),
+    variants: product.variants.map((v) => ({
+      ...v,
+      price: Number(v.price),
+    })),
+    productSpecifications: product.productSpecifications.map((s) => ({
+      ...s,
+      sortOrder: s.sortOrder ?? 0,
+    })),
   };
-
-  return transformProductDetail(product, stats);
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN — CRUD
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const createProduct = async (input: CreateProductInput) => {
   const defaultCount = input.variants.filter((v) => v.isDefault).length;
   if (defaultCount !== 1) throw new BadRequestError("Phải có đúng 1 biến thể mặc định");
 
-  const slug = slugify(input.name).toLowerCase();
+  const baseSlug = slugify(input.name).toLowerCase();
+  let slug = baseSlug;
+  let counter = 1;
+
+  // Slug conflict: thêm suffix -2, -3... nếu trùng
+  while (await repo.checkSlugExists(slug)) {
+    slug = `${baseSlug}-${counter++}`;
+  }
+
   const product = await repo.create({ ...input, slug });
   return transformProductDetail(product);
 };
 
 export const updateProduct = async (id: string, input: UpdateProductInput) => {
-  await getProductById(id);
+  await assertProductExists(id);
 
   const updateData: any = { ...input };
 
   if (input.name) {
-    updateData.slug = slugify(input.name).toLowerCase();
+    const baseSlug = slugify(input.name).toLowerCase();
+    let slug = baseSlug;
+    let counter = 1;
+    while (await repo.checkSlugExists(slug, id)) {
+      slug = `${baseSlug}-${counter++}`;
+    }
+    updateData.slug = slug;
   }
 
   if (input.variants) {
@@ -236,21 +275,100 @@ export const updateProduct = async (id: string, input: UpdateProductInput) => {
     if (defaultCount > 1) throw new BadRequestError("Chỉ được có tối đa 1 biến thể mặc định");
   }
 
-  const product = await repo.update(id, updateData);
-  return transformProductDetail(product);
+  await repo.update(id, updateData);
+
+  // Fetch lại raw data để FE admin dùng (giống getProductById)
+  const updated = await repo.findById(id);
+  return {
+    ...updated!,
+    ratingAverage: Number(updated!.ratingAverage),
+    variants: updated!.variants.map((v) => ({
+      ...v,
+      price: Number(v.price),
+    })),
+    productSpecifications: updated!.productSpecifications.map((s) => ({
+      ...s,
+      sortOrder: s.sortOrder ?? 0,
+    })),
+  };
 };
 
-export const deleteProduct = async (id: string) => {
-  await getProductById(id);
-  return repo.remove(id);
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN — SOFT DELETE LIFECYCLE
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Soft delete — set deletedAt/deletedBy + isActive = false.
+ * Dùng cho nút "Xóa" trên admin list.
+ */
+export const softDeleteProduct = async (id: string, deletedBy: string) => {
+  await assertProductExists(id); // chưa bị xóa
+  return repo.softDelete(id, deletedBy);
 };
 
-// ── Promotion / Sale ──────────────────────────────────────────────────────────
+/**
+ * Restore từ trash.
+ * Kiểm tra slug conflict: nếu có product khác đang dùng slug này thì báo lỗi.
+ */
+export const restoreProduct = async (id: string) => {
+  const product = await assertProductExists(id, { includeDeleted: true });
+
+  if (!product.deletedAt) throw new BadRequestError("Sản phẩm chưa bị xóa");
+
+  // Kiểm tra slug conflict
+  const slugConflict = await repo.checkSlugExists(product.slug, id);
+  if (slugConflict) {
+    throw new ConflictError(`Không thể khôi phục: slug "${product.slug}" đã được dùng bởi sản phẩm khác. Vui lòng đổi tên sản phẩm kia trước.`);
+  }
+
+  return repo.restore(id);
+};
+
+/**
+ * Hard delete — xóa vĩnh viễn.
+ * Bắt buộc phải soft-delete trước (theo pattern).
+ * Controller cần xóa cloudinary images trước khi gọi hàm này.
+ */
+export const hardDeleteProduct = async (id: string) => {
+  const product = await assertProductExists(id, { includeDeleted: true });
+  if (!product.deletedAt) throw new BadRequestError("Phải soft-delete trước khi xóa vĩnh viễn");
+  return repo.hardDelete(id);
+};
+
+/**
+ * Bulk soft-delete nhiều sản phẩm
+ */
+export const bulkSoftDeleteProducts = async (ids: string[], deletedBy: string) => {
+  if (!ids.length) throw new BadRequestError("Danh sách ID không được rỗng");
+  return repo.bulkSoftDelete(ids, deletedBy);
+};
+
+/**
+ * Bulk update (isActive, isFeatured...)
+ */
+export const bulkUpdateProducts = async (ids: string[], updates: any) => {
+  if (!ids.length) throw new BadRequestError("Danh sách ID không được rỗng");
+  return repo.bulkUpdate(ids, updates);
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN — VARIANT SOFT DELETE
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const softDeleteVariant = async (variantId: string, deletedBy: string) => {
+  return repo.softDeleteVariant(variantId, deletedBy);
+};
+
+export const restoreVariant = async (variantId: string) => {
+  return repo.restoreVariant(variantId);
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROMOTION / SALE (public — unchanged)
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const getFlashSaleProducts = async (date: Date = new Date(), options: { limit?: number; categoryId?: string } = {}) => {
   const { products, promotions } = await repo.findProductsOnSaleByDate(date, options);
-
-  // console.log(promotions);
 
   const firstPromotion = promotions?.[0];
 
@@ -278,16 +396,13 @@ export const getCategoriesWithSaleProducts = async (date: Date = new Date(), lim
 
   for (const product of products) {
     const categoryId = product.category.parent?.id ?? product.category.id;
-
     if (!map.has(categoryId)) {
       map.set(categoryId, { totalProducts: 0, saleProducts: 0, newProducts: 0, totalViews: 0, totalSold: 0 });
     }
-
     const data = map.get(categoryId)!;
     data.totalProducts += 1;
     data.totalViews += Number(product.viewsCount);
     data.totalSold += product.variants.reduce((sum, v) => sum + v.soldCount, 0);
-
     if (saleProductIds.has(product.id)) data.saleProducts += 1;
     if (now - product.createdAt.getTime() < NEW_DAYS * 24 * 60 * 60 * 1000) data.newProducts += 1;
   }
@@ -309,7 +424,6 @@ export const getCategoriesWithSaleProducts = async (date: Date = new Date(), lim
 
 export const getFeaturedProductsByCategories = async (options: { limit?: number; categoriesLimit?: number } = {}) => {
   const results = await repo.findFeaturedProductsByCategories(options);
-
   return results.map((result) => ({
     category: result.category,
     products: result.products.flatMap((product) => {
@@ -355,7 +469,6 @@ export const getProductsByPromotion = async (promotionId: string, limit = 20) =>
 
 export const getFeaturedProducts = async (limit = 12) => {
   const products = await repo.findFeaturedProducts(limit);
-
   return products.flatMap((product) => {
     const variantsForCards = getVariantsForCards(product);
     return variantsForCards.flatMap((variant) => {
@@ -439,7 +552,6 @@ export const getSaleSchedule = async (startDate: Date, endDate: Date) => {
       if (!existing.some((p) => p.id === promo.id)) {
         const currentDateOnly = new Date(currentDate);
         currentDateOnly.setHours(0, 0, 0, 0);
-
         existing.push({
           id: promo.id,
           name: promo.name,

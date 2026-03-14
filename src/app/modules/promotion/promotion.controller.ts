@@ -1,21 +1,19 @@
 import { Request, Response } from "express";
 import * as promotionService from "./promotion.service";
-import { ListPromotionsQuery } from "./promotion.validation";
+import { listPromotionsSchema } from "./promotion.validation";
 
-const paginatedResponse = (result: any, message: string) => ({
-  data: result.data,
-  pagination: {
-    page: result.page,
-    limit: result.limit,
-    total: result.total,
-    totalPages: result.totalPages,
-  },
-  message,
-});
+// =====================
+// === PUBLIC ===
+// =====================
 
 export const getPromotionsPublicHandler = async (req: Request, res: Response) => {
-  const result = await promotionService.getPromotions(req.query as unknown as ListPromotionsQuery);
-  res.json(paginatedResponse(result, "Lấy danh sách khuyến mãi thành công"));
+  const query = listPromotionsSchema.parse(req.query);
+  const result = await promotionService.getPromotionsPublic(query);
+  res.json({
+    data: result.data,
+    meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
+    message: "Lấy danh sách khuyến mãi thành công",
+  });
 };
 
 export const getActivePromotionsHandler = async (req: Request, res: Response) => {
@@ -38,15 +36,29 @@ export const getPromotionsByBrandHandler = async (req: Request, res: Response) =
   res.json({ data: promotions, message: "Lấy khuyến mãi cho thương hiệu thành công" });
 };
 
+// =====================
+// === ADMIN: list, detail ===
+// =====================
+
 export const getPromotionsAdminHandler = async (req: Request, res: Response) => {
-  const result = await promotionService.getPromotions(req.query as unknown as ListPromotionsQuery);
-  res.json(paginatedResponse(result, "Lấy danh sách khuyến mãi thành công"));
+  const query = listPromotionsSchema.parse(req.query);
+  const result = await promotionService.getPromotionsAdmin(query);
+  res.json({
+    data: result.data,
+    meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
+    message: "Lấy danh sách khuyến mãi thành công",
+  });
 };
 
-export const getPromotionByIdHandler = async (req: Request, res: Response) => {
-  const promotion = await promotionService.getPromotionById(req.params.id);
+export const getPromotionDetailHandler = async (req: Request, res: Response) => {
+  const isAdmin = req.user!.role === "ADMIN";
+  const promotion = await promotionService.getPromotionDetail(req.params.id, { isAdmin });
   res.json({ data: promotion, message: "Lấy chi tiết khuyến mãi thành công" });
 };
+
+// =====================
+// === ADMIN: create, update ===
+// =====================
 
 export const createPromotionHandler = async (req: Request, res: Response) => {
   const promotion = await promotionService.createPromotion(req.body);
@@ -58,7 +70,37 @@ export const updatePromotionHandler = async (req: Request, res: Response) => {
   res.json({ data: promotion, message: "Cập nhật khuyến mãi thành công" });
 };
 
+// =====================
+// === ADMIN: soft delete, restore, hard delete, trash ===
+// =====================
+
 export const deletePromotionHandler = async (req: Request, res: Response) => {
-  await promotionService.deletePromotion(req.params.id);
+  await promotionService.softDeletePromotion(req.params.id, req.user!.id);
   res.json({ message: "Xóa khuyến mãi thành công" });
+};
+
+export const restorePromotionHandler = async (req: Request, res: Response) => {
+  const promotion = await promotionService.restorePromotion(req.params.id);
+  res.json({ data: promotion, message: "Khôi phục khuyến mãi thành công" });
+};
+
+export const hardDeletePromotionHandler = async (req: Request, res: Response) => {
+  await promotionService.hardDeletePromotion(req.params.id);
+  res.json({ message: "Xóa vĩnh viễn khuyến mãi thành công" });
+};
+
+export const getDeletedPromotionsHandler = async (req: Request, res: Response) => {
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 20;
+  const result = await promotionService.getDeletedPromotions({ page, limit });
+  res.json({
+    data: result.data,
+    meta: {
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      totalPages: Math.ceil(result.total / result.limit),
+    },
+    message: "Lấy danh sách khuyến mãi đã xóa thành công",
+  });
 };

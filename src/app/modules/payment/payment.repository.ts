@@ -15,6 +15,7 @@ import { Prisma, PaymentTransactionStatus } from "@prisma/client";
 const paymentMethodSelect = {
   id: true,
   name: true,
+  code: true,
   description: true,
   isActive: true,
   createdAt: true,

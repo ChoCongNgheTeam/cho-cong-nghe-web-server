@@ -33,6 +33,9 @@ import imageMediaRouter from "@/app/modules/image-media/media.route";
 import uploadRoutes from "@/app/modules/upload/upload.route";
 import homeRouter from "@/app/modules/home/home.route";
 
+import attributeRouter from "@/app/modules/attributes/attribute.route";
+import specificationRouter from "@/app/modules/specifications/specification.route";
+
 const router = Router();
 
 // ===== Core & Auth =====
@@ -67,5 +70,8 @@ router.use("/media", imageMediaRouter);
 // ===== Upload & Home =====
 router.use("/upload", uploadRoutes);
 router.use("/home", homeRouter);
+
+router.use("/attributes", attributeRouter);
+router.use("/specifications", specificationRouter);
 
 export default router;

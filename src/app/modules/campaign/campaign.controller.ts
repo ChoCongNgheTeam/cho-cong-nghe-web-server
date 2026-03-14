@@ -2,11 +2,16 @@ import { Request, Response } from "express";
 import { campaignService } from "./campaign.service";
 import { uploadCampaignCategoryImage } from "./campaign.helpers";
 import { cleanupFile } from "@/services/file-cleanup.service";
-import { ListCampaignsQuery, UpdateCampaignCategoryInput } from "./campaign.validation";
+import { ListCampaignsQuery, UpdateCampaignCategoryInput, bulkDeleteCampaignsSchema } from "./campaign.validation";
 import { CampaignType } from "@prisma/client";
 
 const cleanupFiles = (files: Express.Multer.File[] | undefined) => {
   files?.forEach((file) => cleanupFile(file));
+};
+
+/** Lấy userId từ request (đã qua authMiddleware) */
+const getActorId = (req: Request): string => {
+  return (req as any).user?.id ?? "system";
 };
 
 // ── Public ────────────────────────────────────────────────────────────────────
@@ -49,9 +54,37 @@ export const updateCampaignHandler = async (req: Request, res: Response) => {
   res.json({ data: campaign, message: "Cập nhật chiến dịch thành công" });
 };
 
+/** Soft delete */
 export const deleteCampaignHandler = async (req: Request, res: Response) => {
-  await campaignService.deleteCampaign(req.params.id);
-  res.json({ message: "Xóa chiến dịch thành công" });
+  const deletedBy = getActorId(req);
+  await campaignService.deleteCampaign(req.params.id, deletedBy);
+  res.json({ message: "Chuyển chiến dịch vào thùng rác thành công" });
+};
+
+/** Bulk soft delete */
+export const bulkDeleteCampaignsHandler = async (req: Request, res: Response) => {
+  const input = bulkDeleteCampaignsSchema.parse(req.body);
+  const deletedBy = getActorId(req);
+  const result = await campaignService.bulkDeleteCampaigns(input, deletedBy);
+  res.json({ data: result, message: `Đã chuyển ${result.count} chiến dịch vào thùng rác` });
+};
+
+/** Thùng rác */
+export const getDeletedCampaignsHandler = async (req: Request, res: Response) => {
+  const campaigns = await campaignService.getDeletedCampaigns();
+  res.json({ data: campaigns, message: "Lấy danh sách chiến dịch đã xoá thành công" });
+};
+
+/** Khôi phục */
+export const restoreCampaignHandler = async (req: Request, res: Response) => {
+  const campaign = await campaignService.restoreCampaign(req.params.id);
+  res.json({ data: campaign, message: "Khôi phục chiến dịch thành công" });
+};
+
+/** Xoá vĩnh viễn */
+export const hardDeleteCampaignHandler = async (req: Request, res: Response) => {
+  await campaignService.hardDeleteCampaign(req.params.id);
+  res.json({ message: "Xoá vĩnh viễn chiến dịch thành công" });
 };
 
 // ── Admin — Campaign Categories ───────────────────────────────────────────────

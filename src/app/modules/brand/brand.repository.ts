@@ -33,9 +33,11 @@ const selectAdmin = {
 
 const buildBrandWhere = (query: ListBrandsQuery, onlyActive: boolean, isAdmin: boolean): Prisma.brandsWhereInput => {
   const where: Prisma.brandsWhereInput = {};
+  console.log(query);
+  console.log(onlyActive);
+  console.log(isAdmin);
 
-  // Soft delete filter: public/staff chỉ thấy brand chưa xóa
-  // Admin + includeDeleted=true: thấy tất cả kể cả đã xóa
+  // Soft delete filter
   if (!isAdmin || !query.includeDeleted) {
     where.deletedAt = null;
   }
@@ -52,6 +54,17 @@ const buildBrandWhere = (query: ListBrandsQuery, onlyActive: boolean, isAdmin: b
 
   if (query.isFeatured !== undefined) {
     where.isFeatured = query.isFeatured;
+  }
+
+  // Date range — filter theo createdAt
+  if (query.dateFrom || query.dateTo) {
+    where.createdAt = {
+      ...(query.dateFrom && { gte: query.dateFrom }),
+      // dateTo: lấy đến hết ngày đó (23:59:59)
+      ...(query.dateTo && {
+        lte: new Date(new Date(query.dateTo).setHours(23, 59, 59, 999)),
+      }),
+    };
   }
 
   return where;
@@ -90,15 +103,25 @@ export const checkNameExists = async (name: string, excludeId?: string): Promise
 };
 
 export const findAllPublic = async (query: ListBrandsQuery) => {
+  const { page = 1, limit = 20 } = query;
+  const skip = (page - 1) * limit;
   const where = buildBrandWhere(query, true, false);
   const orderBy = buildBrandOrderBy(query);
-  return prisma.brands.findMany({ where, orderBy, select: selectPublic });
+
+  const [data, total] = await prisma.$transaction([prisma.brands.findMany({ where, orderBy, select: selectPublic, skip, take: limit }), prisma.brands.count({ where })]);
+
+  return { data, page, limit, total, totalPages: Math.ceil(total / limit) };
 };
 
 export const findAllAdmin = async (query: ListBrandsQuery) => {
+  const { page = 1, limit = 20 } = query;
+  const skip = (page - 1) * limit;
   const where = buildBrandWhere(query, false, true);
   const orderBy = buildBrandOrderBy(query);
-  return prisma.brands.findMany({ where, orderBy, select: selectAdmin });
+
+  const [data, total] = await prisma.$transaction([prisma.brands.findMany({ where, orderBy, select: selectAdmin, skip, take: limit }), prisma.brands.count({ where })]);
+
+  return { data, page, limit, total, totalPages: Math.ceil(total / limit) };
 };
 
 export const getActiveBrands = async () => {
@@ -187,7 +210,6 @@ export const update = async (id: string, data: UpdateBrandInput & { slug?: strin
 };
 
 // Soft delete — Admin only
-// Brand bị soft delete sẽ không hiện ở public, không tính name/slug collision
 export const softDelete = async (id: string, deletedById: string) => {
   return prisma.brands.update({
     where: { id, deletedAt: null },
@@ -209,7 +231,6 @@ export const restore = async (id: string) => {
 };
 
 // Hard delete — Admin only, CHỈ sau khi đã soft delete
-// Không xóa ảnh Cloudinary ở đây — service xử lý trước khi gọi
 export const hardDelete = async (id: string) => {
   return prisma.brands.delete({ where: { id } });
 };
