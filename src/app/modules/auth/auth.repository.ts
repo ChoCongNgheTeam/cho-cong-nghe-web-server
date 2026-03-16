@@ -173,7 +173,7 @@ export const findUserById = (id: string) => {
   return prisma.users.findUnique({ where: { id } });
 };
 
-export const createUserFromOAuth = async (data: { email: string; fullName: string; avatarImage?: string | null; userName: string }): Promise<OAuthResolvedUser> => {
+export const createUserFromOAuth = async (data: { email: string; fullName: string; avatarImage?: string | null; userName: string; gender?: any; dateOfBirth?: Date | null; }): Promise<OAuthResolvedUser> => {
   return prisma.users.create({
     data: {
       ...data,

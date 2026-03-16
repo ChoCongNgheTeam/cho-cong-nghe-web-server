@@ -28,6 +28,7 @@ import blogRouters from "@/app/modules/blog/blog.route";
 import commentRoutes from "@/app/modules/comment/comment.route";
 import blogWithCommentsRoutes from "@/app/modules/blog-with-comments/blog-with-comments.routes";
 import imageMediaRouter from "@/app/modules/image-media/media.route";
+import pageRoutes from "@/app/modules/page/page.route";
 
 // ===== Upload & Home =====
 import uploadRoutes from "@/app/modules/upload/upload.route";
@@ -63,6 +64,7 @@ router.use("/blogs", blogRouters);
 router.use("/comments", commentRoutes);
 router.use("/blog-with-comments", blogWithCommentsRoutes);
 router.use("/media", imageMediaRouter);
+router.use("/pages", pageRoutes);
 
 // ===== Upload & Home =====
 router.use("/upload", uploadRoutes);
