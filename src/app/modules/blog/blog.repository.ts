@@ -1,6 +1,6 @@
 import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
-import { ListBlogsQuery } from "./blog.validation";
+import { ListBlogsQuery, ListDeletedBlogsQuery } from "./blog.validation";
 import { BlogStatus } from "./blog.types";
 
 //  Select Fields
@@ -40,10 +40,11 @@ const selectBlogDetail = {
 };
 
 /**
- * Admin — thêm soft delete metadata
+ * Admin — thêm updatedAt + soft delete metadata
  */
 const selectBlogAdmin = {
   ...selectBlogDetail,
+  updatedAt: true, // explicit để FE list admin có "cập nhật lần cuối"
   deletedAt: true,
   deletedBy: true,
 };
@@ -53,9 +54,7 @@ const selectBlogAdmin = {
 const buildBlogWhere = (query: ListBlogsQuery, onlyPublished: boolean, isAdmin: boolean): Prisma.blogsWhereInput => {
   const where: Prisma.blogsWhereInput = {};
 
-  // Soft delete filter:
-  // - Public & Staff: chỉ thấy blog chưa xóa
-  // - Admin + includeDeleted=true: thấy tất cả kể cả đã xóa
+  // Soft delete filter
   if (!isAdmin || !query.includeDeleted) {
     where.deletedAt = null;
   }
@@ -143,21 +142,17 @@ export const update = async (id: string, data: Prisma.blogsUpdateInput | any) =>
   return prisma.blogs.update({
     where: { id, deletedAt: null },
     data,
-    select: selectBlogDetail,
+    select: selectBlogAdmin, // trả về admin select để có đủ fields
   });
 };
 
 /**
  * Soft delete — Staff & Admin.
- * deletedBy: audit log — biết ai thực hiện
  */
 export const softDelete = async (id: string, deletedById: string) => {
   return prisma.blogs.update({
     where: { id, deletedAt: null },
-    data: {
-      deletedAt: new Date(),
-      deletedBy: deletedById,
-    },
+    data: { deletedAt: new Date(), deletedBy: deletedById },
   });
 };
 
@@ -173,9 +168,7 @@ export const restore = async (id: string) => {
 };
 
 /**
- * Hard delete — Admin only, CHỈ sau khi đã soft delete.
- * Không cần xóa comments thủ công vì comments dùng soft delete riêng,
- * nhưng nếu muốn dọn sạch thì soft delete comments luôn (xem service).
+ * Hard delete — Admin only
  */
 export const hardDelete = async (id: string) => {
   return prisma.blogs.delete({ where: { id } });
@@ -217,37 +210,73 @@ export const incrementViewCount = async (id: string) => {
 
 //  Utility
 
-/**
- * checkSlugExists loại trừ blog đã soft delete để tránh slug collision khi restore
- */
 export const checkSlugExists = async (slug: string, excludeId?: string) => {
   const blog = await prisma.blogs.findFirst({
     where: { slug, deletedAt: null },
     select: { id: true },
   });
-
   if (!blog) return false;
   if (excludeId && blog.id === excludeId) return false;
   return true;
 };
 
 /**
- * Lấy danh sách blog trong trash — Admin only
+ * Lấy danh sách blog trong trash — Admin only.
+ * Hỗ trợ search theo title để dễ tìm kiếm.
  */
-export const findAllDeleted = async (options: Pick<ListBlogsQuery, "page" | "limit">) => {
-  const { page = 1, limit = 20 } = options;
+export const findAllDeleted = async (query: ListDeletedBlogsQuery) => {
+  const { page = 1, limit = 20, search } = query;
   const skip = (page - 1) * limit;
+
+  const where: Prisma.blogsWhereInput = {
+    deletedAt: { not: null },
+    ...(search && {
+      OR: [{ title: { contains: search, mode: "insensitive" } }, { content: { contains: search, mode: "insensitive" } }],
+    }),
+  };
 
   const [data, total] = await prisma.$transaction([
     prisma.blogs.findMany({
-      where: { deletedAt: { not: null } },
+      where,
       select: selectBlogAdmin,
       orderBy: { deletedAt: "desc" },
       skip,
       take: limit,
     }),
-    prisma.blogs.count({ where: { deletedAt: { not: null } } }),
+    prisma.blogs.count({ where }),
   ]);
 
   return { data, page, limit, total, totalPages: Math.ceil(total / limit) };
+};
+
+/**
+ * Lấy danh sách tác giả đã có bài viết — dùng cho filter dropdown ở FE.
+ * Chỉ trả về users có ít nhất 1 blog chưa bị xóa.
+ */
+export const findBlogAuthors = async () => {
+  const authors = await prisma.users.findMany({
+    where: {
+      blogs: {
+        some: { deletedAt: null },
+      },
+    },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      avatarImage: true,
+      _count: {
+        select: { blogs: { where: { deletedAt: null } } },
+      },
+    },
+    orderBy: { fullName: "asc" },
+  });
+
+  return authors.map((a) => ({
+    id: a.id,
+    fullName: a.fullName ?? undefined,
+    email: a.email,
+    avatarImage: a.avatarImage ?? undefined,
+    blogCount: a._count.blogs,
+  }));
 };

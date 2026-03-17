@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import * as blogService from "./blog.service";
-import { ListBlogsQuery, listBlogsSchema } from "./blog.validation";
+import { ListBlogsQuery, listBlogsSchema, listDeletedBlogsSchema, createBlogSchema, updateBlogSchema } from "./blog.validation";
 import { parseMultipartData, uploadThumbnail } from "./blog.helpers";
 import { cleanupFile } from "@/services/file-cleanup.service";
 
@@ -51,6 +51,15 @@ export const getBlogDetailHandler = async (req: Request, res: Response) => {
   res.json({ data: blog, message: "Lấy chi tiết bài viết thành công" });
 };
 
+/**
+ * Lấy danh sách tác giả có bài viết — dùng cho filter dropdown FE.
+ * Staff & Admin đều dùng được.
+ */
+export const getBlogAuthorsHandler = async (req: Request, res: Response) => {
+  const authors = await blogService.getBlogAuthors();
+  res.json({ data: authors, message: "Lấy danh sách tác giả thành công" });
+};
+
 //  Staff & Admin: create, update
 
 export const createBlogHandler = async (req: Request, res: Response) => {
@@ -58,11 +67,15 @@ export const createBlogHandler = async (req: Request, res: Response) => {
 
   try {
     const parsedBody = parseMultipartData(req.body);
+
+    // Validate sau khi parse multipart — schema validate parsedBody thay vì req.body thô
+    const validated = createBlogSchema.parse(parsedBody);
+
     const authorId = req.user!.id;
     const thumbnail = file ? await uploadThumbnail(file) : null;
 
     const blog = await blogService.createBlog(authorId, {
-      ...parsedBody,
+      ...validated,
       ...(thumbnail && { imageUrl: thumbnail.url, imagePath: thumbnail.publicId }),
     });
 
@@ -77,10 +90,14 @@ export const updateBlogHandler = async (req: Request, res: Response) => {
 
   try {
     const parsedBody = parseMultipartData(req.body);
+
+    // Validate sau khi parse multipart — schema validate parsedBody thay vì req.body thô
+    const validated = updateBlogSchema.parse(parsedBody);
+
     const thumbnail = file ? await uploadThumbnail(file) : null;
 
     const blog = await blogService.updateBlog(req.params.id, {
-      ...parsedBody,
+      ...validated,
       ...(thumbnail && { imageUrl: thumbnail.url, imagePath: thumbnail.publicId }),
     });
 
@@ -92,10 +109,6 @@ export const updateBlogHandler = async (req: Request, res: Response) => {
 
 //  Staff & Admin: soft delete
 
-/**
- * Soft delete — Staff & Admin
- * Blog không cần phân biệt target role như user module
- */
 export const deleteBlogHandler = async (req: Request, res: Response) => {
   await blogService.softDeleteBlog(req.params.id, req.user!.id);
   res.json({ message: "Xóa bài viết thành công" });
@@ -125,10 +138,12 @@ export const hardDeleteBlogHandler = async (req: Request, res: Response) => {
   res.json({ message: "Xóa bài viết vĩnh viễn thành công" });
 };
 
+/**
+ * Thùng rác — dùng listDeletedBlogsSchema để hỗ trợ search
+ */
 export const getDeletedBlogsHandler = async (req: Request, res: Response) => {
-  const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 20;
-  const result = await blogService.getDeletedBlogs({ page, limit });
+  const query = listDeletedBlogsSchema.parse(req.query);
+  const result = await blogService.getDeletedBlogs(query);
 
   res.json({
     data: result.data,

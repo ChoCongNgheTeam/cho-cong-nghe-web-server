@@ -1,3 +1,4 @@
+import { moderateComment } from "./comment.moderation";
 import * as repo from "./comment.repository";
 import { transformComment, transformCommentsList } from "./comment.transformers";
 import { CreateCommentInput, UpdateCommentInput, ListCommentsQuery, CommentTargetType } from "./comment.validation";
@@ -38,7 +39,6 @@ export const getCommentReplies = async (parentId: string) => {
 };
 
 //  Authenticated user: tạo, tự xóa comment của mình
-
 export const createComment = async (userId: string, input: CreateCommentInput) => {
   const targetExists = await repo.validateTarget(input.targetType, input.targetId);
   if (!targetExists) throw new NotFoundError("Target");
@@ -50,8 +50,26 @@ export const createComment = async (userId: string, input: CreateCommentInput) =
     }
   }
 
+  // Lưu DB trước với isApproved = false
   const comment = await repo.create(userId, input);
-  return transformComment(comment);
+
+  // Chạy AI moderation
+  try {
+    const moderation = await moderateComment(input.content);
+
+    if (moderation.approved) {
+      // Pass → auto approve
+      const approved = await repo.update(comment.id, { isApproved: true });
+      return { comment: transformComment(approved), autoApproved: true };
+    } else {
+      // Reject → giữ isApproved = false, admin review sau
+      return { comment: transformComment(comment), autoApproved: false, reason: moderation.reason };
+    }
+  } catch (error) {
+    // AI fail → giữ isApproved = false, admin review sau (silent fail)
+    console.error("Moderation error:", error);
+    return { comment: transformComment(comment), autoApproved: false };
+  }
 };
 
 /**

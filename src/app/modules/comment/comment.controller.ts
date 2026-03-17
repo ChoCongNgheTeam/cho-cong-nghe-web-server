@@ -28,10 +28,12 @@ export const getCommentRepliesHandler = async (req: Request, res: Response) => {
 //  Authenticated user
 
 export const createCommentHandler = async (req: Request, res: Response) => {
-  const comment = await commentService.createComment(req.user!.id, req.body);
-  res.status(201).json({ data: comment, message: "Tạo comment thành công. Chờ duyệt." });
-};
+  const result = await commentService.createComment(req.user!.id, req.body);
 
+  const message = result.autoApproved ? "Bình luận của bạn đã được đăng." : "Bình luận của bạn đang chờ kiểm duyệt.";
+
+  res.status(201).json({ data: result.comment, message });
+};
 /**
  * User tự xóa comment của mình — soft delete, replies không bị kéo theo
  */
@@ -92,7 +94,7 @@ export const bulkApproveCommentsHandler = async (req: Request, res: Response) =>
  */
 export const deleteCommentHandler = async (req: Request, res: Response) => {
   await commentService.softDeleteComment(req.params.id, req.user!.id);
-  res.json({ message: "Xóa comment thành cong" });
+  res.json({ message: "Xóa comment thành công" });
 };
 
 export const bulkDeleteCommentsHandler = async (req: Request, res: Response) => {

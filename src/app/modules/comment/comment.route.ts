@@ -39,9 +39,9 @@ router.get("/:id/replies", validate(commentParamsSchema, "params"), asyncHandler
 //                              Replies KHÔNG bị kéo theo
 router.delete("/:id", authMiddleware(), validate(commentParamsSchema, "params"), asyncHandler(deleteOwnCommentHandler));
 
-//  Admin
-
 router.post("/", authMiddleware(), validate(createCommentSchema, "body"), asyncHandler(createCommentHandler));
+
+// Admin
 
 router.get("/admin/all", ...staffAdminAuth, validate(listCommentsSchema, "query"), asyncHandler(getCommentsAdminHandler));
 

@@ -227,11 +227,11 @@ export const transformProductDetail = (product: any, reviewStats?: ReviewStats):
     // Individual mode: FE chọn riêng từng attribute (color, storage...)
     const selectedOptions: Record<string, string> = {};
     for (const va of currentVariant.variantAttributes) {
-      console.log("va:", va);
-      console.log("attributeOption:", va.attributeOption);
-      console.log("attribute:", va.attributeOption?.attribute);
+      // console.log("va:", va);
+      // console.log("attributeOption:", va.attributeOption);
+      // console.log("attribute:", va.attributeOption?.attribute);
       const type = va.attributeOption.attribute.code;
-      console.log("type:", type);
+      // console.log("type:", type);
 
       selectedOptions[type] = va.attributeOption.value;
     }

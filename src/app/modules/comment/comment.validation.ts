@@ -17,6 +17,7 @@ export const listCommentsSchema = z.object({
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
   // Admin only: xem cả comment đã soft delete
   includeDeleted: z.coerce.boolean().optional().default(false),
+  search: z.string().optional(),
 });
 
 //  Params

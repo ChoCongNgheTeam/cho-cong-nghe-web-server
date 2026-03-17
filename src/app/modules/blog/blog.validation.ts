@@ -5,14 +5,21 @@ import { BlogStatus } from "./blog.types";
 
 export const listBlogsSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(50).default(12),
+  limit: z.coerce.number().int().positive().max(100).default(12), // tăng từ 50 → 100
   search: z.string().trim().optional(),
   status: z.enum(Object.values(BlogStatus) as [BlogStatus, ...BlogStatus[]]).optional(),
   authorId: z.string().uuid().optional(),
-  sortBy: z.enum(["createdAt", "publishedAt", "viewCount", "title"]).default("publishedAt"),
+  sortBy: z.enum(["createdAt", "publishedAt", "viewCount", "title", "updatedAt"]).default("publishedAt"),
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
   // Admin only: xem cả blog đã soft delete
   includeDeleted: z.coerce.boolean().optional().default(false),
+});
+
+/** Dùng riêng cho GET /admin/trash — hỗ trợ search + pagination */
+export const listDeletedBlogsSchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+  search: z.string().trim().optional(),
 });
 
 //  Params
@@ -65,6 +72,7 @@ export const bulkRestoreSchema = z.object({
 //  Types
 
 export type ListBlogsQuery = z.infer<typeof listBlogsSchema>;
+export type ListDeletedBlogsQuery = z.infer<typeof listDeletedBlogsSchema>;
 export type CreateBlogInput = z.infer<typeof createBlogSchema>;
 export type UpdateBlogInput = z.infer<typeof updateBlogSchema>;
 export { BlogStatus };

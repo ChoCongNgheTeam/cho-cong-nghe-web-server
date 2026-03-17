@@ -58,6 +58,13 @@ const buildCommentWhere = (query: ListCommentsQuery, onlyApproved: boolean, isAd
   if (query.targetId) where.targetId = query.targetId;
   if (query.parentId !== undefined) where.parentId = query.parentId;
 
+  if (query.search) {
+    where.content = {
+      contains: query.search,
+      mode: "insensitive",
+    };
+  }
+
   return where;
 };
 
