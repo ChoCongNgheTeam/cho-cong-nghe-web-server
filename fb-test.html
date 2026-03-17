@@ -1,47 +1,117 @@
+<!-- dùng http://localhost:5500/fb-test.html để chạy demo này -->
+
 <!doctype html>
-<html>
+<html lang="vi">
   <head>
-    <title>Facebook Login Test</title>
+    <meta charset="UTF-8" />
+    <title>Facebook Login & Logout Test</title>
   </head>
   <body>
-    <h2>Facebook Login Test</h2>
+    <h2>Facebook Login Test - DevOps</h2>
 
-    <button onclick="loginWithFacebook()">Login with Facebook</button>
+    <button onclick="loginWithFacebook()">Đăng nhập bằng Facebook</button>
+    
+    <button onclick="logout()">Đăng xuất</button>
 
     <script>
+      // 1. Khởi tạo SDK
       window.fbAsyncInit = function () {
         FB.init({
-          appId: "1570449574260701", // thay bằng App ID
+          appId: "1229067792620105", // App ID của bạn
           cookie: true,
           xfbml: true,
-          version: "v19.0",
+          version: "v25.0", // Dùng v25.0 để tránh lỗi không hỗ trợ version
         });
       };
 
+      // Tải SDK
       (function (d, s, id) {
-        var js,
-          fjs = d.getElementsByTagName(s)[0];
+        var js, fjs = d.getElementsByTagName(s)[0];
         if (d.getElementById(id)) return;
         js = d.createElement(s);
         js.id = id;
-        js.src = "https://connect.facebook.net/en_US/sdk.js";
+        js.src = "https://connect.facebook.net/vi_VN/sdk.js";
         fjs.parentNode.insertBefore(js, fjs);
       })(document, "script", "facebook-jssdk");
 
+      // 2. Hàm gọi Facebook Login
       function loginWithFacebook() {
         FB.login(
-          function (response) {
+          function (response) { 
             console.log("FULL RESPONSE:", response);
 
             if (response.authResponse) {
               const accessToken = response.authResponse.accessToken;
-              console.log("ACCESS TOKEN:", accessToken);
+              console.log("Đã có ACCESS TOKEN từ FB:", accessToken);
+              
+              sendTokenToBackend(accessToken);
             } else {
-              console.log("User cancelled login");
+              console.log("Người dùng đã hủy đăng nhập");
             }
           },
-          { scope: "public_profile,email" },
+          // Đã thêm quyền lấy ngày sinh và giới tính
+          { scope: "public_profile,email,user_birthday,user_gender" } 
         );
+      }
+
+      // 3. Hàm gửi Token xuống Backend
+      async function sendTokenToBackend(token) {
+        try {
+          const res = await fetch('http://localhost:5000/api/v1/auth/oauth/facebook', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            // Bắt buộc thêm dòng này để Backend set được Cookie Refresh Token
+            credentials: 'include',
+            body: JSON.stringify({ accessToken: token })
+          });
+
+          const data = await res.json();
+
+          if (res.ok) {
+            console.log("✅ LƯU DATABASE VÀ ĐĂNG NHẬP BE THÀNH CÔNG!", data);
+            alert("Xin chào: " + data.user.fullName);
+            localStorage.setItem("accessToken", data.accessToken);
+          } else {
+            console.error("❌ Lỗi từ Backend:", data);
+            alert("Lỗi Backend: " + data.message);
+          }
+        } catch (error) {
+          console.error("❌ Lỗi kết nối đến Backend:", error);
+        }
+      }
+
+      // 4. HÀM ĐĂNG XUẤT MỚI
+      async function logout() {
+        // Bước 4.1: Gọi API Backend để xóa Cookie và phiên Refresh Token
+        try {
+          const res = await fetch('http://localhost:5000/api/v1/auth/logout', {
+            method: 'POST',
+            // Bắt buộc phải có include để trình duyệt gửi Cookie cũ lên cho Backend xóa
+            credentials: 'include' 
+          });
+          const data = await res.json();
+          console.log("Phản hồi từ BE khi đăng xuất:", data);
+        } catch (error) {
+          console.error("Lỗi gọi API đăng xuất Backend:", error);
+        }
+
+        // Bước 4.2: Xóa Access Token của hệ thống lưu trong localStorage
+        localStorage.removeItem("accessToken");
+        console.log("Đã xóa Access Token trong Local Storage");
+
+        // Bước 4.3: Đăng xuất khỏi Facebook SDK
+        FB.getLoginStatus(function(response) {
+            if (response.status === 'connected') {
+                FB.logout(function(response) {
+                    console.log("Đã đăng xuất khỏi tài khoản Facebook");
+                    alert("Đã đăng xuất thành công toàn bộ hệ thống!");
+                });
+            } else {
+                alert("Bạn đã đăng xuất khỏi hệ thống rồi!");
+            }
+        });
       }
     </script>
   </body>

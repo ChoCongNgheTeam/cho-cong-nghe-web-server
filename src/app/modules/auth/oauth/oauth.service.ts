@@ -18,6 +18,8 @@ export interface OAuthUserProfile {
   accessToken?: string;
   refreshToken?: string;
   expiresAt?: Date;
+  gender?: string;
+  birthday?: string;
 }
 
 interface OAuthLoginMeta {
@@ -53,12 +55,37 @@ export const findOrCreateOAuthUser = async (provider: string, profile: OAuthUser
     if (existingUser) {
       user = existingUser;
     } else {
+      // 1. Map dữ liệu giới tính của Facebook
+      let mappedGender: any = null;
+      if (profile.gender) {
+        const fbGender = profile.gender.toLowerCase();
+        if (fbGender === "male") mappedGender = "MALE";
+        else if (fbGender === "female") mappedGender = "FEMALE";
+        else mappedGender = "OTHER";
+      }
+
+      // 2. Xử lý ngày sinh chuẩn hóa
+      let parsedDateOfBirth: Date | null = null;
+      if (profile.birthday) {
+        const parts = profile.birthday.split("/"); // FB Format: MM/DD/YYYY hoặc YYYY
+        if (parts.length === 3) {
+          const month = parseInt(parts[0], 10);
+          const day = parseInt(parts[1], 10);
+          const year = parseInt(parts[2], 10);
+          parsedDateOfBirth = new Date(Date.UTC(year, month - 1, day)); 
+        } else if (parts.length === 1 && parts[0].length === 4) {
+          const year = parseInt(parts[0], 10);
+          parsedDateOfBirth = new Date(Date.UTC(year, 0, 1)); 
+        }
+      }
       // Tạo user mới
       user = await createUserFromOAuth({
         email: profile.email,
         fullName: profile.fullName,
         avatarImage: profile.avatarImage ?? null,
         userName: generateUserName(profile.email),
+        gender: mappedGender, 
+        dateOfBirth: parsedDateOfBirth,
       });
     }
 
@@ -146,7 +173,8 @@ export const loginWithGoogle = async (idToken: string, meta?: OAuthLoginMeta) =>
 // ─── Facebook ─────────────────────────────────────────────────────────────────
 
 export const loginWithFacebook = async (accessToken: string, meta?: OAuthLoginMeta) => {
-  const fields = "id,name,email,picture.type(large)";
+  // Bổ sung birthday và gender vào fields
+  const fields = "id,name,email,picture.type(large),birthday,gender";
   const url = `https://graph.facebook.com/me?fields=${fields}&access_token=${accessToken}`;
 
   const response = await fetch(url);
@@ -155,17 +183,19 @@ export const loginWithFacebook = async (accessToken: string, meta?: OAuthLoginMe
   if (!response.ok || data.error) {
     throw new UnauthorizedError("Facebook token không hợp lệ");
   }
-
   if (!data.id) {
     throw new UnauthorizedError("Không lấy được thông tin từ Facebook");
   }
 
   const profile: OAuthUserProfile = {
     providerAccountId: data.id,
-    email: data.email ?? `fb_${data.id}@noemail.local`, // Facebook có thể không trả email
+    email: data.email ?? `fb_${data.id}@noemail.local`, 
     fullName: data.name ?? "Facebook User",
     avatarImage: data.picture?.data?.url,
     accessToken,
+    // Lấy thêm 2 trường từ Data trả về
+    gender: data.gender,
+    birthday: data.birthday,
   };
 
   return findOrCreateOAuthUser("facebook", profile, meta);

@@ -2,6 +2,7 @@ import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
 import { OrderQuery } from "./order.validation";
 
+// 1. CẬP NHẬT QUERY: Thêm brand, code, label và sắp xếp ảnh y hệt Cart
 export const orderSelect = {
   id: true,
   orderCode: true,
@@ -69,8 +70,16 @@ export const formatOrderResponse = (order: any) => {
     ...order,
     orderItems: order.orderItems.map((item: any) => {
       const colorAttr = item.productVariant.variantAttributes.find((attr: any) => {
+        const code = (attr.attributeOption.attribute?.code || "").toLowerCase();
         const name = (attr.attributeOption.attribute?.name || "").toLowerCase();
-        return ["color", "màu", "màu sắc"].includes(name);
+        return ["color", "màu", "màu sắc"].includes(code || name);
+      });
+
+      // Logic quét dung lượng y hệt Cart (nếu FE cần hiển thị)
+      const storageAttr = item.productVariant.variantAttributes.find((attr: any) => {
+        const code = (attr.attributeOption.attribute?.code || "").toLowerCase();
+        const name = (attr.attributeOption.attribute?.name || "").toLowerCase();
+        return ["storage", "dung lượng", "rom", "rom_capacity"].includes(code || name);
       });
 
       const colorValue = colorAttr?.attributeOption.value;
