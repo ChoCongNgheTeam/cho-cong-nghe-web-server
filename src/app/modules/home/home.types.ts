@@ -28,7 +28,7 @@ export interface FeaturedCategory {
   position: number;
 }
 
-// ============ NEW: Campaign Types ============
+// ============ Campaign Types ============
 
 export interface CampaignCategory {
   id: string;
@@ -57,6 +57,47 @@ export interface HomeCampaign {
   categories: CampaignCategory[];
 }
 
+// ============ Sale Schedule Types ============
+
+export interface SaleScheduleRule {
+  actionType: string;
+  discountValue: number | null;
+}
+
+export interface SaleSchedulePromotion {
+  id: string;
+  name: string;
+  description: string | null;
+  startDate: Date | null;
+  endDate: Date | null;
+  priority: number;
+  targetsCount: number;
+  rules: SaleScheduleRule[];
+}
+
+/** Một ô ngày trong lịch sale */
+export interface SaleScheduleDay {
+  date: string; // "2026-03-18"
+  isToday: boolean;
+  hasActiveSale: boolean;
+  promotions: SaleSchedulePromotion[];
+}
+
+/** Response của GET /home/sale-schedule */
+export interface HomeSaleScheduleResponse {
+  /** Lịch sale 7 ngày (từ hôm nay) */
+  schedule: SaleScheduleDay[];
+  /** Flash sale hôm nay — load sẵn để render tab đầu tiên không cần request thêm */
+  todayProducts: {
+    products: any[];
+    total: number;
+    date: Date;
+    startDate: Date | null;
+    endDate: Date | null;
+    promotions: Array<{ id: string; name: string; description: string | null; priority: number }>;
+  };
+}
+
 // ============ Home Response ============
 
 export interface HomeResponse {
@@ -70,8 +111,9 @@ export interface HomeResponse {
     startDate: Date | null;
     endDate: Date | null;
   };
+  /** Lịch sale 7 ngày kèm products hôm nay — dùng cho section Flash Sale */
+  saleSchedule: HomeSaleScheduleResponse;
   bannersSection1: HomeBanner[];
-  // NEW: Replace categoryRanking with activeCampaigns
   activeCampaigns: HomeCampaign[];
   featuredProducts: any[];
   bestSellingProducts: any[];

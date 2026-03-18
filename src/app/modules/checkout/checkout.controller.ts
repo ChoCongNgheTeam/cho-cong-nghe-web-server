@@ -68,9 +68,15 @@ export const checkoutHandler = async (req: Request, res: Response) => {
 
   // Generate orderCode sớm — dùng làm orderRef cho payment providers
   // để orderId trong Momo/VNPay/ZaloPay khớp với orderCode thực trong DB
-  const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, "");
-  const randomPart = Math.random().toString(36).substring(2, 7).toUpperCase();
-  const orderCode = `CCN-${datePart}-${randomPart}`;
+  const numberPart = Math.floor(Math.random() * 100)
+    .toString()
+    .padStart(2, "0");
+
+  const letterPart = Math.random().toString(36).substring(2, 4).toUpperCase();
+
+  const uuidPart = crypto.randomUUID().slice(0, 6).toUpperCase();
+
+  const orderCode = `CCN${numberPart}${letterPart}${uuidPart}`;
 
   // Bước 2: Build payment info — HTTP calls ra ngoài, TRƯỚC transaction
   // orderRef = orderCode thực (không phải REF-timestamp nữa)

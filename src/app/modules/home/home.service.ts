@@ -1,81 +1,107 @@
 import * as mediaService from "../image-media/media.service";
 import * as categoryService from "../category/category.service";
 import { campaignService } from "../campaign/campaign.service";
-import { getFlashSaleProductsWithPricing } from "../pricing/use-cases/getFlashSaleProductsWithPricing.service";
 import { getFeaturedProductsWithPricing } from "../pricing/use-cases/getFeaturedProductsWithPricing.service";
 import { getBestSellingProductsWithPricing } from "../pricing/use-cases/getBestSellingProductsWithPricing.service";
 import { getRecentlyViewedProductsWithPricing } from "../pricing/use-cases/getRecentlyViewedProductsWithPricing.service";
 import * as blogService from "../blog/blog.service";
 import { MediaPosition, CampaignType } from "@prisma/client";
-import { HomeResponse, HomeCampaign } from "./home.types";
+import { HomeResponse, HomeCampaign, HomeSaleScheduleResponse } from "./home.types";
+
+// Import service mới từ product module
+import { getSaleScheduleV2, getProductsOnSaleDate } from "../product/product.service";
+import { getVariantPricing } from "../pricing/pricing.service";
+import { mapPricingToSummary } from "../pricing/pricing.helpers";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRICING HELPER — dùng lại pattern của getFlashSaleProductsWithPricing
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Get active campaigns for home page
- * Only campaigns that are:
- * - isActive = true
- * - Not expired (if endDate is set, must be >= today)
- * - Not future (if startDate is set, must be <= today)
- * - Type is CAMPAIGN, SEASONAL, or EVENT (not RANKING)
+ * Enrich { card, pricingContext }[] với giá sale thực tế từ pricing engine.
+ * Tương tự getFlashSaleProductsWithPricing nhưng nhận raw items.
  */
+const enrichProductsWithPricing = async (items: Array<{ card: any; pricingContext: any }>, userId?: string): Promise<any[]> => {
+  return Promise.all(
+    items.map(async ({ card, pricingContext }) => {
+      if (!pricingContext) return { ...card, price: null };
+      const pricing = await getVariantPricing(pricingContext.productId, pricingContext.variantId, pricingContext.price, pricingContext.brandId, pricingContext.categoryPath, userId);
+      return { ...card, price: mapPricingToSummary(pricing) };
+    }),
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INTERNAL HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
 const getActiveHomeCampaigns = async (): Promise<HomeCampaign[]> => {
   const today = new Date();
-  today.setHours(0, 0, 0, 0); // Start of day
+  today.setHours(0, 0, 0, 0);
 
-  // Get all active campaigns (CAMPAIGN, SEASONAL, EVENT only)
   const allCampaigns = await Promise.all([
     campaignService.getActiveCampaigns(CampaignType.CAMPAIGN),
     campaignService.getActiveCampaigns(CampaignType.SEASONAL),
     campaignService.getActiveCampaigns(CampaignType.EVENT),
   ]);
 
-  // console.log(allCampaigns);
-
-  // Flatten and filter by date
   const campaigns = allCampaigns.flat().filter((campaign) => {
-    // Check if campaign is within valid date range
     const isNotExpired = !campaign.endDate || new Date(campaign.endDate) >= today;
     const isNotFuture = !campaign.startDate || new Date(campaign.startDate) <= today;
-
     return isNotExpired && isNotFuture;
   });
 
-  // console.log(campaigns);
-
-  // Get full campaign details with categories
   const campaignsWithCategories = await Promise.all(campaigns.map((campaign) => campaignService.getCampaignBySlug(campaign.slug)));
-  // console.log(campaignsWithCategories);
 
-  // Filter out campaigns with no categories
   return campaignsWithCategories.filter((campaign) => campaign.categories && campaign.categories.length > 0);
 };
+
+/**
+ * getSaleScheduleForHome
+ *
+ * Lấy lịch sale 7 ngày từ hôm nay + products flash sale hôm nay.
+ * Gọi parallel để không block homepage load.
+ */
+const getSaleScheduleForHome = async (userId?: string): Promise<HomeSaleScheduleResponse> => {
+  const today = new Date();
+  const endDate = new Date(today.getTime() + 6 * 24 * 60 * 60 * 1000); // +6 ngày = 7 ngày tổng
+
+  // Parallel: lịch 7 ngày + products hôm nay
+  const [schedule, todayResult] = await Promise.all([getSaleScheduleV2(today, endDate), getProductsOnSaleDate(today, { limit: 12 })]);
+
+  // Enrich pricing — giá sale thực tế (giảm 15%, 10%...) thay vì giá gốc
+  const todayProductsEnriched = await enrichProductsWithPricing(todayResult.data, userId);
+
+  return {
+    schedule,
+    todayProducts: {
+      products: todayProductsEnriched,
+      total: todayResult.total,
+      date: todayResult.date as unknown as Date,
+      startDate: null,
+      endDate: null,
+      promotions: todayResult.promotions,
+    },
+  };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLIC SERVICES
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const getHomePageData = async (userId?: string): Promise<HomeResponse> => {
   const today = new Date();
 
-  // Parallel queries to optimize performance
-  const [allMedia, featuredCategories, flashSaleResult, activeCampaigns, featuredProducts, bestSellingProducts, blogs] = await Promise.all([
+  const [allMedia, featuredCategories, saleSchedule, activeCampaigns, featuredProducts, bestSellingProducts, blogs] = await Promise.all([
     mediaService.getAllActiveMedia(),
-
     categoryService.getFeaturedCategories(12),
-
-    getFlashSaleProductsWithPricing(today, { limit: 12 }, userId),
-
-    // NEW: Get active campaigns instead of category ranking
+    getSaleScheduleForHome(userId), // lấy cả lịch + today products (có pricing)
     getActiveHomeCampaigns(),
-
     getFeaturedProductsWithPricing(12, userId),
-
     getBestSellingProductsWithPricing(12, userId),
-
-    blogService.getBlogsPublic({
-      page: 1,
-      limit: 7,
-      sortBy: "publishedAt",
-      sortOrder: "desc",
-    }),
+    blogService.getBlogsPublic({ page: 1, limit: 7, sortBy: "publishedAt", sortOrder: "desc" }),
   ]);
 
-  // Extract media by position
   const sliders = allMedia[MediaPosition.HOME_TOP] || [];
   const bannersTop = allMedia[MediaPosition.BELOW_SLIDER] || [];
   const bannersSection1 = allMedia[MediaPosition.HOME_SECTION_1] || [];
@@ -84,15 +110,16 @@ export const getHomePageData = async (userId?: string): Promise<HomeResponse> =>
     sliders,
     featuredCategories,
     bannersTop,
-    flashSaleProducts: {
-      products: flashSaleResult.data,
-      total: flashSaleResult.total,
-      date: flashSaleResult.date,
-      startDate: flashSaleResult.startDate,
-      endDate: flashSaleResult.endDate,
-    },
+    // Reuse từ saleSchedule — không query riêng tránh trùng lặp
+    // flashSaleProducts: {
+    //   products: saleSchedule.todayProducts.products,
+    //   total: saleSchedule.todayProducts.total,
+    //   date: saleSchedule.todayProducts.date,
+    //   startDate: saleSchedule.todayProducts.startDate,
+    //   endDate: saleSchedule.todayProducts.endDate,
+    // },
+    saleSchedule,
     bannersSection1,
-    // NEW: Active campaigns with categories
     activeCampaigns,
     featuredProducts,
     bestSellingProducts,
@@ -101,13 +128,39 @@ export const getHomePageData = async (userId?: string): Promise<HomeResponse> =>
 };
 
 /**
- * Optional: Get specific section data
- * Used for lazy loading or refreshing individual sections
+ * getSaleScheduleSection
+ *
+ * Endpoint riêng cho FE fetch khi cần refresh lịch sale
+ * mà không reload toàn bộ homepage.
  */
-export const getFlashSaleSection = async (userId?: string, date?: Date) => {
-  const saleDate = date || new Date();
-  return getFlashSaleProductsWithPricing(saleDate, { limit: 20 }, userId);
+export const getSaleScheduleSection = async (): Promise<HomeSaleScheduleResponse> => {
+  return getSaleScheduleForHome();
 };
+
+/**
+ * getProductsByDateSection
+ *
+ * FE gọi khi user click vào 1 tab ngày trong Flash Sale section.
+ * promotionId optional — filter products của 1 promotion cụ thể.
+ */
+export const getProductsByDateSection = async (date: Date, options: { promotionId?: string; page?: number; limit?: number } = {}, userId?: string) => {
+  const result = await getProductsOnSaleDate(date, { ...options, limit: options.limit ?? 20 });
+
+  // Enrich pricing cho từng sản phẩm
+  const productsEnriched = await enrichProductsWithPricing(result.data, userId);
+
+  return {
+    ...result,
+    data: productsEnriched,
+  };
+};
+
+// ── Giữ nguyên các section handlers cũ ──────────────────────────────────────
+
+// export const getFlashSaleSection = async (userId?: string, date?: Date) => {
+//   const saleDate = date || new Date();
+//   return getFlashSaleProductsWithPricing(saleDate, { limit: 20 }, userId);
+// };
 
 export const getBestSellingSection = async (userId?: string, limit: number = 12) => {
   return getBestSellingProductsWithPricing(limit, userId);
@@ -117,10 +170,6 @@ export const getRecentlyViewedSection = async (productIds: string[], userId?: st
   return getRecentlyViewedProductsWithPricing(productIds, userId);
 };
 
-/**
- * NEW: Get active campaigns section only
- * Can be used to refresh campaigns without reloading entire page
- */
 export const getActiveCampaignsSection = async () => {
   return getActiveHomeCampaigns();
 };

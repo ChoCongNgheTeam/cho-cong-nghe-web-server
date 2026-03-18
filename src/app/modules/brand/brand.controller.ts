@@ -39,7 +39,13 @@ export const getBrandsAdminHandler = async (req: Request, res: Response) => {
   const result = await brandService.getBrandsAdmin(query);
   res.json({
     data: result.data,
-    meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
+    meta: {
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      totalPages: result.totalPages,
+      activeCounts: result.activeCounts,
+    },
     message: "Lấy danh sách thương hiệu thành công",
   });
 };

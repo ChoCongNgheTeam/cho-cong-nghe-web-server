@@ -49,11 +49,7 @@ const selectVariantAttribute = {
       value: true,
       label: true,
       attribute: {
-        select: {
-          id: true,
-          code: true,
-          name: true,
-        },
+        select: { id: true, code: true, name: true },
       },
     },
   },
@@ -210,6 +206,20 @@ export const buildAdminProductWhere = (query: Record<string, any>): Prisma.produ
     where.OR = [{ name: { contains: query.search, mode: "insensitive" } }, { slug: { contains: query.search, mode: "insensitive" } }, { description: { contains: query.search, mode: "insensitive" } }];
   }
 
+  if (query.inStock !== undefined) {
+    where.variants = query.inStock
+      ? {
+          some: {
+            quantity: { gt: 0 },
+          },
+        }
+      : {
+          every: {
+            quantity: { lte: 0 },
+          },
+        };
+  }
+
   if (query.brandId) {
     where.brandId = Array.isArray(query.brandId) ? { in: query.brandId } : query.brandId;
   }
@@ -304,17 +314,63 @@ export const findAllPublic = async (query: ListProductsQuery) => findAll(query, 
  * Admin product list — hỗ trợ search, filter, includeDeleted, dateFrom/dateTo
  */
 export const findAllAdmin = async (query: Record<string, any>) => {
+  console.log(query);
+
   const { page = 1, limit = 20, sortBy = "createdAt", sortOrder = "desc" } = query;
   const skip = (page - 1) * limit;
 
   const where = buildAdminProductWhere(query);
   const orderBy = buildOrderBy(sortBy, sortOrder);
 
-  const [data, total] = await Promise.all([prisma.products.findMany({ where, select: selectProductCardAdmin, orderBy, skip, take: limit }), prisma.products.count({ where })]);
+  // Base where không filter theo tab — dùng để đếm statusCounts
+  const baseWhere = buildAdminProductWhere({
+    ...query,
+    isActive: undefined,
+    isFeatured: undefined,
+    inStock: undefined,
+  });
 
-  return { data, page, limit, total, totalPages: Math.ceil(total / limit) };
+  const [data, total, countAll, countActive, countInactive, countFeatured, countOutOfStock] = await Promise.all([
+    prisma.products.findMany({ where, select: selectProductCardAdmin, orderBy, skip, take: limit }),
+    prisma.products.count({ where }),
+    prisma.products.count({ where: baseWhere }),
+    prisma.products.count({ where: { ...baseWhere, isActive: true } }),
+    prisma.products.count({ where: { ...baseWhere, isActive: false } }),
+    prisma.products.count({ where: { ...baseWhere, isFeatured: true } }),
+    // outOfStock — đếm qua variants
+    prisma.products.count({
+      where: {
+        ...baseWhere,
+        AND: [
+          {
+            variants: {
+              some: {}, // phải có ít nhất 1 variant
+            },
+          },
+          {
+            variants: {
+              every: {
+                quantity: {
+                  lte: 0,
+                },
+              },
+            },
+          },
+        ],
+      },
+    }),
+  ]);
+
+  const statusCounts = {
+    ALL: countAll,
+    active: countActive,
+    inactive: countInactive,
+    featured: countFeatured,
+    outOfStock: countOutOfStock,
+  };
+
+  return { data, page, limit, total, totalPages: Math.ceil(total / limit), statusCounts };
 };
-
 /**
  * Admin trash — chỉ lấy sản phẩm đã bị soft-delete
  */
@@ -568,13 +624,46 @@ export const create = async (data: any) => {
 export const update = async (id: string, data: any) => {
   const { specifications, variants, colorImages, ...updateData } = data;
 
-  if (colorImages !== undefined) {
-    await prisma.product_color_images.deleteMany({ where: { productId: id } });
-    if (colorImages.length > 0) {
-      await createColorImages(id, colorImages);
+  // ── Color images — per-color, không xóa màu không được đề cập ────────────
+  if (colorImages !== undefined && colorImages.length > 0) {
+    for (const ci of colorImages) {
+      const color: string = ci.color;
+
+      // 1. Xóa các ảnh được đánh dấu xóa (deleteImageIds từ FE)
+      const toDelete: string[] = ci.deleteImageIds ?? [];
+      if (toDelete.length > 0) {
+        await prisma.product_color_images.deleteMany({
+          where: { id: { in: toDelete }, productId: id },
+        });
+      }
+
+      // 2. Nếu có ảnh mới được upload (imagePath/imageUrl có trong ci) → append
+      //    Controller đã uploadColorImages và truyền xuống dưới dạng:
+      //    [{ color, imagePath, imageUrl, altText, position }]
+      //    Chỉ tạo record mới nếu có imagePath (tức là có file được upload)
+      if (ci.imagePath) {
+        // Tính position tiếp theo cho màu này
+        const maxPos = await prisma.product_color_images.aggregate({
+          where: { productId: id, color },
+          _max: { position: true },
+        });
+        const nextPosition = (maxPos._max.position ?? -1) + 1;
+
+        await prisma.product_color_images.create({
+          data: {
+            productId: id,
+            color,
+            imagePath: ci.imagePath,
+            imageUrl: ci.imageUrl ?? null,
+            altText: ci.altText ?? color,
+            position: ci.position ?? nextPosition,
+          },
+        });
+      }
     }
   }
 
+  // ── Specifications ────────────────────────────────────────────────────────
   if (specifications !== undefined) {
     await prisma.product_specifications.deleteMany({ where: { productId: id } });
     if (specifications.length > 0) {
@@ -590,6 +679,7 @@ export const update = async (id: string, data: any) => {
     }
   }
 
+  // ── Variants ──────────────────────────────────────────────────────────────
   if (variants !== undefined) {
     const existingVariants = await prisma.products_variants.findMany({
       where: { productId: id, deletedAt: null },
@@ -598,15 +688,11 @@ export const update = async (id: string, data: any) => {
 
     const existingIds = existingVariants.map((v) => v.id);
     const updateIds = variants.filter((v: any) => v.id).map((v: any) => v.id);
-    const toDelete = existingIds.filter((vid) => !updateIds.includes(vid));
+    const toDeleteIds = existingIds.filter((vid) => !updateIds.includes(vid));
 
-    if (toDelete.length > 0) {
-      await prisma.variants_attributes.deleteMany({
-        where: { productVariantId: { in: toDelete } },
-      });
-      await prisma.products_variants.deleteMany({
-        where: { id: { in: toDelete } },
-      });
+    if (toDeleteIds.length > 0) {
+      await prisma.variants_attributes.deleteMany({ where: { productVariantId: { in: toDeleteIds } } });
+      await prisma.products_variants.deleteMany({ where: { id: { in: toDeleteIds } } });
     }
 
     for (const variant of variants) {
@@ -624,9 +710,7 @@ export const update = async (id: string, data: any) => {
             ...(variant.variantAttributes && {
               variantAttributes: {
                 deleteMany: {},
-                create: variant.variantAttributes.map((attr: any) => ({
-                  attributeOptionId: attr.attributeOptionId,
-                })),
+                create: variant.variantAttributes.map((attr: any) => ({ attributeOptionId: attr.attributeOptionId })),
               },
             }),
           },
@@ -641,10 +725,7 @@ export const update = async (id: string, data: any) => {
             isDefault: variant.isDefault || false,
             isActive: variant.isActive ?? true,
             variantAttributes: {
-              create:
-                variant.variantAttributes?.map((attr: any) => ({
-                  attributeOptionId: attr.attributeOptionId,
-                })) || [],
+              create: variant.variantAttributes?.map((attr: any) => ({ attributeOptionId: attr.attributeOptionId })) || [],
             },
           },
         });
@@ -723,6 +804,14 @@ export const getColorImagesByProductId = async (productId: string) => {
   return prisma.product_color_images.findMany({
     where: { productId },
     select: { id: true, imageUrl: true, imagePath: true },
+  });
+};
+
+export const getColorImagesByIds = async (ids: string[]) => {
+  if (!ids.length) return [];
+  return prisma.product_color_images.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, imageUrl: true, imagePath: true, color: true },
   });
 };
 
@@ -1292,5 +1381,620 @@ export const findCategoriesWithSaleProducts = async (date: Date) => {
       _count: { select: { products: true } },
     },
     orderBy: { position: "asc" },
+  });
+};
+
+/**
+ * product.repository.additions.ts
+ *
+ * Các hàm repository bổ sung cho:
+ *   1. Search suggestions (trending by viewsCount)
+ *   2. Sale schedule — trả về products theo ngày cụ thể
+ *   3. Product comparison — so sánh tối đa 4 sản phẩm cùng category
+ *   4. Admin stats — tổng quan dashboard
+ *
+ * CÁCH DÙNG: Paste/import vào product.repository.ts hiện tại
+ */
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SELECT FRAGMENTS (copy từ product.repository.ts để dùng nội bộ)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const selectVariantMinimal = {
+  id: true,
+  code: true,
+  price: true,
+  quantity: true,
+  soldCount: true,
+  isDefault: true,
+  isActive: true,
+  variantAttributes: { select: selectVariantAttribute },
+};
+
+const selectColorImageMinimal = {
+  id: true,
+  color: true,
+  imageUrl: true,
+  altText: true,
+  position: true,
+};
+
+// Dùng cho card sản phẩm trong comparison & sale schedule
+const selectProductCardBase = {
+  id: true,
+  name: true,
+  slug: true,
+  viewsCount: true,
+  ratingAverage: true,
+  ratingCount: true,
+  isFeatured: true,
+  isActive: true,
+  totalSoldCount: true,
+  variantDisplay: true,
+  createdAt: true,
+  brand: { select: { id: true, name: true, slug: true } },
+  category: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      parent: {
+        select: {
+          id: true,
+          slug: true,
+          parent: { select: { id: true, slug: true } },
+        },
+      },
+    },
+  },
+  img: {
+    select: selectColorImageMinimal,
+    orderBy: [{ color: "asc" as const }, { position: "asc" as const }],
+    take: 1,
+  },
+  variants: {
+    where: { isActive: true, deletedAt: null },
+    select: selectVariantMinimal,
+    orderBy: { isDefault: "desc" as const },
+  },
+  productSpecifications: {
+    where: { isHighlight: true },
+    orderBy: { sortOrder: "asc" as const },
+    select: {
+      specificationId: true,
+      sortOrder: true,
+      value: true,
+      isHighlight: true,
+      specification: {
+        select: { id: true, key: true, group: true, name: true, icon: true, unit: true },
+      },
+    },
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. SEARCH SUGGESTIONS — top trending by viewsCount
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * findTrendingSearchSuggestions
+ *
+ * Trả về danh sách tên sản phẩm phổ biến dùng cho input search dropdown.
+ * Sắp xếp theo viewsCount DESC để ưu tiên sản phẩm được xem nhiều nhất.
+ *
+ * Khác với findSearchSuggestions (text-match), hàm này trả về top trending
+ * khi q rỗng (user vừa focus vào ô tìm kiếm chưa gõ gì).
+ * Khi q có nội dung → filter ILIKE + sort viewsCount.
+ */
+export const findTrendingSearchSuggestions = async (
+  q: string,
+  options: {
+    limit?: number;
+    categorySlug?: string;
+  } = {},
+): Promise<
+  Array<{
+    id: string;
+    name: string;
+    slug: string;
+    thumbnail: string | null;
+    viewsCount: number;
+    priceOrigin: number;
+    isTrending: boolean;
+  }>
+> => {
+  const limit = Math.min(options.limit ?? 8, 20);
+
+  // Resolve categoryId từ slug nếu có
+  let categoryIds: string[] | undefined;
+  if (options.categorySlug) {
+    const rows = await prisma.$queryRaw<{ id: string }[]>`
+      WITH RECURSIVE subcategories AS (
+        SELECT id FROM categories WHERE slug = ${options.categorySlug} AND "deletedAt" IS NULL
+        UNION ALL
+        SELECT c.id FROM categories c JOIN subcategories sc ON c."parentId" = sc.id
+        WHERE c."deletedAt" IS NULL
+      )
+      SELECT id FROM subcategories
+    `;
+    categoryIds = rows.map((r) => r.id);
+    if (categoryIds.length === 0) return [];
+  }
+
+  const products = await prisma.products.findMany({
+    where: {
+      isActive: true,
+      deletedAt: null,
+      ...(q.trim() ? { name: { contains: q.trim(), mode: "insensitive" } } : {}),
+      ...(categoryIds ? { categoryId: { in: categoryIds } } : {}),
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      viewsCount: true,
+      img: {
+        select: { imageUrl: true },
+        orderBy: [{ color: "asc" as const }, { position: "asc" as const }],
+        take: 1,
+      },
+      variants: {
+        where: { isActive: true, deletedAt: null, isDefault: true },
+        select: { price: true },
+        take: 1,
+      },
+    },
+    orderBy: [{ viewsCount: "desc" }, { totalSoldCount: "desc" }],
+    take: limit,
+  });
+
+  // Top 3 (hoặc top 30%) được đánh dấu trending
+  const trendingCutoff = Math.max(1, Math.ceil(products.length * 0.3));
+
+  return products.map((p, idx) => ({
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    thumbnail: p.img[0]?.imageUrl ?? null,
+    viewsCount: Number(p.viewsCount),
+    priceOrigin: p.variants[0] ? Number(p.variants[0].price) : 0,
+    isTrending: idx < trendingCutoff,
+  }));
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. SALE SCHEDULE — products theo ngày (hoặc date range)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * findSaleScheduleDays
+ *
+ * Trả về lịch sale dạng:
+ * [
+ *   { date: "2026-03-19", promotions: [...], isToday: false },
+ *   { date: "2026-03-20", promotions: [...], isToday: true },
+ * ]
+ * Chỉ lấy metadata promotion theo ngày, KHÔNG lấy products.
+ * FE dùng để render calendar — khi click vào ngày mới gọi findProductsOnSaleDate.
+ */
+export const findSaleScheduleDays = async (
+  startDate: Date,
+  endDate: Date,
+): Promise<
+  Array<{
+    date: string;
+    promotions: Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      startDate: Date | null;
+      endDate: Date | null;
+      priority: number;
+      targetsCount: number;
+      rules: Array<{
+        actionType: string;
+        discountValue: number | null;
+      }>;
+    }>;
+    isToday: boolean;
+    hasActiveSale: boolean;
+  }>
+> => {
+  const promotions = await prisma.promotions.findMany({
+    where: {
+      isActive: true,
+      deletedAt: null,
+      OR: [
+        // Promotions giao với khoảng [startDate, endDate]
+        {
+          AND: [{ OR: [{ startDate: null }, { startDate: { lte: endDate } }] }, { OR: [{ endDate: null }, { endDate: { gte: startDate } }] }],
+        },
+      ],
+    },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      startDate: true,
+      endDate: true,
+      priority: true,
+      _count: { select: { targets: true } },
+      rules: {
+        select: {
+          actionType: true,
+          discountValue: true,
+        },
+      },
+    },
+    orderBy: [{ priority: "desc" }, { startDate: "asc" }],
+  });
+
+  const scheduleMap = new Map<string, typeof promotions>();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Phân bổ promotions vào từng ngày trong range
+  for (const promo of promotions) {
+    const promoStart = promo.startDate ? new Date(promo.startDate) : startDate;
+    const promoEnd = promo.endDate ? new Date(promo.endDate) : endDate;
+
+    let cur = new Date(Math.max(promoStart.getTime(), startDate.getTime()));
+    cur.setHours(0, 0, 0, 0);
+    const last = new Date(Math.min(promoEnd.getTime(), endDate.getTime()));
+    last.setHours(0, 0, 0, 0);
+
+    while (cur <= last) {
+      const key = cur.toISOString().split("T")[0];
+      if (!scheduleMap.has(key)) scheduleMap.set(key, []);
+      const arr = scheduleMap.get(key)!;
+      if (!arr.some((p) => p.id === promo.id)) arr.push(promo);
+      cur = new Date(cur);
+      cur.setDate(cur.getDate() + 1);
+    }
+  }
+
+  return Array.from(scheduleMap.entries())
+    .map(([date, promos]) => {
+      const dateObj = new Date(date);
+      dateObj.setHours(0, 0, 0, 0);
+      return {
+        date,
+        isToday: dateObj.getTime() === today.getTime(),
+        hasActiveSale: promos.length > 0,
+        promotions: promos
+          .sort((a, b) => b.priority - a.priority)
+          .map((p) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            startDate: p.startDate,
+            endDate: p.endDate,
+            priority: p.priority,
+            targetsCount: p._count.targets,
+            rules: p.rules.map((r) => ({
+              actionType: r.actionType,
+              discountValue: r.discountValue ? Number(r.discountValue) : null,
+            })),
+          })),
+      };
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+};
+
+/**
+ * findProductsOnSaleDate
+ *
+ * Trả về products đang có promotion vào đúng ngày `date`.
+ * FE gọi khi click vào 1 ngày trên calendar.
+ *
+ * Hỗ trợ filter theo promotionId (khi ngày có nhiều promotion,
+ * FE có thể chọn xem sản phẩm của promotion cụ thể).
+ */
+export const findProductsOnSaleDate = async (
+  date: Date,
+  options: {
+    promotionId?: string;
+    limit?: number;
+    page?: number;
+    categoryId?: string;
+  } = {},
+): Promise<{
+  date: string;
+  promotions: Array<{ id: string; name: string; description: string | null; priority: number }>;
+  products: any[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}> => {
+  const limit = options.limit ?? 20;
+  const page = options.page ?? 1;
+  const skip = (page - 1) * limit;
+
+  const dateStart = new Date(date);
+  dateStart.setHours(0, 0, 0, 0);
+  const dateEnd = new Date(date);
+  dateEnd.setHours(23, 59, 59, 999);
+
+  // Tìm promotions active vào ngày đó
+  const promotionWhere: any = {
+    isActive: true,
+    deletedAt: null,
+    OR: [
+      {
+        AND: [{ OR: [{ startDate: null }, { startDate: { lte: dateEnd } }] }, { OR: [{ endDate: null }, { endDate: { gte: dateStart } }] }],
+      },
+    ],
+  };
+  if (options.promotionId) {
+    promotionWhere.id = options.promotionId;
+  }
+
+  const activePromotions = await prisma.promotions.findMany({
+    where: promotionWhere,
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      priority: true,
+      targets: {
+        select: { targetType: true, targetId: true },
+      },
+    },
+    orderBy: { priority: "desc" },
+  });
+
+  if (activePromotions.length === 0) {
+    return {
+      date: date.toISOString().split("T")[0],
+      promotions: [],
+      products: [],
+      total: 0,
+      page,
+      limit,
+      totalPages: 0,
+    };
+  }
+
+  // Thu thập product IDs, category IDs, brand IDs từ targets
+  const directProductIds = new Set<string>();
+  const categoryIds = new Set<string>();
+  const brandIds = new Set<string>();
+  let includeAll = false;
+
+  for (const promo of activePromotions) {
+    for (const target of promo.targets) {
+      if (target.targetType === "ALL") {
+        includeAll = true;
+        break;
+      }
+      if (target.targetType === "PRODUCT" && target.targetId) directProductIds.add(target.targetId);
+      if (target.targetType === "CATEGORY" && target.targetId) categoryIds.add(target.targetId);
+      if (target.targetType === "BRAND" && target.targetId) brandIds.add(target.targetId);
+    }
+    if (includeAll) break;
+  }
+
+  // Build product where
+  const productWhere: any = {
+    isActive: true,
+    deletedAt: null,
+    ...(options.categoryId ? { categoryId: options.categoryId } : {}),
+  };
+
+  if (!includeAll) {
+    const orConditions: any[] = [];
+    if (directProductIds.size > 0) orConditions.push({ id: { in: Array.from(directProductIds) } });
+    if (categoryIds.size > 0) orConditions.push({ categoryId: { in: Array.from(categoryIds) } });
+    if (brandIds.size > 0) orConditions.push({ brandId: { in: Array.from(brandIds) } });
+
+    if (orConditions.length === 0) {
+      return {
+        date: date.toISOString().split("T")[0],
+        promotions: activePromotions.map((p) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          priority: p.priority,
+        })),
+        products: [],
+        total: 0,
+        page,
+        limit,
+        totalPages: 0,
+      };
+    }
+
+    productWhere.OR = orConditions;
+  }
+
+  const [products, total] = await Promise.all([
+    prisma.products.findMany({
+      where: productWhere,
+      select: selectProductCardBase,
+      orderBy: [{ totalSoldCount: "desc" }, { viewsCount: "desc" }],
+      skip,
+      take: limit,
+    }),
+    prisma.products.count({ where: productWhere }),
+  ]);
+
+  return {
+    date: date.toISOString().split("T")[0],
+    promotions: activePromotions.map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      priority: p.priority,
+    })),
+    products,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. PRODUCT COMPARISON
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * findProductsForComparison
+ *
+ * Lấy đầy đủ specifications của tối đa 4 sản phẩm để so sánh.
+ * Yêu cầu tất cả sản phẩm phải cùng category — validate ở service layer.
+ *
+ * Response được normalize:
+ * - specMatrix: danh sách spec group + key, mỗi row có values[] tương ứng từng sản phẩm
+ *   (null nếu sản phẩm đó không có spec đó)
+ * - products: thông tin cơ bản mỗi sản phẩm
+ */
+export const findProductsForComparison = async (ids: string[]) => {
+  if (ids.length < 2 || ids.length > 4) {
+    throw new Error("Chỉ so sánh được 2-4 sản phẩm");
+  }
+
+  const products = await prisma.products.findMany({
+    where: {
+      id: { in: ids },
+      isActive: true,
+      deletedAt: null,
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      ratingAverage: true,
+      ratingCount: true,
+      totalSoldCount: true,
+      viewsCount: true,
+      isFeatured: true,
+      categoryId: true,
+      category: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          // Lấy spec definitions của category (để biết thứ tự và group)
+          categorySpecifications: {
+            orderBy: { sortOrder: "asc" as const },
+            select: {
+              groupName: true,
+              sortOrder: true,
+              specification: {
+                select: {
+                  id: true,
+                  key: true,
+                  name: true,
+                  icon: true,
+                  unit: true,
+                  group: true,
+                  sortOrder: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      brand: { select: { id: true, name: true, slug: true } },
+      img: {
+        select: selectColorImageMinimal,
+        orderBy: [{ color: "asc" as const }, { position: "asc" as const }],
+        take: 1,
+      },
+      variants: {
+        where: { isDefault: true, isActive: true, deletedAt: null },
+        select: {
+          id: true,
+          price: true,
+          quantity: true,
+          soldCount: true,
+          variantAttributes: { select: selectVariantAttribute },
+        },
+        take: 1,
+      },
+      productSpecifications: {
+        select: {
+          specificationId: true,
+          value: true,
+          isHighlight: true,
+          sortOrder: true,
+        },
+      },
+    },
+  });
+
+  return products;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. ADMIN STATS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * getAdminProductStats
+ *
+ * Dashboard overview: tổng sản phẩm, active/inactive, hết hàng, đã xóa.
+ * Dùng Promise.all để parallel queries.
+ */
+export const getAdminProductStats = async () => {
+  const [total, active, inactive, outOfStock, deleted, featured] = await Promise.all([
+    // Tổng (không tính đã xóa)
+    prisma.products.count({ where: { deletedAt: null } }),
+
+    // Đang hiển thị
+    prisma.products.count({ where: { deletedAt: null, isActive: true } }),
+
+    // Đang ẩn
+    prisma.products.count({ where: { deletedAt: null, isActive: false } }),
+
+    // Hết hàng (tất cả variants đều quantity <= 0)
+    prisma.products.count({
+      where: {
+        deletedAt: null,
+        isActive: true,
+        variants: {
+          every: { quantity: { lte: 0 }, deletedAt: null },
+        },
+      },
+    }),
+
+    // Đã xóa mềm
+    prisma.products.count({ where: { deletedAt: { not: null } } }),
+
+    // Nổi bật
+    prisma.products.count({ where: { deletedAt: null, isActive: true, isFeatured: true } }),
+  ]);
+
+  return { total, active, inactive, outOfStock, deleted, featured };
+};
+
+/**
+ * findActiveVariantsMatchingSelection
+ *
+ * Lọc variants theo selectedOptions (VD: { storage: "128gb" }).
+ * Chỉ trả về variants có TẤT CẢ các attributes trong selectedOptions khớp.
+ *
+ * Nếu selectedOptions rỗng → trả về tất cả active variants (backward compat).
+ */
+export const findActiveVariantsMatchingSelection = async (productId: string, selectedOptions: Record<string, string>) => {
+  const allVariants = await prisma.products_variants.findMany({
+    where: { productId, isActive: true, deletedAt: null },
+    select: selectVariant, // reuse select fragment có sẵn trong file
+    orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+  });
+
+  const selectedEntries = Object.entries(selectedOptions).filter(([, v]) => v?.trim());
+
+  // Không có selection → trả về tất cả (không break behavior cũ)
+  if (selectedEntries.length === 0) return allVariants;
+
+  return allVariants.filter((variant) => {
+    // Build map: attributeCode → value (lowercase để so sánh case-insensitive)
+    const attrMap = new Map(variant.variantAttributes.map((va) => [va.attributeOption.attribute.code, va.attributeOption.value.toLowerCase().trim()]));
+
+    // Variant phải khớp TẤT CẢ selected attributes
+    return selectedEntries.every(([code, value]) => attrMap.get(code) === value.toLowerCase().trim());
   });
 };

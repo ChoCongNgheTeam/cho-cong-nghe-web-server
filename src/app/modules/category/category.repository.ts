@@ -77,17 +77,41 @@ export const findAllPublic = async (query: ListCategoriesQuery) => {
 };
 
 export const findAllAdmin = async (query: ListCategoriesQuery) => {
+  const { page = 1, limit = 20 } = query;
+  const skip = (page - 1) * limit;
+
   const where = buildCategoryWhere(query, false, true);
   const orderBy = buildCategoryOrderBy(query);
 
-  return prisma.categories.findMany({
-    where,
-    orderBy,
-    select: {
-      ...selectCategoryAdmin,
-      _count: { select: { children: true } },
-    },
-  });
+  // baseWhere — không filter isActive/isFeatured để đếm statusCounts chính xác
+  const baseWhere = buildCategoryWhere({ ...query, isActive: undefined, isFeatured: undefined }, false, true);
+
+  const [data, total, countAll, countActive, countInactive, countFeatured] = await Promise.all([
+    prisma.categories.findMany({
+      where,
+      orderBy,
+      skip,
+      take: limit,
+      select: {
+        ...selectCategoryAdmin,
+        _count: { select: { children: true } },
+      },
+    }),
+    prisma.categories.count({ where }),
+    prisma.categories.count({ where: baseWhere }),
+    prisma.categories.count({ where: { ...baseWhere, isActive: true } }),
+    prisma.categories.count({ where: { ...baseWhere, isActive: false } }),
+    prisma.categories.count({ where: { ...baseWhere, isFeatured: true } }),
+  ]);
+
+  const statusCounts = {
+    ALL: countAll,
+    active: countActive,
+    inactive: countInactive,
+    featured: countFeatured,
+  };
+
+  return { data, page, limit, total, totalPages: Math.ceil(total / limit), statusCounts };
 };
 
 // findAll dùng cho dropdown/select — luôn loại deleted

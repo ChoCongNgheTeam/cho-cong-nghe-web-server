@@ -42,7 +42,13 @@ export const getAllOrdersAdminHandler = async (req: Request, res: Response) => {
   const result = await service.getAllOrdersAdmin(query);
   res.json({
     data: result.data,
-    meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
+    meta: {
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      totalPages: result.totalPages,
+      statusCounts: result.statusCounts,
+    },
     message: "Lấy danh sách đơn hàng thành công",
   });
 };

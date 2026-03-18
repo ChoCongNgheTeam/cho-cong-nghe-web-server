@@ -111,20 +111,72 @@ export const formatOrderResponse = (order: any) => {
 };
 
 export const findAllOrders = async (query: OrderQuery) => {
-  const { page = 1, limit = 20, search, status, paymentStatus } = query;
+  const { page = 1, limit = 20, search, status, paymentStatus, dateFrom, dateTo } = query;
+
   const skip = (page - 1) * limit;
-  const where: Prisma.ordersWhereInput = {};
 
-  if (status) where.orderStatus = status;
-  if (paymentStatus) where.paymentStatus = paymentStatus;
+  // ── Base filters (dùng chung) ──
+  const baseWhere: Prisma.ordersWhereInput = {
+    ...(paymentStatus && { paymentStatus }),
 
-  if (search) {
-    where.OR = [{ orderCode: { contains: search, mode: "insensitive" } }, { shippingPhone: { contains: search } }, { shippingContactName: { contains: search, mode: "insensitive" } }];
-  }
+    ...(search && {
+      OR: [{ orderCode: { contains: search, mode: "insensitive" } }, { shippingPhone: { contains: search } }, { shippingContactName: { contains: search, mode: "insensitive" } }],
+    }),
 
-  const [data, total] = await Promise.all([prisma.orders.findMany({ where, skip, take: limit, select: orderSelect, orderBy: { orderDate: "desc" } }), prisma.orders.count({ where })]);
+    ...((dateFrom || dateTo) && {
+      orderDate: {
+        ...(dateFrom && { gte: new Date(dateFrom) }),
+        ...(dateTo && { lte: new Date(dateTo) }),
+      },
+    }),
+  };
 
-  return { data: data.map(formatOrderResponse), page, limit, total, totalPages: Math.ceil(total / limit) };
+  // ── Where chính (có filter status) ──
+  const where: Prisma.ordersWhereInput = {
+    ...baseWhere,
+    ...(status && { orderStatus: status }),
+  };
+
+  const statusList = ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"] as const;
+
+  // ── Queries ──
+  const [orders, total, totalAll, ...statusCountsRaw] = await Promise.all([
+    prisma.orders.findMany({
+      where,
+      skip,
+      take: limit,
+      select: orderSelect,
+      orderBy: { orderDate: "desc" },
+    }),
+
+    // total theo filter hiện tại
+    prisma.orders.count({ where }),
+
+    // total ALL (không filter status)
+    prisma.orders.count({ where: baseWhere }),
+
+    // count từng status
+    ...statusList.map((s) =>
+      prisma.orders.count({
+        where: { ...baseWhere, orderStatus: s },
+      }),
+    ),
+  ]);
+
+  // ── Map statusCounts ──
+  const statusCounts = {
+    ALL: totalAll,
+    ...Object.fromEntries(statusList.map((s, i) => [s, statusCountsRaw[i]])),
+  };
+
+  return {
+    data: orders.map(formatOrderResponse),
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
+    statusCounts,
+  };
 };
 
 export const findOrdersByUserId = async (userId: string) => {

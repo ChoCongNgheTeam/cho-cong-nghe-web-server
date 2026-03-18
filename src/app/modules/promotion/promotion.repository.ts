@@ -6,7 +6,6 @@ import { ListPromotionsQuery, CreatePromotionInput, UpdatePromotionInput } from 
 // === SELECT OBJECTS ===
 // =====================
 
-// Select dùng cho public/listing — gọn nhẹ
 const selectPromotionCard = {
   id: true,
   name: true,
@@ -16,15 +15,10 @@ const selectPromotionCard = {
   startDate: true,
   endDate: true,
   createdAt: true,
-  rules: {
-    select: { id: true },
-  },
-  targets: {
-    select: { id: true },
-  },
+  rules: { select: { id: true } },
+  targets: { select: { id: true } },
 } satisfies Prisma.promotionsSelect;
 
-// Select dùng cho admin — thêm soft delete metadata + full fields
 const selectPromotionAdmin = {
   id: true,
   name: true,
@@ -59,7 +53,6 @@ const selectPromotionAdmin = {
   },
 } satisfies Prisma.promotionsSelect;
 
-// Select dùng cho detail — đầy đủ nhất (public detail)
 const selectPromotionDetail = {
   id: true,
   name: true,
@@ -99,7 +92,6 @@ const selectPromotionDetail = {
 const buildPromotionWhere = (query: ListPromotionsQuery, isAdmin: boolean): Prisma.promotionsWhereInput => {
   const where: Prisma.promotionsWhereInput = {};
 
-  // Soft delete filter
   if (!isAdmin || !query.includeDeleted) {
     where.deletedAt = null;
   }
@@ -117,21 +109,14 @@ const buildPromotionWhere = (query: ListPromotionsQuery, isAdmin: boolean): Pris
     if (query.isExpired) {
       where.endDate = { lt: now };
     } else {
-      where.AND = [
-        {
-          OR: [{ endDate: null }, { endDate: { gte: now } }],
-        },
-      ];
+      where.AND = [{ OR: [{ endDate: null }, { endDate: { gte: now } }] }];
     }
   }
 
-  // Date range — filter theo createdAt
   if (query.dateFrom || query.dateTo) {
     where.createdAt = {
       ...(query.dateFrom && { gte: query.dateFrom }),
-      ...(query.dateTo && {
-        lte: new Date(new Date(query.dateTo).setHours(23, 59, 59, 999)),
-      }),
+      ...(query.dateTo && { lte: new Date(new Date(query.dateTo).setHours(23, 59, 59, 999)) }),
     };
   }
 
@@ -163,9 +148,43 @@ export const findAllAdmin = async (query: ListPromotionsQuery) => {
   const where = buildPromotionWhere(query, true);
   const orderBy = buildPromotionOrderBy(query);
 
-  const [data, total] = await prisma.$transaction([prisma.promotions.findMany({ where, orderBy, select: selectPromotionAdmin, skip, take: limit }), prisma.promotions.count({ where })]);
+  const now = new Date();
+  const baseWhere: Prisma.promotionsWhereInput = { deletedAt: null };
 
-  return { data, page, limit, total, totalPages: Math.ceil(total / limit) };
+  const [data, total, activeCount, inactiveCount, expiredCount, upcomingCount] = await prisma.$transaction([
+    prisma.promotions.findMany({ where, orderBy, select: selectPromotionAdmin, skip, take: limit }),
+    prisma.promotions.count({ where }),
+    // active: isActive=true + chưa hết hạn + đã bắt đầu
+    prisma.promotions.count({
+      where: {
+        ...baseWhere,
+        isActive: true,
+        AND: [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }],
+      },
+    }),
+    // inactive: isActive=false
+    prisma.promotions.count({ where: { ...baseWhere, isActive: false } }),
+    // expired: endDate đã qua
+    prisma.promotions.count({ where: { ...baseWhere, endDate: { lt: now } } }),
+    // upcoming: isActive=true + startDate chưa tới
+    prisma.promotions.count({
+      where: {
+        ...baseWhere,
+        isActive: true,
+        startDate: { gt: now },
+      },
+    }),
+  ]);
+
+  const statusCounts = {
+    ALL: activeCount + inactiveCount,
+    active: activeCount,
+    inactive: inactiveCount,
+    expired: expiredCount,
+    upcoming: upcomingCount,
+  };
+
+  return { data, page, limit, total, totalPages: Math.ceil(total / limit), statusCounts };
 };
 
 export const findById = async (id: string, options: { includeDeleted?: boolean; isAdmin?: boolean } = {}) => {
@@ -195,7 +214,6 @@ export const checkPromotionName = async (name: string, excludeId?: string): Prom
 
 export const findActivePromotions = async () => {
   const now = new Date();
-
   return prisma.promotions.findMany({
     where: {
       isActive: true,
@@ -209,17 +227,12 @@ export const findActivePromotions = async () => {
 
 export const findActivePromotionsForProduct = async (productId: string) => {
   const now = new Date();
-
   return prisma.promotions.findMany({
     where: {
       isActive: true,
       deletedAt: null,
       AND: [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }],
-      targets: {
-        some: {
-          OR: [{ targetType: "ALL" }, { targetType: "PRODUCT", targetId: productId }],
-        },
-      },
+      targets: { some: { OR: [{ targetType: "ALL" }, { targetType: "PRODUCT", targetId: productId }] } },
     },
     select: selectPromotionDetail,
     orderBy: { priority: "asc" },
@@ -228,17 +241,12 @@ export const findActivePromotionsForProduct = async (productId: string) => {
 
 export const findActivePromotionsForCategory = async (categoryId: string) => {
   const now = new Date();
-
   return prisma.promotions.findMany({
     where: {
       isActive: true,
       deletedAt: null,
       AND: [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }],
-      targets: {
-        some: {
-          OR: [{ targetType: "ALL" }, { targetType: "CATEGORY", targetId: categoryId }],
-        },
-      },
+      targets: { some: { OR: [{ targetType: "ALL" }, { targetType: "CATEGORY", targetId: categoryId }] } },
     },
     select: selectPromotionDetail,
     orderBy: { priority: "asc" },
@@ -247,17 +255,12 @@ export const findActivePromotionsForCategory = async (categoryId: string) => {
 
 export const findActivePromotionsForBrand = async (brandId: string) => {
   const now = new Date();
-
   return prisma.promotions.findMany({
     where: {
       isActive: true,
       deletedAt: null,
       AND: [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }],
-      targets: {
-        some: {
-          OR: [{ targetType: "ALL" }, { targetType: "BRAND", targetId: brandId }],
-        },
-      },
+      targets: { some: { OR: [{ targetType: "ALL" }, { targetType: "BRAND", targetId: brandId }] } },
     },
     select: selectPromotionDetail,
     orderBy: { priority: "asc" },
@@ -270,7 +273,6 @@ export const findActivePromotionsForBrand = async (brandId: string) => {
 
 export const create = async (data: CreatePromotionInput) => {
   const { rules, targets, ...promotionData } = data;
-
   return prisma.promotions.create({
     data: {
       ...promotionData,
@@ -284,7 +286,6 @@ export const create = async (data: CreatePromotionInput) => {
 export const update = async (id: string, data: UpdatePromotionInput) => {
   const { rules, targets, ...updateData } = data;
 
-  // Replace rules/targets nếu được cung cấp (Cascade đã lo xóa cũ)
   if (rules !== undefined) {
     await prisma.promotion_rules.deleteMany({ where: { promotionId: id } });
   }
@@ -307,19 +308,13 @@ export const update = async (id: string, data: UpdatePromotionInput) => {
 // === SOFT DELETE / RESTORE / HARD DELETE ===
 // =====================
 
-// Soft delete — Admin only
 export const softDelete = async (id: string, deletedById: string) => {
   return prisma.promotions.update({
     where: { id, deletedAt: null },
-    data: {
-      deletedAt: new Date(),
-      deletedBy: deletedById,
-      isActive: false,
-    },
+    data: { deletedAt: new Date(), deletedBy: deletedById, isActive: false },
   });
 };
 
-// Restore từ trash — Admin only
 export const restore = async (id: string) => {
   return prisma.promotions.update({
     where: { id },
@@ -328,13 +323,10 @@ export const restore = async (id: string) => {
   });
 };
 
-// Hard delete — Admin only, CHỈ sau khi đã soft delete
-// Rules & targets tự xóa qua Cascade
 export const hardDelete = async (id: string) => {
   return prisma.promotions.delete({ where: { id } });
 };
 
-// Lấy danh sách promotion đã soft delete — Admin only (trang trash)
 export const findAllDeleted = async (options: { page?: number; limit?: number } = {}) => {
   const { page = 1, limit = 20 } = options;
   const skip = (page - 1) * limit;
@@ -359,7 +351,6 @@ export const findAllDeleted = async (options: { page?: number; limit?: number } 
 
 export const getActivePromotions = async () => {
   const now = new Date();
-
   const promotions = await prisma.promotions.findMany({
     where: {
       isActive: true,

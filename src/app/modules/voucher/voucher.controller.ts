@@ -2,24 +2,17 @@ import { Request, Response } from "express";
 import * as voucherService from "./voucher.service";
 import { ListVouchersQuery, ValidateVoucherInput, bulkDeleteVouchersSchema } from "./voucher.validation";
 
-const paginatedResponse = (result: any, message: string) => ({
-  data: result.data,
-  pagination: {
-    page: result.page,
-    limit: result.limit,
-    total: result.total,
-    totalPages: result.totalPages,
-  },
-  message,
-});
-
 const getActorId = (req: Request): string => (req as any).user?.id ?? "system";
 
 // ── Public ────────────────────────────────────────────────────────────────────
 
 export const getVouchersPublicHandler = async (req: Request, res: Response) => {
   const result = await voucherService.getVouchers(req.query as unknown as ListVouchersQuery);
-  res.json(paginatedResponse(result, "Lấy danh sách voucher thành công"));
+  res.json({
+    data: result.data,
+    meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
+    message: "Lấy danh sách voucher thành công",
+  });
 };
 
 export const getVoucherByCodeHandler = async (req: Request, res: Response) => {
@@ -49,7 +42,17 @@ export const getUserVouchersHandler = async (req: Request, res: Response) => {
 
 export const getVouchersAdminHandler = async (req: Request, res: Response) => {
   const result = await voucherService.getVouchers(req.query as unknown as ListVouchersQuery);
-  res.json(paginatedResponse(result, "Lấy danh sách voucher thành công"));
+  res.json({
+    data: result.data,
+    meta: {
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      totalPages: result.totalPages,
+      statusCounts: result.statusCounts,
+    },
+    message: "Lấy danh sách voucher thành công",
+  });
 };
 
 export const getVoucherByIdHandler = async (req: Request, res: Response) => {
@@ -57,7 +60,6 @@ export const getVoucherByIdHandler = async (req: Request, res: Response) => {
   res.json({ data: voucher, message: "Lấy chi tiết voucher thành công" });
 };
 
-/** Thùng rác */
 export const getDeletedVouchersHandler = async (req: Request, res: Response) => {
   const vouchers = await voucherService.getDeletedVouchers();
   res.json({ data: vouchers, message: "Lấy danh sách voucher đã xoá thành công" });
@@ -75,14 +77,12 @@ export const updateVoucherHandler = async (req: Request, res: Response) => {
   res.json({ data: voucher, message: "Cập nhật voucher thành công" });
 };
 
-/** Soft delete */
 export const deleteVoucherHandler = async (req: Request, res: Response) => {
   const deletedBy = getActorId(req);
   await voucherService.deleteVoucher(req.params.id, deletedBy);
   res.json({ message: "Chuyển voucher vào thùng rác thành công" });
 };
 
-/** Bulk soft delete */
 export const bulkDeleteVouchersHandler = async (req: Request, res: Response) => {
   const input = bulkDeleteVouchersSchema.parse(req.body);
   const deletedBy = getActorId(req);
@@ -90,23 +90,17 @@ export const bulkDeleteVouchersHandler = async (req: Request, res: Response) => 
   res.json({ data: result, message: `Đã chuyển ${result.count} voucher vào thùng rác` });
 };
 
-/** Khôi phục */
 export const restoreVoucherHandler = async (req: Request, res: Response) => {
   const voucher = await voucherService.restoreVoucher(req.params.id);
   res.json({ data: voucher, message: "Khôi phục voucher thành công" });
 };
 
-/** Xoá vĩnh viễn */
 export const hardDeleteVoucherHandler = async (req: Request, res: Response) => {
   await voucherService.hardDeleteVoucher(req.params.id);
   res.json({ message: "Xoá vĩnh viễn voucher thành công" });
 };
 
-/** Assign to users */
 export const assignVoucherToUsersHandler = async (req: Request, res: Response) => {
   const result = await voucherService.assignVoucherToUsers(req.body);
-  res.json({
-    data: result,
-    message: `Gán voucher cho ${result.assigned} người dùng thành công`,
-  });
+  res.json({ data: result, message: `Gán voucher cho ${result.assigned} người dùng thành công` });
 };

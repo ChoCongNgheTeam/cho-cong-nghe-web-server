@@ -193,6 +193,7 @@ export const transformProductCard = (product: any): ProductCard | null => {
     priceOrigin: Number(defaultVariant.price),
     slug: product.slug,
     thumbnail,
+    createdAt: product.createdAt ? new Date(product.createdAt) : null,
     rating: {
       average: Number(product.ratingAverage) || 0,
       count: product.ratingCount || 0,

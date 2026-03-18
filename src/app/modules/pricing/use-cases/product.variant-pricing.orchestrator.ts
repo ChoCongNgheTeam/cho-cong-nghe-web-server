@@ -1,4 +1,4 @@
-import { getAllProductVariants } from "../../product/product.service";
+import { getAllProductVariants, getProductVariantsBySelection } from "../../product/product.service";
 import { getVariantPricing } from "../pricing.service";
 
 interface VariantOption {
@@ -7,15 +7,24 @@ interface VariantOption {
   colorValue: string;
   storageLabel: string;
   storageValue: string;
-  price: number; // base price
-  finalPrice: number; // sau sale
+  price: number;
+  finalPrice: number;
   discountPercentage: number;
   available: boolean;
   isDefault: boolean;
+  imageUrl: string | null;
 }
 
-export const getProductVariantOptions = async (slug: string, userId?: string): Promise<VariantOption[]> => {
-  const { productId, brandId, categoryPath, variants, images } = await getAllProductVariants(slug); // ✅ cần thêm images (xem bên dưới)
+/**
+ * getProductVariantOptions
+ *
+ * selectedOptions VD: { storage: "128gb" }
+ * → Chỉ trả về variants 128GB với các màu tương ứng.
+ *
+ * selectedOptions = {} → trả về tất cả như cũ (backward compat).
+ */
+export const getProductVariantOptions = async (slug: string, userId?: string, selectedOptions: Record<string, string> = {}): Promise<VariantOption[]> => {
+  const { productId, brandId, categoryPath, variants, images } = await getProductVariantsBySelection(slug, selectedOptions, userId);
 
   const results = await Promise.all(
     variants.map(async (variant) => {
@@ -35,8 +44,7 @@ export const getProductVariantOptions = async (slug: string, userId?: string): P
         }
       }
 
-      // ✅ Lấy ảnh đầu tiên theo color
-      const firstImage = images.filter((img) => img.color === colorValue).sort((a, b) => a.position - b.position)[0];
+      const firstImage = images.filter((img: any) => img.color === colorValue).sort((a: any, b: any) => a.position - b.position)[0];
 
       const pricing = await getVariantPricing(productId, variant.id, Number(variant.price), brandId, categoryPath, userId);
 
@@ -51,7 +59,7 @@ export const getProductVariantOptions = async (slug: string, userId?: string): P
         discountPercentage: pricing.discountPercentage ?? 0,
         available: variant.isActive && variant.quantity > 0,
         isDefault: variant.isDefault,
-        imageUrl: firstImage?.imageUrl ?? null, // ✅ thêm
+        imageUrl: firstImage?.imageUrl ?? null,
       };
     }),
   );

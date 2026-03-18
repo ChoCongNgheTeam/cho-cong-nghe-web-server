@@ -10,7 +10,17 @@ export const getSpecificationsActiveHandler = async (req: Request, res: Response
 export const getSpecificationsAdminHandler = async (req: Request, res: Response) => {
   const query = listSpecificationsSchema.parse(req.query);
   const result = await service.getSpecificationsAdmin(query);
-  res.json({ data: result.data, meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages }, message: "Lấy danh sách thông số thành công" });
+  res.json({
+    data: result.data,
+    meta: {
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      totalPages: result.totalPages,
+      activeCounts: result.activeCounts,
+    },
+    message: "Lấy danh sách thông số thành công",
+  });
 };
 
 export const getSpecificationDetailHandler = async (req: Request, res: Response) => {

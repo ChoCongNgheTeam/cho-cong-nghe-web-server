@@ -24,6 +24,8 @@ export const listProductsSchema = z
     categoryId: z.string().uuid().optional(),
     brandId: z.union([z.string().uuid(), z.array(z.string().uuid())]).optional(),
     isFeatured: z.coerce.boolean().optional(),
+    dateFrom: z.string().optional(),
+    dateTo: z.string().optional(),
     minPrice: z.coerce.number().nonnegative().optional(),
     maxPrice: z.coerce.number().nonnegative().optional(),
     minRating: z.coerce.number().min(0).max(5).optional(),
@@ -82,6 +84,7 @@ export const adminListProductsSchema = z.object({
   categoryId: z.string().uuid().optional(),
   isActive: queryBoolean,
   isFeatured: queryBoolean,
+  inStock: queryBoolean,
   includeDeleted: queryBoolean,
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
@@ -174,6 +177,87 @@ export const updateProductSchema = z.object({
 });
 
 export const variantOptionsQuerySchema = z.object({});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SEARCH TRENDING
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /products/search-trending
+ *
+ * q là optional (rỗng = show trending, có nội dung = filter + sort trending)
+ */
+export const searchSuggestTrendingSchema = z.object({
+  q: z.string().default(""),
+  limit: z.coerce.number().positive().max(20).default(8),
+  category: z.string().optional(),
+});
+
+export type SearchSuggestTrendingQuery = z.infer<typeof searchSuggestTrendingSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SALE SCHEDULE V2
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /products/sale-schedule-v2
+ */
+export const saleScheduleQuerySchema = z.object({
+  startDate: z
+    .string()
+    .optional()
+    .refine((v) => !v || !isNaN(Date.parse(v)), { message: "startDate không hợp lệ (ISO 8601)" }),
+  endDate: z
+    .string()
+    .optional()
+    .refine((v) => !v || !isNaN(Date.parse(v)), { message: "endDate không hợp lệ (ISO 8601)" }),
+});
+
+export type SaleScheduleQuery = z.infer<typeof saleScheduleQuerySchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRODUCTS ON SALE BY DATE
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /products/sale-by-date?date=2026-03-19&promotionId=xxx&page=1&limit=20
+ */
+export const saleByDateQuerySchema = z.object({
+  date: z.string().refine((v) => !isNaN(Date.parse(v)), {
+    message: "date không hợp lệ (format: YYYY-MM-DD)",
+  }),
+  promotionId: z.string().uuid().optional(),
+  categoryId: z.string().uuid().optional(),
+  page: z.coerce.number().positive().default(1),
+  limit: z.coerce.number().positive().max(100).default(20),
+});
+
+export type SaleByDateQuery = z.infer<typeof saleByDateQuerySchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRODUCT COMPARISON
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /products/compare?ids=id1,id2,id3
+ *
+ * ids là comma-separated UUIDs, tối đa 4.
+ * VD: ?ids=uuid1,uuid2,uuid3
+ */
+export const compareProductsSchema = z.object({
+  ids: z
+    .string()
+    .min(1, "Cần ít nhất 2 sản phẩm để so sánh")
+    .transform((v) =>
+      v
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.array(z.string().uuid("ID sản phẩm không hợp lệ")).min(2, "Cần ít nhất 2 sản phẩm").max(4, "Tối đa 4 sản phẩm")),
+});
+
+export type CompareProductsQuery = z.infer<typeof compareProductsSchema>;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INFERRED TYPES

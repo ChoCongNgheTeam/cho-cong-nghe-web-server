@@ -17,13 +17,14 @@ export const attributeIdParamSchema = z.object({
 });
 
 export const listCategoriesQuerySchema = z.object({
+  page: z.coerce.number().positive().default(1),
+  limit: z.coerce.number().positive().max(200).default(20),
   search: z.string().optional(),
   parentId: z.string().uuid().optional(),
   isFeatured: z.coerce.boolean().optional(),
   isActive: z.coerce.boolean().optional(),
   sortBy: z.enum(["name", "position", "createdAt"]).default("position"),
   sortOrder: z.enum(["asc", "desc"]).default("asc"),
-  // Admin only: xem cả category đã soft delete
   includeDeleted: z.coerce.boolean().optional().default(false),
 });
 

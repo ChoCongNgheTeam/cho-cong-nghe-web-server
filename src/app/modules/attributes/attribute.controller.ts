@@ -12,7 +12,17 @@ export const getAttributesActiveHandler = async (req: Request, res: Response) =>
 export const getAttributesAdminHandler = async (req: Request, res: Response) => {
   const query = listAttributesSchema.parse(req.query);
   const result = await service.getAttributesAdmin(query);
-  res.json({ data: result.data, meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages }, message: "Lấy danh sách thuộc tính thành công" });
+  res.json({
+    data: result.data,
+    meta: {
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      totalPages: result.totalPages,
+      activeCounts: result.activeCounts,
+    },
+    message: "Lấy danh sách thuộc tính thành công",
+  });
 };
 
 export const getAttributeDetailHandler = async (req: Request, res: Response) => {

@@ -37,8 +37,18 @@ export const getCategoryBySlugHandler = async (req: Request, res: Response) => {
 
 export const getCategoriesAdminHandler = async (req: Request, res: Response) => {
   const query = listCategoriesQuerySchema.parse(req.query);
-  const categories = await categoryService.getCategoriesAdmin(query);
-  res.json({ data: categories, total: categories.length, message: "Lấy danh sách danh mục thành công" });
+  const result = await categoryService.getCategoriesAdmin(query);
+  res.json({
+    data: result.data,
+    meta: {
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      totalPages: result.totalPages,
+      statusCounts: result.statusCounts,
+    },
+    message: "Lấy danh sách danh mục thành công",
+  });
 };
 
 export const getAllCategoriesHandler = async (req: Request, res: Response) => {

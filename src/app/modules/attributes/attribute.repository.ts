@@ -28,12 +28,20 @@ export const findAll = async (query: ListAttributesQuery) => {
   const skip = (page - 1) * limit;
   const where = buildWhere(query);
 
-  const [data, total] = await prisma.$transaction([
+  const [data, total, activeCount, inactiveCount] = await prisma.$transaction([
     prisma.attributes.findMany({ where, select: selectAttribute, orderBy: { [sortBy]: sortOrder }, skip, take: limit }),
     prisma.attributes.count({ where }),
+    prisma.attributes.count({ where: { isActive: true } }),
+    prisma.attributes.count({ where: { isActive: false } }),
   ]);
 
-  return { data, page, limit, total, totalPages: Math.ceil(total / limit) };
+  const activeCounts = {
+    ALL: activeCount + inactiveCount,
+    ACTIVE: activeCount,
+    INACTIVE: inactiveCount,
+  };
+
+  return { data, page, limit, total, totalPages: Math.ceil(total / limit), activeCounts };
 };
 
 // Public: chỉ lấy active, dùng cho ProductForm

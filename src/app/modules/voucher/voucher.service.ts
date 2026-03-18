@@ -31,13 +31,11 @@ export const getUserVouchers = async (userId: string) => {
   return vouchers.map((v) => transformUserVoucher(v, v.userVoucherData));
 };
 
-/** Danh sách đã xoá mềm (thùng rác) */
 export const getDeletedVouchers = async () => {
   const data = await repo.findDeleted();
   return data.map(transformVoucherCard);
 };
 
-// validateVoucher trả về VoucherValidationResult thay vì throw
 export const validateVoucher = async (input: ValidateVoucherInput): Promise<VoucherValidationResult> => {
   const { code, orderTotal, userId } = input;
 
@@ -46,11 +44,7 @@ export const validateVoucher = async (input: ValidateVoucherInput): Promise<Vouc
   if (!voucher.isActive) return { isValid: false, message: "Mã voucher đã bị vô hiệu hóa" };
   if (!hasVoucherStarted(voucher.startDate)) return { isValid: false, message: "Mã voucher chưa có hiệu lực" };
   if (isVoucherExpired(voucher.endDate)) return { isValid: false, message: "Mã voucher đã hết hạn" };
-  if (orderTotal < Number(voucher.minOrderValue))
-    return {
-      isValid: false,
-      message: `Đơn hàng tối thiểu ${Number(voucher.minOrderValue).toLocaleString("vi-VN")}đ`,
-    };
+  if (orderTotal < Number(voucher.minOrderValue)) return { isValid: false, message: `Đơn hàng tối thiểu ${Number(voucher.minOrderValue).toLocaleString("vi-VN")}đ` };
   if (voucher.maxUses && voucher.usesCount >= voucher.maxUses) return { isValid: false, message: "Mã voucher đã hết lượt sử dụng" };
 
   if (userId) {
@@ -63,7 +57,6 @@ export const validateVoucher = async (input: ValidateVoucherInput): Promise<Vouc
   }
 
   const discount = calculateDiscount(voucher.discountType as DiscountType, Number(voucher.discountValue), orderTotal);
-
   return { isValid: true, discount, voucher: transformVoucherDetail(voucher) };
 };
 
@@ -93,23 +86,15 @@ export const updateVoucher = async (id: string, input: UpdateVoucherInput) => {
   return transformVoucherDetail(voucher);
 };
 
-/**
- * Soft delete — giữ voucher trong DB để bảo toàn lịch sử order.
- */
 export const deleteVoucher = async (id: string, deletedBy: string) => {
   await assertVoucherExists(id);
   return repo.softDelete(id, deletedBy);
 };
 
-/** Bulk soft delete */
 export const bulkDeleteVouchers = async (input: BulkDeleteVouchersInput, deletedBy: string) => {
   return repo.bulkSoftDelete(input.ids, deletedBy);
 };
 
-/**
- * Khôi phục — chỉ cần clear deletedAt.
- * Kiểm tra code trùng sau khi restore.
- */
 export const restoreVoucher = async (id: string) => {
   const voucher = await assertVoucherExists(id, true);
   if (!voucher.deletedAt) throw new BadRequestError("Voucher chưa bị xoá");
@@ -121,11 +106,6 @@ export const restoreVoucher = async (id: string) => {
   return transformVoucherDetail(restored);
 };
 
-/**
- * Xoá vĩnh viễn — chỉ sau khi đã soft-delete.
- * targets + voucherUsers bị cascade.
- * voucher_usages GIỮ LẠI (audit log).
- */
 export const hardDeleteVoucher = async (id: string) => {
   const voucher = await assertVoucherExists(id, true);
   if (!voucher.deletedAt) throw new BadRequestError("Chỉ có thể xoá vĩnh viễn voucher đã chuyển vào thùng rác");

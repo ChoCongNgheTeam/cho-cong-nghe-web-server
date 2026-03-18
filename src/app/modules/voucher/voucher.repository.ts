@@ -51,10 +51,7 @@ const selectVoucherDetail = {
 // =====================
 
 const buildVoucherWhere = (query: ListVouchersQuery, onlyActive = false): Prisma.vouchersWhereInput => {
-  const where: Prisma.vouchersWhereInput = {
-    // Mặc định loại trừ soft-deleted
-    deletedAt: null,
-  };
+  const where: Prisma.vouchersWhereInput = { deletedAt: null };
 
   if (onlyActive) {
     where.isActive = true;
@@ -91,7 +88,10 @@ export const findAll = async (query: ListVouchersQuery) => {
   const skip = (page - 1) * limit;
   const where = buildVoucherWhere(query);
 
-  const [data, total] = await Promise.all([
+  const now = new Date();
+  const baseWhere: Prisma.vouchersWhereInput = { deletedAt: null };
+
+  const [data, total, activeCount, inactiveCount, expiredCount, upcomingCount] = await prisma.$transaction([
     prisma.vouchers.findMany({
       where,
       select: selectVoucherCard,
@@ -100,12 +100,36 @@ export const findAll = async (query: ListVouchersQuery) => {
       take: limit,
     }),
     prisma.vouchers.count({ where }),
+    // active: isActive=true + đã bắt đầu + chưa hết hạn
+    prisma.vouchers.count({
+      where: {
+        ...baseWhere,
+        isActive: true,
+        AND: [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }],
+      },
+    }),
+    // inactive: isActive=false
+    prisma.vouchers.count({ where: { ...baseWhere, isActive: false } }),
+    // expired: endDate đã qua
+    prisma.vouchers.count({ where: { ...baseWhere, endDate: { lt: now } } }),
+    // upcoming: isActive=true + startDate chưa tới
+    prisma.vouchers.count({
+      where: { ...baseWhere, isActive: true, startDate: { gt: now } },
+    }),
   ]);
 
-  return { data, page, limit, total, totalPages: Math.ceil(total / limit) };
+  const statusCounts = {
+    ALL: activeCount + inactiveCount,
+    active: activeCount,
+    inactive: inactiveCount,
+    expired: expiredCount,
+    upcoming: upcomingCount,
+  };
+
+  return { data, page, limit, total, totalPages: Math.ceil(total / limit), statusCounts };
 };
 
-/** Thùng rác — chỉ các voucher đã bị soft-delete */
+/** Thùng rác */
 export const findDeleted = async () => {
   return prisma.vouchers.findMany({
     where: { deletedAt: { not: null } },
@@ -128,27 +152,16 @@ export const findByCode = (code: string) =>
 
 export const findUserVouchers = async (userId: string) => {
   const voucherUsers = await prisma.voucher_user.findMany({
-    where: {
-      userId,
-      voucher: {
-        deletedAt: null,
-      },
-    },
-    include: {
-      voucher: {
-        select: selectVoucherDetail,
-      },
-    },
+    where: { userId, voucher: { deletedAt: null } },
+    include: { voucher: { select: selectVoucherDetail } },
   });
 
   return voucherUsers.map((vu) => ({
     ...vu.voucher,
-    userVoucherData: {
-      maxUses: vu.maxUses,
-      usedCount: vu.usedCount,
-    },
+    userVoucherData: { maxUses: vu.maxUses, usedCount: vu.usedCount },
   }));
 };
+
 export const findUserVoucherUsage = (userId: string, voucherId: string) =>
   prisma.voucher_user.findUnique({
     where: { voucherId_userId: { voucherId, userId } },
@@ -207,7 +220,6 @@ export const update = async (id: string, data: any) => {
 // === SOFT DELETE / RESTORE / HARD DELETE ===
 // =====================
 
-/** Soft delete — ghi deletedAt + deletedBy */
 export const softDelete = async (id: string, deletedBy: string) => {
   return prisma.vouchers.update({
     where: { id },
@@ -216,7 +228,6 @@ export const softDelete = async (id: string, deletedBy: string) => {
   });
 };
 
-/** Bulk soft delete */
 export const bulkSoftDelete = async (ids: string[], deletedBy: string) => {
   return prisma.vouchers.updateMany({
     where: { id: { in: ids }, deletedAt: null },
@@ -224,7 +235,6 @@ export const bulkSoftDelete = async (ids: string[], deletedBy: string) => {
   });
 };
 
-/** Khôi phục — xoá deletedAt + deletedBy */
 export const restore = async (id: string) => {
   return prisma.vouchers.update({
     where: { id },
@@ -233,11 +243,6 @@ export const restore = async (id: string) => {
   });
 };
 
-/**
- * Xoá vĩnh viễn.
- * targets & voucherUsers bị cascade.
- * voucher_usages KHÔNG xoá (audit log).
- */
 export const hardDelete = async (id: string) => {
   return prisma.vouchers.delete({ where: { id } });
 };
@@ -260,10 +265,7 @@ export const assignToUsers = async (voucherId: string, userIds: string[], maxUse
 
 export const incrementUsage = async (voucherId: string, userId: string) => {
   return prisma.$transaction(async (tx) => {
-    await tx.vouchers.update({
-      where: { id: voucherId },
-      data: { usesCount: { increment: 1 } },
-    });
+    await tx.vouchers.update({ where: { id: voucherId }, data: { usesCount: { increment: 1 } } });
 
     const userVoucher = await tx.voucher_user.findUnique({
       where: { voucherId_userId: { voucherId, userId } },
@@ -339,9 +341,7 @@ export const getVoucherByCode = async (code: string, userId?: string) => {
       userMaxUses = voucherUser.maxUses;
       userUsedCount = voucherUser.usedCount;
     } else {
-      userUsedCount = await prisma.voucher_usages.count({
-        where: { voucherId: voucher.id, userId },
-      });
+      userUsedCount = await prisma.voucher_usages.count({ where: { voucherId: voucher.id, userId } });
     }
   }
 

@@ -5,7 +5,7 @@ import { transformProductCard, transformProductDetail, transformProductSpecifica
 import { RawVariant, ReviewStats } from "./product.types";
 import { buildCategoryPath } from "../category/category.helpers";
 import prisma from "prisma/client";
-import { getProductIdsFromPromotions } from "./product.repository";
+import { findProductsForComparison, findProductsOnSaleDate, findSaleScheduleDays, findTrendingSearchSuggestions, getAdminProductStats, getProductIdsFromPromotions } from "./product.repository";
 import { normalizeVariant } from "./product.helpers";
 import { NotFoundError, BadRequestError, ConflictError } from "@/errors";
 
@@ -84,7 +84,7 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
   if (!product || !product.isActive) throw new NotFoundError("Sản phẩm");
 
   const reviewStats = await repo.getReviewStats(product.id);
-
+  // check view count cho nay
   repo.update(product.id, { viewsCount: BigInt(product.viewsCount) + BigInt(1) }).catch(console.error);
 
   const productDetail = transformProductDetail(product, {
@@ -592,4 +592,312 @@ export const getActivePromotions = async () => {
     priority: promo.priority,
     targetsCount: promo._count.targets,
   }));
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. SEARCH SUGGESTIONS TRENDING
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * getSearchSuggestionsTrending
+ *
+ * Khi q rỗng (user focus vào ô search chưa gõ):
+ *   → Trả về top 8 sản phẩm trending nhất (viewsCount + soldCount)
+ *
+ * Khi q có nội dung:
+ *   → Filter ILIKE + sort viewsCount
+ *
+ * Mỗi item có isTrending = true/false để FE render icon 🔥.
+ */
+export const getSearchSuggestionsTrending = async (q: string, options: { limit?: number; category?: string } = {}) => {
+  return findTrendingSearchSuggestions(q, {
+    limit: options.limit,
+    categorySlug: options.category,
+  });
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. SALE SCHEDULE V2
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * getSaleScheduleV2
+ *
+ * Trả về lịch sale dạng calendar (metadata only, không load products).
+ * Default: 14 ngày từ hôm nay.
+ * Max range: 60 ngày để tránh quá tải.
+ */
+export const getSaleScheduleV2 = async (startDate?: Date, endDate?: Date) => {
+  const now = new Date();
+  const from = startDate ?? now;
+  const to = endDate ?? new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+
+  // Guard: không cho phép range > 60 ngày
+  const diffDays = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays > 60) {
+    throw new BadRequestError("Khoảng thời gian tối đa là 60 ngày");
+  }
+
+  return findSaleScheduleDays(from, to);
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. PRODUCTS ON SALE DATE
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * getProductsOnSaleDate
+ *
+ * Trả về products có promotion vào đúng 1 ngày.
+ * FE gọi khi user click vào 1 ô ngày trên calendar.
+ */
+export const getProductsOnSaleDate = async (
+  date: Date,
+  options: {
+    promotionId?: string;
+    page?: number;
+    limit?: number;
+    categoryId?: string;
+  } = {},
+) => {
+  const result = await findProductsOnSaleDate(date, options);
+
+  // Transform products → card format (giống flash sale)
+  const cards = result.products.flatMap((product) => {
+    const variants: any[] = product.variants ?? [];
+    if (variants.length === 0) return [];
+
+    // CARD mode: mỗi variant 1 card; SELECTOR: chỉ lấy default
+    const variantsForCards = product.variantDisplay === "CARD" ? variants : [variants.find((v: any) => v.isDefault) ?? variants[0]].filter(Boolean);
+
+    return variantsForCards.flatMap((variant: any) => {
+      const card = transformProductCard({ ...product, variants: [variant] });
+      if (!card) return [];
+      return [
+        {
+          card,
+          pricingContext: {
+            productId: product.id,
+            variantId: variant.id,
+            price: Number(variant.price),
+            brandId: product.brand?.id,
+            categoryPath: buildCategoryPath(product.category),
+          },
+        },
+      ];
+    });
+  });
+
+  return {
+    date: result.date,
+    promotions: result.promotions,
+    data: cards,
+    total: result.total,
+    page: result.page,
+    limit: result.limit,
+    totalPages: result.totalPages,
+  };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. PRODUCT COMPARISON
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * compareProducts
+ *
+ * Validate → fetch → normalize thành spec matrix.
+ *
+ * Response shape:
+ * {
+ *   categoryId: string,
+ *   categoryName: string,
+ *   products: [
+ *     {
+ *       id, name, slug, thumbnail, brand,
+ *       price, inStock,
+ *       rating: { average, count },
+ *       totalSoldCount,
+ *     },
+ *     ...
+ *   ],
+ *   specMatrix: [
+ *     {
+ *       groupName: "Màn hình",
+ *       specs: [
+ *         {
+ *           key: "screen_size",
+ *           name: "Kích thước màn hình",
+ *           icon: "...",
+ *           unit: "inch",
+ *           values: ["6.1", "6.7", null, "6.4"]  // null = sản phẩm đó không có spec này
+ *         },
+ *         ...
+ *       ]
+ *     },
+ *     ...
+ *   ]
+ * }
+ */
+export const compareProducts = async (ids: string[]) => {
+  if (ids.length < 2 || ids.length > 4) {
+    throw new BadRequestError("Cần 2-4 sản phẩm để so sánh");
+  }
+
+  const products = await findProductsForComparison(ids);
+
+  // Validate tất cả sản phẩm tồn tại
+  const foundIds = new Set(products.map((p) => p.id));
+  const missingIds = ids.filter((id) => !foundIds.has(id));
+  if (missingIds.length > 0) {
+    throw new NotFoundError(`Sản phẩm không tồn tại: ${missingIds.join(", ")}`);
+  }
+
+  // Validate cùng category (so sánh categoryId cấp lá)
+  const categoryIds = [...new Set(products.map((p) => p.categoryId))];
+  if (categoryIds.length > 1) {
+    throw new BadRequestError("Chỉ có thể so sánh sản phẩm trong cùng danh mục");
+  }
+
+  // Giữ đúng thứ tự ids đầu vào
+  const orderedProducts = ids.map((id) => products.find((p) => p.id === id)).filter(Boolean) as typeof products;
+
+  // Lấy category specs từ sản phẩm đầu tiên (cùng category nên specs giống nhau)
+  const categorySpecs = orderedProducts[0].category.categorySpecifications;
+
+  // Build spec value map: productId → specificationId → value
+  const specValueMap = new Map<string, Map<string, string | null>>();
+  for (const product of orderedProducts) {
+    const valueMap = new Map<string, string | null>();
+    for (const ps of product.productSpecifications) {
+      valueMap.set(ps.specificationId, ps.value);
+    }
+    specValueMap.set(product.id, valueMap);
+  }
+
+  // Build spec matrix theo group
+  const groupMap = new Map<
+    string,
+    Array<{
+      specificationId: string;
+      key: string;
+      name: string;
+      icon?: string | null;
+      unit?: string | null;
+      sortOrder: number;
+      values: (string | null)[];
+    }>
+  >();
+
+  // Track thứ tự group
+  const groupOrder: string[] = [];
+
+  for (const catSpec of categorySpecs) {
+    const { groupName, specification } = catSpec;
+
+    if (!groupMap.has(groupName)) {
+      groupMap.set(groupName, []);
+      groupOrder.push(groupName);
+    }
+
+    const values = orderedProducts.map((p) => {
+      const pMap = specValueMap.get(p.id);
+      return pMap?.get(specification.id) ?? null;
+    });
+
+    // Bỏ qua spec mà TẤT CẢ sản phẩm đều null (không có dữ liệu)
+    const hasAnyValue = values.some((v) => v !== null);
+    if (!hasAnyValue) continue;
+
+    groupMap.get(groupName)!.push({
+      specificationId: specification.id,
+      key: specification.key,
+      name: specification.name,
+      icon: specification.icon,
+      unit: specification.unit,
+      sortOrder: specification.sortOrder,
+      values,
+    });
+  }
+
+  // Sort specs trong mỗi group theo sortOrder
+  const specMatrix = groupOrder.map((groupName) => ({
+    groupName,
+    specs: (groupMap.get(groupName) ?? []).sort((a, b) => a.sortOrder - b.sortOrder),
+  }));
+
+  // Build product summaries
+  const productSummaries = orderedProducts.map((p) => {
+    const defaultVariant = p.variants[0];
+    return {
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      thumbnail: p.img[0]?.imageUrl ?? null,
+      brand: p.brand,
+      price: defaultVariant ? Number(defaultVariant.price) : 0,
+      inStock: defaultVariant ? defaultVariant.quantity > 0 : false,
+      rating: {
+        average: Number(p.ratingAverage),
+        count: p.ratingCount,
+      },
+      totalSoldCount: p.totalSoldCount,
+      isFeatured: p.isFeatured,
+    };
+  });
+
+  return {
+    categoryId: orderedProducts[0].category.id,
+    categoryName: orderedProducts[0].category.name,
+    categorySlug: orderedProducts[0].category.slug,
+    products: productSummaries,
+    specMatrix: specMatrix.filter((g) => g.specs.length > 0),
+  };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. ADMIN STATS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getProductStats = async () => {
+  return getAdminProductStats();
+};
+
+/**
+ * getProductVariantsBySelection
+ *
+ * Trả về variants + images đã lọc theo selectedOptions.
+ *
+ * VD: selectedOptions = { storage: "128gb" }
+ *   → variants: 128GB × [Đen, Trắng, Đỏ]
+ *   → images: chỉ ảnh của Đen/Trắng/Đỏ
+ *
+ * VD: selectedOptions = {} → tất cả variants (giống cũ)
+ */
+export const getProductVariantsBySelection = async (slug: string, selectedOptions: Record<string, string>, userId?: string) => {
+  const product = await repo.findBySlug(slug);
+  if (!product || !product.isActive) throw new NotFoundError("Sản phẩm");
+
+  const matchedVariants = await repo.findActiveVariantsMatchingSelection(product.id, selectedOptions);
+
+  const normalizedVariants = matchedVariants.map(normalizeVariant);
+
+  // Collect màu từ matched variants để filter images
+  const relevantColors = new Set<string>();
+  for (const v of normalizedVariants) {
+    const colorAttr = v.variantAttributes.find((va) => va.attributeOption.attribute.code === "color");
+    if (colorAttr) relevantColors.add(colorAttr.attributeOption.value);
+  }
+
+  // Filter images theo màu — nếu không có attribute color thì trả về tất cả ảnh
+  const filteredImages = relevantColors.size > 0 ? (product.img ?? []).filter((img: any) => relevantColors.has(img.color)) : (product.img ?? []);
+
+  return {
+    productId: product.id,
+    brandId: (product as any).brand?.id,
+    categoryPath: buildCategoryPath((product as any).category),
+    selectedOptions,
+    variants: normalizedVariants,
+    images: filteredImages,
+  };
 };

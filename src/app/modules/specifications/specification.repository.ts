@@ -33,12 +33,22 @@ export const findAll = async (query: ListSpecificationsQuery) => {
   const skip = (page - 1) * limit;
   const where = buildWhere(query);
 
-  const [data, total] = await prisma.$transaction([
+  const [data, total, activeCount, inactiveCount, filterableCount] = await prisma.$transaction([
     prisma.specifications.findMany({ where, select: selectSpec, orderBy: { [sortBy]: sortOrder }, skip, take: limit }),
     prisma.specifications.count({ where }),
+    prisma.specifications.count({ where: { isActive: true } }),
+    prisma.specifications.count({ where: { isActive: false } }),
+    prisma.specifications.count({ where: { isFilterable: true } }),
   ]);
 
-  return { data, page, limit, total, totalPages: Math.ceil(total / limit) };
+  const activeCounts = {
+    ALL: activeCount + inactiveCount,
+    ACTIVE: activeCount,
+    INACTIVE: inactiveCount,
+    FILTERABLE: filterableCount,
+  };
+
+  return { data, page, limit, total, totalPages: Math.ceil(total / limit), activeCounts };
 };
 
 // Public — cho ProductForm

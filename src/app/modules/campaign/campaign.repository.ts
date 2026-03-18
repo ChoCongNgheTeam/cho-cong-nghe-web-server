@@ -6,10 +6,7 @@ const prisma = new PrismaClient();
 // ── Query builders ─────────────────────────────────────────────────────────────
 
 const buildCampaignWhere = (query: ListCampaignsQuery, onlyActive: boolean): Prisma.campaignsWhereInput => {
-  const where: Prisma.campaignsWhereInput = {
-    // Mặc định chỉ lấy chưa bị xoá mềm
-    deletedAt: null,
-  };
+  const where: Prisma.campaignsWhereInput = { deletedAt: null };
 
   if (onlyActive) {
     where.isActive = true;
@@ -54,18 +51,14 @@ export class CampaignRepository {
   // ── Slug / Name checks ──────────────────────────────────────────────────────
 
   async checkSlugExists(slug: string, excludeId?: string): Promise<boolean> {
-    const campaign = await prisma.campaigns.findFirst({
-      where: { slug, deletedAt: null },
-    });
+    const campaign = await prisma.campaigns.findFirst({ where: { slug, deletedAt: null } });
     if (!campaign) return false;
     if (excludeId && campaign.id === excludeId) return false;
     return true;
   }
 
   async checkNameExists(name: string, excludeId?: string): Promise<boolean> {
-    const campaign = await prisma.campaigns.findFirst({
-      where: { name, deletedAt: null },
-    });
+    const campaign = await prisma.campaigns.findFirst({ where: { name, deletedAt: null } });
     if (!campaign) return false;
     if (excludeId && campaign.id === excludeId) return false;
     return true;
@@ -76,26 +69,57 @@ export class CampaignRepository {
   async findAllPublic(query: ListCampaignsQuery) {
     const where = buildCampaignWhere(query, true);
     const orderBy = buildCampaignOrderBy(query);
-
-    return prisma.campaigns.findMany({
-      where,
-      orderBy,
-      select: selectCampaignPublic,
-    });
+    return prisma.campaigns.findMany({ where, orderBy, select: selectCampaignPublic });
   }
 
   async findAllAdmin(query: ListCampaignsQuery) {
+    const { page = 1, limit = 20 } = query;
+    const skip = (page - 1) * limit;
     const where = buildCampaignWhere(query, false);
     const orderBy = buildCampaignOrderBy(query);
 
-    return prisma.campaigns.findMany({
-      where,
-      orderBy,
-      include: { _count: { select: { categories: true } } },
-    });
+    const now = new Date();
+    const baseWhere: Prisma.campaignsWhereInput = { deletedAt: null };
+
+    const [data, total, activeCount, inactiveCount, upcomingCount, expiredCount] = await prisma.$transaction([
+      prisma.campaigns.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limit,
+        include: { _count: { select: { categories: true } } },
+      }),
+      prisma.campaigns.count({ where }),
+      // active: isActive=true + đã bắt đầu + chưa hết hạn
+      prisma.campaigns.count({
+        where: {
+          ...baseWhere,
+          isActive: true,
+          AND: [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }],
+        },
+      }),
+      // inactive: isActive=false
+      prisma.campaigns.count({ where: { ...baseWhere, isActive: false } }),
+      // upcoming: isActive=true + startDate chưa tới
+      prisma.campaigns.count({
+        where: { ...baseWhere, isActive: true, startDate: { gt: now } },
+      }),
+      // expired: endDate đã qua
+      prisma.campaigns.count({ where: { ...baseWhere, endDate: { lt: now } } }),
+    ]);
+
+    const statusCounts = {
+      ALL: activeCount + inactiveCount,
+      active: activeCount,
+      inactive: inactiveCount,
+      upcoming: upcomingCount,
+      expired: expiredCount,
+    };
+
+    return { data, page, limit, total, totalPages: Math.ceil(total / limit), statusCounts };
   }
 
-  /** Thùng rác — chỉ những campaign đã bị soft-delete */
+  /** Thùng rác */
   async findDeleted() {
     return prisma.campaigns.findMany({
       where: { deletedAt: { not: null } },
@@ -127,9 +151,7 @@ export class CampaignRepository {
         categories: {
           orderBy: { position: "asc" },
           include: {
-            category: {
-              select: { id: true, name: true, slug: true, imageUrl: true, imagePath: true },
-            },
+            category: { select: { id: true, name: true, slug: true, imageUrl: true, imagePath: true } },
           },
         },
       },
@@ -143,9 +165,7 @@ export class CampaignRepository {
         categories: {
           orderBy: { position: "asc" },
           include: {
-            category: {
-              select: { id: true, name: true, slug: true, imageUrl: true, imagePath: true },
-            },
+            category: { select: { id: true, name: true, slug: true, imageUrl: true, imagePath: true } },
           },
         },
       },
@@ -170,7 +190,6 @@ export class CampaignRepository {
 
   async updateCampaign(id: string, data: UpdateCampaignInput & { slug?: string }) {
     const updateData: Prisma.campaignsUpdateInput = {};
-
     if (data.name !== undefined) updateData.name = data.name;
     if (data.slug !== undefined) updateData.slug = data.slug;
     if (data.type !== undefined) updateData.type = data.type;
@@ -178,32 +197,21 @@ export class CampaignRepository {
     if (data.startDate !== undefined) updateData.startDate = data.startDate;
     if (data.endDate !== undefined) updateData.endDate = data.endDate;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
-
     return prisma.campaigns.update({ where: { id }, data: updateData });
   }
 
-  /** Soft delete — ghi deletedAt + deletedBy */
   async softDelete(id: string, deletedBy: string) {
-    return prisma.campaigns.update({
-      where: { id },
-      data: { deletedAt: new Date(), deletedBy },
-    });
+    return prisma.campaigns.update({ where: { id }, data: { deletedAt: new Date(), deletedBy } });
   }
 
-  /** Khôi phục — xoá deletedAt + deletedBy */
   async restore(id: string) {
-    return prisma.campaigns.update({
-      where: { id },
-      data: { deletedAt: null, deletedBy: null },
-    });
+    return prisma.campaigns.update({ where: { id }, data: { deletedAt: null, deletedBy: null } });
   }
 
-  /** Xoá vĩnh viễn khỏi DB */
   async hardDelete(id: string) {
     return prisma.campaigns.delete({ where: { id } });
   }
 
-  /** Bulk soft delete */
   async bulkSoftDelete(ids: string[], deletedBy: string) {
     return prisma.campaigns.updateMany({
       where: { id: { in: ids }, deletedAt: null },
@@ -214,18 +222,14 @@ export class CampaignRepository {
   // ── Campaign Categories ─────────────────────────────────────────────────────
 
   async checkCategoryInCampaign(campaignId: string, categoryId: string): Promise<boolean> {
-    const exists = await prisma.campaign_categories.findFirst({
-      where: { campaignId, categoryId },
-    });
+    const exists = await prisma.campaign_categories.findFirst({ where: { campaignId, categoryId } });
     return !!exists;
   }
 
   async getCampaignCategory(campaignId: string, categoryId: string) {
     return prisma.campaign_categories.findFirst({
       where: { campaignId, categoryId },
-      include: {
-        category: { select: { id: true, name: true, slug: true } },
-      },
+      include: { category: { select: { id: true, name: true, slug: true } } },
     });
   }
 
@@ -254,17 +258,11 @@ export class CampaignRepository {
     if (data.description !== undefined) updateData.description = data.description || null;
     if (data.imagePath !== undefined) updateData.imagePath = data.imagePath;
     if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl;
-
-    return prisma.campaign_categories.updateMany({
-      where: { campaignId, categoryId },
-      data: updateData,
-    });
+    return prisma.campaign_categories.updateMany({ where: { campaignId, categoryId }, data: updateData });
   }
 
   async removeCampaignCategory(campaignId: string, categoryId: string) {
-    return prisma.campaign_categories.deleteMany({
-      where: { campaignId, categoryId },
-    });
+    return prisma.campaign_categories.deleteMany({ where: { campaignId, categoryId } });
   }
 
   async checkCategoryExists(categoryId: string): Promise<boolean> {

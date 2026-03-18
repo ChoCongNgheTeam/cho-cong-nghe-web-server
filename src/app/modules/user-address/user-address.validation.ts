@@ -3,7 +3,10 @@ import { AddressType } from "@prisma/client";
 
 export const createAddressSchema = z.object({
   contactName: z.string().trim().min(1, "Tên liên hệ không được để trống").max(100, "Tên liên hệ không quá 100 ký tự"),
-  phone: z.string().trim().regex(/^(\+84|0)[0-9]{9,10}$/, "Số điện thoại không hợp lệ"),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^(\+84|0)[0-9]{9,10}$/, "Số điện thoại không hợp lệ"),
   provinceId: z.string().uuid("Province ID không hợp lệ").min(1, "Vui lòng chọn Tỉnh/Thành phố"),
   wardId: z.string().uuid("Ward ID không hợp lệ").min(1, "Vui lòng chọn Phường/Xã"),
   detailAddress: z.string().trim().min(1, "Địa chỉ chi tiết không được để trống").max(500, "Địa chỉ chi tiết không quá 500 ký tự"),
@@ -13,7 +16,11 @@ export const createAddressSchema = z.object({
 
 export const updateAddressSchema = z.object({
   contactName: z.string().trim().min(1, "Tên liên hệ không được để trống").max(100, "Tên liên hệ không quá 100 ký tự").optional(),
-  phone: z.string().trim().regex(/^(\+84|0)[0-9]{9,10}$/, "Số điện thoại không hợp lệ").optional(),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^(\+84|0)[0-9]{9,10}$/, "Số điện thoại không hợp lệ")
+    .optional(),
   provinceId: z.string().uuid("Province ID không hợp lệ").optional(),
   wardId: z.string().uuid("Ward ID không hợp lệ").optional(),
   detailAddress: z.string().trim().min(1, "Địa chỉ chi tiết không được để trống").max(500, "Địa chỉ chi tiết không quá 500 ký tự").optional(),
@@ -56,6 +63,8 @@ export const createWardSchema = z.object({
 
 export const listAddressesQuerySchema = z.object({
   search: z.string().optional(),
+  // [FIX] Thêm userId để admin có thể filter địa chỉ theo user cụ thể
+  userId: z.string().uuid("User ID không hợp lệ").optional(),
   provinceId: z.string().uuid().optional(),
   wardId: z.string().uuid().optional(),
   includeDeleted: z.coerce.boolean().optional().default(false),

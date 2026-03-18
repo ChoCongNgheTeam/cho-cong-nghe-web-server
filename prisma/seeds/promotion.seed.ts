@@ -13,20 +13,6 @@ type PromotionTargetSeed = {
   targetId: string | null;
 };
 
-/**
- * HƯỚNG DẪN SỬ DỤNG:
- *
- * 1. Seed data này tạo sẵn các promotion templates
- * 2. targetId để NULL - khi cần áp dụng, bạn vào DB update targetId
- * 3. Sau khi reset DB, chạy seed này để tạo lại templates
- * 4. Lấy ID từ categories/brands/products và update vào promotion_targets table
- *
- * VÍ DỤ UPDATE:
- * UPDATE promotion_targets
- * SET targetId = 'category-id-thuc-te'
- * WHERE promotionId = (SELECT id FROM promotions WHERE name = 'IPHONE_GIAM_10_PERCENT');
- */
-
 const promotionTemplates: {
   name: string;
   description: string;
@@ -39,16 +25,16 @@ const promotionTemplates: {
   usageLimit?: number;
   rules: PromotionRuleSeed[];
   targets: PromotionTargetSeed[];
-  notes?: string; // Ghi chú cho dev
+  notes?: string;
 }[] = [
   // ============================================================================
-  // ĐIỆN THOẠI - BRAND PROMOTIONS
+  // EXISTING
   // ============================================================================
   {
     name: "APPLE_IPHONE_GIAM_10_PERCENT",
     description: "Giảm 10% cho tất cả iPhone",
     priority: 20,
-    isActive: true, // Mặc định tắt, bật khi cần
+    isActive: true,
     startDate: new Date("2026-03-05"),
     endDate: new Date("2026-04-28"),
     notes: "Apply cho brand: Apple (iPhone) - Lấy brand ID và update vào targetId",
@@ -61,7 +47,80 @@ const promotionTemplates: {
     targets: [
       {
         targetType: TargetType.CATEGORY,
-        targetId: null, // Update brand ID sau
+        targetId: null,
+      },
+    ],
+  },
+
+  // ============================================================================
+  // TEST: 3 PROMOTIONS CHO NGÀY 18 / 19 / 20 THÁNG 3
+  // (dùng để test GET /sale-schedule-v2 và GET /sale-by-date)
+  // Sau khi seed xong → update targetId bằng ID thực tế trong DB
+  // ============================================================================
+
+  {
+    name: "FLASH_SALE_18_03_2026",
+    description: "Flash Sale 18/03 — Giảm 15% toàn bộ sản phẩm",
+    priority: 30,
+    isActive: true,
+    startDate: new Date("2026-03-18T00:00:00.000Z"),
+    endDate: new Date("2026-03-18T23:59:59.000Z"),
+    notes: "Test ngày 18/03. Đổi targetType ALL → áp dụng toàn sản phẩm, không cần targetId",
+    rules: [
+      {
+        actionType: PromotionActionType.DISCOUNT_PERCENT,
+        discountValue: "15.00",
+      },
+    ],
+    targets: [
+      {
+        targetType: TargetType.ALL,
+        targetId: null,
+      },
+    ],
+  },
+
+  {
+    name: "SALE_LAPTOP_19_03_2026",
+    description: "Ưu đãi Laptop 19/03 — Giảm 2.000.000đ",
+    priority: 25,
+    isActive: true,
+    startDate: new Date("2026-03-19T00:00:00.000Z"),
+    endDate: new Date("2026-03-19T23:59:59.000Z"),
+    notes: "Test ngày 19/03. Update targetId = ID của category Laptop",
+    rules: [
+      {
+        actionType: PromotionActionType.DISCOUNT_FIXED,
+        discountValue: "2000000.00",
+      },
+    ],
+    targets: [
+      {
+        targetType: TargetType.CATEGORY,
+        targetId: null, // → update = category Laptop ID
+      },
+    ],
+  },
+
+  {
+    name: "WEEKEND_SALE_20_03_2026",
+    description: "Weekend Sale 20/03 — Mua 1 tặng 1 phụ kiện",
+    priority: 20,
+    isActive: true,
+    startDate: new Date("2026-03-20T00:00:00.000Z"),
+    endDate: new Date("2026-03-20T23:59:59.000Z"),
+    notes: "Test ngày 20/03. Update targetId = ID của category Phụ kiện",
+    rules: [
+      {
+        actionType: PromotionActionType.BUY_X_GET_Y,
+        buyQuantity: 1,
+        getQuantity: 1,
+      },
+    ],
+    targets: [
+      {
+        targetType: TargetType.CATEGORY,
+        targetId: null, // → update = category Phụ kiện ID
       },
     ],
   },
@@ -84,7 +143,6 @@ export async function seedPromotions(prisma: PrismaClient) {
 
     const promotion = await prisma.promotions.upsert({
       where: { name: data.name },
-
       update: {
         description: data.description,
         priority: data.priority,
@@ -95,7 +153,6 @@ export async function seedPromotions(prisma: PrismaClient) {
         maxDiscountValue: data.maxDiscountValue ?? null,
         usageLimit: data.usageLimit ?? null,
       },
-
       create: {
         name: data.name,
         description: data.description,
@@ -109,16 +166,9 @@ export async function seedPromotions(prisma: PrismaClient) {
       },
     });
 
-    // Reset Rules + Targets (Idempotent seed)
-    await prisma.promotion_rules.deleteMany({
-      where: { promotionId: promotion.id },
-    });
+    await prisma.promotion_rules.deleteMany({ where: { promotionId: promotion.id } });
+    await prisma.promotion_targets.deleteMany({ where: { promotionId: promotion.id } });
 
-    await prisma.promotion_targets.deleteMany({
-      where: { promotionId: promotion.id },
-    });
-
-    // Create Rules
     for (const r of data.rules) {
       await prisma.promotion_rules.create({
         data: {
@@ -132,13 +182,12 @@ export async function seedPromotions(prisma: PrismaClient) {
       });
     }
 
-    // Create Targets (với targetId = null)
     for (const t of data.targets) {
       await prisma.promotion_targets.create({
         data: {
           promotionId: promotion.id,
           targetType: t.targetType,
-          targetId: t.targetId ?? null, // NULL - sẽ update sau
+          targetId: t.targetId ?? null,
         },
       });
     }
@@ -148,21 +197,16 @@ export async function seedPromotions(prisma: PrismaClient) {
 
   console.log(`✅ Seeded ${createdPromotions.length} promotion templates`);
   console.log("");
-  console.log("📝 HƯỚNG DẪN SỬ DỤNG:");
-  console.log("1. Tất cả promotion templates đã được tạo với targetId = NULL");
-  console.log("2. Để kích hoạt promotion, bạn cần:");
-  console.log("   - Lấy ID của category/brand/product từ DB");
-  console.log("   - UPDATE promotion_targets SET targetId = 'ID-thuc-te' WHERE ...");
-  console.log("   - UPDATE promotions SET isActive = true WHERE name = '...'");
+  console.log("📝 SAU KHI SEED — TEST APIs:");
+  console.log("  GET /products/sale-schedule-v2?startDate=2026-03-18&endDate=2026-03-20");
+  console.log("  GET /products/sale-by-date?date=2026-03-18");
+  console.log("  GET /products/sale-by-date?date=2026-03-19");
+  console.log("  GET /products/sale-by-date?date=2026-03-20");
   console.log("");
-  console.log("VÍ DỤ UPDATE:");
-  console.log("UPDATE promotion_targets");
-  console.log("SET targetId = 'cat_iphone_17_series_id'");
-  console.log("WHERE promotionId = (");
-  console.log("  SELECT id FROM promotions");
-  console.log("  WHERE name = 'IPHONE_17_SERIES_GIAM_2_TRIEU'");
-  console.log(");");
-  console.log("");
+  console.log("📝 UPDATE targetId sau khi seed:");
+  console.log("  FLASH_SALE_18_03 → targetType ALL, không cần update targetId");
+  console.log("  SALE_LAPTOP_19_03 → UPDATE promotion_targets SET targetId = '<laptop_category_id>'");
+  console.log("  WEEKEND_SALE_20_03 → UPDATE promotion_targets SET targetId = '<phukien_category_id>'");
 
   return createdPromotions;
 }

@@ -6,6 +6,8 @@ export const orderQuerySchema = z.object({
   search: z.string().optional(),
   status: z.enum(["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"]).optional(),
   paymentStatus: z.enum(["UNPAID", "PAID", "REFUNDED"]).optional(),
+  dateFrom: z.coerce.date().optional(),
+  dateTo: z.coerce.date().optional(),
 });
 
 export type OrderQuery = z.infer<typeof orderQuerySchema>;

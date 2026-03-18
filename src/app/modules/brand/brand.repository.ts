@@ -33,9 +33,6 @@ const selectAdmin = {
 
 const buildBrandWhere = (query: ListBrandsQuery, onlyActive: boolean, isAdmin: boolean): Prisma.brandsWhereInput => {
   const where: Prisma.brandsWhereInput = {};
-  console.log(query);
-  console.log(onlyActive);
-  console.log(isAdmin);
 
   // Soft delete filter
   if (!isAdmin || !query.includeDeleted) {
@@ -60,7 +57,6 @@ const buildBrandWhere = (query: ListBrandsQuery, onlyActive: boolean, isAdmin: b
   if (query.dateFrom || query.dateTo) {
     where.createdAt = {
       ...(query.dateFrom && { gte: query.dateFrom }),
-      // dateTo: lấy đến hết ngày đó (23:59:59)
       ...(query.dateTo && {
         lte: new Date(new Date(query.dateTo).setHours(23, 59, 59, 999)),
       }),
@@ -119,9 +115,24 @@ export const findAllAdmin = async (query: ListBrandsQuery) => {
   const where = buildBrandWhere(query, false, true);
   const orderBy = buildBrandOrderBy(query);
 
-  const [data, total] = await prisma.$transaction([prisma.brands.findMany({ where, orderBy, select: selectAdmin, skip, take: limit }), prisma.brands.count({ where })]);
+  const baseWhere: Prisma.brandsWhereInput = { deletedAt: null };
 
-  return { data, page, limit, total, totalPages: Math.ceil(total / limit) };
+  const [data, total, activeCount, inactiveCount, featuredCount] = await prisma.$transaction([
+    prisma.brands.findMany({ where, orderBy, select: selectAdmin, skip, take: limit }),
+    prisma.brands.count({ where }),
+    prisma.brands.count({ where: { ...baseWhere, isActive: true } }),
+    prisma.brands.count({ where: { ...baseWhere, isActive: false } }),
+    prisma.brands.count({ where: { ...baseWhere, isFeatured: true } }),
+  ]);
+
+  const activeCounts = {
+    ALL: activeCount + inactiveCount,
+    ACTIVE: activeCount,
+    INACTIVE: inactiveCount,
+    FEATURED: featuredCount,
+  };
+
+  return { data, page, limit, total, totalPages: Math.ceil(total / limit), activeCounts };
 };
 
 export const getActiveBrands = async () => {
