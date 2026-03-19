@@ -98,7 +98,7 @@ export const getHomePageData = async (userId?: string): Promise<HomeResponse> =>
     getActiveHomeCampaigns(),
     getFeaturedProductsWithPricing(12, userId),
     getBestSellingProductsWithPricing(12, userId),
-    blogService.getBlogsPublic({ page: 1, limit: 7, sortBy: "publishedAt", sortOrder: "desc" }),
+    blogService.getBlogsPublic({ page: 1, limit: 7, sortBy: "publishedAt", sortOrder: "desc", includeDeleted: false }),
   ]);
 
   const sliders = allMedia[MediaPosition.HOME_TOP] || [];

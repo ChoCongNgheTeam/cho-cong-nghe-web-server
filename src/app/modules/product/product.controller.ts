@@ -74,7 +74,7 @@ export const getProductVariantOptionsHandler = async (req: Request, res: Respons
     }
   }
 
-  const result = await getProductVariantOptions(req.params.slug, req.user?.id, selectedOptions);
+  const result = await getProductVariantOptions(req.params.slug, selectedOptions, req.user?.id);
 
   res.json({ data: result, message: "Lấy danh sách variant thành công" });
 };

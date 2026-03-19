@@ -11,7 +11,7 @@ export interface WishlistItem {
     brandId: string;
     ratingAverage: any; // Decimal từ Prisma
     ratingCount: number;
-    
+
     // Cây danh mục để tính giá
     category?: {
       id: string;
@@ -25,6 +25,7 @@ export interface WishlistItem {
     variants: Array<{
       id: string;
       price: any; // Decimal
+      variantAttributes: Array<{ attributeOptionId: string }>;
     }>;
 
     // Thông số nổi bật (Highlight)

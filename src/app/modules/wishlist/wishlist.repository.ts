@@ -5,11 +5,11 @@ const productSelect = {
   id: true,
   name: true,
   slug: true,
-  isActive: true, 
+  isActive: true,
   brandId: true,
   ratingAverage: true,
   ratingCount: true,
-  
+
   category: {
     select: {
       id: true,
@@ -24,8 +24,31 @@ const productSelect = {
 
   variants: {
     where: { isDefault: true, isActive: true },
-    select: { id: true, price: true },
     take: 1,
+    select: {
+      id: true,
+      price: true,
+      variantAttributes: {
+        select: {
+          value: true,
+          attribute: {
+            select: {
+              code: true,
+            },
+          },
+          attributeOption: {
+            select: {
+              value: true,
+              attribute: {
+                select: {
+                  code: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
 
   productSpecifications: {

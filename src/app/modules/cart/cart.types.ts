@@ -30,7 +30,7 @@ export interface CartItemWithProduct extends CartItem {
         attribute?: {
           name?: string;
           code?: string | null; // Đổi type thành code
-        }
+        };
       };
     }>;
     quantity: number;
@@ -49,10 +49,11 @@ export interface CartResponse {
   categoryId?: string;
   categoryPath?: string[];
   variantCode?: string;
+  variantAttributes?: any[];
   image?: string;
   color?: string;
   colorValue?: string;
-  storage?: string;       
+  storage?: string;
   storageValue?: string;
   quantity: number;
   unitPrice: number;

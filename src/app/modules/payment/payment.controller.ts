@@ -167,4 +167,4 @@ export const stripeWebhookHandler = async (req: Request, res: Response) => {
  * GET /payment/stripe/return
  * Stripe redirect FE về đây sau khi thanh toán
  */
-export const stripeReturnHandler = (req: Request, res: Response): void => _stripeReturnHandler(req, res);
+export const stripeReturnHandler = (req: Request, res: Response): Promise<void> => _stripeReturnHandler(req, res);
