@@ -174,15 +174,18 @@ export const loginWithGoogle = async (idToken: string, meta?: OAuthLoginMeta) =>
 
 export const loginWithFacebook = async (accessToken: string, meta?: OAuthLoginMeta) => {
   // Bổ sung birthday và gender vào fields
-  const fields = "id,name,email,picture.type(large),birthday,gender";
+  const fields = "id,name,picture.type(large),birthday,gender";
   const url = `https://graph.facebook.com/me?fields=${fields}&access_token=${accessToken}`;
 
   const response = await fetch(url);
   const data = (await response.json()) as any;
 
   if (!response.ok || data.error) {
+    // IN LỖI RA MÀN HÌNH TERMINAL (NODE.JS)
+    console.log("==== LỖI TỪ FACEBOOK ====", data.error); 
     throw new UnauthorizedError("Facebook token không hợp lệ");
   }
+
   if (!data.id) {
     throw new UnauthorizedError("Không lấy được thông tin từ Facebook");
   }

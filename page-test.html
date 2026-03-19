@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý Page / Policy</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 p-8 font-sans text-gray-800 relative">
+
+    <div class="max-w-7xl mx-auto bg-white rounded-lg shadow-sm overflow-hidden">
+        
+        <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-semibold text-gray-800">Page / Policy</h1>
+                <div class="text-sm text-gray-500 mt-1">Dashboard / Page</div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </span>
+                    <input type="text" id="searchInput" placeholder="Tìm kiếm theo title" 
+                           class="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm w-64">
+                </div>
+                <select id="typeFilter" class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Tất cả</option>
+                    <option value="PAGE">Trang tĩnh</option>
+                    <option value="POLICY">Chính sách</option>
+                </select>
+                <button onclick="openModal('create')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center transition-colors shadow-sm">
+                    <i class="fa-solid fa-plus mr-2"></i> Thêm mới
+                </button>
+            </div>
+        </div>
+
+        <div class="px-6 pt-3 bg-gray-50 border-b border-gray-200 flex space-x-6">
+            <button id="tabActive" onclick="switchTab('active')" class="pb-3 text-sm font-medium text-blue-600 border-b-2 border-blue-600 transition-colors">
+                <i class="fa-solid fa-list-check mr-1"></i> Đang hoạt động
+            </button>
+            <button id="tabTrash" onclick="switchTab('trash')" class="pb-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors cursor-pointer">
+                <i class="fa-solid fa-trash-can mr-1"></i> Thùng rác
+            </button>
+        </div>
+
+        <div class="overflow-x-auto min-h-[400px]">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider border-b border-gray-200">
+                        <th class="px-6 py-3 font-medium">Title</th>
+                        <th class="px-6 py-3 font-medium">Đường dẫn</th>
+                        <th class="px-6 py-3 font-medium">Loại</th>
+                        <th class="px-6 py-3 font-medium">Chính sách</th>
+                        <th class="px-6 py-3 font-medium text-center">Trạng thái</th>
+                        <th class="px-6 py-3 font-medium text-center">Thứ tự</th>
+                        <th class="px-6 py-3 font-medium" id="dateHeader">Ngày tạo</th>
+                        <th class="px-6 py-3 font-medium text-center">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody" class="divide-y divide-gray-200 text-sm">
+                    <tr><td colspan="8" class="px-6 py-8 text-center text-gray-500">Đang tải dữ liệu...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-white">
+            <div class="flex items-center text-sm text-gray-500">
+                <span class="mr-2">Rows per page:</span>
+                <select id="limitSelect" class="border-none focus:ring-0 cursor-pointer font-medium text-gray-700 outline-none">
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                </select>
+            </div>
+            <div class="flex items-center space-x-4 text-sm text-gray-600">
+                <span id="pageInfo">0-0 of 0</span>
+                <div class="flex space-x-1">
+                    <button id="prevBtn" class="p-1 rounded hover:bg-gray-100 disabled:opacity-50 text-gray-400 hover:text-gray-600 transition-colors">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <button id="nextBtn" class="p-1 rounded hover:bg-gray-100 disabled:opacity-50 text-gray-400 hover:text-gray-600 transition-colors">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="pageModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center z-50 px-4 transition-opacity">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden animate-[fadeIn_0.2s_ease-out]">
+            
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 shrink-0">
+                <h2 id="modalTitle" class="text-lg font-semibold text-gray-800">Thêm trang mới</h2>
+                <button type="button" onclick="closeModal()" class="text-gray-400 hover:text-gray-700 transition-colors"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            
+            <form id="pageForm" onsubmit="handleSave(event)" class="flex flex-col flex-grow overflow-hidden">
+                <div class="px-6 py-5 overflow-y-auto flex-grow">
+                    <input type="hidden" id="pageId">
+                    <div class="grid grid-cols-2 gap-5">
+                        <div class="col-span-2 sm:col-span-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Tiêu đề *</label>
+                            <input type="text" id="title" required oninput="autoGenerateSlug()" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        </div>
+                        <div class="col-span-2 sm:col-span-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Đường dẫn (Slug) *</label>
+                            <input type="text" id="slug" required class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="vd: gio-thieu">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Loại trang *</label>
+                            <select id="type" required onchange="togglePolicyType()" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 outline-none">
+                                <option value="PAGE">Trang tĩnh (PAGE)</option>
+                                <option value="POLICY">Chính sách (POLICY)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Loại chính sách</label>
+                            <select id="policyType" disabled class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-gray-100 text-gray-500 outline-none">
+                                <option value="">-- Chọn --</option>
+                                <option value="PRIVACY">Bảo mật (PRIVACY)</option>
+                                <option value="TERMS">Điều khoản (TERMS)</option>
+                                <option value="SHIPPING">Giao hàng (SHIPPING)</option>
+                                <option value="RETURN">Đổi trả (RETURN)</option>
+                                <option value="PAYMENT">Thanh toán (PAYMENT)</option>
+                                <option value="WARRANTY">Bảo hành (WARRANTY)</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center space-x-6">
+                            <div class="w-1/2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Độ ưu tiên</label>
+                                <input type="number" id="priority" value="0" required class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 outline-none">
+                            </div>
+                            <div class="w-1/2 mt-6">
+                                <label class="inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="isPublished" checked class="sr-only peer">
+                                    <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                    <span class="ms-3 text-sm font-medium text-gray-700">Hiển thị</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-5 mb-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nội dung bài viết *</label>
+                        <div class="border border-gray-300 rounded-md flex flex-col">
+                            <div id="quill-editor" class="bg-white text-base h-[350px] rounded-b-md"></div>
+                        </div>
+                    </div>
+                    
+                    <div id="formError" class="text-red-500 text-sm hidden mt-3 p-3 bg-red-50 rounded-md border border-red-200"></div>
+                </div>
+                
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3 shrink-0">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">Hủy</button>
+                    <button type="submit" id="saveBtn" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 flex items-center transition-colors">
+                        <i class="fa-solid fa-spinner fa-spin mr-2 hidden" id="saveSpinner"></i> Lưu thay đổi
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid #e5e7eb; background: #f9fafb; border-radius: 0.375rem 0.375rem 0 0; }
+        .ql-container.ql-snow { border: none; }
+        .overflow-y-auto::-webkit-scrollbar { width: 8px; }
+        .overflow-y-auto::-webkit-scrollbar-track { background: transparent; }
+        .overflow-y-auto::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+        .overflow-y-auto::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+        .ql-editor::-webkit-scrollbar { width: 6px; }
+        .ql-editor::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .ql-editor::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .ql-editor::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+
+    <script>
+        // ⚠️ ĐIỀN TOKEN VÀ PORT SERVER VÀO ĐÂY ⚠️
+        const ADMIN_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJhYmIxN2ZhMi0yYmMyLTRmZGYtODY2NC1mMTU0NzMzZDZkNzEiLCJyb2xlIjoiQURNSU4iLCJpYXQiOjE3NzM3Mzc3MzEsImV4cCI6MTc3MzczODYzMX0.3XYg47rqspOMnxoC9iQo180_gv3kFsTAT_8xvJt7HhQ"; 
+        const BASE_API_URL = "http://localhost:5000/api/v1/pages/admin"; 
+
+        let currentTab = 'active'; // 'active' hoặc 'trash'
+        let currentPage = 1;
+        let currentLimit = 10;
+        let totalItems = 0;
+        let modalMode = 'create'; 
+
+        const tableBody = document.getElementById('tableBody');
+        const modal = document.getElementById('pageModal');
+        const formError = document.getElementById('formError');
+
+        // KHỞI TẠO QUILL
+        const quill = new Quill('#quill-editor', {
+            theme: 'snow',
+            placeholder: 'Nhập nội dung bài viết...',
+            modules: {
+                toolbar: [
+                    [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'color': [] }, { 'background': [] }],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    [{ 'align': [] }],
+                    ['link', 'image', 'video'],
+                    ['clean']
+                ]
+            }
+        });
+
+        // ================= TABS LOGIC =================
+        function switchTab(tab) {
+            currentTab = tab;
+            currentPage = 1;
+            
+            // Đổi UI Tab
+            const activeClass = "pb-3 text-sm font-medium text-blue-600 border-b-2 border-blue-600 transition-colors";
+            const inactiveClass = "pb-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors cursor-pointer";
+            
+            document.getElementById('tabActive').className = tab === 'active' ? activeClass : inactiveClass;
+            document.getElementById('tabTrash').className = tab === 'trash' ? activeClass : inactiveClass;
+
+            // Đổi tiêu đề cột Ngày
+            document.getElementById('dateHeader').textContent = tab === 'active' ? 'Ngày tạo' : 'Ngày xóa';
+
+            fetchPages();
+        }
+
+        // ================= 1. GỌI API LẤY DANH SÁCH =================
+        async function fetchPages() {
+            try {
+                const keyword = document.getElementById('searchInput').value;
+                const type = document.getElementById('typeFilter').value;
+                
+                const queryParams = new URLSearchParams({ page: currentPage, limit: currentLimit });
+                if (keyword) queryParams.append('keyword', keyword);
+                if (type) queryParams.append('type', type);
+
+                // Xác định Endpoint dựa theo Tab
+                const endpoint = currentTab === 'active' ? '/all' : '/trash';
+
+                const response = await fetch(`${BASE_API_URL}${endpoint}?${queryParams.toString()}`, {
+                    headers: { 'Authorization': `Bearer ${ADMIN_TOKEN}` }
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    totalItems = result.pagination.total;
+                    renderTable(result.data);
+                    updatePagination();
+                } else {
+                    tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-red-500 py-6">${result.message}</td></tr>`;
+                }
+            } catch (error) {
+                tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-red-500 py-6">Lỗi kết nối Server</td></tr>`;
+            }
+        }
+
+        // ================= 2. RENDER TABLE (ĐỘNG THEO TAB) =================
+        function renderTable(pages) {
+            if (!pages.length) {
+                const emptyMsg = currentTab === 'active' ? 'Không có dữ liệu' : 'Thùng rác đang trống';
+                return tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-gray-500 py-10">${emptyMsg}</td></tr>`;
+            }
+
+            tableBody.innerHTML = pages.map(page => {
+                // Xử lý Cột Trạng Thái (Bật/Tắt nhanh)
+                let statusHtml = '';
+                if (currentTab === 'active') {
+                    statusHtml = `
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="checkbox" onchange="toggleStatus('${page.id}', this.checked)" ${page.isPublished ? 'checked' : ''} class="sr-only peer">
+                            <div class="relative w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+                        </label>
+                    `;
+                } else {
+                    statusHtml = `<span class="text-xs font-medium px-2 py-1 rounded bg-red-50 text-red-600">Đã xóa</span>`;
+                }
+
+                // Xử lý Cột Thao Tác
+                let actionsHtml = '';
+                if (currentTab === 'active') {
+                    actionsHtml = `
+                        <button onclick="openModal('edit', '${page.id}')" class="text-blue-500 hover:text-blue-700 p-1" title="Sửa"><i class="fa-regular fa-pen-to-square"></i></button>
+                        <button onclick="handleSoftDelete('${page.id}')" class="text-orange-500 hover:text-orange-700 p-1" title="Đưa vào thùng rác"><i class="fa-regular fa-trash-can"></i></button>
+                    `;
+                } else {
+                    actionsHtml = `
+                        <button onclick="handleRestore('${page.id}')" class="text-green-500 hover:text-green-700 p-1 mr-2" title="Khôi phục"><i class="fa-solid fa-clock-rotate-left"></i></button>
+                        <button onclick="handleHardDelete('${page.id}')" class="text-red-500 hover:text-red-700 p-1" title="Xóa vĩnh viễn"><i class="fa-solid fa-circle-xmark"></i></button>
+                    `;
+                }
+
+                const dateToShow = currentTab === 'active' ? page.createdAt : page.deletedAt;
+
+                return `
+                <tr class="hover:bg-gray-50 transition-colors group">
+                    <td class="px-6 py-4 flex items-center">
+                        <div class="w-8 h-8 rounded ${page.type === 'PAGE' ? 'bg-gray-100 text-gray-500' : 'bg-blue-50 text-blue-500'} flex items-center justify-center mr-3 shrink-0">
+                            <i class="${page.type === 'PAGE' ? 'fa-regular fa-file-lines' : 'fa-solid fa-shield-halved'}"></i>
+                        </div>
+                        <span class="font-medium text-gray-900 line-clamp-1">${page.title}</span>
+                    </td>
+                    <td class="px-6 py-4 text-gray-500">/${page.slug}</td>
+                    <td class="px-6 py-4"><span class="px-2.5 py-1 rounded text-xs font-medium ${page.type === 'PAGE' ? 'bg-gray-100 text-gray-700' : 'bg-blue-50 text-blue-700'}">${page.type}</span></td>
+                    <td class="px-6 py-4">${page.policyType ? `<span class="bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-1 rounded text-xs font-medium">${page.policyType}</span>` : '<span class="text-gray-400">-</span>'}</td>
+                    <td class="px-6 py-4 text-center">${statusHtml}</td>
+                    <td class="px-6 py-4 text-center font-medium">${page.priority || 0}</td>
+                    <td class="px-6 py-4 text-gray-500">${new Date(dateToShow).toLocaleDateString('vi-VN')}</td>
+                    <td class="px-6 py-4 text-center">
+                        <div class="flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            ${actionsHtml}
+                        </div>
+                    </td>
+                </tr>
+            `}).join('');
+        }
+
+        // ================= 3. ĐỔI TRẠNG THÁI NHANH (QUICK TOGGLE) =================
+        async function toggleStatus(id, isPublished) {
+            try {
+                const res = await fetch(`${BASE_API_URL}/${id}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ADMIN_TOKEN}` },
+                    body: JSON.stringify({ isPublished })
+                });
+                const data = await res.json();
+                if(!res.ok) {
+                    alert(data.message || "Cập nhật trạng thái thất bại!");
+                    fetchPages(); // Load lại để revert công tắc
+                }
+            } catch(e) { 
+                alert("Lỗi mạng!"); 
+                fetchPages(); 
+            }
+        }
+
+        // ================= 4. THÙNG RÁC: XÓA MỀM, KHÔI PHỤC, XÓA VĨNH VIỄN =================
+        async function handleSoftDelete(id) {
+            if(!confirm("Đưa trang này vào thùng rác?")) return;
+            executeAction(`${BASE_API_URL}/${id}`, 'DELETE');
+        }
+
+        async function handleRestore(id) {
+            if(!confirm("Khôi phục lại trang tĩnh này?")) return;
+            executeAction(`${BASE_API_URL}/${id}/restore`, 'PATCH');
+        }
+
+        async function handleHardDelete(id) {
+            if(!confirm("CẢNH BÁO: Xóa vĩnh viễn không thể hoàn tác! Bạn có chắc không?")) return;
+            executeAction(`${BASE_API_URL}/${id}/hard-delete`, 'DELETE');
+        }
+
+        async function executeAction(url, method) {
+            try {
+                const res = await fetch(url, { method, headers: { 'Authorization': `Bearer ${ADMIN_TOKEN}` } });
+                const data = await res.json();
+                if(res.ok) { fetchPages(); } 
+                else { alert(data.message || "Thao tác thất bại!"); }
+            } catch(e) { alert("Lỗi mạng!"); }
+        }
+
+        // ================= 5. FORM MODAL THÊM / SỬA =================
+        async function openModal(mode, id = null) {
+            modalMode = mode;
+            formError.classList.add('hidden');
+            document.getElementById('pageForm').reset();
+            
+            document.getElementById('modalTitle').textContent = mode === 'create' ? 'Thêm trang mới' : 'Cập nhật trang';
+            togglePolicyType();
+
+            if (mode === 'edit') {
+                try {
+                    const response = await fetch(`${BASE_API_URL}/${id}`, { headers: { 'Authorization': `Bearer ${ADMIN_TOKEN}` }});
+                    const result = await response.json();
+                    if(response.ok) {
+                        const p = result.data;
+                        document.getElementById('pageId').value = p.id;
+                        document.getElementById('title').value = p.title;
+                        document.getElementById('slug').value = p.slug;
+                        document.getElementById('type').value = p.type;
+                        document.getElementById('policyType').value = p.policyType || "";
+                        document.getElementById('priority').value = p.priority;
+                        document.getElementById('isPublished').checked = p.isPublished;
+                        quill.root.innerHTML = p.content;
+                        togglePolicyType();
+                    } else { alert("Lỗi lấy dữ liệu: " + result.message); return; }
+                } catch(e) { alert("Lỗi kết nối khi tải chi tiết trang!"); return; }
+            } else { quill.root.innerHTML = ''; }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeModal() { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+
+        function togglePolicyType() {
+            const type = document.getElementById('type').value;
+            const policySelect = document.getElementById('policyType');
+            if (type === 'POLICY') {
+                policySelect.disabled = false; policySelect.classList.remove('bg-gray-100', 'text-gray-500');
+            } else {
+                policySelect.disabled = true; policySelect.value = ""; policySelect.classList.add('bg-gray-100', 'text-gray-500');
+            }
+        }
+
+        function autoGenerateSlug() {
+            if (modalMode === 'edit') return; 
+            let title = document.getElementById('title').value;
+            let slug = title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").trim();
+            document.getElementById('slug').value = slug;
+        }
+
+        async function handleSave(e) {
+            e.preventDefault();
+            const btnSpinner = document.getElementById('saveSpinner');
+            const saveBtn = document.getElementById('saveBtn');
+            formError.classList.add('hidden');
+
+            const editorContent = quill.root.innerHTML;
+            if (editorContent === '<p><br></p>' || editorContent.trim() === '') return showError("Nội dung không được để trống!");
+
+            const payload = {
+                title: document.getElementById('title').value,
+                slug: document.getElementById('slug').value,
+                type: document.getElementById('type').value,
+                priority: Number(document.getElementById('priority').value),
+                isPublished: document.getElementById('isPublished').checked,
+                content: editorContent 
+            };
+            
+            const policyVal = document.getElementById('policyType').value;
+            if(payload.type === 'POLICY') {
+                if(!policyVal) return showError("Vui lòng chọn Loại chính sách");
+                payload.policyType = policyVal;
+            } else { payload.policyType = null; }
+
+            const url = modalMode === 'create' ? BASE_API_URL : `${BASE_API_URL}/${document.getElementById('pageId').value}`;
+            const method = modalMode === 'create' ? 'POST' : 'PATCH';
+
+            try {
+                btnSpinner.classList.remove('hidden'); saveBtn.disabled = true;
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ADMIN_TOKEN}` },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                if (response.ok) {
+                    closeModal();
+                    if(currentTab === 'trash') switchTab('active'); else fetchPages(); 
+                } else { showError(result.message || 'Có lỗi xảy ra!'); }
+            } catch (err) { showError('Lỗi kết nối máy chủ khi lưu.'); }
+            finally { btnSpinner.classList.add('hidden'); saveBtn.disabled = false; }
+        }
+
+        function showError(msg) { formError.textContent = msg; formError.classList.remove('hidden'); }
+
+        // ================= SỰ KIỆN PHÂN TRANG & TÌM KIẾM =================
+        document.getElementById('searchInput').addEventListener('keypress', e => { if (e.key === 'Enter') { currentPage = 1; fetchPages(); } });
+        document.getElementById('typeFilter').addEventListener('change', () => { currentPage = 1; fetchPages(); });
+        document.getElementById('limitSelect').addEventListener('change', e => { currentLimit = Number(e.target.value); currentPage = 1; fetchPages(); });
+        document.getElementById('prevBtn').addEventListener('click', () => { if (currentPage > 1) { currentPage--; fetchPages(); } });
+        document.getElementById('nextBtn').addEventListener('click', () => { if (currentPage < Math.ceil(totalItems / currentLimit)) { currentPage++; fetchPages(); } });
+
+        function updatePagination() {
+            const start = (currentPage - 1) * currentLimit + 1;
+            const end = Math.min(currentPage * currentLimit, totalItems);
+            document.getElementById('pageInfo').textContent = totalItems > 0 ? `${start}-${end} của ${totalItems}` : `0-0 của 0`;
+            document.getElementById('prevBtn').disabled = currentPage === 1;
+            document.getElementById('nextBtn').disabled = end >= totalItems;
+        }
+
+        fetchPages();
+    </script>
+</body>
+</html>

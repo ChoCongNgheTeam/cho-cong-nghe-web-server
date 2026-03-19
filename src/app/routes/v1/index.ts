@@ -34,6 +34,9 @@ import pageRoutes from "@/app/modules/page/page.route";
 import uploadRoutes from "@/app/modules/upload/upload.route";
 import homeRouter from "@/app/modules/home/home.route";
 
+// ===== Chatbot =====
+import { chatbotRoute } from "@/app/modules/chatbot/chatbot.route";
+
 const router = Router();
 
 // ===== Core & Auth =====
@@ -69,5 +72,8 @@ router.use("/pages", pageRoutes);
 // ===== Upload & Home =====
 router.use("/upload", uploadRoutes);
 router.use("/home", homeRouter);
+
+// ===== Chatbot =====
+router.use("/chatbot", chatbotRoute);
 
 export default router;

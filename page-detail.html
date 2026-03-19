@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đọc Trang - Chợ Công Nghệ</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50 flex flex-col min-h-screen font-sans text-gray-800">
+
+    <nav class="bg-blue-600 text-white p-4 shadow-md">
+        <div class="max-w-4xl mx-auto font-bold text-lg flex items-center">
+            <i class="fa-solid fa-store mr-2"></i> Chợ Công Nghệ
+        </div>
+    </nav>
+
+    <main class="flex-grow max-w-4xl mx-auto w-full p-8 my-8 bg-white shadow-sm rounded-lg min-h-[500px]">
+        
+        <div class="text-sm text-gray-500 mb-6 flex items-center">
+            <a href="#" class="hover:text-blue-600 transition-colors">Trang chủ</a>
+            <span class="mx-2"><i class="fa-solid fa-chevron-right text-xs"></i></span>
+            <span id="breadcrumbTitle">Đang tải...</span>
+        </div>
+
+        <div id="loading" class="text-center py-20 text-gray-500">
+            <i class="fa-solid fa-circle-notch fa-spin text-4xl text-blue-600 mb-4"></i>
+            <p>Đang tải nội dung trang...</p>
+        </div>
+
+        <div id="error" class="hidden text-center py-20">
+            <i class="fa-solid fa-triangle-exclamation text-4xl text-red-500 mb-4"></i>
+            <h2 class="text-red-500 font-bold text-xl">Không tìm thấy nội dung</h2>
+            <p class="text-gray-500 mt-2">Trang bạn yêu cầu không tồn tại hoặc đã bị xóa.</p>
+        </div>
+
+        <div id="contentWrapper" class="hidden">
+            <h1 id="pageTitle" class="text-3xl font-bold text-gray-900 mb-4"></h1>
+            <p id="updatedAt" class="text-sm text-gray-400 mb-8 border-b border-gray-100 pb-4"></p>
+            
+            <div id="pageBody" class="prose prose-blue max-w-none prose-img:rounded-lg prose-headings:text-gray-800 prose-a:text-blue-600">
+                </div>
+        </div>
+
+    </main>
+
+    <footer class="bg-gray-900 text-white pt-12 pb-6 mt-auto">
+        <div class="max-w-4xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+            
+            <div>
+                <h3 class="text-lg font-bold mb-4 flex items-center text-blue-400">
+                    <i class="fa-solid fa-store mr-2"></i> Chợ Công Nghệ
+                </h3>
+                <p class="text-gray-400 text-sm leading-relaxed">
+                    Hệ thống bán lẻ các sản phẩm công nghệ chính hãng, uy tín và chất lượng hàng đầu Việt Nam.
+                </p>
+            </div>
+            
+            <div>
+                <h3 class="text-lg font-bold mb-4 uppercase tracking-wider text-sm">Về chúng tôi</h3>
+                <ul id="footerPages" class="space-y-3 text-sm text-gray-400">
+                    <li><i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang tải...</li>
+                </ul>
+            </div>
+            
+            <div>
+                <h3 class="text-lg font-bold mb-4 uppercase tracking-wider text-sm">Chính sách</h3>
+                <ul id="footerPolicies" class="space-y-3 text-sm text-gray-400">
+                    <li><i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang tải...</li>
+                </ul>
+            </div>
+
+        </div>
+        
+        <div class="border-t border-gray-800 pt-6 text-center text-sm text-gray-500">
+            &copy; 2026 Chợ Công Nghệ - FPT Polytechnic. All rights reserved.
+        </div>
+    </footer>
+
+    <script>
+        // ========================================================
+        // ⚠️ BƯỚC QUAN TRỌNG: CẤU HÌNH API
+        // ========================================================
+        const API_URL = "http://localhost:5000/api/v1/pages"; // Đổi port của bạn vào đây
+        
+        // TỰ ĐỘNG LẤY SLUG TỪ THANH URL (vd: ?slug=gioi-thieu)
+        // Nếu không có, mặc định sẽ lấy trang "dieu-khoan-su-dung" để test
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentSlug = urlParams.get('slug') || "dieu-khoan-su-dung"; 
+        
+        // Hàm dịch ngược HTML (Cách 2)
+        function decodeHTML(htmlStr) {
+            var txt = document.createElement("textarea");
+            txt.innerHTML = htmlStr;
+            return txt.value;
+        }
+
+        // ==========================================
+        // 1. GỌI API LẤY CHI TIẾT TRANG (Phần thân)
+        // ==========================================
+        async function fetchPageDetail() {
+            try {
+                const response = await fetch(`${API_URL}/${currentSlug}`);
+                const result = await response.json();
+
+                document.getElementById('loading').classList.add('hidden');
+
+                if (response.ok && result.data) {
+                    const page = result.data;
+                    
+                    document.getElementById('breadcrumbTitle').textContent = page.title;
+                    document.getElementById('pageTitle').textContent = page.title;
+                    
+                    const date = new Date(page.updatedAt).toLocaleDateString('vi-VN', {
+                        day: '2-digit', month: '2-digit', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                    });
+                    document.getElementById('updatedAt').textContent = `Cập nhật lần cuối: ${date}`;
+
+                    const decodedContent = decodeHTML(page.content);
+                    document.getElementById('pageBody').innerHTML = decodedContent;
+
+                    document.getElementById('contentWrapper').classList.remove('hidden');
+                } else {
+                    document.getElementById('error').classList.remove('hidden');
+                }
+            } catch (error) {
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('error').innerHTML = `
+                    <i class="fa-solid fa-server text-4xl text-red-500 mb-4"></i>
+                    <h2 class="text-red-500 font-bold text-xl">Lỗi kết nối máy chủ</h2>
+                    <p class="text-gray-500 mt-2">Vui lòng kiểm tra lại Backend.</p>
+                `;
+                document.getElementById('error').classList.remove('hidden');
+            }
+        }
+
+        // ==========================================
+        // 2. GỌI API LẤY DANH SÁCH (Cho Footer)
+        // ==========================================
+        async function fetchFooterLinks() {
+            try {
+                // Gọi API lấy danh sách tất cả các trang (đã sắp xếp theo priority từ BE)
+                const response = await fetch(API_URL); 
+                const result = await response.json();
+
+                if (response.ok && result.data) {
+                    const pages = result.data;
+                    
+                    // Tách riêng mảng Trang tĩnh (PAGE) và Chính sách (POLICY)
+                    const staticPages = pages.filter(p => p.type === 'PAGE');
+                    const policies = pages.filter(p => p.type === 'POLICY');
+
+                    // Hàm phụ: Dùng để sinh ra các thẻ <li> chứa thẻ <a>
+                    const renderLinks = (list) => list.map(item => `
+                        <li>
+                            <a href="?slug=${item.slug}" class="hover:text-blue-400 transition-colors flex items-center group">
+                                <i class="fa-solid fa-angle-right text-xs mr-2 text-gray-600 group-hover:text-blue-400 transition-colors"></i> 
+                                ${item.title}
+                            </a>
+                        </li>
+                    `).join('');
+
+                    // Đổ dữ liệu vào cột "Về chúng tôi"
+                    document.getElementById('footerPages').innerHTML = staticPages.length > 0 
+                        ? renderLinks(staticPages) 
+                        : '<li>Chưa có thông tin</li>';
+                        
+                    // Đổ dữ liệu vào cột "Chính sách"
+                    document.getElementById('footerPolicies').innerHTML = policies.length > 0 
+                        ? renderLinks(policies) 
+                        : '<li>Chưa có chính sách</li>';
+                }
+            } catch (error) {
+                console.error("Lỗi tải danh sách footer:", error);
+                document.getElementById('footerPages').innerHTML = '<li class="text-red-400">Lỗi tải dữ liệu</li>';
+                document.getElementById('footerPolicies').innerHTML = '<li class="text-red-400">Lỗi tải dữ liệu</li>';
+            }
+        }
+
+        // Chạy cả 2 hàm cùng lúc khi trình duyệt vừa load xong
+        fetchPageDetail();
+        fetchFooterLinks();
+    </script>
+</body>
+</html>

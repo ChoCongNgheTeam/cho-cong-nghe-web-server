@@ -101,11 +101,17 @@ enum PageType {
 }
 
 enum PolicyType {
-  PRIVACY
-  TERMS
-  SHIPPING
-  RETURN
-  PAYMENT
+  DATA_PRIVACY          // Cho DataPrivacy
+  DELIVERY              // Cho Delivery
+  DELIVERY_INSTALLATION // Cho DeliveryInstallation
+  INSTALLMENT           // Cho Installment
+  LOYALTY               // Cho Loyalty
+  MOBILE_NETWORK        // Cho MobileNetwork
+  PRIVACY               // Cho Privacy
+  RETURN                // Cho Return
+  TECHNICAL_SUPPORT     // Cho Technical-support
+  UNBOXING              // Cho unboxing
+  WARRANTY              // Cho warranty-policy
 }
 
 enum FilterType {
