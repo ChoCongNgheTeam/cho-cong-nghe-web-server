@@ -193,6 +193,7 @@ export const transformProductCard = (product: any): ProductCard | null => {
     priceOrigin: Number(defaultVariant.price),
     slug: product.slug,
     thumbnail,
+    createdAt: product.createdAt ? new Date(product.createdAt) : null,
     rating: {
       average: Number(product.ratingAverage) || 0,
       count: product.ratingCount || 0,
@@ -227,7 +228,12 @@ export const transformProductDetail = (product: any, reviewStats?: ReviewStats):
     // Individual mode: FE chọn riêng từng attribute (color, storage...)
     const selectedOptions: Record<string, string> = {};
     for (const va of currentVariant.variantAttributes) {
+      // console.log("va:", va);
+      // console.log("attributeOption:", va.attributeOption);
+      // console.log("attribute:", va.attributeOption?.attribute);
       const type = va.attributeOption.attribute.code;
+      // console.log("type:", type);
+
       selectedOptions[type] = va.attributeOption.value;
     }
     availableOptions = buildAvailableOptionsWithStatus(validVariants, product.img || [], selectedOptions);

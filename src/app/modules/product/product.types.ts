@@ -141,6 +141,7 @@ export interface ProductCard {
   originalPrice?: number;
   discount?: number;
   thumbnail: string;
+  createdAt: Date | null;
   rating: {
     average: number;
     count: number;

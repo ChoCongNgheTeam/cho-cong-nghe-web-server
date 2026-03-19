@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import * as categoryService from "./category.service";
 import { parseMultipartData, uploadCategoryImage } from "./category.helpers";
 import { cleanupFile } from "@/services/file-cleanup.service";
-import { listCategoriesQuerySchema, featuredCategoriesQuerySchema } from "./category.validation";
+import { listCategoriesQuerySchema, featuredCategoriesQuerySchema, createCategorySchema, updateCategorySchema } from "./category.validation";
 
 // Public
 
@@ -37,8 +37,18 @@ export const getCategoryBySlugHandler = async (req: Request, res: Response) => {
 
 export const getCategoriesAdminHandler = async (req: Request, res: Response) => {
   const query = listCategoriesQuerySchema.parse(req.query);
-  const categories = await categoryService.getCategoriesAdmin(query);
-  res.json({ data: categories, total: categories.length, message: "Lấy danh sách danh mục thành công" });
+  const result = await categoryService.getCategoriesAdmin(query);
+  res.json({
+    data: result.data,
+    meta: {
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      totalPages: result.totalPages,
+      statusCounts: result.statusCounts,
+    },
+    message: "Lấy danh sách danh mục thành công",
+  });
 };
 
 export const getAllCategoriesHandler = async (req: Request, res: Response) => {
@@ -63,10 +73,12 @@ export const createCategoryHandler = async (req: Request, res: Response) => {
   const file = req.file;
   try {
     const parsedBody = parseMultipartData(req.body);
+    // Validate sau khi parse để Zod thấy đúng kiểu dữ liệu (boolean thật, không phải string)
+    const validatedBody = createCategorySchema.parse(parsedBody);
     const uploadedImage = file ? await uploadCategoryImage(file) : null;
 
     const category = await categoryService.createCategory({
-      ...parsedBody,
+      ...validatedBody,
       ...(uploadedImage && { imageUrl: uploadedImage.url, imagePath: uploadedImage.publicId }),
     });
 
@@ -80,10 +92,12 @@ export const updateCategoryHandler = async (req: Request, res: Response) => {
   const file = req.file;
   try {
     const parsedBody = parseMultipartData(req.body);
+    // Validate sau khi parse — đảm bảo isActive/isFeatured là boolean thật
+    const validatedBody = updateCategorySchema.parse(parsedBody);
     const uploadedImage = file ? await uploadCategoryImage(file) : null;
 
     const category = await categoryService.updateCategory(req.params.id, {
-      ...parsedBody,
+      ...validatedBody,
       ...(uploadedImage && { imageUrl: uploadedImage.url, imagePath: uploadedImage.publicId }),
     });
 

@@ -77,7 +77,6 @@ export const updateBrand = async (id: string, data: UpdateBrandInput) => {
 };
 
 // Soft delete — Admin only
-// Guard: không xóa nếu còn sản phẩm active liên kết
 export const softDeleteBrand = async (id: string, deletedById: string) => {
   await assertBrandExists(id);
 
@@ -95,18 +94,15 @@ export const restoreBrand = async (id: string) => {
   if (!brand) throw new NotFoundError("Thương hiệu");
   if (!brand.deletedAt) throw new BadRequestError("Thương hiệu này chưa bị xóa");
 
-  // Kiểm tra name/slug không bị conflict sau khi restore
   const nameConflict = await brandRepository.checkNameExists(brand.name, id);
   if (nameConflict) {
     throw new BadRequestError(`Không thể khôi phục vì tên "${brand.name}" đã được dùng bởi thương hiệu khác`);
   }
 
-  const restored = await brandRepository.restore(id);
-  return restored;
+  return brandRepository.restore(id);
 };
 
 // Hard delete — Admin only, CHỈ sau khi đã soft delete
-// Xóa ảnh Cloudinary trước khi hard delete
 export const hardDeleteBrand = async (id: string) => {
   const brand = (await brandRepository.findById(id, { includeDeleted: true, isAdmin: true })) as any;
   if (!brand) throw new NotFoundError("Thương hiệu");

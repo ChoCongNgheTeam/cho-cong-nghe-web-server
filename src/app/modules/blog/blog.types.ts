@@ -15,6 +15,13 @@ export interface Author {
   avatarImage?: string;
 }
 
+/**
+ * Author với blog count — dùng cho filter dropdown FE
+ */
+export interface BlogAuthor extends Author {
+  blogCount: number;
+}
+
 // ─── Response shapes ─────────────────────────────────────────────────────────
 
 export interface BlogCard {
@@ -27,6 +34,7 @@ export interface BlogCard {
   status: BlogStatus;
   author: Author;
   createdAt: Date;
+  updatedAt?: Date; // có trong admin response
   publishedAt?: Date;
   commentsCount?: number;
   // Soft delete — chỉ xuất hiện trong response admin/trash

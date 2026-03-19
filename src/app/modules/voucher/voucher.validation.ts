@@ -13,14 +13,13 @@ export const TargetTypeEnum = z.enum(["ALL", "PRODUCT", "CATEGORY", "BRAND"]);
 
 export const listVouchersSchema = z.object({
   page: z.coerce.number().positive().default(1),
-  limit: z.coerce.number().positive().max(50).default(12),
+  limit: z.coerce.number().positive().max(100).default(20),
   search: z.string().optional(),
   discountType: DiscountTypeEnum.optional(),
   isActive: z.coerce.boolean().optional(),
   isExpired: z.coerce.boolean().optional(),
-  sortBy: z
-    .enum(["createdAt", "code", "discountValue", "usesCount", "priority"])
-    .default("createdAt"),
+  includeDeleted: z.coerce.boolean().optional().default(false),
+  sortBy: z.enum(["createdAt", "code", "discountValue", "usesCount", "priority"]).default("createdAt"),
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
 });
 
@@ -58,6 +57,7 @@ export const createVoucherSchema = z
     discountType: DiscountTypeEnum,
     discountValue: z.coerce.number().positive("Giá trị giảm giá phải lớn hơn 0"),
     minOrderValue: z.coerce.number().nonnegative().default(0),
+    maxDiscountValue: z.coerce.number().positive().optional(),
     maxUses: z.coerce.number().int().positive().optional(),
     maxUsesPerUser: z.coerce.number().int().positive().optional(),
     startDate: z.coerce.date().optional(),
@@ -69,27 +69,17 @@ export const createVoucherSchema = z
   })
   .refine(
     (data) => {
-      if (data.discountType === "DISCOUNT_PERCENT" && data.discountValue > 100) {
-        return false;
-      }
+      if (data.discountType === "DISCOUNT_PERCENT" && data.discountValue > 100) return false;
       return true;
     },
-    {
-      message: "Giảm giá theo % không được vượt quá 100",
-      path: ["discountValue"],
-    },
+    { message: "Giảm giá theo % không được vượt quá 100", path: ["discountValue"] },
   )
   .refine(
     (data) => {
-      if (data.startDate && data.endDate && data.startDate > data.endDate) {
-        return false;
-      }
+      if (data.startDate && data.endDate && data.startDate > data.endDate) return false;
       return true;
     },
-    {
-      message: "Ngày bắt đầu phải trước ngày kết thúc",
-      path: ["endDate"],
-    },
+    { message: "Ngày bắt đầu phải trước ngày kết thúc", path: ["endDate"] },
   );
 
 export const updateVoucherSchema = z
@@ -99,35 +89,31 @@ export const updateVoucherSchema = z
     discountType: DiscountTypeEnum.optional(),
     discountValue: z.coerce.number().positive().optional(),
     minOrderValue: z.coerce.number().nonnegative().optional(),
-    maxUses: z.coerce.number().int().positive().optional(),
-    maxUsesPerUser: z.coerce.number().int().positive().optional(),
-    startDate: z.coerce.date().optional(),
-    endDate: z.coerce.date().optional(),
+    maxDiscountValue: z.coerce.number().positive().optional().nullable(),
+    maxUses: z.coerce.number().int().positive().optional().nullable(),
+    maxUsesPerUser: z.coerce.number().int().positive().optional().nullable(),
+    startDate: z.coerce.date().optional().nullable(),
+    endDate: z.coerce.date().optional().nullable(),
     priority: z.coerce.number().int().optional(),
     isActive: z.boolean().optional(),
     targets: z.array(voucherTargetSchema).optional(),
   })
   .refine(
     (data) => {
-      if (
-        data.discountType === "DISCOUNT_PERCENT" &&
-        data.discountValue &&
-        data.discountValue > 100
-      ) {
-        return false;
-      }
+      if (data.discountType === "DISCOUNT_PERCENT" && data.discountValue && data.discountValue > 100) return false;
       return true;
     },
-    {
-      message: "Giảm giá theo % không được vượt quá 100",
-      path: ["discountValue"],
-    },
+    { message: "Giảm giá theo % không được vượt quá 100", path: ["discountValue"] },
   );
 
 export const assignVoucherToUsersSchema = z.object({
   voucherId: z.string().uuid(),
   userIds: z.array(z.string().uuid()).min(1, "Phải chọn ít nhất 1 user"),
   maxUsesPerUser: z.coerce.number().int().positive().default(1),
+});
+
+export const bulkDeleteVouchersSchema = z.object({
+  ids: z.array(z.string().uuid("ID không hợp lệ")).min(1, "Phải chọn ít nhất 1 voucher"),
 });
 
 // =====================
@@ -139,3 +125,4 @@ export type ValidateVoucherInput = z.infer<typeof validateVoucherSchema>;
 export type CreateVoucherInput = z.infer<typeof createVoucherSchema>;
 export type UpdateVoucherInput = z.infer<typeof updateVoucherSchema>;
 export type AssignVoucherToUsersInput = z.infer<typeof assignVoucherToUsersSchema>;
+export type BulkDeleteVouchersInput = z.infer<typeof bulkDeleteVouchersSchema>;

@@ -5,25 +5,35 @@ import { z } from "zod";
 // =====================
 
 export const TargetTypeEnum = z.enum(["ALL", "PRODUCT", "CATEGORY", "BRAND"]);
-export const PromotionActionTypeEnum = z.enum([
-  "DISCOUNT_PERCENT",
-  "DISCOUNT_FIXED",
-  "BUY_X_GET_Y",
-  "GIFT_PRODUCT",
-]);
+export const PromotionActionTypeEnum = z.enum(["DISCOUNT_PERCENT", "DISCOUNT_FIXED", "BUY_X_GET_Y", "GIFT_PRODUCT"]);
 
 // =====================
 // === QUERY SCHEMAS ===
 // =====================
 
+// Helper: parse query string boolean đúng cách (giống brand)
+const queryBoolean = z.preprocess((v) => (v === "true" ? true : v === "false" ? false : v), z.boolean().optional());
+
 export const listPromotionsSchema = z.object({
+  // Pagination
   page: z.coerce.number().positive().default(1),
-  limit: z.coerce.number().positive().max(50).default(12),
+  limit: z.coerce.number().positive().max(100).default(20),
+
+  // Search & filter
   search: z.string().optional(),
-  isActive: z.coerce.boolean().optional(),
-  isExpired: z.coerce.boolean().optional(),
-  sortBy: z.enum(["createdAt", "name", "priority", "startDate", "endDate"]).default("priority"),
+  isActive: queryBoolean,
+  isExpired: queryBoolean,
+
+  // Date range filter (theo createdAt)
+  dateFrom: z.coerce.date().optional(),
+  dateTo: z.coerce.date().optional(),
+
+  // Sort
+  sortBy: z.enum(["createdAt", "name", "priority", "startDate", "endDate"]).default("createdAt"),
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
+
+  // Admin only: xem cả promotion đã soft delete
+  includeDeleted: queryBoolean.pipe(z.boolean().optional().default(false)),
 });
 
 // =====================
@@ -38,9 +48,6 @@ export const promotionParamsSchema = z.object({
 // === CREATE/UPDATE SCHEMAS ===
 // =====================
 
-/**
- * Promotion Rule Schema
- */
 const promotionRuleSchema = z
   .object({
     actionType: PromotionActionTypeEnum,
@@ -51,40 +58,24 @@ const promotionRuleSchema = z
   })
   .refine(
     (data) => {
-      // DISCOUNT_PERCENT requires discountValue <= 100
-      if (
-        data.actionType === "DISCOUNT_PERCENT" &&
-        data.discountValue &&
-        data.discountValue > 100
-      ) {
+      if (data.actionType === "DISCOUNT_PERCENT" && data.discountValue && data.discountValue > 100) {
         return false;
       }
       return true;
     },
-    {
-      message: "Giảm giá theo % không được vượt quá 100",
-      path: ["discountValue"],
-    },
+    { message: "Giảm giá theo % không được vượt quá 100", path: ["discountValue"] },
   )
   .refine(
     (data) => {
-      // DISCOUNT actions require discountValue
-      if (
-        (data.actionType === "DISCOUNT_PERCENT" || data.actionType === "DISCOUNT_FIXED") &&
-        !data.discountValue
-      ) {
+      if ((data.actionType === "DISCOUNT_PERCENT" || data.actionType === "DISCOUNT_FIXED") && !data.discountValue) {
         return false;
       }
       return true;
     },
-    {
-      message: "discountValue bắt buộc cho action DISCOUNT",
-      path: ["discountValue"],
-    },
+    { message: "discountValue bắt buộc cho action DISCOUNT", path: ["discountValue"] },
   )
   .refine(
     (data) => {
-      // BUY_X_GET_Y requires buyQuantity and getQuantity
       if (data.actionType === "BUY_X_GET_Y" && (!data.buyQuantity || !data.getQuantity)) {
         return false;
       }
@@ -97,7 +88,6 @@ const promotionRuleSchema = z
   )
   .refine(
     (data) => {
-      // GIFT_PRODUCT requires giftProductVariantId
       if (data.actionType === "GIFT_PRODUCT" && !data.giftProductVariantId) {
         return false;
       }
@@ -109,9 +99,6 @@ const promotionRuleSchema = z
     },
   );
 
-/**
- * Promotion Target Schema
- */
 const promotionTargetSchema = z
   .object({
     targetType: TargetTypeEnum,
@@ -119,16 +106,12 @@ const promotionTargetSchema = z
   })
   .refine(
     (data) => {
-      // If targetType is not ALL, targetId is required
       if (data.targetType !== "ALL" && !data.targetId) {
         return false;
       }
       return true;
     },
-    {
-      message: "targetId bắt buộc khi targetType không phải ALL",
-      path: ["targetId"],
-    },
+    { message: "targetId bắt buộc khi targetType không phải ALL", path: ["targetId"] },
   );
 
 export const createPromotionSchema = z
@@ -152,10 +135,7 @@ export const createPromotionSchema = z
       }
       return true;
     },
-    {
-      message: "Ngày bắt đầu phải trước ngày kết thúc",
-      path: ["endDate"],
-    },
+    { message: "Ngày bắt đầu phải trước ngày kết thúc", path: ["endDate"] },
   );
 
 export const updatePromotionSchema = z
@@ -179,10 +159,7 @@ export const updatePromotionSchema = z
       }
       return true;
     },
-    {
-      message: "Ngày bắt đầu phải trước ngày kết thúc",
-      path: ["endDate"],
-    },
+    { message: "Ngày bắt đầu phải trước ngày kết thúc", path: ["endDate"] },
   );
 
 // =====================

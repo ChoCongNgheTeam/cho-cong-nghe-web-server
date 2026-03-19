@@ -3,8 +3,10 @@ import { CreateCampaignInput, UpdateCampaignInput, ListCampaignsQuery, CampaignC
 
 const prisma = new PrismaClient();
 
+// ── Query builders ─────────────────────────────────────────────────────────────
+
 const buildCampaignWhere = (query: ListCampaignsQuery, onlyActive: boolean): Prisma.campaignsWhereInput => {
-  const where: Prisma.campaignsWhereInput = {};
+  const where: Prisma.campaignsWhereInput = { deletedAt: null };
 
   if (onlyActive) {
     where.isActive = true;
@@ -24,93 +26,111 @@ const buildCampaignWhere = (query: ListCampaignsQuery, onlyActive: boolean): Pri
 };
 
 const buildCampaignOrderBy = (query: ListCampaignsQuery): Prisma.campaignsOrderByWithRelationInput[] => {
-  const orderBy: Prisma.campaignsOrderByWithRelationInput[] = [];
-
-  if (query.sortBy === "createdAt") {
-    orderBy.push({ createdAt: query.sortOrder });
-  } else if (query.sortBy === "startDate") {
-    orderBy.push({ startDate: query.sortOrder });
-  } else if (query.sortBy === "endDate") {
-    orderBy.push({ endDate: query.sortOrder });
-  } else {
-    orderBy.push({ name: query.sortOrder });
-  }
-
-  return orderBy;
+  if (query.sortBy === "startDate") return [{ startDate: query.sortOrder }];
+  if (query.sortBy === "endDate") return [{ endDate: query.sortOrder }];
+  if (query.sortBy === "name") return [{ name: query.sortOrder }];
+  return [{ createdAt: query.sortOrder }];
 };
 
-export class CampaignRepository {
-  // Campaign methods
-  async checkSlugExists(slug: string, excludeId?: string): Promise<boolean> {
-    const campaign = await prisma.campaigns.findUnique({
-      where: { slug },
-    });
+// ── Select shapes ──────────────────────────────────────────────────────────────
 
+const selectCampaignPublic = {
+  id: true,
+  name: true,
+  slug: true,
+  type: true,
+  description: true,
+  startDate: true,
+  endDate: true,
+  _count: { select: { categories: true } },
+} satisfies Prisma.campaignsSelect;
+
+// ── Repository class ───────────────────────────────────────────────────────────
+
+export class CampaignRepository {
+  // ── Slug / Name checks ──────────────────────────────────────────────────────
+
+  async checkSlugExists(slug: string, excludeId?: string): Promise<boolean> {
+    const campaign = await prisma.campaigns.findFirst({ where: { slug, deletedAt: null } });
     if (!campaign) return false;
     if (excludeId && campaign.id === excludeId) return false;
-
     return true;
   }
 
   async checkNameExists(name: string, excludeId?: string): Promise<boolean> {
-    const campaign = await prisma.campaigns.findFirst({
-      where: { name },
-    });
-
+    const campaign = await prisma.campaigns.findFirst({ where: { name, deletedAt: null } });
     if (!campaign) return false;
     if (excludeId && campaign.id === excludeId) return false;
-
     return true;
   }
+
+  // ── Reads ───────────────────────────────────────────────────────────────────
 
   async findAllPublic(query: ListCampaignsQuery) {
     const where = buildCampaignWhere(query, true);
     const orderBy = buildCampaignOrderBy(query);
-
-    return await prisma.campaigns.findMany({
-      where,
-      orderBy,
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        type: true,
-        description: true,
-        startDate: true,
-        endDate: true,
-        _count: {
-          select: { categories: true },
-        },
-      },
-    });
+    return prisma.campaigns.findMany({ where, orderBy, select: selectCampaignPublic });
   }
 
   async findAllAdmin(query: ListCampaignsQuery) {
+    const { page = 1, limit = 20 } = query;
+    const skip = (page - 1) * limit;
     const where = buildCampaignWhere(query, false);
     const orderBy = buildCampaignOrderBy(query);
 
-    return await prisma.campaigns.findMany({
-      where,
-      orderBy,
-      include: {
-        _count: {
-          select: { categories: true },
+    const now = new Date();
+    const baseWhere: Prisma.campaignsWhereInput = { deletedAt: null };
+
+    const [data, total, activeCount, inactiveCount, upcomingCount, expiredCount] = await prisma.$transaction([
+      prisma.campaigns.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limit,
+        include: { _count: { select: { categories: true } } },
+      }),
+      prisma.campaigns.count({ where }),
+      // active: isActive=true + đã bắt đầu + chưa hết hạn
+      prisma.campaigns.count({
+        where: {
+          ...baseWhere,
+          isActive: true,
+          AND: [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }],
         },
-      },
+      }),
+      // inactive: isActive=false
+      prisma.campaigns.count({ where: { ...baseWhere, isActive: false } }),
+      // upcoming: isActive=true + startDate chưa tới
+      prisma.campaigns.count({
+        where: { ...baseWhere, isActive: true, startDate: { gt: now } },
+      }),
+      // expired: endDate đã qua
+      prisma.campaigns.count({ where: { ...baseWhere, endDate: { lt: now } } }),
+    ]);
+
+    const statusCounts = {
+      ALL: activeCount + inactiveCount,
+      active: activeCount,
+      inactive: inactiveCount,
+      upcoming: upcomingCount,
+      expired: expiredCount,
+    };
+
+    return { data, page, limit, total, totalPages: Math.ceil(total / limit), statusCounts };
+  }
+
+  /** Thùng rác */
+  async findDeleted() {
+    return prisma.campaigns.findMany({
+      where: { deletedAt: { not: null } },
+      orderBy: { deletedAt: "desc" },
+      include: { _count: { select: { categories: true } } },
     });
   }
 
   async getActiveCampaigns(type?: CampaignType) {
-    const where: Prisma.campaignsWhereInput = {
-      isActive: true,
-    };
-
-    if (type) {
-      where.type = type;
-    }
-
-    return await prisma.campaigns.findMany({
-      where,
+    return prisma.campaigns.findMany({
+      where: { isActive: true, deletedAt: null, ...(type && { type }) },
       orderBy: [{ startDate: "desc" }, { createdAt: "desc" }],
       select: {
         id: true,
@@ -125,51 +145,37 @@ export class CampaignRepository {
   }
 
   async getCampaignBySlug(slug: string) {
-    return await prisma.campaigns.findUnique({
-      where: { slug, isActive: true },
+    return prisma.campaigns.findFirst({
+      where: { slug, isActive: true, deletedAt: null },
       include: {
         categories: {
           orderBy: { position: "asc" },
           include: {
-            category: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-                imageUrl: true,
-                imagePath: true,
-              },
-            },
+            category: { select: { id: true, name: true, slug: true, imageUrl: true, imagePath: true } },
           },
         },
       },
     });
   }
 
-  async getCampaignById(id: string) {
-    return await prisma.campaigns.findUnique({
-      where: { id },
+  async getCampaignById(id: string, includeDeleted = false) {
+    return prisma.campaigns.findFirst({
+      where: { id, ...(!includeDeleted && { deletedAt: null }) },
       include: {
         categories: {
           orderBy: { position: "asc" },
           include: {
-            category: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-                imageUrl: true,
-                imagePath: true,
-              },
-            },
+            category: { select: { id: true, name: true, slug: true, imageUrl: true, imagePath: true } },
           },
         },
       },
     });
   }
+
+  // ── Writes ──────────────────────────────────────────────────────────────────
 
   async createCampaign(data: CreateCampaignInput & { slug: string }) {
-    return await prisma.campaigns.create({
+    return prisma.campaigns.create({
       data: {
         name: data.name,
         slug: data.slug,
@@ -183,8 +189,7 @@ export class CampaignRepository {
   }
 
   async updateCampaign(id: string, data: UpdateCampaignInput & { slug?: string }) {
-    const updateData: any = {};
-
+    const updateData: Prisma.campaignsUpdateInput = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.slug !== undefined) updateData.slug = data.slug;
     if (data.type !== undefined) updateData.type = data.type;
@@ -192,51 +197,44 @@ export class CampaignRepository {
     if (data.startDate !== undefined) updateData.startDate = data.startDate;
     if (data.endDate !== undefined) updateData.endDate = data.endDate;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    return prisma.campaigns.update({ where: { id }, data: updateData });
+  }
 
-    return await prisma.campaigns.update({
-      where: { id },
-      data: updateData,
+  async softDelete(id: string, deletedBy: string) {
+    return prisma.campaigns.update({ where: { id }, data: { deletedAt: new Date(), deletedBy } });
+  }
+
+  async restore(id: string) {
+    return prisma.campaigns.update({ where: { id }, data: { deletedAt: null, deletedBy: null } });
+  }
+
+  async hardDelete(id: string) {
+    return prisma.campaigns.delete({ where: { id } });
+  }
+
+  async bulkSoftDelete(ids: string[], deletedBy: string) {
+    return prisma.campaigns.updateMany({
+      where: { id: { in: ids }, deletedAt: null },
+      data: { deletedAt: new Date(), deletedBy },
     });
   }
 
-  async deleteCampaign(id: string) {
-    return await prisma.campaigns.delete({
-      where: { id },
-    });
-  }
+  // ── Campaign Categories ─────────────────────────────────────────────────────
 
-  // Campaign Category methods
   async checkCategoryInCampaign(campaignId: string, categoryId: string): Promise<boolean> {
-    const exists = await prisma.campaign_categories.findFirst({
-      where: {
-        campaignId,
-        categoryId,
-      },
-    });
-
+    const exists = await prisma.campaign_categories.findFirst({ where: { campaignId, categoryId } });
     return !!exists;
   }
 
   async getCampaignCategory(campaignId: string, categoryId: string) {
-    return await prisma.campaign_categories.findFirst({
-      where: {
-        campaignId,
-        categoryId,
-      },
-      include: {
-        category: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
-      },
+    return prisma.campaign_categories.findFirst({
+      where: { campaignId, categoryId },
+      include: { category: { select: { id: true, name: true, slug: true } } },
     });
   }
 
   async addCampaignCategories(campaignId: string, categories: CampaignCategoryInput[]) {
-    return await prisma.$transaction(
+    return prisma.$transaction(
       categories.map((category) =>
         prisma.campaign_categories.create({
           data: {
@@ -255,41 +253,20 @@ export class CampaignRepository {
 
   async updateCampaignCategory(campaignId: string, categoryId: string, data: UpdateCampaignCategoryInput) {
     const updateData: any = {};
-
     if (data.position !== undefined) updateData.position = data.position;
     if (data.title !== undefined) updateData.title = data.title || null;
     if (data.description !== undefined) updateData.description = data.description || null;
     if (data.imagePath !== undefined) updateData.imagePath = data.imagePath;
     if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl;
-
-    return await prisma.campaign_categories.updateMany({
-      where: {
-        campaignId,
-        categoryId,
-      },
-      data: updateData,
-    });
+    return prisma.campaign_categories.updateMany({ where: { campaignId, categoryId }, data: updateData });
   }
 
   async removeCampaignCategory(campaignId: string, categoryId: string) {
-    return await prisma.campaign_categories.deleteMany({
-      where: {
-        campaignId,
-        categoryId,
-      },
-    });
-  }
-
-  async getCampaignCategoriesCount(campaignId: string): Promise<number> {
-    return await prisma.campaign_categories.count({
-      where: { campaignId },
-    });
+    return prisma.campaign_categories.deleteMany({ where: { campaignId, categoryId } });
   }
 
   async checkCategoryExists(categoryId: string): Promise<boolean> {
-    const category = await prisma.categories.findUnique({
-      where: { id: categoryId },
-    });
+    const category = await prisma.categories.findUnique({ where: { id: categoryId } });
     return !!category;
   }
 }

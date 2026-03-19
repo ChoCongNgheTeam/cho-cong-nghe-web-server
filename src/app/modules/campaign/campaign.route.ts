@@ -4,6 +4,7 @@ import { authMiddleware } from "@/app/middlewares/auth.middleware";
 import { requireRole } from "@/app/middlewares/role.middleware";
 import { campaignUpload } from "@/app/middlewares/upload/campaignUpload";
 import { parseMultipart } from "@/app/middlewares/parse-multipart-data";
+import { asyncHandler } from "@/utils/async-handler";
 import {
   getCampaignsPublicHandler,
   getCampaignsAdminHandler,
@@ -13,6 +14,10 @@ import {
   createCampaignHandler,
   updateCampaignHandler,
   deleteCampaignHandler,
+  bulkDeleteCampaignsHandler,
+  getDeletedCampaignsHandler,
+  restoreCampaignHandler,
+  hardDeleteCampaignHandler,
   addCategoriesToCampaignHandler,
   updateCampaignCategoryHandler,
   removeCategoryFromCampaignHandler,
@@ -28,34 +33,52 @@ import {
   addCampaignCategorySchema,
   updateCampaignCategorySchema,
   campaignCategoryParamsSchema,
+  bulkDeleteCampaignsSchema,
 } from "./campaign.validation";
-import { asyncHandler } from "@/utils/async-handler";
 
 const router = Router();
 
 const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
 
-// Public
+// ── Public ────────────────────────────────────────────────────────────────────
+
 router.get("/", validate(listCampaignsQuerySchema, "query"), asyncHandler(getCampaignsPublicHandler));
 router.get("/active", validate(activeCampaignsQuerySchema, "query"), asyncHandler(getActiveCampaignsHandler));
 router.get("/slug/:slug", validate(campaignSlugParamsSchema, "params"), asyncHandler(getCampaignBySlugHandler));
 
-// Admin — Campaign CRUD
+// ── Admin — static routes (phải đặt trước /:id) ───────────────────────────────
+
 router.get("/admin/all", ...adminAuth, validate(listCampaignsQuerySchema, "query"), asyncHandler(getCampaignsAdminHandler));
 router.post("/admin", ...adminAuth, validate(createCampaignSchema, "body"), asyncHandler(createCampaignHandler));
 
-// động sau
+/** Thùng rác */
+router.get("/admin/trash", ...adminAuth, asyncHandler(getDeletedCampaignsHandler));
+
+/** Bulk soft delete */
+router.delete("/admin/bulk", ...adminAuth, validate(bulkDeleteCampaignsSchema, "body"), asyncHandler(bulkDeleteCampaignsHandler));
+
+// ── Admin — dynamic /:id ───────────────────────────────────────────────────────
+
 router.get("/admin/:id", ...adminAuth, validate(campaignParamsSchema, "params"), asyncHandler(getCampaignDetailHandler));
 router.patch("/admin/:id", ...adminAuth, validate(campaignParamsSchema, "params"), validate(updateCampaignSchema, "body"), asyncHandler(updateCampaignHandler));
+
+/** Soft delete */
 router.delete("/admin/:id", ...adminAuth, validate(campaignParamsSchema, "params"), asyncHandler(deleteCampaignHandler));
 
-// Admin — Campaign Categories
+/** Khôi phục */
+router.post("/admin/:id/restore", ...adminAuth, validate(campaignParamsSchema, "params"), asyncHandler(restoreCampaignHandler));
+
+/** Xoá vĩnh viễn (chỉ sau khi đã soft-delete) */
+router.delete("/admin/:id/permanent", ...adminAuth, validate(campaignParamsSchema, "params"), asyncHandler(hardDeleteCampaignHandler));
+
+// ── Admin — Campaign Categories ───────────────────────────────────────────────
+
 router.post(
   "/admin/:campaignId/categories",
   ...adminAuth,
   campaignUpload.array("images", 20),
   parseMultipart({ fields: { categories: "json" } }),
-  validate(campaignParamsSchema, "params"),
+  validate(campaignCategoryParamsSchema, "params"),
   validate(addCampaignCategorySchema, "body"),
   asyncHandler(addCategoriesToCampaignHandler),
 );

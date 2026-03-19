@@ -29,8 +29,8 @@ const extractExcerpt = (content: string, maxLength = 200): string => {
 //  Transformers
 
 /**
- * BlogCard — dùng cho list view (public & admin)
- * Admin response sẽ có thêm deletedAt/deletedBy nếu includeDeleted
+ * BlogCard — dùng cho list view (public & admin).
+ * Admin response có thêm updatedAt + deletedAt/deletedBy nếu includeDeleted.
  */
 export const transformBlogCard = (blog: any): BlogCard => ({
   id: blog.id,
@@ -42,6 +42,8 @@ export const transformBlogCard = (blog: any): BlogCard => ({
   status: blog.status,
   author: transformAuthor(blog.author),
   createdAt: blog.createdAt,
+  // updatedAt — có trong selectBlogAdmin, không có trong selectBlogCard (public)
+  ...(blog.updatedAt !== undefined && { updatedAt: blog.updatedAt }),
   publishedAt: blog.publishedAt ?? undefined,
   // Soft delete metadata — chỉ có khi admin query với select admin
   ...(blog.deletedAt !== undefined && { deletedAt: blog.deletedAt ?? undefined }),
@@ -70,7 +72,6 @@ export const transformBlogDetail = (blog: any): BlogDetail => ({
 
 /**
  * Lấy imagePath từ raw blog để delete ảnh cũ trên Cloudinary
- * (imagePath không expose ra ngoài response)
  */
 export const extractImagePath = (blog: any): string | undefined => {
   return blog.imagePath ?? undefined;

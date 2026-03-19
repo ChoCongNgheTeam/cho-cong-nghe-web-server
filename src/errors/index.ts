@@ -29,6 +29,12 @@ export class NotFoundError extends AppError {
 
 /* ---------- 409 ---------- */
 
+export class ConflictError extends AppError {
+  constructor(message = "Conflict", code = "CONFLICT") {
+    super(message, 409, code);
+  }
+}
+
 export class DuplicateError extends AppError {
   constructor(field = "Field", code = "DUPLICATE") {
     super(`${field} đã được sử dụng`, 409, code);

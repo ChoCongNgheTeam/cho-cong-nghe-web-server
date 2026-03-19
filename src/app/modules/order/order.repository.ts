@@ -2,7 +2,6 @@ import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
 import { OrderQuery } from "./order.validation";
 
-// 1. CẬP NHẬT QUERY: Thêm brand, code, label và sắp xếp ảnh y hệt Cart
 export const orderSelect = {
   id: true,
   orderCode: true,
@@ -23,8 +22,6 @@ export const orderSelect = {
   paymentStatus: true,
   orderDate: true,
   updatedAt: true,
-  deletedAt: true,
-  deletedBy: true,
   user: { select: { id: true, fullName: true, email: true, phone: true } },
   paymentMethod: { select: { id: true, name: true, description: true } },
   voucher: { select: { id: true, code: true, description: true } },
@@ -39,6 +36,8 @@ export const orderSelect = {
       id: true,
       quantity: true,
       unitPrice: true,
+      // [NEW] Include review để check canReview — chỉ lấy id để nhẹ
+      review: { select: { id: true, isApproved: true } },
       productVariant: {
         select: {
           id: true,
@@ -49,7 +48,6 @@ export const orderSelect = {
               id: true,
               name: true,
               slug: true,
-              // Đã gỡ bỏ take: 1 để lấy toàn bộ ảnh phục vụ so khớp màu
               img: { select: { imageUrl: true, color: true } },
             },
           },
@@ -66,21 +64,20 @@ export const orderSelect = {
   },
 } satisfies Prisma.ordersSelect;
 
-// 2. HÀM FORMAT: Đập phẳng dữ liệu Order Item cho giống hệt Cart Item
 export const formatOrderResponse = (order: any) => {
   if (!order) return order;
+
+  const isDelivered = order.orderStatus === "DELIVERED";
 
   return {
     ...order,
     orderItems: order.orderItems.map((item: any) => {
-      // Logic quét màu sắc y hệt Cart
       const colorAttr = item.productVariant.variantAttributes.find((attr: any) => {
         const code = (attr.attributeOption.attribute?.code || "").toLowerCase();
         const name = (attr.attributeOption.attribute?.name || "").toLowerCase();
         return ["color", "màu", "màu sắc"].includes(code || name);
       });
 
-      // Logic quét dung lượng y hệt Cart (nếu FE cần hiển thị)
       const storageAttr = item.productVariant.variantAttributes.find((attr: any) => {
         const code = (attr.attributeOption.attribute?.code || "").toLowerCase();
         const name = (attr.attributeOption.attribute?.name || "").toLowerCase();
@@ -89,28 +86,32 @@ export const formatOrderResponse = (order: any) => {
 
       const colorValue = colorAttr?.attributeOption.value;
 
-      // 2. Lọc ra MẢNG ẢNH chỉ chứa đúng màu của biến thể
       let filteredImages = item.productVariant.product.img;
       if (colorValue) {
         filteredImages = item.productVariant.product.img.filter((img: any) => img.color === colorValue);
       }
-
-      // Fallback: Nếu lọc xong không có ảnh nào khớp, giữ lại 1 ảnh đầu tiên làm đại diện
       if (filteredImages.length === 0 && item.productVariant.product.img.length > 0) {
         filteredImages = [item.productVariant.product.img[0]];
       }
 
-      // 3. Lấy link ảnh đầu tiên trong mảng đã lọc để gán cho trường `image` bên ngoài (FE tiện dùng)
       const finalImageUrl = filteredImages.length > 0 ? filteredImages[0].imageUrl : null;
 
-      // TRẢ VỀ CẤU TRÚC PHẲNG (Flattened) GIỐNG HỆT CART
+      // [NEW] canReview: đơn đã giao + chưa có review cho item này
+      const hasReview = !!item.review;
+      const canReview = isDelivered && !hasReview;
+
       return {
         ...item,
+        // Expose reviewId nếu đã review (FE có thể dùng để navigate tới review)
+        reviewId: item.review?.id ?? null,
+        reviewStatus: item.review?.isApproved ?? null,
+        // canReview: true = được phép tạo review mới
+        canReview,
         productVariant: {
           ...item.productVariant,
           product: {
             ...item.productVariant.product,
-            img: filteredImages, // 👈 Ghi đè mảng 30 ảnh thành mảng chỉ có ảnh đúng màu
+            img: filteredImages,
           },
         },
         image: finalImageUrl,
@@ -120,72 +121,74 @@ export const formatOrderResponse = (order: any) => {
 };
 
 export const findAllOrders = async (query: OrderQuery) => {
-  const { page = 1, limit = 20, search, status, paymentStatus, includeDeleted } = query;
+  const { page = 1, limit = 20, search, status, paymentStatus, dateFrom, dateTo } = query;
   const skip = (page - 1) * limit;
-  const where: Prisma.ordersWhereInput = {};
 
-  if (!includeDeleted) where.deletedAt = null;
-  if (status) where.orderStatus = status;
-  if (paymentStatus) where.paymentStatus = paymentStatus;
+  const baseWhere: Prisma.ordersWhereInput = {
+    ...(paymentStatus && { paymentStatus }),
+    ...(search && {
+      OR: [{ orderCode: { contains: search, mode: "insensitive" } }, { shippingPhone: { contains: search } }, { shippingContactName: { contains: search, mode: "insensitive" } }],
+    }),
+    ...((dateFrom || dateTo) && {
+      orderDate: {
+        ...(dateFrom && { gte: new Date(dateFrom) }),
+        ...(dateTo && { lte: new Date(dateTo) }),
+      },
+    }),
+  };
 
-  if (search) {
-    where.OR = [{ orderCode: { contains: search, mode: "insensitive" } }, { shippingPhone: { contains: search } }, { shippingContactName: { contains: search, mode: "insensitive" } }];
-  }
+  const where: Prisma.ordersWhereInput = {
+    ...baseWhere,
+    ...(status && { orderStatus: status }),
+  };
 
-  const [data, total] = await Promise.all([prisma.orders.findMany({ where, skip, take: limit, select: orderSelect, orderBy: { orderDate: "desc" } }), prisma.orders.count({ where })]);
+  const statusList = ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"] as const;
 
-  return { data: data.map(formatOrderResponse), page, limit, total, totalPages: Math.ceil(total / limit) };
-};
+  const [orders, total, totalAll, ...statusCountsRaw] = await Promise.all([
+    prisma.orders.findMany({
+      where,
+      skip,
+      take: limit,
+      select: orderSelect,
+      orderBy: { orderDate: "desc" },
+    }),
+    prisma.orders.count({ where }),
+    prisma.orders.count({ where: baseWhere }),
+    ...statusList.map((s) => prisma.orders.count({ where: { ...baseWhere, orderStatus: s } })),
+  ]);
 
-export const findAllArchivedOrders = async (query: OrderQuery) => {
-  const { page = 1, limit = 20, search } = query;
-  const skip = (page - 1) * limit;
-  const where: Prisma.ordersWhereInput = { deletedAt: { not: null } };
+  const statusCounts = {
+    ALL: totalAll,
+    ...Object.fromEntries(statusList.map((s, i) => [s, statusCountsRaw[i]])),
+  };
 
-  if (search) {
-    where.OR = [{ orderCode: { contains: search, mode: "insensitive" } }, { shippingPhone: { contains: search } }];
-  }
-
-  const [data, total] = await Promise.all([prisma.orders.findMany({ where, skip, take: limit, select: orderSelect, orderBy: { deletedAt: "desc" } }), prisma.orders.count({ where })]);
-
-  return { data: data.map(formatOrderResponse), page, limit, total, totalPages: Math.ceil(total / limit) };
+  return {
+    data: orders.map(formatOrderResponse),
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
+    statusCounts,
+  };
 };
 
 export const findOrdersByUserId = async (userId: string) => {
   const orders = await prisma.orders.findMany({
-    where: { userId, deletedAt: null },
+    where: { userId },
     select: orderSelect,
     orderBy: { orderDate: "desc" },
   });
   return orders.map(formatOrderResponse);
 };
 
-export const findOrderById = async (id: string, includeDeleted = false) => {
-  const order = await prisma.orders.findUnique({
-    where: { id, ...(!includeDeleted ? { deletedAt: null } : {}) },
-    select: orderSelect,
-  });
-
-  // Format object đơn lẻ
+export const findOrderById = async (id: string) => {
+  const order = await prisma.orders.findUnique({ where: { id }, select: orderSelect });
   return formatOrderResponse(order);
 };
 
-// Payment info select — chỉ lấy những field cần cho trang /order/{orderCode}/payment
-const orderPaymentInfoSelect = {
-  orderCode: true,
-  totalAmount: true,
-  paymentStatus: true,
-  orderStatus: true,
-  bankTransferQrUrl: true,
-  bankTransferContent: true,
-  bankTransferExpiredAt: true,
-  paymentMethod: { select: { name: true, description: true } },
-} satisfies Prisma.ordersSelect;
-
 export const findOrderPaymentInfoByCode = async (orderCode: string, userId: string) => {
-  // Dùng orderSelect đầy đủ để trả về đủ thông tin đơn hàng (giống getMyOrders)
   const order = await prisma.orders.findFirst({
-    where: { orderCode, userId, deletedAt: null },
+    where: { orderCode, userId },
     select: orderSelect,
   });
   return formatOrderResponse(order);
@@ -194,26 +197,4 @@ export const findOrderPaymentInfoByCode = async (orderCode: string, userId: stri
 export const updateOrder = async (id: string, data: any) => {
   const order = await prisma.orders.update({ where: { id }, data, select: orderSelect });
   return formatOrderResponse(order);
-};
-
-// --- Archive & Delete ---
-export const archiveOrder = async (id: string, adminId: string) => {
-  return prisma.orders.update({
-    where: { id },
-    data: { deletedAt: new Date(), deletedBy: adminId },
-  });
-};
-
-export const unarchiveOrder = async (id: string) => {
-  return prisma.orders.update({
-    where: { id },
-    data: { deletedAt: null, deletedBy: null },
-  });
-};
-
-export const hardDeleteOrderFromDb = async (id: string) => {
-  return prisma.$transaction(async (tx) => {
-    await tx.order_items.deleteMany({ where: { orderId: id } });
-    return tx.orders.delete({ where: { id } });
-  });
 };
