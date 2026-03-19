@@ -34,6 +34,10 @@ const buildCardEntry = (product: any, variant: any) => {
       price: Number(variant.price),
       brandId: product.brand?.id,
       categoryPath: buildCategoryPath(product.category),
+      variantAttributes: (variant.variantAttributes ?? []).map((va: any) => ({
+        code: va.attributeOption.attribute.code,
+        value: va.attributeOption.value,
+      })),
     },
   };
 };
@@ -54,7 +58,7 @@ const assertProductExists = async (id: string, options: { includeDeleted?: boole
 
 export const getProductsPublic = async (query: ListProductsQuery) => {
   const result = await repo.findAllPublic(query);
-  console.log(result);
+  // console.log(result);
 
   const cards = result.data.flatMap((product) => {
     const variantsForCards = getVariantsForCards(product);
@@ -106,7 +110,25 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
     orderItemId = orderItem?.id ?? null;
   }
 
-  return { ...productDetail, categoryPath: buildCategoryPath(product.category), highlights, highlightGroups, canReview, orderItemId };
+  // Extract variantAttributes từ default variant của raw product
+  // để pricing use-cases có thể forward cho ATTRIBUTE promotion matching
+  const defaultVariant = product.variants?.find((v: any) => v.isDefault) ?? product.variants?.[0];
+  const defaultVariantAttributes = (defaultVariant?.variantAttributes ?? [])
+    .map((va: any) => ({
+      code: va.attributeOption?.attribute?.code,
+      value: va.attributeOption?.value,
+    }))
+    .filter((a: any) => a.code && a.value);
+
+  return {
+    ...productDetail,
+    categoryPath: buildCategoryPath(product.category),
+    highlights,
+    highlightGroups,
+    canReview,
+    orderItemId,
+    defaultVariantAttributes, // ← dùng trong getProductDetailWithPricing
+  };
 };
 
 export const getProductVariant = async (slug: string, options?: Record<string, string>) => {
@@ -127,6 +149,10 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
       price: Number(variant.price),
       brandId: product.brand?.id,
       categoryPath: buildCategoryPath(product.category),
+      variantAttributes: (variant.variantAttributes ?? []).map((va: any) => ({
+        code: va.attributeOption.attribute.code,
+        value: va.attributeOption.value,
+      })),
     },
   };
 };
@@ -683,6 +709,10 @@ export const getProductsOnSaleDate = async (
             price: Number(variant.price),
             brandId: product.brand?.id,
             categoryPath: buildCategoryPath(product.category),
+            variantAttributes: (variant.variantAttributes ?? []).map((va: any) => ({
+              code: va.attributeOption.attribute.code,
+              value: va.attributeOption.value,
+            })),
           },
         },
       ];

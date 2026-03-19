@@ -49,6 +49,8 @@ const selectPromotionAdmin = {
       id: true,
       targetType: true,
       targetId: true,
+      targetCode: true,
+      targetValue: true,
     },
   },
 } satisfies Prisma.promotionsSelect;
@@ -81,6 +83,8 @@ const selectPromotionDetail = {
       id: true,
       targetType: true,
       targetId: true,
+      targetCode: true,
+      targetValue: true,
     },
   },
 } satisfies Prisma.promotionsSelect;
@@ -392,6 +396,8 @@ export const getActivePromotions = async () => {
       promotionId: promo.id,
       targetType: t.targetType,
       targetId: t.targetId,
+      targetCode: t.targetCode, // ← FIX: đã có trong selectPromotionDetail nhưng bị bỏ qua khi map
+      targetValue: t.targetValue, // ← FIX: tương tự
     })),
   }));
 };

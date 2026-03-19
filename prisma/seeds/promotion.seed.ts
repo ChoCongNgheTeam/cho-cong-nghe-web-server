@@ -273,6 +273,8 @@ export async function seedPromotions(prisma: PrismaClient) {
           promotionId: promotion.id,
           targetType: t.targetType,
           targetId: t.targetId ?? null,
+          targetCode: t.targetCode ?? null,
+          targetValue: t.targetValue ?? null,
         },
       });
     }
