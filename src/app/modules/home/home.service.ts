@@ -64,7 +64,7 @@ const getActiveHomeCampaigns = async (): Promise<HomeCampaign[]> => {
  */
 const getSaleScheduleForHome = async (userId?: string): Promise<HomeSaleScheduleResponse> => {
   const today = new Date();
-  const endDate = new Date(today.getTime() + 6 * 24 * 60 * 60 * 1000); // +6 ngày = 7 ngày tổng
+  const endDate = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000); // +6 ngày = 7 ngày tổng
 
   // Parallel: lịch 7 ngày + products hôm nay
   const [schedule, todayResult] = await Promise.all([getSaleScheduleV2(today, endDate), getProductsOnSaleDate(today, { limit: 12 })]);

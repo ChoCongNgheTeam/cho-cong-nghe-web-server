@@ -54,6 +54,7 @@ const assertProductExists = async (id: string, options: { includeDeleted?: boole
 
 export const getProductsPublic = async (query: ListProductsQuery) => {
   const result = await repo.findAllPublic(query);
+  console.log(result);
 
   const cards = result.data.flatMap((product) => {
     const variantsForCards = getVariantsForCards(product);

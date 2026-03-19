@@ -10,7 +10,9 @@ type PromotionRuleSeed = {
 
 type PromotionTargetSeed = {
   targetType: TargetType;
-  targetId: string | null;
+  targetCode?: string;
+  targetValue?: string;
+  targetId?: string | null;
 };
 
 const promotionTemplates: {
@@ -28,48 +30,18 @@ const promotionTemplates: {
   notes?: string;
 }[] = [
   // ============================================================================
-  // EXISTING
-  // ============================================================================
-  {
-    name: "APPLE_IPHONE_GIAM_10_PERCENT",
-    description: "Giảm 10% cho tất cả iPhone",
-    priority: 20,
-    isActive: true,
-    startDate: new Date("2026-03-05"),
-    endDate: new Date("2026-04-28"),
-    notes: "Apply cho brand: Apple (iPhone) - Lấy brand ID và update vào targetId",
-    rules: [
-      {
-        actionType: PromotionActionType.DISCOUNT_PERCENT,
-        discountValue: "10.00",
-      },
-    ],
-    targets: [
-      {
-        targetType: TargetType.CATEGORY,
-        targetId: null,
-      },
-    ],
-  },
-
-  // ============================================================================
-  // TEST: 3 PROMOTIONS CHO NGÀY 18 / 19 / 20 THÁNG 3
-  // (dùng để test GET /sale-schedule-v2 và GET /sale-by-date)
-  // Sau khi seed xong → update targetId bằng ID thực tế trong DB
+  // 🌍 GLOBAL
   // ============================================================================
 
   {
-    name: "FLASH_SALE_18_03_2026",
-    description: "Flash Sale 18/03 — Giảm 15% toàn bộ sản phẩm",
-    priority: 30,
+    name: "GLOBAL_5_PERCENT",
+    description: "Giảm 5% toàn bộ sản phẩm",
+    priority: 5,
     isActive: true,
-    startDate: new Date("2026-03-18T00:00:00.000Z"),
-    endDate: new Date("2026-03-18T23:59:59.000Z"),
-    notes: "Test ngày 18/03. Đổi targetType ALL → áp dụng toàn sản phẩm, không cần targetId",
     rules: [
       {
         actionType: PromotionActionType.DISCOUNT_PERCENT,
-        discountValue: "15.00",
+        discountValue: "5.00",
       },
     ],
     targets: [
@@ -80,47 +52,160 @@ const promotionTemplates: {
     ],
   },
 
+  // ============================================================================
+  // 🍎 BRAND
+  // ============================================================================
+
   {
-    name: "SALE_LAPTOP_19_03_2026",
-    description: "Ưu đãi Laptop 19/03 — Giảm 2.000.000đ",
-    priority: 25,
+    name: "APPLE_7_PERCENT",
+    description: "Giảm 7% cho toàn bộ sản phẩm Apple",
+    priority: 10,
     isActive: true,
-    startDate: new Date("2026-03-19T00:00:00.000Z"),
-    endDate: new Date("2026-03-19T23:59:59.000Z"),
-    notes: "Test ngày 19/03. Update targetId = ID của category Laptop",
     rules: [
       {
-        actionType: PromotionActionType.DISCOUNT_FIXED,
-        discountValue: "2000000.00",
+        actionType: PromotionActionType.DISCOUNT_PERCENT,
+        discountValue: "7.00",
+      },
+    ],
+    targets: [
+      {
+        targetType: TargetType.BRAND,
+        targetId: "apple",
+      },
+    ],
+  },
+
+  // ============================================================================
+  // 📱 CATEGORY
+  // ============================================================================
+
+  {
+    name: "IPHONE_10_PERCENT",
+    description: "Giảm 10% cho toàn bộ iPhone",
+    priority: 20,
+    isActive: true,
+    rules: [
+      {
+        actionType: PromotionActionType.DISCOUNT_PERCENT,
+        discountValue: "10.00",
       },
     ],
     targets: [
       {
         targetType: TargetType.CATEGORY,
-        targetId: null, // → update = category Laptop ID
+        targetId: "iphone",
+      },
+    ],
+  },
+
+  // ============================================================================
+  // 💾 ATTRIBUTE (storage)
+  // ============================================================================
+
+  {
+    name: "STORAGE_128GB_8_PERCENT",
+    description: "Giảm 8% cho bản 128GB",
+    priority: 30,
+    isActive: true,
+    rules: [
+      {
+        actionType: PromotionActionType.DISCOUNT_PERCENT,
+        discountValue: "8.00",
+      },
+    ],
+    targets: [
+      {
+        targetType: TargetType.ATTRIBUTE,
+        targetCode: "storage",
+        targetValue: "128GB",
       },
     ],
   },
 
   {
-    name: "WEEKEND_SALE_20_03_2026",
-    description: "Weekend Sale 20/03 — Mua 1 tặng 1 phụ kiện",
-    priority: 20,
+    name: "STORAGE_256GB_5_PERCENT",
+    description: "Giảm 5% cho bản 256GB",
+    priority: 30,
     isActive: true,
-    startDate: new Date("2026-03-20T00:00:00.000Z"),
-    endDate: new Date("2026-03-20T23:59:59.000Z"),
-    notes: "Test ngày 20/03. Update targetId = ID của category Phụ kiện",
     rules: [
       {
-        actionType: PromotionActionType.BUY_X_GET_Y,
-        buyQuantity: 1,
-        getQuantity: 1,
+        actionType: PromotionActionType.DISCOUNT_PERCENT,
+        discountValue: "5.00",
       },
     ],
     targets: [
       {
-        targetType: TargetType.CATEGORY,
-        targetId: null, // → update = category Phụ kiện ID
+        targetType: TargetType.ATTRIBUTE,
+        targetCode: "storage",
+        targetValue: "256GB",
+      },
+    ],
+  },
+
+  {
+    name: "STORAGE_512GB_12_PERCENT",
+    description: "Giảm 12% cho bản 512GB",
+    priority: 30,
+    isActive: true,
+    rules: [
+      {
+        actionType: PromotionActionType.DISCOUNT_PERCENT,
+        discountValue: "12.00",
+      },
+    ],
+    targets: [
+      {
+        targetType: TargetType.ATTRIBUTE,
+        targetCode: "storage",
+        targetValue: "512GB",
+      },
+    ],
+  },
+
+  // ============================================================================
+  // 🎯 PRODUCT (override riêng)
+  // ============================================================================
+
+  {
+    name: "IPHONE_16_SPECIAL_20_PERCENT",
+    description: "Giảm riêng 20% cho iPhone 16",
+    priority: 100,
+    isActive: true,
+    rules: [
+      {
+        actionType: PromotionActionType.DISCOUNT_PERCENT,
+        discountValue: "20.00",
+      },
+    ],
+    targets: [
+      {
+        targetType: TargetType.PRODUCT,
+        targetId: "iphone-16",
+      },
+    ],
+  },
+
+  // ============================================================================
+  // ⚡ FLASH SALE
+  // ============================================================================
+
+  {
+    name: "FLASH_SALE_15_PERCENT",
+    description: "Flash Sale giảm 15% toàn bộ sản phẩm",
+    priority: 50,
+    isActive: true,
+    startDate: new Date("2026-03-18T00:00:00.000Z"),
+    endDate: new Date("2026-03-18T23:59:59.000Z"),
+    rules: [
+      {
+        actionType: PromotionActionType.DISCOUNT_PERCENT,
+        discountValue: "15.00",
+      },
+    ],
+    targets: [
+      {
+        targetType: TargetType.ALL,
+        targetId: null,
       },
     ],
   },

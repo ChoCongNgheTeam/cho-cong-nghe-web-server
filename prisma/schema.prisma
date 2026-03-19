@@ -67,6 +67,7 @@ enum TargetType {
   CATEGORY
   BRAND
   ALL
+  ATTRIBUTE
 }
 
 enum PromotionActionType {
@@ -806,6 +807,8 @@ model promotion_targets {
   promotionId String     @db.Uuid
   targetType  TargetType
   targetId    String?
+  targetCode  String?    // "storage"
+  targetValue String?    // "128GB"
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authMiddleware } from "@/app/middlewares/auth.middleware";
 import {
   getHomePageHandler,
-  getFlashSaleSectionHandler,
+  // getFlashSaleSectionHandler,
   getBestSellingSectionHandler,
   getRecentlyViewedSectionHandler,
   getActiveCampaignsSectionHandler,
@@ -18,7 +18,7 @@ router.get("/", authMiddleware(false), asyncHandler(getHomePageHandler));
 
 // ── Flash Sale ────────────────────────────────────────────────────────────────
 // Endpoint cũ — giữ backward compat
-router.get("/flash-sale", authMiddleware(false), asyncHandler(getFlashSaleSectionHandler));
+// router.get("/flash-sale", authMiddleware(false), asyncHandler(getFlashSaleSectionHandler));
 
 // [NEW] Lịch sale 7 ngày + products hôm nay (không cần auth)
 router.get("/sale-schedule", asyncHandler(getSaleScheduleSectionHandler));
