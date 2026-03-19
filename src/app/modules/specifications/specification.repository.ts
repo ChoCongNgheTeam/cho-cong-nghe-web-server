@@ -34,7 +34,13 @@ export const findAll = async (query: ListSpecificationsQuery) => {
   const where = buildWhere(query);
 
   const [data, total, activeCount, inactiveCount, filterableCount] = await prisma.$transaction([
-    prisma.specifications.findMany({ where, select: selectSpec, orderBy: { [sortBy]: sortOrder }, skip, take: limit }),
+    prisma.specifications.findMany({
+      where,
+      select: selectSpec,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    }),
     prisma.specifications.count({ where }),
     prisma.specifications.count({ where: { isActive: true } }),
     prisma.specifications.count({ where: { isActive: false } }),

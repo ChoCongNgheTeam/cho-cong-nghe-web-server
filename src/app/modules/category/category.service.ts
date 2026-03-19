@@ -13,7 +13,9 @@ const assertCategoryExists = async (id: string, options: { includeDeleted?: bool
   return category;
 };
 
-// Public
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLIC
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const getCategoriesPublic = async (query: ListCategoriesQuery) => {
   return repo.findAllPublic(query);
@@ -45,7 +47,9 @@ export const getCategoryBySlug = async (slug: string) => {
   return category;
 };
 
-// Admin: list, detail
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN: LIST
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const getCategoriesAdmin = async (query: ListCategoriesQuery) => {
   return repo.findAllAdmin(query);
@@ -59,20 +63,27 @@ export const getRootCategoriesForAdmin = async () => {
   return repo.findRootCategories(false);
 };
 
-export const getCategoryDetail = async (id: string, options: { includeDeleted?: boolean; isAdmin?: boolean } = {}) => {
-  // Dùng tree để lấy children + parent cùng lúc
-  const categories = await repo.findAllCategoriesForTree(false);
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN: DETAIL
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const current = categories.find((c) => c.id === id);
-  if (!current) throw new NotFoundError("Danh mục");
-
-  const childrenTree = buildCategoryTree(categories, id);
-  const parent = current.parentId ? (categories.find((c) => c.id === current.parentId) ?? null) : null;
-
-  return { ...current, parent, children: childrenTree };
+/**
+ * getCategoryDetail
+ *
+ * Dùng findByIdWithRelations thay vì findAllCategoriesForTree để
+ * trả về đầy đủ imageUrl, imagePath, description, timestamps, parent, children.
+ */
+export const getCategoryDetail = async (id: string, options: { isAdmin?: boolean } = {}) => {
+  const category = await repo.findByIdWithRelations(id, {
+    includeDeleted: options.isAdmin ?? true,
+  });
+  if (!category) throw new NotFoundError("Danh mục");
+  return category;
 };
 
-// Admin: create, update
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN: CREATE / UPDATE
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const createCategory = async (input: CreateCategoryInput) => {
   const { name, parentId, position, ...rest } = input;
@@ -113,9 +124,7 @@ export const updateCategory = async (id: string, input: UpdateCategoryInput) => 
       if (!parent) throw new NotFoundError("Danh mục cha");
 
       const children = await repo.hasChildren(id);
-      if (children) {
-        throw new BadRequestError("Không thể chuyển danh mục có danh mục con thành danh mục con");
-      }
+      if (children) throw new BadRequestError("Không thể chuyển danh mục có danh mục con thành danh mục con");
     }
   }
 
@@ -151,72 +160,57 @@ export const updateCategory = async (id: string, input: UpdateCategoryInput) => 
     .catch(handlePrismaError);
 };
 
-// Soft delete — Admin only
-// Guard: không xóa nếu còn children hoặc sản phẩm active
-// Không xóa ảnh — giữ lại cho restore
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN: DELETE / RESTORE / HARD DELETE
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const softDeleteCategory = async (id: string, deletedById: string) => {
   await assertCategoryExists(id);
 
   const children = await repo.hasChildren(id);
-  if (children) {
-    throw new BadRequestError("Không thể xóa danh mục có danh mục con. Vui lòng xóa danh mục con trước.");
-  }
+  if (children) throw new BadRequestError("Không thể xóa danh mục có danh mục con. Vui lòng xóa danh mục con trước.");
 
   const products = await repo.hasProducts(id);
-  if (products) {
-    throw new BadRequestError("Không thể xóa danh mục đang có sản phẩm. Vui lòng chuyển sản phẩm sang danh mục khác trước.");
-  }
+  if (products) throw new BadRequestError("Không thể xóa danh mục đang có sản phẩm. Vui lòng chuyển sản phẩm sang danh mục khác trước.");
 
   return repo.softDelete(id, deletedById);
 };
 
-// Restore — Admin only
-// Kiểm tra name conflict trong parent trước khi restore
 export const restoreCategory = async (id: string) => {
   const category = (await repo.findById(id, { includeDeleted: true, isAdmin: true })) as any;
   if (!category) throw new NotFoundError("Danh mục");
   if (!category.deletedAt) throw new BadRequestError("Danh mục này chưa bị xóa");
 
   const nameConflict = await repo.existsByNameInParent(category.name, category.parentId, id);
-  if (nameConflict) {
-    throw new BadRequestError(`Không thể khôi phục vì tên "${category.name}" đã được dùng trong cùng cấp`);
-  }
+  if (nameConflict) throw new BadRequestError(`Không thể khôi phục vì tên "${category.name}" đã được dùng trong cùng cấp`);
 
   return repo.restore(id);
 };
 
-// Hard delete — Admin only, CHỈ sau khi đã soft delete
-// Xóa ảnh Cloudinary trước khi hard delete
 export const hardDeleteCategory = async (id: string) => {
   const category = (await repo.findById(id, { includeDeleted: true, isAdmin: true })) as any;
   if (!category) throw new NotFoundError("Danh mục");
 
-  if (!category.deletedAt) {
-    throw new ForbiddenError("Phải soft delete trước khi xóa vĩnh viễn. Dùng DELETE /admin/categories/:id");
-  }
+  if (!category.deletedAt) throw new ForbiddenError("Phải soft delete trước khi xóa vĩnh viễn. Dùng DELETE /admin/categories/:id");
 
-  if (category.imagePath) {
-    await deleteOldCategoryImage(category.imagePath);
-  }
+  if (category.imagePath) await deleteOldCategoryImage(category.imagePath);
 
   return repo.hardDelete(id);
 };
 
-// Trash list — Admin only
 export const getDeletedCategories = async (options: { page?: number; limit?: number } = {}) => {
   return repo.findAllDeleted(options);
 };
 
-// Reorder
+// ─────────────────────────────────────────────────────────────────────────────
+// REORDER
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const reorderCategory = async (categoryId: string, newPosition: number) => {
   const category = await assertCategoryExists(categoryId);
-
   const siblings = await repo.findSiblings((category as any).parentId);
 
-  if (newPosition < 0 || newPosition >= siblings.length) {
-    throw new BadRequestError("Vị trí không hợp lệ");
-  }
+  if (newPosition < 0 || newPosition >= siblings.length) throw new BadRequestError("Vị trí không hợp lệ");
 
   const updates = siblings
     .filter((s) => s.id !== categoryId)
@@ -228,11 +222,12 @@ export const reorderCategory = async (categoryId: string, newPosition: number) =
   updates.push(prisma.categories.update({ where: { id: categoryId }, data: { position: newPosition } }));
 
   await prisma.$transaction(updates);
-
   return { message: "Sắp xếp thành công" };
 };
 
-// Category template (attributes + specifications)
+// ─────────────────────────────────────────────────────────────────────────────
+// TEMPLATE / ATTRIBUTES / SPECIFICATIONS
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const getCategoryTemplate = async (categoryId: string) => {
   const category = await assertCategoryExists(categoryId);
@@ -256,11 +251,7 @@ export const getCategoryTemplate = async (categoryId: string) => {
   };
 };
 
-// Attributes & Specifications
-
-export const getAllAttributes = async () => {
-  return repo.getAllAttributes();
-};
+export const getAllAttributes = async () => repo.getAllAttributes();
 
 export const getAttributeOptions = async (attributeId: string) => {
   const attribute = await prisma.attributes.findUnique({
@@ -273,6 +264,4 @@ export const getAttributeOptions = async (attributeId: string) => {
   return { attribute, options };
 };
 
-export const getAllSpecifications = async () => {
-  return repo.getAllSpecifications();
-};
+export const getAllSpecifications = async () => repo.getAllSpecifications();

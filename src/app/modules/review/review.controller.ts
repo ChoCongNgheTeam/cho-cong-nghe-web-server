@@ -7,15 +7,22 @@ import { ReviewStatus } from "@prisma/client";
 
 export const createReviewHandler = async (req: Request, res: Response) => {
   const result = await reviewService.createUserReview(req.user!.id, req.body);
-
   const message = result.autoApproved ? "Đánh giá của bạn đã được đăng." : "Đánh giá của bạn đang chờ kiểm duyệt.";
-
   res.status(201).json({ data: result.review, message });
 };
 
+/**
+ * GET /reviews/product/:productId
+ * Response: { data: { reviews: [...], stats: { average, total, distribution } }, total, message }
+ */
 export const getProductReviewsHandler = async (req: Request, res: Response) => {
-  const reviews = await reviewService.getReviewsByProduct(req.params.productId);
-  res.json({ data: reviews, total: reviews.length, message: "Lấy danh sách đánh giá sản phẩm thành công" });
+  const result = await reviewService.getReviewsByProduct(req.params.productId);
+  res.json({
+    data: result.reviews,
+    stats: result.stats,
+    total: result.stats.total,
+    message: "Lấy danh sách đánh giá sản phẩm thành công",
+  });
 };
 
 // ── Admin ──────────────────────────────────────────────────────────────────
@@ -23,15 +30,9 @@ export const getProductReviewsHandler = async (req: Request, res: Response) => {
 export const getAllReviewsAdminHandler = async (req: Request, res: Response) => {
   const query = listReviewsSchema.parse(req.query);
   const result = await reviewService.getAllReviewsAdmin(query);
-
   res.json({
     data: result.data,
-    pagination: {
-      page: result.page,
-      limit: result.limit,
-      total: result.total,
-      totalPages: result.totalPages,
-    },
+    pagination: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
     message: "Lấy tất cả đánh giá thành công",
   });
 };
@@ -49,13 +50,11 @@ export const updateReviewAdminHandler = async (req: Request, res: Response) => {
 export const approveReviewHandler = async (req: Request, res: Response) => {
   const { isApproved } = req.body;
   const review = await reviewService.approveReview(req.params.id, isApproved as ReviewStatus);
-
   const messages: Record<string, string> = {
     APPROVED: "Duyệt đánh giá thành công",
     REJECTED: "Từ chối đánh giá thành công",
     PENDING: "Đặt lại trạng thái chờ duyệt thành công",
   };
-
   res.json({ data: review, message: messages[isApproved] ?? "Cập nhật trạng thái thành công" });
 };
 
@@ -96,15 +95,9 @@ export const getDeletedReviewsHandler = async (req: Request, res: Response) => {
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 20;
   const result = await reviewService.getDeletedReviews({ page, limit });
-
   res.json({
     data: result.data,
-    pagination: {
-      page: result.page,
-      limit: result.limit,
-      total: result.total,
-      totalPages: result.totalPages,
-    },
+    pagination: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
     message: "Lấy danh sách đánh giá đã xóa thành công",
   });
 };

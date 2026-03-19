@@ -53,7 +53,7 @@ router.get("/slug/:slug", validate(categorySlugParamsSchema, "params"), asyncHan
 
 // Admin — static
 router.get("/admin", ...adminAuth, validate(listCategoriesQuerySchema, "query"), asyncHandler(getCategoriesAdminHandler));
-router.post("/admin", ...adminAuth, categoryUpload.single("imageUrl"), validate(createCategorySchema, "body"), asyncHandler(createCategoryHandler));
+router.post("/admin", ...adminAuth, categoryUpload.single("imageUrl"), asyncHandler(createCategoryHandler));
 router.get("/admin/all", ...adminAuth, asyncHandler(getAllCategoriesHandler));
 router.get("/admin/roots", ...adminAuth, asyncHandler(getRootCategoriesForAdminHandler));
 router.get("/admin/trash", ...adminAuth, asyncHandler(getDeletedCategoriesHandler));
@@ -69,7 +69,9 @@ router.delete("/admin/:id/permanent", ...adminAuth, validate(categoryParamsSchem
 
 // Admin — param only
 router.get("/admin/:id", ...adminAuth, validate(categoryParamsSchema, "params"), asyncHandler(getCategoryDetailHandler));
-router.patch("/admin/:id", ...adminAuth, categoryUpload.single("imageUrl"), validate(categoryParamsSchema, "params"), validate(updateCategorySchema, "body"), asyncHandler(updateCategoryHandler));
+// Không validate body ở đây vì body là multipart — field data là JSON string
+// Controller tự gọi parseMultipartData + updateCategorySchema.parse sau khi giải nén
+router.patch("/admin/:id", ...adminAuth, categoryUpload.single("imageUrl"), validate(categoryParamsSchema, "params"), asyncHandler(updateCategoryHandler));
 router.delete("/admin/:id", ...adminAuth, validate(categoryParamsSchema, "params"), asyncHandler(deleteCategoryHandler));
 
 // Param + suffix — public (template dùng cho form tạo sản phẩm)

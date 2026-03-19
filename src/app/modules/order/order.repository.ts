@@ -2,7 +2,6 @@ import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
 import { OrderQuery } from "./order.validation";
 
-// 1. CẬP NHẬT QUERY: Thêm brand, code, label và sắp xếp ảnh y hệt Cart
 export const orderSelect = {
   id: true,
   orderCode: true,
@@ -37,6 +36,8 @@ export const orderSelect = {
       id: true,
       quantity: true,
       unitPrice: true,
+      // [NEW] Include review để check canReview — chỉ lấy id để nhẹ
+      review: { select: { id: true, isApproved: true } },
       productVariant: {
         select: {
           id: true,
@@ -66,6 +67,8 @@ export const orderSelect = {
 export const formatOrderResponse = (order: any) => {
   if (!order) return order;
 
+  const isDelivered = order.orderStatus === "DELIVERED";
+
   return {
     ...order,
     orderItems: order.orderItems.map((item: any) => {
@@ -75,7 +78,6 @@ export const formatOrderResponse = (order: any) => {
         return ["color", "màu", "màu sắc"].includes(code || name);
       });
 
-      // Logic quét dung lượng y hệt Cart (nếu FE cần hiển thị)
       const storageAttr = item.productVariant.variantAttributes.find((attr: any) => {
         const code = (attr.attributeOption.attribute?.code || "").toLowerCase();
         const name = (attr.attributeOption.attribute?.name || "").toLowerCase();
@@ -88,15 +90,23 @@ export const formatOrderResponse = (order: any) => {
       if (colorValue) {
         filteredImages = item.productVariant.product.img.filter((img: any) => img.color === colorValue);
       }
-
       if (filteredImages.length === 0 && item.productVariant.product.img.length > 0) {
         filteredImages = [item.productVariant.product.img[0]];
       }
 
       const finalImageUrl = filteredImages.length > 0 ? filteredImages[0].imageUrl : null;
 
+      // [NEW] canReview: đơn đã giao + chưa có review cho item này
+      const hasReview = !!item.review;
+      const canReview = isDelivered && !hasReview;
+
       return {
         ...item,
+        // Expose reviewId nếu đã review (FE có thể dùng để navigate tới review)
+        reviewId: item.review?.id ?? null,
+        reviewStatus: item.review?.isApproved ?? null,
+        // canReview: true = được phép tạo review mới
+        canReview,
         productVariant: {
           ...item.productVariant,
           product: {
@@ -112,17 +122,13 @@ export const formatOrderResponse = (order: any) => {
 
 export const findAllOrders = async (query: OrderQuery) => {
   const { page = 1, limit = 20, search, status, paymentStatus, dateFrom, dateTo } = query;
-
   const skip = (page - 1) * limit;
 
-  // ── Base filters (dùng chung) ──
   const baseWhere: Prisma.ordersWhereInput = {
     ...(paymentStatus && { paymentStatus }),
-
     ...(search && {
       OR: [{ orderCode: { contains: search, mode: "insensitive" } }, { shippingPhone: { contains: search } }, { shippingContactName: { contains: search, mode: "insensitive" } }],
     }),
-
     ...((dateFrom || dateTo) && {
       orderDate: {
         ...(dateFrom && { gte: new Date(dateFrom) }),
@@ -131,7 +137,6 @@ export const findAllOrders = async (query: OrderQuery) => {
     }),
   };
 
-  // ── Where chính (có filter status) ──
   const where: Prisma.ordersWhereInput = {
     ...baseWhere,
     ...(status && { orderStatus: status }),
@@ -139,7 +144,6 @@ export const findAllOrders = async (query: OrderQuery) => {
 
   const statusList = ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"] as const;
 
-  // ── Queries ──
   const [orders, total, totalAll, ...statusCountsRaw] = await Promise.all([
     prisma.orders.findMany({
       where,
@@ -148,22 +152,11 @@ export const findAllOrders = async (query: OrderQuery) => {
       select: orderSelect,
       orderBy: { orderDate: "desc" },
     }),
-
-    // total theo filter hiện tại
     prisma.orders.count({ where }),
-
-    // total ALL (không filter status)
     prisma.orders.count({ where: baseWhere }),
-
-    // count từng status
-    ...statusList.map((s) =>
-      prisma.orders.count({
-        where: { ...baseWhere, orderStatus: s },
-      }),
-    ),
+    ...statusList.map((s) => prisma.orders.count({ where: { ...baseWhere, orderStatus: s } })),
   ]);
 
-  // ── Map statusCounts ──
   const statusCounts = {
     ALL: totalAll,
     ...Object.fromEntries(statusList.map((s, i) => [s, statusCountsRaw[i]])),

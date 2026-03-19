@@ -219,9 +219,19 @@ export const createOrderAdmin = async (input: CreateOrderAdminInput) => {
 
     const totalAmount = subtotalAmount + shippingFee - finalVoucherDiscount;
 
+    const numberPart = Math.floor(Math.random() * 100)
+      .toString()
+      .padStart(2, "0");
+
+    const letterPart = Math.random().toString(36).substring(2, 4).toUpperCase();
+
+    const uuidPart = crypto.randomUUID().slice(0, 6).toUpperCase();
+
+    const orderCode = `CCN${numberPart}${letterPart}${uuidPart}`;
+
     return tx.orders.create({
       data: {
-        orderCode: `ORD${Date.now().toString().slice(-6)}`,
+        orderCode: orderCode,
         userId: finalUserId!,
         paymentMethodId,
         voucherId: appliedVoucherId,

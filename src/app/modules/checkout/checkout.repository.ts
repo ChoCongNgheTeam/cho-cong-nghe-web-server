@@ -140,17 +140,40 @@ export const executeOrderTransaction = async (userId: string, checkoutSummary: C
         },
       },
     });
+    // update variant
+    await Promise.all(
+      checkoutSummary.items.map((item) =>
+        tx.products_variants.update({
+          where: { id: item.productVariantId },
+          data: {
+            quantity: { decrement: item.quantity },
+            soldCount: { increment: item.quantity },
+          },
+        }),
+      ),
+    );
 
-    // 2. Trừ tồn kho & Tăng số lượng đã bán
-    for (const item of checkoutSummary.items) {
-      await tx.products_variants.update({
-        where: { id: item.productVariantId },
-        data: {
-          quantity: { decrement: item.quantity },
-          soldCount: { increment: item.quantity },
-        },
-      });
+    // build map
+    const productSoldMap = new Map<string, number>();
+
+    for (const item of newOrder.orderItems) {
+      const productId = item.productVariant.productId;
+
+      const current = productSoldMap.get(productId) || 0;
+      productSoldMap.set(productId, current + item.quantity);
     }
+
+    // update product
+    await Promise.all(
+      Array.from(productSoldMap.entries()).map(([productId, quantity]) =>
+        tx.products.update({
+          where: { id: productId },
+          data: {
+            totalSoldCount: { increment: quantity },
+          },
+        }),
+      ),
+    );
 
     // 3. Xóa giỏ hàng (chỉ khi checkout từ giỏ hàng)
     if (isFromCart) {
