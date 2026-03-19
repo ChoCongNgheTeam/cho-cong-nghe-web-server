@@ -70,7 +70,7 @@ const promotionTemplates: {
     targets: [
       {
         targetType: TargetType.BRAND,
-        targetId: "apple",
+        targetId: "",
       },
     ],
   },
@@ -93,7 +93,7 @@ const promotionTemplates: {
     targets: [
       {
         targetType: TargetType.CATEGORY,
-        targetId: "iphone",
+        targetId: "",
       },
     ],
   },
@@ -180,7 +180,7 @@ const promotionTemplates: {
     targets: [
       {
         targetType: TargetType.PRODUCT,
-        targetId: "iphone-16",
+        targetId: "",
       },
     ],
   },

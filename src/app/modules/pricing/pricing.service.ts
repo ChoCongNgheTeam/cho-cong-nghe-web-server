@@ -131,40 +131,40 @@ export const calculateProductPrice = async (input: PricingProductInput, userId?:
       }
     }
   }
-  console.log(
-    "ATTR targets:",
-    context.availablePromotions
-      .flatMap((p) => p.targets)
-      .filter((t) => t.targetType === "ATTRIBUTE")
-      .map((t) => ({ code: t.targetCode, value: t.targetValue })),
-  );
+  // console.log(
+  //   "ATTR targets:",
+  //   context.availablePromotions
+  //     .flatMap((p) => p.targets)
+  //     .filter((t) => t.targetType === "ATTRIBUTE")
+  //     .map((t) => ({ code: t.targetCode, value: t.targetValue })),
+  // );
 
   // Thêm log này vào calculateProductPrice trong pricing.service.ts
   // Đặt ngay SAU khi build context
 
   // ── DEBUG (xóa sau khi fix) ────────────────────────────────────────────────
 
-  console.log("=== PRICING DEBUG ===");
-  console.log("productId:", input.productId);
-  console.log("variantAttributes (input):", JSON.stringify(input.variantAttributes));
-  console.log("categoryPath:", input.categoryPath);
-  console.log("brandId:", input.brandId);
-  console.log("");
+  // console.log("=== PRICING DEBUG ===");
+  // console.log("productId:", input.productId);
+  // console.log("variantAttributes (input):", JSON.stringify(input.variantAttributes));
+  // console.log("categoryPath:", input.categoryPath);
+  // console.log("brandId:", input.brandId);
+  // console.log("");
 
-  // Check tất cả promotions active
-  console.log(
-    "All active promotions:",
-    context.availablePromotions.map((p) => ({
-      name: p.name,
-      priority: p.priority,
-      isActive: p.isActive,
-      targets: p.targets.map((t) => ({ type: t.targetType, code: t.targetCode, value: t.targetValue, id: t.targetId })),
-    })),
-  );
+  // // Check tất cả promotions active
+  // console.log(
+  //   "All active promotions:",
+  //   context.availablePromotions.map((p) => ({
+  //     name: p.name,
+  //     priority: p.priority,
+  //     isActive: p.isActive,
+  //     targets: p.targets.map((t) => ({ type: t.targetType, code: t.targetCode, value: t.targetValue, id: t.targetId })),
+  //   })),
+  // );
 
   // Check ATTRIBUTE targets
   const attrTargets = context.availablePromotions.flatMap((p) => p.targets).filter((t) => t.targetType === "ATTRIBUTE");
-  console.log("ATTRIBUTE targets:", JSON.stringify(attrTargets));
+  // console.log("ATTRIBUTE targets:", JSON.stringify(attrTargets));
 
   // Check từng promotion có match không
   for (const promo of context.availablePromotions) {
@@ -174,15 +174,15 @@ export const calculateProductPrice = async (input: PricingProductInput, userId?:
       return attrs.some((a) => a.code.toLowerCase() === (t.targetCode ?? "").toLowerCase() && a.value.toLowerCase() === (t.targetValue ?? "").toLowerCase());
     });
     if (matches || promo.targets.some((t) => t.targetType === "ATTRIBUTE")) {
-      console.log(`Promo "${promo.name}" ATTRIBUTE match: ${matches}`);
-      console.log("  variant attrs:", context.variantAttributes);
-      console.log(
-        "  promo targets:",
-        promo.targets.filter((t) => t.targetType === "ATTRIBUTE"),
-      );
+      // console.log(`Promo "${promo.name}" ATTRIBUTE match: ${matches}`);
+      // console.log("  variant attrs:", context.variantAttributes);
+      // console.log(
+      //   "  promo targets:",
+      //   promo.targets.filter((t) => t.targetType === "ATTRIBUTE"),
+      // );
     }
   }
-  console.log("=====================");
+  // console.log("=====================");
   // ── END DEBUG ──────────────────────────────────────────────────────────────
   return {
     productId: input.productId,

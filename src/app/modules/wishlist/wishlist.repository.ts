@@ -30,12 +30,6 @@ const productSelect = {
       price: true,
       variantAttributes: {
         select: {
-          value: true,
-          attribute: {
-            select: {
-              code: true,
-            },
-          },
           attributeOption: {
             select: {
               value: true,

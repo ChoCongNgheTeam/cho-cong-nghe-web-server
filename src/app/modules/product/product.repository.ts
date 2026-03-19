@@ -5,6 +5,7 @@ import { OrderStatus } from "@prisma/client";
 import { extractVariantOptions } from "@/helpers/variant-options";
 import { HighlightSpecificationGroup } from "./product.types";
 import { buildOrderBy, buildProductWhere } from "./product_filter.where-builder";
+import { validate as isUUID } from "uuid";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SELECT FRAGMENTS
@@ -1768,9 +1769,18 @@ export const findProductsOnSaleDate = async (
         includeAll = true;
         break;
       }
-      if (target.targetType === "PRODUCT" && target.targetId) directProductIds.add(target.targetId);
-      if (target.targetType === "CATEGORY" && target.targetId) categoryIds.add(target.targetId);
-      if (target.targetType === "BRAND" && target.targetId) brandIds.add(target.targetId);
+
+      if (target.targetType === "PRODUCT" && target.targetId && isUUID(target.targetId)) {
+        directProductIds.add(target.targetId);
+      }
+
+      if (target.targetType === "CATEGORY" && target.targetId && isUUID(target.targetId)) {
+        categoryIds.add(target.targetId);
+      }
+
+      if (target.targetType === "BRAND" && target.targetId && isUUID(target.targetId)) {
+        brandIds.add(target.targetId);
+      }
     }
     if (includeAll) break;
   }
@@ -1779,9 +1789,11 @@ export const findProductsOnSaleDate = async (
   const productWhere: any = {
     isActive: true,
     deletedAt: null,
-    ...(options.categoryId ? { categoryId: options.categoryId } : {}),
   };
 
+  if (options.categoryId && isUUID(options.categoryId)) {
+    productWhere.categoryId = options.categoryId;
+  }
   if (!includeAll) {
     const orConditions: any[] = [];
     if (directProductIds.size > 0) orConditions.push({ id: { in: Array.from(directProductIds) } });
