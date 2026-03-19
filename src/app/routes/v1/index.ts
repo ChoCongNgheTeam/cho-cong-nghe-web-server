@@ -37,6 +37,9 @@ import homeRouter from "@/app/modules/home/home.route";
 import attributeRouter from "@/app/modules/attributes/attribute.route";
 import specificationRouter from "@/app/modules/specifications/specification.route";
 
+// ===== Chatbot =====
+import { chatbotRoute } from "@/app/modules/chatbot/chatbot.route";
+
 const router = Router();
 
 // ===== Core & Auth =====
@@ -75,5 +78,8 @@ router.use("/home", homeRouter);
 
 router.use("/attributes", attributeRouter);
 router.use("/specifications", specificationRouter);
+
+// ===== Chatbot =====
+router.use("/chatbot", chatbotRoute);
 
 export default router;

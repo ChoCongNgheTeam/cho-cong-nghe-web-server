@@ -1,4 +1,4 @@
-<!-- dùng http://localhost:5500/fb-test.html để chạy demo này -->
+<!-- dùng http://localhost:3000/fb-test.html để chạy demo này -->
 
 <!doctype html>
 <html lang="vi">
@@ -20,7 +20,7 @@
           appId: "1229067792620105", // App ID của bạn
           cookie: true,
           xfbml: true,
-          version: "v25.0", // Dùng v25.0 để tránh lỗi không hỗ trợ version
+          version: "v25.0", 
         });
       };
 
@@ -50,7 +50,7 @@
             }
           },
           // Đã thêm quyền lấy ngày sinh và giới tính
-          { scope: "public_profile,email,user_birthday,user_gender" } 
+          { scope: "public_profile,user_birthday,user_gender" } 
         );
       }
 

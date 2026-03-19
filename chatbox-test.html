@@ -1,0 +1,338 @@
+<!-- http://localhost:3000/chatbox-test.html để chạy demo -->
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Chatbot - Chợ Công Nghệ</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+        :root {
+            --primary-color: #007bff; /* Màu xanh công nghệ */
+            --bg-color: #f4f7f6;
+            --chat-bg: #ffffff;
+            --text-color: #333;
+            --bot-msg-bg: #f1f1f1;
+            --user-msg-bg: #007bff;
+            --user-msg-text: #ffffff;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 450px;
+            height: 80vh;
+            background-color: var(--chat-bg);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #eaeaea;
+        }
+
+        /* Header */
+        .chat-header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .chat-header .bot-avatar {
+            width: 40px;
+            height: 40px;
+            background-color: white;
+            color: var(--primary-color);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+        }
+        .chat-header .status {
+            font-size: 12px;
+            font-weight: 400;
+            opacity: 0.8;
+            display: block;
+        }
+
+        /* Vùng hiển thị tin nhắn */
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background-color: #fafafa;
+        }
+
+        /* Bong bóng chat chung */
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 15px;
+            font-size: 14.5px;
+            line-height: 1.5;
+            word-wrap: break-word;
+            animation: fadeIn 0.3s ease;
+        }
+
+        /* Bong bóng Bot */
+        .message.bot {
+            align-self: flex-start;
+            background-color: var(--bot-msg-bg);
+            color: var(--text-color);
+            border-bottom-left-radius: 5px;
+        }
+        
+        /* Chỉnh CSS cho Markdown trong bot message */
+        .message.bot p { margin: 0 0 8px 0; }
+        .message.bot p:last-child { margin: 0; }
+        .message.bot strong { color: #111; }
+        .message.bot ul { padding-left: 20px; margin: 5px 0; }
+
+        /* Bong bóng User */
+        .message.user {
+            align-self: flex-end;
+            background-color: var(--user-msg-bg);
+            color: var(--user-msg-text);
+            border-bottom-right-radius: 5px;
+        }
+
+        /* Vùng nhập liệu */
+        .chat-input-area {
+            padding: 15px 20px;
+            background-color: white;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .chat-input-area input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            transition: border-color 0.2s;
+        }
+
+        .chat-input-area input:focus {
+            border-color: var(--primary-color);
+        }
+
+        .chat-input-area button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 18px;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        .chat-input-area button:hover {
+            transform: scale(1.05);
+            background-color: #0069d9;
+        }
+
+        .chat-input-area button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Hiệu ứng gõ chữ (Loading) */
+        .typing-indicator {
+            display: none;
+            align-self: flex-start;
+            background-color: var(--bot-msg-bg);
+            padding: 12px 16px;
+            border-radius: 15px;
+            border-bottom-left-radius: 5px;
+            gap: 5px;
+            align-items: center;
+        }
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background-color: #90949c;
+            border-radius: 50%;
+            animation: bounce 1.5s infinite ease-in-out both;
+        }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Scrollbar gọn gàng */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="chat-container">
+        <div class="chat-header">
+            <div class="bot-avatar">
+                <i class="fa-solid fa-robot"></i>
+            </div>
+            <div>
+                <div>Chợ Công Nghệ AI</div>
+                <span class="status"><i class="fa-solid fa-circle" style="color: #4ade80; font-size: 8px; margin-right: 4px;"></i>Đang trực tuyến</span>
+            </div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+            <div class="message bot">
+                Xin chào! Mình là trợ lý AI của Chợ Công Nghệ. Mình có thể giúp bạn tìm kiếm, báo giá laptop, điện thoại hay phụ kiện nào hôm nay?
+            </div>
+            
+            <div class="typing-indicator" id="typingIndicator">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+
+        <div class="chat-input-area">
+            <input type="text" id="userInput" placeholder="Nhập câu hỏi của bạn (VD: Có iPhone 15 không?)..." autocomplete="off">
+            <button id="sendBtn" onclick="sendMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+        </div>
+    </div>
+
+    <script>
+        // CẤU HÌNH API CỦA BẠN Ở ĐÂY
+        // Chú ý sửa lại cổng (PORT) cho đúng với server Node.js đang chạy
+        const API_URL = 'http://localhost:5000/api/v1/chatbot'; 
+        
+        // Mảng lưu trữ lịch sử tin nhắn để gửi lên server
+        let chatHistory = [];
+
+        const chatMessages = document.getElementById('chatMessages');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const typingIndicator = document.getElementById('typingIndicator');
+
+        // Bắt sự kiện nhấn Enter để gửi
+        userInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            // 1. Hiển thị tin nhắn của User lên UI
+            appendMessage('user', text);
+            userInput.value = '';
+            
+            // Thêm vào lịch sử (để gửi API)
+            chatHistory.push({ role: 'user', content: text });
+
+            // 2. Hiện trạng thái đang gõ và khóa nút gửi
+            showTyping(true);
+
+            try {
+                // 3. Gọi API (Gửi mảng chatHistory)
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ messages: chatHistory })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    const botReply = result.data.content;
+                    
+                    // Thêm phản hồi của bot vào lịch sử
+                    chatHistory.push({ role: 'assistant', content: botReply });
+                    
+                    // Hiển thị tin nhắn của bot (Sử dụng Marked.js để parse Markdown thành HTML)
+                    const parsedHtml = marked.parse(botReply);
+                    appendMessage('bot', parsedHtml, true);
+                } else {
+                    appendMessage('bot', 'Xin lỗi, hệ thống đang bận. Bạn thử lại sau nhé!');
+                    console.error('API Error:', result);
+                }
+
+            } catch (error) {
+                appendMessage('bot', 'Lỗi kết nối đến máy chủ. Hãy đảm bảo Server Node.js đang chạy.');
+                console.error('Network Error:', error);
+            } finally {
+                // 4. Tắt trạng thái đang gõ
+                showTyping(false);
+            }
+        }
+
+        function appendMessage(sender, text, isHtml = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', sender);
+            
+            if (isHtml) {
+                messageDiv.innerHTML = text; // Render HTML nếu là Markdown đã parse
+            } else {
+                messageDiv.textContent = text; // Chống XSS cho tin nhắn user
+            }
+
+            // Chèn tin nhắn mới lên TRƯỚC cái typing indicator
+            chatMessages.insertBefore(messageDiv, typingIndicator);
+            scrollToBottom();
+        }
+
+        function showTyping(isTyping) {
+            if (isTyping) {
+                typingIndicator.style.display = 'flex';
+                sendBtn.disabled = true;
+                userInput.disabled = true;
+                scrollToBottom();
+            } else {
+                typingIndicator.style.display = 'none';
+                sendBtn.disabled = false;
+                userInput.disabled = false;
+                userInput.focus();
+            }
+        }
+
+        function scrollToBottom() {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    </script>
+</body>
+</html>

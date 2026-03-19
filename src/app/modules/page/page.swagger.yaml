@@ -1,0 +1,435 @@
+openapi: 3.0.0
+info:
+  title: Page API
+  version: 1.0.0
+  description: API quản lý các trang tĩnh (Giới thiệu, Liên hệ) và trang chính sách (Policies)
+
+servers:
+  - url: /api/v1
+    description: Base API endpoint
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Nhập JWT token (không cần thêm 'Bearer ' ở đầu)"
+
+  schemas:
+    PageType:
+      type: string
+      enum: [PAGE, POLICY]
+      description: Loại trang tĩnh
+
+    PolicyType:
+      type: string
+      enum: [PRIVACY, TERMS, SHIPPING, RETURN, PAYMENT]
+      nullable: true
+      description: Phân loại chính sách (chỉ áp dụng nếu type là POLICY)
+
+    PageCard:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        slug:
+          type: string
+        type:
+          $ref: "#/components/schemas/PageType"
+        policyType:
+          $ref: "#/components/schemas/PolicyType"
+        isPublished:
+          type: boolean
+        priority:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PageDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        slug:
+          type: string
+        content:
+          type: string
+          description: Nội dung chi tiết của trang (HTML/Rich Text)
+        type:
+          $ref: "#/components/schemas/PageType"
+        policyType:
+          $ref: "#/components/schemas/PolicyType"
+        isPublished:
+          type: boolean
+        priority:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+
+tags:
+  - name: Public - Pages
+    description: API công khai cho trang tĩnh và chính sách
+  - name: Admin - Pages
+    description: API quản trị trang tĩnh
+
+paths:
+  /pages:
+    get:
+      tags:
+        - Public - Pages
+      summary: Lấy danh sách các trang công khai (Menu/Footer)
+      description: API này không trả về trường `content` để tối ưu tốc độ render menu hoặc footer.
+      parameters:
+        - in: query
+          name: type
+          schema:
+            $ref: "#/components/schemas/PageType"
+          description: Lọc theo loại trang
+        - in: query
+          name: policyType
+          schema:
+            $ref: "#/components/schemas/PolicyType"
+          description: Lọc theo loại chính sách cụ thể
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PageCard"
+                  message:
+                    type: string
+        "500":
+          description: Lỗi server
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /pages/{slug}:
+    get:
+      tags:
+        - Public - Pages
+      summary: Lấy chi tiết trang tĩnh theo slug
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+          example: about
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/PageDetail"
+                  message:
+                    type: string
+        "404":
+          description: Không tìm thấy trang tĩnh
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Lỗi server
+
+  /pages/admin/all:
+    get:
+      tags:
+        - Admin - Pages
+      summary: Lấy danh sách tất cả các trang (dành cho Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+        - in: query
+          name: keyword
+          schema:
+            type: string
+          description: Tìm theo tiêu đề trang
+        - in: query
+          name: type
+          schema:
+            $ref: "#/components/schemas/PageType"
+        - in: query
+          name: isPublished
+          schema:
+            type: string
+            enum: ["true", "false"]
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PageCard"
+                  pagination:
+                    $ref: "#/components/schemas/PaginationMeta"
+                  message:
+                    type: string
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "500":
+          description: Lỗi server
+
+  /pages/admin:
+    post:
+      tags:
+        - Admin - Pages
+      summary: Tạo trang tĩnh mới (Admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - slug
+                - content
+                - type
+              properties:
+                title:
+                  type: string
+                  example: "Giới thiệu về chúng tôi"
+                slug:
+                  type: string
+                  example: "about"
+                content:
+                  type: string
+                  example: "<p>Nội dung chi tiết ở dạng HTML...</p>"
+                type:
+                  $ref: "#/components/schemas/PageType"
+                policyType:
+                  $ref: "#/components/schemas/PolicyType"
+                isPublished:
+                  type: boolean
+                  default: true
+                priority:
+                  type: integer
+                  default: 0
+                  description: Số thứ tự hiển thị (càng nhỏ càng đứng trước)
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/PageDetail"
+                  message:
+                    type: string
+        "400":
+          description: Dữ liệu không hợp lệ hoặc trùng Slug
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "500":
+          description: Lỗi server
+
+  /pages/admin/{id}:
+    get:
+      tags:
+        - Admin - Pages
+      summary: Lấy chi tiết trang tĩnh theo ID (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/PageDetail"
+                  message:
+                    type: string
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "404":
+          description: Không tìm thấy
+        "500":
+          description: Lỗi server
+
+    patch:
+      tags:
+        - Admin - Pages
+      summary: Cập nhật thông tin trang tĩnh (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                slug:
+                  type: string
+                content:
+                  type: string
+                type:
+                  $ref: "#/components/schemas/PageType"
+                policyType:
+                  $ref: "#/components/schemas/PolicyType"
+                isPublished:
+                  type: boolean
+                priority:
+                  type: integer
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/PageDetail"
+                  message:
+                    type: string
+        "400":
+          description: Dữ liệu không hợp lệ hoặc trùng Slug
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "404":
+          description: Không tìm thấy
+        "500":
+          description: Lỗi server
+
+    delete:
+      tags:
+        - Admin - Pages
+      summary: Xóa trang tĩnh (Admin - Soft Delete)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Xóa thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          description: Chưa xác thực
+        "403":
+          description: Không có quyền
+        "404":
+          description: Không tìm thấy
+        "500":
+          description: Lỗi server

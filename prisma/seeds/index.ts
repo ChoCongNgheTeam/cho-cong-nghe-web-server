@@ -17,3 +17,4 @@ export * from "./comment.seed";
 export * from "./image-media.seed";
 export * from "./category-variant-attribute.seed";
 export * from "./campaigns.seed";
+export * from "./page.seed";

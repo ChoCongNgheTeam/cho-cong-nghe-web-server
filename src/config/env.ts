@@ -10,4 +10,6 @@ export const env = {
   JWT_REFRESH_TTL_LONG: process.env.JWT_REFRESH_TTL_LONG || "7d",
 
   RESET_TOKEN_EXPIRES_IN: Number(process.env.RESET_TOKEN_EXPIRES_IN || 3600000),
+
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
 };
