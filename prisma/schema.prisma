@@ -70,6 +70,20 @@ enum TargetType {
   ATTRIBUTE
 }
 
+enum StackingGroup {
+  PERCENT
+  FIXED
+  FLASH
+  BANK
+  GIFT
+}
+
+enum ApplyType {
+  STACKABLE
+  EXCLUSIVE
+}
+
+
 enum PromotionActionType {
   DISCOUNT_PERCENT
   DISCOUNT_FIXED
@@ -782,6 +796,10 @@ model promotions {
   usageLimit       Int?
   usedCount        Int       @default(0)
   createdAt        DateTime  @default(now())
+
+  applyType      ApplyType     @default(EXCLUSIVE)
+  stackingGroup  StackingGroup @default(PERCENT)
+  stopProcessing Boolean       @default(false)
 
   // --- Soft Delete ---
   deletedAt        DateTime?

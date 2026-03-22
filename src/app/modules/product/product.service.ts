@@ -689,38 +689,45 @@ export const getProductsOnSaleDate = async (
 ) => {
   const result = await findProductsOnSaleDate(date, options);
 
-  // Transform products → card format (giống flash sale)
-  const cards = result.products.flatMap((product) => {
+  const cards: Array<{ card: any; pricingContext: any }> = [];
+
+  for (const product of result.products) {
     const variants: any[] = product.variants ?? [];
-    if (variants.length === 0) return [];
+    if (variants.length === 0) continue;
 
-    // CARD mode: mỗi variant 1 card; SELECTOR: chỉ lấy default
-    const variantsForCards = product.variantDisplay === "CARD" ? variants : [variants.find((v: any) => v.isDefault) ?? variants[0]].filter(Boolean);
+    const variantsForCards =
+      product.variantDisplay === "CARD"
+        ? [variants.find((v: any) => v.isDefault) ?? variants[0]].filter(Boolean) // ← chỉ lấy default dù CARD
+        : [variants.find((v: any) => v.isDefault) ?? variants[0]].filter(Boolean);
 
-    return variantsForCards.flatMap((variant: any) => {
+    for (const variant of variantsForCards) {
       const card = transformProductCard({ ...product, variants: [variant] });
-      if (!card) return [];
-      return [
-        {
-          card,
-          pricingContext: {
-            productId: product.id,
-            variantId: variant.id,
-            price: Number(variant.price),
-            brandId: product.brand?.id,
-            categoryPath: buildCategoryPath(product.category),
-            variantAttributes: (variant.variantAttributes ?? []).map((va: any) => ({
-              code: va.attributeOption.attribute.code,
-              value: va.attributeOption.value,
-            })),
-          },
+      if (!card) continue;
+
+      cards.push({
+        card,
+        pricingContext: {
+          productId: product.id,
+          variantId: variant.id,
+          price: Number(variant.price),
+          brandId: product.brand?.id,
+          categoryPath: buildCategoryPath(product.category),
+          variantAttributes: (variant.variantAttributes ?? []).map((va: any) => ({
+            code: va.attributeOption.attribute.code,
+            value: va.attributeOption.value,
+          })),
         },
-      ];
-    });
-  });
+      });
+
+      // Giới hạn cứng sau khi expand variants
+      if (cards.length >= (options.limit ?? 20)) break;
+    }
+
+    if (cards.length >= (options.limit ?? 20)) break;
+  }
 
   return {
-    date: result.date,
+    date: new Date(date).toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }), // ← thay result.date
     promotions: result.promotions,
     data: cards,
     total: result.total,
@@ -729,7 +736,6 @@ export const getProductsOnSaleDate = async (
     totalPages: result.totalPages,
   };
 };
-
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. PRODUCT COMPARISON
 // ─────────────────────────────────────────────────────────────────────────────

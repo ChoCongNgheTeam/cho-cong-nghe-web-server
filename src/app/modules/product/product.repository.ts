@@ -1090,7 +1090,7 @@ export const getProductIdsFromPromotions = async (date: Date): Promise<{ product
       isActive: true,
       AND: [{ OR: [{ startDate: null }, { startDate: { lte: date } }] }, { OR: [{ endDate: null }, { endDate: { gte: date } }] }],
     },
-    include: { targets: true },
+    include: { targets: true }, // targets đã include targetCode, targetValue
   });
 
   for (const promotion of activePromotions) {
@@ -1116,6 +1116,24 @@ export const getProductIdsFromPromotions = async (date: Date): Promise<{ product
           select: { id: true },
         });
         products.forEach((p) => productIds.add(p.id));
+      } else if (target.targetType === "ATTRIBUTE" && target.targetCode && target.targetValue) {
+        // ← NEW
+        const matchingVariants = await prisma.products_variants.findMany({
+          where: {
+            isActive: true,
+            deletedAt: null,
+            variantAttributes: {
+              some: {
+                attributeOption: {
+                  value: { equals: target.targetValue, mode: "insensitive" },
+                  attribute: { code: { equals: target.targetCode, mode: "insensitive" } },
+                },
+              },
+            },
+          },
+          select: { productId: true },
+        });
+        matchingVariants.forEach((v) => productIds.add(v.productId));
       }
     }
   }
@@ -1578,6 +1596,7 @@ export const findTrendingSearchSuggestions = async (
  * Chỉ lấy metadata promotion theo ngày, KHÔNG lấy products.
  * FE dùng để render calendar — khi click vào ngày mới gọi findProductsOnSaleDate.
  */
+const toVNDateStr = (d: Date): string => d.toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
 export const findSaleScheduleDays = async (
   startDate: Date,
   endDate: Date,
@@ -1605,10 +1624,14 @@ export const findSaleScheduleDays = async (
     where: {
       isActive: true,
       deletedAt: null,
+      startDate: { not: null },
+      endDate: { not: null },
+      targets: {
+        some: { targetType: "PRODUCT" }, // ← chỉ lấy promotion có target PRODUCT
+      },
       OR: [
-        // Promotions giao với khoảng [startDate, endDate]
         {
-          AND: [{ OR: [{ startDate: null }, { startDate: { lte: endDate } }] }, { OR: [{ endDate: null }, { endDate: { gte: startDate } }] }],
+          AND: [{ startDate: { lte: endDate } }, { endDate: { gte: startDate } }],
         },
       ],
     },
@@ -1645,7 +1668,7 @@ export const findSaleScheduleDays = async (
     last.setHours(0, 0, 0, 0);
 
     while (cur <= last) {
-      const key = cur.toISOString().split("T")[0];
+      const key = toVNDateStr(cur);
       if (!scheduleMap.has(key)) scheduleMap.set(key, []);
       const arr = scheduleMap.get(key)!;
       if (!arr.some((p) => p.id === promo.id)) arr.push(promo);
@@ -1654,13 +1677,15 @@ export const findSaleScheduleDays = async (
     }
   }
 
+  const todayStr = toVNDateStr(new Date());
+
   return Array.from(scheduleMap.entries())
     .map(([date, promos]) => {
       const dateObj = new Date(date);
       dateObj.setHours(0, 0, 0, 0);
       return {
         date,
-        isToday: dateObj.getTime() === today.getTime(),
+        isToday: date === todayStr,
         hasActiveSale: promos.length > 0,
         promotions: promos
           .sort((a, b) => b.priority - a.priority)
@@ -1698,6 +1723,7 @@ export const findProductsOnSaleDate = async (
     limit?: number;
     page?: number;
     categoryId?: string;
+    activeNow?: boolean;
   } = {},
 ): Promise<{
   date: string;
@@ -1716,15 +1742,19 @@ export const findProductsOnSaleDate = async (
   dateStart.setHours(0, 0, 0, 0);
   const dateEnd = new Date(date);
   dateEnd.setHours(23, 59, 59, 999);
-
+  const now = new Date();
   // Tìm promotions active vào ngày đó
   const promotionWhere: any = {
     isActive: true,
     deletedAt: null,
-    OR: [
-      {
-        AND: [{ OR: [{ startDate: null }, { startDate: { lte: dateEnd } }] }, { OR: [{ endDate: null }, { endDate: { gte: dateStart } }] }],
-      },
+    startDate: { not: null },
+    endDate: { not: null },
+    targets: { some: { targetType: "PRODUCT" } },
+    AND: [
+      // Nếu activeNow=true → chỉ lấy promotion đã bắt đầu (startDate <= now)
+      // Nếu không → lấy tất cả overlap với ngày đó
+      { startDate: { lte: options.activeNow ? now : dateEnd } },
+      { endDate: { gte: dateStart } },
     ],
   };
   if (options.promotionId) {
@@ -1739,7 +1769,12 @@ export const findProductsOnSaleDate = async (
       description: true,
       priority: true,
       targets: {
-        select: { targetType: true, targetId: true },
+        select: {
+          targetType: true,
+          targetId: true,
+          targetCode: true,
+          targetValue: true,
+        },
       },
     },
     orderBy: { priority: "desc" },
@@ -1747,7 +1782,7 @@ export const findProductsOnSaleDate = async (
 
   if (activePromotions.length === 0) {
     return {
-      date: date.toISOString().split("T")[0],
+      date: toVNDateStr(date),
       promotions: [],
       products: [],
       total: 0,
@@ -1780,6 +1815,25 @@ export const findProductsOnSaleDate = async (
 
       if (target.targetType === "BRAND" && target.targetId && isUUID(target.targetId)) {
         brandIds.add(target.targetId);
+      }
+      if (target.targetType === "ATTRIBUTE" && target.targetCode && target.targetValue) {
+        // Query products có variant chứa attribute này
+        const matchingVariants = await prisma.products_variants.findMany({
+          where: {
+            isActive: true,
+            deletedAt: null,
+            variantAttributes: {
+              some: {
+                attributeOption: {
+                  value: { equals: target.targetValue, mode: "insensitive" },
+                  attribute: { code: { equals: target.targetCode, mode: "insensitive" } },
+                },
+              },
+            },
+          },
+          select: { productId: true },
+        });
+        matchingVariants.forEach((v) => directProductIds.add(v.productId));
       }
     }
     if (includeAll) break;

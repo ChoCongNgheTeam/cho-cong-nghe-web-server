@@ -1,6 +1,18 @@
-import { PromotionData, VoucherData, PricingContext, PromotionTargetData, PromotionRuleData, VoucherTargetData, DisplayPromotion } from "./pricing.types";
+import {
+  PromotionData,
+  VoucherData,
+  PricingContext,
+  PromotionTargetData,
+  PromotionRuleData,
+  VoucherTargetData,
+  DisplayPromotion,
+  AppliedDiscount,
+  StackingGroup,
+  StackedPromotionResult,
+} from "./pricing.types";
 import { TargetType, PromotionActionType, DiscountType } from "@prisma/client";
 import { DISCOUNT_CALCULATION } from "./pricing.constants";
+import { formatPromotionDescription } from "./pricing.helpers";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TARGET MATCHING
@@ -163,52 +175,219 @@ export const calculatePromotionRuleDiscount = (
 // Chỉ 1 promotion được áp dụng per product (MAX_PROMOTIONS_PER_PRODUCT = 1)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PRICE_AFFECTING_ACTIONS: PromotionActionType[] = [PromotionActionType.DISCOUNT_PERCENT, PromotionActionType.DISCOUNT_FIXED];
+// const PRICE_AFFECTING_ACTIONS: PromotionActionType[] = [PromotionActionType.DISCOUNT_PERCENT, PromotionActionType.DISCOUNT_FIXED];
 
-export const getBestPromotionRule = (
-  productId: string,
-  basePrice: number,
-  quantity: number,
-  categoryPath?: string[],
-  brandId?: string,
-  context?: PricingContext,
-): { promotion: PromotionData; rule: PromotionRuleData } | null => {
-  if (!context?.availablePromotions) return null;
+// export const getBestPromotionRule = (
+//   productId: string,
+//   basePrice: number,
+//   quantity: number,
+//   categoryPath?: string[],
+//   brandId?: string,
+//   context?: PricingContext,
+// ): { promotion: PromotionData; rule: PromotionRuleData } | null => {
+//   if (!context?.availablePromotions) return null;
 
-  let best: {
+//   let best: {
+//     promotion: PromotionData;
+//     rule: PromotionRuleData;
+//     discountAmount: number;
+//   } | null = null;
+
+//   for (const promotion of context.availablePromotions) {
+//     const applicableRules = getApplicablePromotionRules(promotion, productId, quantity, brandId, context);
+
+//     for (const rule of applicableRules) {
+//       if (!PRICE_AFFECTING_ACTIONS.includes(rule.actionType)) continue;
+
+//       const { discountAmount } = calculatePromotionRuleDiscount(rule, basePrice, quantity, promotion.maxDiscountValue);
+
+//       if (!best) {
+//         best = { promotion, rule, discountAmount };
+//         continue;
+//       }
+
+//       // Rule 1: higher discount wins
+//       if (discountAmount > best.discountAmount) {
+//         best = { promotion, rule, discountAmount };
+//         continue;
+//       }
+
+//       // Rule 2: tie-break by priority (higher number = more specific = wins)
+//       if (discountAmount === best.discountAmount && promotion.priority > best.promotion.priority) {
+//         best = { promotion, rule, discountAmount };
+//       }
+//     }
+//   }
+
+//   return best ? { promotion: best.promotion, rule: best.rule } : null;
+// };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STACKED PROMOTIONS ENGINE
+// Thay thế getBestPromotionRule — hỗ trợ stack nhiều promotion theo rules
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getStackedPromotions = (productId: string, basePrice: number, quantity: number, categoryPath?: string[], brandId?: string, context?: PricingContext): StackedPromotionResult => {
+  if (!context?.availablePromotions) {
+    return {
+      appliedPromotions: [],
+      availablePromotions: [],
+      finalPrice: basePrice,
+      totalDiscount: 0,
+      discountBreakdown: {},
+      giftProducts: [],
+    };
+  }
+
+  // 1. Lọc promotions applicable + sort priority DESC
+  const candidates: Array<{
     promotion: PromotionData;
     rule: PromotionRuleData;
-    discountAmount: number;
-  } | null = null;
+  }> = [];
 
   for (const promotion of context.availablePromotions) {
     const applicableRules = getApplicablePromotionRules(promotion, productId, quantity, brandId, context);
+    if (applicableRules.length === 0) continue;
 
-    for (const rule of applicableRules) {
-      if (!PRICE_AFFECTING_ACTIONS.includes(rule.actionType)) continue;
+    // Lấy rule price-affecting đầu tiên (PERCENT/FIXED) để compete
+    // Gift/BuyXGetY xử lý riêng bên dưới
+    const priceRule = applicableRules.find((r) => PRICE_AFFECTING_ACTIONS.includes(r.actionType));
+    if (priceRule) {
+      candidates.push({ promotion, rule: priceRule });
+    }
 
-      const { discountAmount } = calculatePromotionRuleDiscount(rule, basePrice, quantity, promotion.maxDiscountValue);
-
-      if (!best) {
-        best = { promotion, rule, discountAmount };
-        continue;
-      }
-
-      // Rule 1: higher discount wins
-      if (discountAmount > best.discountAmount) {
-        best = { promotion, rule, discountAmount };
-        continue;
-      }
-
-      // Rule 2: tie-break by priority (higher number = more specific = wins)
-      if (discountAmount === best.discountAmount && promotion.priority > best.promotion.priority) {
-        best = { promotion, rule, discountAmount };
-      }
+    // Gift rules — collect riêng, không compete với price rules
+    const giftRules = applicableRules.filter((r) => r.actionType === PromotionActionType.GIFT_PRODUCT);
+    for (const gr of giftRules) {
+      candidates.push({ promotion, rule: gr });
     }
   }
 
-  return best ? { promotion: best.promotion, rule: best.rule } : null;
+  // Sort priority DESC
+  candidates.sort((a, b) => b.promotion.priority - a.promotion.priority);
+
+  // 2. Build availablePromotions (tất cả applicable — cho UI)
+  const availablePromotions: DisplayPromotion[] = [];
+  const seenAvailable = new Set<string>();
+  let stoppedForAvailable = false;
+
+  for (const { promotion, rule } of candidates) {
+    if (stoppedForAvailable) break;
+
+    if (!seenAvailable.has(promotion.id)) {
+      availablePromotions.push({
+        id: promotion.id,
+        name: promotion.name,
+        description: promotion.description,
+        actionType: rule.actionType,
+        buyQuantity: rule.buyQuantity,
+        getQuantity: rule.getQuantity,
+        discountValue: rule.discountValue ? Number(rule.discountValue) : undefined,
+      });
+      seenAvailable.add(promotion.id);
+    }
+
+    // Nếu EXCLUSIVE → chỉ show promotion đó, dừng
+    if (promotion.applyType === "EXCLUSIVE") {
+      stoppedForAvailable = true;
+    }
+  }
+
+  // 3. Apply stacking logic
+  let currentPrice = basePrice;
+  const appliedPromotions: AppliedDiscount[] = [];
+  const discountBreakdown: Partial<Record<StackingGroup, number>> = {};
+  const usedGroups = new Set<StackingGroup>();
+  const giftProducts: { variantId: string; quantity: number }[] = [];
+  let stopped = false;
+
+  for (const { promotion, rule } of candidates) {
+    if (stopped) break;
+
+    // Gift rules — luôn apply, không tính vào stacking group
+    if (rule.actionType === PromotionActionType.GIFT_PRODUCT) {
+      if (rule.giftProductVariantId && rule.getQuantity) {
+        const sets = rule.buyQuantity ? Math.floor(quantity / rule.buyQuantity) : 1;
+        const giftQty = sets * rule.getQuantity;
+        if (giftQty > 0) {
+          giftProducts.push({
+            variantId: rule.giftProductVariantId,
+            quantity: giftQty,
+          });
+          appliedPromotions.push({
+            type: "PROMOTION",
+            id: promotion.id,
+            name: promotion.name,
+            discountAmount: 0,
+            description: formatPromotionDescription(rule),
+            actionType: rule.actionType,
+            stackingGroup: promotion.stackingGroup,
+          });
+        }
+      }
+      continue;
+    }
+
+    // EXCLUSIVE — apply và dừng hẳn
+    if (promotion.applyType === "EXCLUSIVE") {
+      const { discountAmount } = calculatePromotionRuleDiscount(rule, currentPrice, quantity, promotion.maxDiscountValue);
+      if (discountAmount > 0) {
+        currentPrice = currentPrice - discountAmount / quantity;
+        appliedPromotions.push({
+          type: "PROMOTION",
+          id: promotion.id,
+          name: promotion.name,
+          discountAmount,
+          description: formatPromotionDescription(rule),
+          actionType: rule.actionType,
+          stackingGroup: promotion.stackingGroup,
+        });
+        discountBreakdown[promotion.stackingGroup] = (discountBreakdown[promotion.stackingGroup] ?? 0) + discountAmount;
+      }
+      stopped = true;
+      break;
+    }
+
+    // STACKABLE — check group đã dùng chưa
+    if (usedGroups.has(promotion.stackingGroup)) continue;
+
+    const { discountAmount } = calculatePromotionRuleDiscount(rule, currentPrice, quantity, promotion.maxDiscountValue);
+    if (discountAmount <= 0) continue;
+
+    currentPrice = currentPrice - discountAmount / quantity;
+    usedGroups.add(promotion.stackingGroup);
+
+    appliedPromotions.push({
+      type: "PROMOTION",
+      id: promotion.id,
+      name: promotion.name,
+      discountAmount,
+      description: formatPromotionDescription(rule),
+      actionType: rule.actionType,
+      stackingGroup: promotion.stackingGroup,
+    });
+
+    discountBreakdown[promotion.stackingGroup] = (discountBreakdown[promotion.stackingGroup] ?? 0) + discountAmount;
+
+    if (promotion.stopProcessing) {
+      stopped = true;
+      break;
+    }
+  }
+
+  const totalDiscount = basePrice * quantity - currentPrice * quantity;
+
+  return {
+    appliedPromotions,
+    availablePromotions,
+    finalPrice: currentPrice,
+    totalDiscount: Math.round(totalDiscount),
+    discountBreakdown,
+    giftProducts,
+  };
 };
+
+const PRICE_AFFECTING_ACTIONS: PromotionActionType[] = [PromotionActionType.DISCOUNT_PERCENT, PromotionActionType.DISCOUNT_FIXED];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VOUCHER

@@ -3,7 +3,8 @@ import { DiscountType, TargetType, PromotionActionType } from "@prisma/client";
 // ─────────────────────────────────────────────────────────────────────────────
 // INPUT TYPES
 // ─────────────────────────────────────────────────────────────────────────────
-
+export type StackingGroup = "PERCENT" | "FIXED" | "FLASH" | "BANK" | "GIFT";
+export type ApplyType = "STACKABLE" | "EXCLUSIVE";
 /**
  * Attribute của 1 variant — dùng để match ATTRIBUTE promotion target.
  * Map từ: variantAttributes[].attributeOption.attribute.code + .value
@@ -89,8 +90,21 @@ export interface PromotionData {
   usageLimit: number | null;
   usedCount: number;
 
+  applyType: ApplyType;
+  stackingGroup: StackingGroup;
+  stopProcessing: boolean;
+
   rules: PromotionRuleData[];
   targets: PromotionTargetData[];
+}
+
+export interface StackedPromotionResult {
+  appliedPromotions: AppliedDiscount[];
+  availablePromotions: DisplayPromotion[];
+  finalPrice: number;
+  totalDiscount: number;
+  discountBreakdown: Partial<Record<StackingGroup, number>>;
+  giftProducts: { variantId: string; quantity: number }[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -136,6 +150,7 @@ export interface AppliedDiscount {
   discountAmount: number;
   description: string;
   actionType?: PromotionActionType | DiscountType;
+  stackingGroup?: StackingGroup;
 }
 
 export interface DisplayPromotion {
@@ -167,6 +182,7 @@ export interface PricedProduct {
 
   hasPromotion: boolean;
   discountPercentage: number;
+  discountBreakdown?: Partial<Record<StackingGroup, number>>;
 }
 
 export interface PricingResult {

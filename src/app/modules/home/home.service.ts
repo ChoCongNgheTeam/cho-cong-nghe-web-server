@@ -66,10 +66,17 @@ const getActiveHomeCampaigns = async (): Promise<HomeCampaign[]> => {
 };
 
 const getSaleScheduleForHome = async (userId?: string): Promise<HomeSaleScheduleResponse> => {
-  const today = new Date();
-  const endDate = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
+  // Dùng date string VN để tránh UTC offset
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }); // "2026-03-21"
+  const todayVN = new Date(todayStr + "T00:00:00+07:00");
+  const endDate = new Date(todayStr + "T00:00:00+07:00");
+  endDate.setDate(endDate.getDate() + 3);
 
-  const [schedule, todayResult] = await Promise.all([getSaleScheduleV2(today, endDate), getProductsOnSaleDate(today, { limit: 12 })]);
+  // Truyền thêm option nowOnly để filter chặt hơn
+  const [schedule, todayResult] = await Promise.all([
+    getSaleScheduleV2(todayVN, endDate),
+    getProductsOnSaleDate(todayVN, { limit: 12, activeNow: true }), // ← thêm flag
+  ]);
 
   const todayProductsEnriched = await enrichProductsWithPricing(todayResult.data, userId);
 
