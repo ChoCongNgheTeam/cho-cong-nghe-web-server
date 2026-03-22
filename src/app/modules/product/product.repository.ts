@@ -70,7 +70,7 @@ const selectVariant = {
 };
 
 // Card select — public listing
-const selectProductCard = {
+export const selectProductCard = {
   id: true,
   name: true,
   slug: true,
