@@ -63,6 +63,10 @@ export const featuredCategoriesQuerySchema = z.object({
   limit: z.coerce.number().positive().max(50).default(6),
 });
 
+export const resolveCategoryQuerySchema = z.object({
+  q: z.string().min(1, "Từ khóa không được để trống"),
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CREATE / UPDATE
 // ─────────────────────────────────────────────────────────────────────────────

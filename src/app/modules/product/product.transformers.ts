@@ -168,6 +168,30 @@ export const calculateOverallStockStatus = (variants: RawVariant[]): "in_stock" 
   return "in_stock";
 };
 
+/**
+ * Detect xem product có nên dùng bundle mode không.
+ * Bundle khi: variantDisplay = CARD, HOẶC có attribute ngoài color (ram, gpu, capacity...)
+ */
+const shouldUseBundleMode = (product: any, validVariants: RawVariant[]): boolean => {
+  if (product.variantDisplay === "CARD") return true;
+
+  // Collect tất cả attribute types từ variants
+  const attrTypes = new Set<string>();
+  for (const v of validVariants) {
+    for (const va of v.variantAttributes) {
+      attrTypes.add(va.attributeOption.attribute.code);
+    }
+  }
+
+  // Nếu có attribute nào ngoài color → bundle
+  const NON_BUNDLE_ATTRS = new Set(["color", "storage"]); // chỉ color → individual
+  for (const type of attrTypes) {
+    if (!NON_BUNDLE_ATTRS.has(type)) return true;
+  }
+
+  return false;
+};
+
 export const transformProductCard = (product: any): ProductCard | null => {
   const allVariants: any[] = product.variants ?? [];
 
@@ -213,27 +237,18 @@ export const transformProductCard = (product: any): ProductCard | null => {
 
 export const transformProductDetail = (product: any, reviewStats?: ReviewStats): Omit<ProductDetail, "highlights" | "canReview" | "orderItemId"> => {
   const validVariants = product.variants.filter((v: { isActive: boolean }) => v.isActive);
-
   const currentVariant = validVariants.find((v: { isDefault: boolean }) => v.isDefault) ?? validVariants[0];
 
-  // Bundle mode khi product.variantDisplay = CARD
-  const isBundleMode = product.variantDisplay === "CARD";
+  // ← dùng helper mới thay vì chỉ check variantDisplay
+  const isBundleMode = shouldUseBundleMode(product, validVariants);
 
-  // Build availableOptions theo mode
   let availableOptions: AvailableOption[];
   if (isBundleMode) {
-    // Bundle mode: FE chọn theo cụm cấu hình (6GB/128GB, 8GB/256GB...)
     availableOptions = buildVariantBundles(validVariants, currentVariant.id);
   } else {
-    // Individual mode: FE chọn riêng từng attribute (color, storage...)
     const selectedOptions: Record<string, string> = {};
     for (const va of currentVariant.variantAttributes) {
-      // console.log("va:", va);
-      // console.log("attributeOption:", va.attributeOption);
-      // console.log("attribute:", va.attributeOption?.attribute);
       const type = va.attributeOption.attribute.code;
-      // console.log("type:", type);
-
       selectedOptions[type] = va.attributeOption.value;
     }
     availableOptions = buildAvailableOptionsWithStatus(validVariants, product.img || [], selectedOptions);
@@ -288,7 +303,7 @@ export const transformVariant = (variant: RawVariant, colorImages: any[]): Produ
 export const transformProductVariantResponse = (product: any, variant: RawVariant) => {
   const validVariants: RawVariant[] = product.variants.filter((v: { isActive: boolean }) => v.isActive).map(normalizeVariant);
 
-  const isBundleMode = product.variantDisplay === "CARD";
+  const isBundleMode = shouldUseBundleMode(product, validVariants); // ← dùng helper
 
   let availableOptions: AvailableOption[];
   if (isBundleMode) {
@@ -302,14 +317,9 @@ export const transformProductVariantResponse = (product: any, variant: RawVarian
     availableOptions = buildAvailableOptionsWithStatus(validVariants, product.img || [], selectedOptions);
   }
 
-  // Build name theo variant đang được chọn
   const displayName = variant.variantAttributes?.length ? buildVariantDisplayName(product.name, variant.variantAttributes) : product.name;
 
-  return {
-    name: displayName,
-    variant: transformVariant(variant, product.img),
-    availableOptions,
-  };
+  return { name: displayName, variant: transformVariant(variant, product.img), availableOptions };
 };
 
 export const transformProductSpecifications = (product: {

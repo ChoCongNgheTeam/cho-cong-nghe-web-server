@@ -20,8 +20,8 @@ import { getRelatedProductsWithPricing } from "../pricing/use-cases/getRelatedPr
 import { getFlashSaleProductsWithPricing } from "../pricing/use-cases/getFlashSaleProductsWithPricing.service";
 import { getNewArrivalProductsWithPricing } from "../pricing/use-cases/getNewArrivalProductsWithPricing.service";
 import { getBestSellingProductsWithPricing } from "../pricing/use-cases/getBestSellingProductsWithPricing.service";
-import { getProductVariantOptions } from "../pricing/use-cases/product.variant-pricing.orchestrator";
-import { compareProducts, getProductsOnSaleDate, getProductStats, getSaleScheduleV2, getSearchSuggestionsTrending } from "./product.service";
+// import { getProductVariantOptions } from "../pricing/use-cases/product.variant-pricing.orchestrator";
+import { compareProducts, getProductsOnSaleDate, getProductStats, getProductVariantOptions, getSaleScheduleV2, getSearchSuggestionsTrending } from "./product.service";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -63,19 +63,24 @@ export const getProductVariantHandler = async (req: Request, res: Response) => {
   res.json({ data: result, message: "Lấy chi tiết variant thành công" });
 };
 
+// export const getProductVariantOptionsHandler = async (req: Request, res: Response) => {
+//   // Tách selectedOptions từ query params — bỏ các system params
+//   const SKIP_PARAMS = new Set(["page", "limit", "sort", "order"]);
+//   const selectedOptions: Record<string, string> = {};
+
+//   for (const [key, value] of Object.entries(req.query)) {
+//     if (!SKIP_PARAMS.has(key) && typeof value === "string" && value.trim()) {
+//       selectedOptions[key] = value.trim();
+//     }
+//   }
+
+//   const result = await getProductVariantOptions(req.params.slug, selectedOptions, req.user?.id);
+
+//   res.json({ data: result, message: "Lấy danh sách variant thành công" });
+// };
+
 export const getProductVariantOptionsHandler = async (req: Request, res: Response) => {
-  // Tách selectedOptions từ query params — bỏ các system params
-  const SKIP_PARAMS = new Set(["page", "limit", "sort", "order"]);
-  const selectedOptions: Record<string, string> = {};
-
-  for (const [key, value] of Object.entries(req.query)) {
-    if (!SKIP_PARAMS.has(key) && typeof value === "string" && value.trim()) {
-      selectedOptions[key] = value.trim();
-    }
-  }
-
-  const result = await getProductVariantOptions(req.params.slug, selectedOptions, req.user?.id);
-
+  const result = await getProductVariantOptions(req.params.slug, req.query as Record<string, string>);
   res.json({ data: result, message: "Lấy danh sách variant thành công" });
 };
 

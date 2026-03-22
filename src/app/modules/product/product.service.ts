@@ -56,9 +56,9 @@ const assertProductExists = async (id: string, options: { includeDeleted?: boole
 // PUBLIC
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Thêm interleave khi search
 export const getProductsPublic = async (query: ListProductsQuery) => {
   const result = await repo.findAllPublic(query);
-  // console.log(result);
 
   const cards = result.data.flatMap((product) => {
     const variantsForCards = getVariantsForCards(product);
@@ -75,6 +75,32 @@ export const getProductsPublic = async (query: ListProductsQuery) => {
     total: result.total,
     totalPages: result.totalPages,
   };
+};
+
+// Helper interleave
+const interleaveBrands = (items: Array<{ card: any; pricingContext: any }>) => {
+  const groups = new Map<string, Array<{ card: any; pricingContext: any }>>();
+
+  for (const item of items) {
+    // brandId từ pricingContext
+    const brandId = item.pricingContext?.brandId ?? "unknown";
+    if (!groups.has(brandId)) groups.set(brandId, []);
+    groups.get(brandId)!.push(item);
+  }
+
+  const result: Array<{ card: any; pricingContext: any }> = [];
+  const queues = Array.from(groups.values());
+  let i = 0;
+
+  while (result.length < items.length) {
+    const active = queues.filter((q) => q.length > 0);
+    if (active.length === 0) break;
+    const queue = queues[i % queues.length];
+    if (queue.length > 0) result.push(queue.shift()!);
+    i++;
+  }
+
+  return result;
 };
 
 export const getSearchSuggestions = async (query: SearchSuggestQuery) => {
@@ -135,7 +161,16 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
   const product = await repo.findBySlug(slug);
   if (!product || !product.isActive) throw new NotFoundError("Sản phẩm");
 
-  const variant = await repo.findVariantByOptions(product.id, options || {});
+  let variant;
+  console.log(options?.bundle);
+
+  // NEW: nếu có bundle param → tìm theo variantId trực tiếp
+  if (options?.bundle) {
+    variant = await repo.findVariantById(options.bundle);
+  } else {
+    variant = await repo.findVariantByOptions(product.id, options || {});
+  }
+
   if (!variant || !variant.isActive) throw new NotFoundError("Variant");
 
   const normalizedVariant = normalizeVariant(variant);
@@ -155,6 +190,41 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
       })),
     },
   };
+};
+
+export const getProductVariantOptions = async (slug: string, options?: Record<string, string>) => {
+  const product = await repo.findBySlug(slug);
+  if (!product || !product.isActive) throw new NotFoundError("Sản phẩm");
+
+  // Lấy tất cả active variants
+  const allVariants = await repo.findAllActiveVariants(product.id);
+
+  // Filter theo storage nếu có
+  const storageFilter = options?.storage?.toLowerCase();
+
+  const filtered = storageFilter
+    ? allVariants.filter((v: any) => v.variantAttributes.some((va: any) => va.attributeOption.attribute.code === "storage" && va.attributeOption.value.toLowerCase() === storageFilter))
+    : allVariants;
+
+  // Map sang VariantOption format
+  return filtered.map((v: any) => {
+    const colorAttr = v.variantAttributes.find((va: any) => va.attributeOption.attribute.code === "color");
+    const storageAttr = v.variantAttributes.find((va: any) => va.attributeOption.attribute.code === "storage");
+
+    // Tìm ảnh cho color này
+    const colorImage = product.img?.find((img: any) => img.color === colorAttr?.attributeOption.value);
+
+    return {
+      id: v.id, // variantId — đúng cho changeVariant
+      colorLabel: colorAttr?.attributeOption.label ?? "",
+      colorValue: colorAttr?.attributeOption.value ?? "",
+      storageLabel: storageAttr?.attributeOption.label ?? "",
+      // price: Number(v.price),
+      // price: Number(10000000000),
+      available: v.isActive && v.quantity > 0,
+      imageUrl: colorImage?.imageUrl ?? null,
+    };
+  });
 };
 
 export const getAllProductVariants = async (slug: string) => {

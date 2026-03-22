@@ -26,8 +26,6 @@ export const getCartWithPricing = async (userId: string, voucherCode?: string) =
 
   const items = await Promise.all(
     cartItems.map(async (item) => {
-      // Cart item cần expose variantAttributes từ product service
-      // Structure: item.variantAttributes = [{ code, value }]
       const variantAttributes = (item.variantAttributes ?? []).map((va: any) => ({
         code: va.code ?? va.attributeOption?.attribute?.code,
         value: va.value ?? va.attributeOption?.value,
@@ -68,40 +66,39 @@ export const getCartWithPricing = async (userId: string, voucherCode?: string) =
     errors,
   };
 };
+// export const validateCartForCheckout = async (userId: string, voucherCode?: string) => {
+//   const errors: string[] = [];
+//   const warnings: string[] = [];
+//   const cart = await getCartWithPricing(userId, voucherCode);
 
-export const validateCartForCheckout = async (userId: string, voucherCode?: string) => {
-  const errors: string[] = [];
-  const warnings: string[] = [];
-  const cart = await getCartWithPricing(userId, voucherCode);
+//   if (cart.items.length === 0) {
+//     errors.push("Giỏ hàng trống");
+//     return { isValid: false, errors, warnings };
+//   }
 
-  if (cart.items.length === 0) {
-    errors.push("Giỏ hàng trống");
-    return { isValid: false, errors, warnings };
-  }
+//   cart.items.forEach((item: any) => {
+//     if (item.quantity <= 0) errors.push(`Số lượng không hợp lệ cho sản phẩm ${item.productName}`);
+//   });
 
-  cart.items.forEach((item: any) => {
-    if (item.quantity <= 0) errors.push(`Số lượng không hợp lệ cho sản phẩm ${item.productName}`);
-  });
+//   if (!cart.isValid) errors.push(...cart.errors);
+//   if (cart.finalTotal < 0) errors.push("Tổng giá trị đơn hàng không hợp lệ");
 
-  if (!cart.isValid) errors.push(...cart.errors);
-  if (cart.finalTotal < 0) errors.push("Tổng giá trị đơn hàng không hợp lệ");
+//   return { isValid: errors.length === 0, errors, warnings };
+// };
 
-  return { isValid: errors.length === 0, errors, warnings };
-};
+// export const applyVoucherToCart = async (userId: string, voucherCode: string) => {
+//   try {
+//     const cart = await getCartWithPricing(userId, voucherCode);
+//     if (!cart.isValid && cart.errors.length > 0) return { success: false, message: cart.errors[0] };
+//     if (!cart.appliedVoucher) return { success: false, message: "Voucher không áp dụng được cho giỏ hàng này" };
+//     return {
+//       success: true,
+//       message: `Đã áp dụng voucher. Giảm ${cart.totalVoucherDiscount.toLocaleString()}đ`,
+//       cart,
+//     };
+//   } catch (e: any) {
+//     return { success: false, message: e.message || "Lỗi khi áp dụng voucher" };
+//   }
+// };
 
-export const applyVoucherToCart = async (userId: string, voucherCode: string) => {
-  try {
-    const cart = await getCartWithPricing(userId, voucherCode);
-    if (!cart.isValid && cart.errors.length > 0) return { success: false, message: cart.errors[0] };
-    if (!cart.appliedVoucher) return { success: false, message: "Voucher không áp dụng được cho giỏ hàng này" };
-    return {
-      success: true,
-      message: `Đã áp dụng voucher. Giảm ${cart.totalVoucherDiscount.toLocaleString()}đ`,
-      cart,
-    };
-  } catch (e: any) {
-    return { success: false, message: e.message || "Lỗi khi áp dụng voucher" };
-  }
-};
-
-export const removeVoucherFromCart = async (userId: string) => getCartWithPricing(userId);
+// export const removeVoucherFromCart = async (userId: string) => getCartWithPricing(userId);

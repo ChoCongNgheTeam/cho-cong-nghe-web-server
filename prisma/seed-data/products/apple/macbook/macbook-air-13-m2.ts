@@ -20,5 +20,6 @@ export const macbookAir13M2: SeedProductInput = {
   brandName: "Apple",
   categoryNames: ["MacBook Air 13 inch"],
   isFeatured: false,
+  variantDisplay: "CARD",
   highlights: [{ key: "chip_m2" }, { key: "battery_life" }, { key: "no_fan_design" }],
 };

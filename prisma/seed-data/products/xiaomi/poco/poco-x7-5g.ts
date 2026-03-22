@@ -16,5 +16,6 @@ export const pocoX7: SeedProductInput = {
   brandName: "Xiaomi",
   categoryNames: ["Poco Series"],
   isFeatured: true,
+  variantDisplay: "CARD",
   highlights: [{ key: "inverter_tech" }, { key: "energy_label" }, { key: "cooling_capacity" }],
 };

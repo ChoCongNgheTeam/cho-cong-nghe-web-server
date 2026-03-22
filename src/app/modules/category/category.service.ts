@@ -25,6 +25,26 @@ export const getRootCategories = async () => {
   return repo.findRootCategories(true);
 };
 
+export const resolveCategory = async (keyword: string) => {
+  const q = keyword.trim();
+
+  // Tìm category match — ưu tiên root categories (parentId = null) và slug match
+  const category = await prisma.categories.findFirst({
+    where: {
+      deletedAt: null,
+      isActive: true,
+      OR: [{ name: { contains: q, mode: "insensitive" } }, { slug: { contains: q, mode: "insensitive" } }],
+    },
+    orderBy: [
+      { parentId: "asc" }, // null (root) sẽ lên đầu
+      { position: "asc" },
+    ],
+    select: { id: true, name: true, slug: true, parentId: true },
+  });
+
+  return category ?? null;
+};
+
 export const getFeaturedCategories = async (limit?: number) => {
   const categories = await repo.findFeaturedCategories(limit);
   return categories.map((c) => ({

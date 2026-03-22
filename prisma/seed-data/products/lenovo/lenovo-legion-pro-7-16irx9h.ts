@@ -12,5 +12,6 @@ export const lenovoLegionPro7_16IRX9H: SeedProductInput = {
   brandName: "Lenovo",
   categoryNames: ["Lenovo Legion Gaming"],
   isFeatured: false,
+  variantDisplay: "CARD",
   highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
 };

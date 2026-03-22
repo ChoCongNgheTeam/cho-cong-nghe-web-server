@@ -16,5 +16,6 @@ export const galaxyS24FE: SeedProductInput = {
   brandName: "Samsung",
   categoryNames: ["Galaxy AI"],
   isFeatured: false,
+  variantDisplay: "CARD",
   highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
 };

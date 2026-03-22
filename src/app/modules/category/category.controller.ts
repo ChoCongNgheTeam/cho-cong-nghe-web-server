@@ -2,7 +2,8 @@ import { Request, Response } from "express";
 import * as categoryService from "./category.service";
 import { parseMultipartData, uploadCategoryImage } from "./category.helpers";
 import { cleanupFile } from "@/services/file-cleanup.service";
-import { listCategoriesQuerySchema, featuredCategoriesQuerySchema, createCategorySchema, updateCategorySchema } from "./category.validation";
+import { listCategoriesQuerySchema, featuredCategoriesQuerySchema, createCategorySchema, updateCategorySchema, resolveCategoryQuerySchema } from "./category.validation";
+import { resolveCategory } from "./category.service";
 
 // Public
 
@@ -21,6 +22,12 @@ export const getFeaturedCategoriesHandler = async (req: Request, res: Response) 
   const { limit } = featuredCategoriesQuerySchema.parse(req.query);
   const categories = await categoryService.getFeaturedCategories(limit);
   res.json({ data: categories, total: categories.length, message: "Lấy danh mục nổi bật thành công" });
+};
+
+export const resolveCategoryHandler = async (req: Request, res: Response) => {
+  const { q } = resolveCategoryQuerySchema.parse(req.query);
+  const category = await resolveCategory(q);
+  res.json({ data: category, message: category ? "Tìm thấy danh mục" : "Không tìm thấy danh mục" });
 };
 
 export const getCategoryTreeHandler = async (req: Request, res: Response) => {
