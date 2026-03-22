@@ -755,6 +755,7 @@ export const getProductsOnSaleDate = async (
     page?: number;
     limit?: number;
     categoryId?: string;
+    activeNow?: boolean;
   } = {},
 ) => {
   const result = await findProductsOnSaleDate(date, options);

@@ -169,7 +169,7 @@ export const buildSearchCategoryAndBrandIds = async (
   // Với mỗi category match → lấy toàn bộ descendants qua CTE
   const categoryIds: string[] = [];
   for (const cat of matchedCats) {
-    const rows = await prismaClient.$queryRaw<{ id: string }[]>`
+    const rows: { id: string }[] = await prismaClient.$queryRaw`
       WITH RECURSIVE descendants AS (
         SELECT id FROM categories WHERE id = ${cat.id}::uuid AND "deletedAt" IS NULL
         UNION ALL
