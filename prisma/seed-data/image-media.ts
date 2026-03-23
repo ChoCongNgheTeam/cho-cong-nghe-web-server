@@ -2,6 +2,7 @@ export interface ImageMediaSeed {
   type: "SLIDER" | "BANNER";
   position: "HOME_TOP" | "BELOW_SLIDER" | "HOME_SECTION_1" | "HOME_SECTION_2";
   title?: string;
+  subTitle?: string;
   imagePath: string;
   linkUrl?: string;
   order: number;
@@ -12,102 +13,66 @@ export const imageMediaSeeds: ImageMediaSeed[] = [
   // ==========================================
   // 1. SLIDER (HOME_TOP) - 5 isActive: true
   // ==========================================
+
   {
     type: "SLIDER",
     position: "HOME_TOP",
-    title: "Slider Laptop 1",
+    title: "SIÊU PHẨM CÔNG NGHỆ 2026",
+    subTitle: "Trải nghiệm thiết kế đột phá và hiệu năng đỉnh cao. Trả góp 0% ngay hôm nay!",
     imagePath: "sliders/slider-1.png",
+    linkUrl: "/dien-thoai-apple",
     order: 1,
     isActive: true,
   },
   {
     type: "SLIDER",
     position: "HOME_TOP",
-    title: "Slider Laptop 2",
-    imagePath: "sliders/slider-2.jpg",
+    title: "CHIẾN GAME ĐỈNH - LÀM VIỆC NHANH",
+    subTitle: "Combo Laptop, bàn phím cơ và chuột Gaming cực chất. Giảm đến 30%.",
+    imagePath: "sliders/slider-2.png",
+    linkUrl: "/laptop-phu-kien-gaming",
     order: 2,
     isActive: true,
   },
   {
     type: "SLIDER",
     position: "HOME_TOP",
-    title: "Slider Phone 2",
+    title: "TIỆN NGHI CHO GIA ĐÌNH HIỆN ĐẠI",
+    subTitle: "Tủ lạnh, máy giặt, TV chính hãng. Nâng tầm không gian sống của bạn.",
     imagePath: "sliders/slider-3.png",
+    linkUrl: "/dien-may-gia-dung",
     order: 3,
     isActive: true,
   },
   {
     type: "SLIDER",
     position: "HOME_TOP",
-    title: "Slider Tablet 1",
+    title: "THẾ GIỚI PHỤ KIỆN CHÍNH HÃNG",
+    subTitle: "Tai nghe, sạc dự phòng tốc độ cao. Luôn sẵn sàng cho mọi hành trình.",
     imagePath: "sliders/slider-4.png",
+    linkUrl: "/phu-kien-cong-nghe",
     order: 4,
     isActive: true,
   },
   {
     type: "SLIDER",
     position: "HOME_TOP",
-    title: "Slider Tablet 3",
-    imagePath: "sliders/test-slider.jpg",
+    title: "ÂM NHẠC SỐNG ĐỘNG MỌI CUỘC VUI",
+    subTitle: "Loa JBL, Marshall và tai nghe cực cháy. Chất âm đỉnh cao, ưu đãi cực sốc.",
+    imagePath: "sliders/slider-5.png",
+    linkUrl: "/loa-tai-nghe-audio",
     order: 5,
-    isActive: false,
+    isActive: true,
   },
-  // Remaining sliders (isActive: false)
   {
     type: "SLIDER",
     position: "HOME_TOP",
-    title: "Slider Laptop 6",
-    imagePath: "sliders/slider-laptop-6.jpg",
+    title: "GIẢI PHÁP LÀM MÁT THÔNG MINH",
+    subTitle: "Máy lạnh Inverter, quạt thế hệ mới. Tiết kiệm điện, miễn phí lắp đặt.",
+    imagePath: "sliders/slider-6.png",
+    linkUrl: "/thiet-bi-lam-mat",
     order: 6,
-    isActive: false,
-  },
-  {
-    type: "SLIDER",
-    position: "HOME_TOP",
-    title: "Slider Phone 11",
-    imagePath: "sliders/slider-phone-11.jpg",
-    order: 7,
-    isActive: false,
-  },
-  {
-    type: "SLIDER",
-    position: "HOME_TOP",
-    title: "Slider Phone 8",
-    imagePath: "sliders/slider-phone-8.webp",
-    order: 8,
-    isActive: false,
-  },
-  {
-    type: "SLIDER",
-    position: "HOME_TOP",
-    title: "Slider Tablet 4",
-    imagePath: "sliders/slider-tablet-4.jpg",
-    order: 9,
-    isActive: false,
-  },
-  {
-    type: "SLIDER",
-    position: "HOME_TOP",
-    title: "Slider Tablet 5",
-    imagePath: "sliders/slider-tablet-5.jpg",
-    order: 10,
-    isActive: false,
-  },
-  {
-    type: "SLIDER",
-    position: "HOME_TOP",
-    title: "Slider Tablet 6",
-    imagePath: "sliders/slider-tablet-6.jpg",
-    order: 11,
-    isActive: false,
-  },
-  {
-    type: "SLIDER",
-    position: "HOME_TOP",
-    title: "Slider Tablet 7",
-    imagePath: "sliders/slider-tablet-7.jpg",
-    order: 12,
-    isActive: false,
+    isActive: true,
   },
 
   // ==========================================

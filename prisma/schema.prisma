@@ -929,6 +929,7 @@ model image_media {
   type      MediaType
   position  MediaPosition
   title     String?
+  subTitle  String?
   imagePath String?
   imageUrl  String?
   linkUrl   String?
