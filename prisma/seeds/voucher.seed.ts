@@ -191,7 +191,7 @@ const voucherSeeds: VoucherSeedItem[] = [
     discountValue: "50000",
     minOrderValue: "300000",
     maxDiscountValue: "50000",
-    maxUses: null, // không giới hạn
+    // maxUses: null, // không giới hạn
     maxUsesPerUser: 3,
     startDate: new Date(),
     endDate: days(60),
