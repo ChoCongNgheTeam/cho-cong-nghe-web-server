@@ -11,6 +11,24 @@ export const createAndSend = async (payload: NotificationPayload, channels: Arra
   const results = [];
 
   for (const channel of channels) {
+    // ← EMAIL không cần lưu DB — chỉ gửi mail
+    if (channel === "EMAIL") {
+      try {
+        const user = await prisma.users.findUnique({
+          where: { id: payload.userId },
+          select: { email: true, fullName: true },
+        });
+        if (user) {
+          await sendNotificationEmail(user.email, payload.title, payload.body, { ...payload.data, type: payload.type });
+        }
+        results.push({ channel, status: "SENT" });
+      } catch {
+        results.push({ channel, status: "FAILED" });
+      }
+      continue; // ← skip tạo DB row
+    }
+
+    // IN_APP + PUSH → lưu DB
     const notif = await repo.create({
       ...payload,
       channel,
@@ -23,29 +41,16 @@ export const createAndSend = async (payload: NotificationPayload, channels: Arra
       } else if (channel === "PUSH") {
         const tokens = await repo.getFcmTokensByUserId(payload.userId);
         let sent = false;
-
         for (const t of tokens) {
           const ok = await sendPushNotification(t.token, payload.title, payload.body, payload.data as any);
-          if (!ok) {
-            await repo.deleteFcmToken(t.token); // token hết hạn → xóa
-          } else {
-            sent = true;
-          }
+          if (!ok) await repo.deleteFcmToken(t.token);
+          else sent = true;
         }
         await repo.updateStatus(notif.id, sent ? "SENT" : "FAILED");
-      } else if (channel === "EMAIL") {
-        const user = await prisma.users.findUnique({
-          where: { id: payload.userId },
-          select: { email: true, fullName: true },
-        });
-        if (user) {
-          await sendNotificationEmail(user.email, payload.title, payload.body, payload.data);
-          await repo.updateStatus(notif.id, "SENT", new Date());
-        }
       }
 
       results.push({ channel, status: "SENT" });
-    } catch (err) {
+    } catch {
       await repo.updateStatus(notif.id, "FAILED");
       results.push({ channel, status: "FAILED" });
     }

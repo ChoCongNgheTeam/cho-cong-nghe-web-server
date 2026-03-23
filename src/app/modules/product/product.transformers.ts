@@ -184,7 +184,7 @@ const shouldUseBundleMode = (product: any, validVariants: RawVariant[]): boolean
   }
 
   // Nếu có attribute nào ngoài color → bundle
-  const NON_BUNDLE_ATTRS = new Set(["color", "storage"]); // chỉ color → individual
+  const NON_BUNDLE_ATTRS = new Set(["color", "storage", "size"]); // chỉ color → individual
   for (const type of attrTypes) {
     if (!NON_BUNDLE_ATTRS.has(type)) return true;
   }

@@ -1,4 +1,4 @@
-import { moderateComment } from "./comment.moderation";
+import { moderateContent } from "@/services/moderation";
 import * as repo from "./comment.repository";
 import { transformComment, transformCommentsList } from "./comment.transformers";
 import { CreateCommentInput, UpdateCommentInput, ListCommentsQuery, CommentTargetType } from "./comment.validation";
@@ -55,8 +55,7 @@ export const createComment = async (userId: string, input: CreateCommentInput) =
 
   // Chạy AI moderation
   try {
-    const moderation = await moderateComment(input.content);
-
+    const moderation = await moderateContent("comment", comment.content || "");
     if (moderation.approved) {
       // Pass → auto approve
       const approved = await repo.update(comment.id, { isApproved: true });

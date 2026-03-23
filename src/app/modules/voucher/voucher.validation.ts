@@ -21,12 +21,23 @@ export const listVouchersSchema = z.object({
   includeDeleted: z.coerce.boolean().optional().default(false),
   sortBy: z.enum(["createdAt", "code", "discountValue", "usesCount", "priority"]).default("createdAt"),
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
+  cartTotal: z.coerce.number().nonnegative().optional(),
+});
+
+export const cartItemSchema = z.object({
+  productId: z.string().uuid(),
+  categoryId: z.string().uuid().optional(),
+  brandId: z.string().uuid().optional(),
+  categoryPath: z.array(z.string()).optional(),
+  // Giá sau khi đã áp promotion (unit_price × quantity)
+  itemTotal: z.coerce.number().nonnegative().optional(),
 });
 
 export const validateVoucherSchema = z.object({
   code: z.string().min(1, "Mã voucher không được để trống"),
   orderTotal: z.coerce.number().positive("Tổng đơn hàng phải lớn hơn 0"),
   userId: z.string().uuid().optional(),
+  cartItems: z.array(cartItemSchema).optional().default([]),
 });
 
 // =====================
@@ -126,3 +137,4 @@ export type CreateVoucherInput = z.infer<typeof createVoucherSchema>;
 export type UpdateVoucherInput = z.infer<typeof updateVoucherSchema>;
 export type AssignVoucherToUsersInput = z.infer<typeof assignVoucherToUsersSchema>;
 export type BulkDeleteVouchersInput = z.infer<typeof bulkDeleteVouchersSchema>;
+export type CartItem = z.infer<typeof cartItemSchema>;

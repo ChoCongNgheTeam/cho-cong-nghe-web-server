@@ -113,6 +113,8 @@ export interface VoucherValidationResult {
   message?: string;
   discount?: number;
   voucher?: VoucherDetail;
+
+  eligibleTotal?: number;
 }
 
 // =====================
