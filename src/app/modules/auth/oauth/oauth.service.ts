@@ -7,6 +7,8 @@ import { findOAuthAccount, createOAuthAccount, findByEmail, createUserFromOAuth 
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { OAuthResolvedUser } from "./oauth.types";
+import { sendWelcomeVoucherNotification } from "@/app/modules/notification/notification.service";
+import prisma from "prisma/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,10 +74,10 @@ export const findOrCreateOAuthUser = async (provider: string, profile: OAuthUser
           const month = parseInt(parts[0], 10);
           const day = parseInt(parts[1], 10);
           const year = parseInt(parts[2], 10);
-          parsedDateOfBirth = new Date(Date.UTC(year, month - 1, day)); 
+          parsedDateOfBirth = new Date(Date.UTC(year, month - 1, day));
         } else if (parts.length === 1 && parts[0].length === 4) {
           const year = parseInt(parts[0], 10);
-          parsedDateOfBirth = new Date(Date.UTC(year, 0, 1)); 
+          parsedDateOfBirth = new Date(Date.UTC(year, 0, 1));
         }
       }
       // Tạo user mới
@@ -84,8 +86,38 @@ export const findOrCreateOAuthUser = async (provider: string, profile: OAuthUser
         fullName: profile.fullName,
         avatarImage: profile.avatarImage ?? null,
         userName: generateUserName(profile.email),
-        gender: mappedGender, 
+        gender: mappedGender,
         dateOfBirth: parsedDateOfBirth,
+      });
+
+      setImmediate(async () => {
+        try {
+          if (!user) return; // ← guard để TS không complain
+          const welcomeVoucher = await prisma.vouchers.create({
+            data: {
+              code: `WELCOME_${user.id.slice(0, 8).toUpperCase()}`,
+              description: "Voucher chào mừng thành viên mới",
+              discountType: "DISCOUNT_FIXED",
+              discountValue: "100000",
+              minOrderValue: "500000",
+              maxDiscountValue: "100000",
+              maxUses: 1,
+              maxUsesPerUser: 1,
+              endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+              isActive: true,
+              priority: 10,
+              targets: { create: [{ targetType: "ALL" }] },
+            },
+          });
+
+          await prisma.voucher_user.create({
+            data: { voucherId: welcomeVoucher.id, userId: user.id, maxUses: 1, usedCount: 0 },
+          });
+
+          await sendWelcomeVoucherNotification(user.id, welcomeVoucher.code, 100000);
+        } catch (err) {
+          console.error("[OAuth] Failed to create welcome voucher:", err);
+        }
       });
     }
 
@@ -182,7 +214,7 @@ export const loginWithFacebook = async (accessToken: string, meta?: OAuthLoginMe
 
   if (!response.ok || data.error) {
     // IN LỖI RA MÀN HÌNH TERMINAL (NODE.JS)
-    console.log("==== LỖI TỪ FACEBOOK ====", data.error); 
+    console.log("==== LỖI TỪ FACEBOOK ====", data.error);
     throw new UnauthorizedError("Facebook token không hợp lệ");
   }
 
@@ -192,7 +224,7 @@ export const loginWithFacebook = async (accessToken: string, meta?: OAuthLoginMe
 
   const profile: OAuthUserProfile = {
     providerAccountId: data.id,
-    email: data.email ?? `fb_${data.id}@noemail.local`, 
+    email: data.email ?? `fb_${data.id}@noemail.local`,
     fullName: data.name ?? "Facebook User",
     avatarImage: data.picture?.data?.url,
     accessToken,

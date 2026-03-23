@@ -47,6 +47,7 @@ export interface VoucherCard {
   description?: string;
   discountType: DiscountType;
   discountValue: number;
+  maxDiscountValue?: number;
   minOrderValue: number;
   maxUses?: number;
   usesCount: number;
@@ -67,6 +68,7 @@ export interface VoucherDetail {
   description?: string;
   discountType: DiscountType;
   discountValue: number;
+  maxDiscountValue?: number;
   minOrderValue: number;
   maxUses?: number;
   maxUsesPerUser?: number;
@@ -138,6 +140,7 @@ export interface RawVoucher {
   description: string | null;
   discountType: any;
   discountValue: any;
+  maxDiscountValue: any;
   minOrderValue: any;
   maxUses: number | null;
   maxUsesPerUser: number | null;
@@ -159,6 +162,7 @@ export interface VoucherListItem {
   discountType: DiscountType;
   discountValue: Decimal;
   minOrderValue: Decimal;
+  maxDiscountValue: Decimal | null;
   maxUses: number | null;
   usesCount: number;
   startDate: Date | null;

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>FCM Test</title>
+  </head>
+  <body>
+    <h2>FCM Token Test</h2>
+    <button id="btn">Get FCM Token</button>
+
+    <pre id="output"></pre>
+
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+      import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
+
+      // 🔥 DÁN CONFIG CỦA BẠN VÀO ĐÂY
+      const firebaseConfig = {
+        apiKey: "AIzaSyBGbIWl69OxmyN8v1wzcEbqt2YETCj5khs",
+        authDomain: "chocongnghe-bbb90.firebaseapp.com",
+        projectId: "chocongnghe-bbb90",
+        storageBucket: "chocongnghe-bbb90.firebasestorage.app",
+        messagingSenderId: "1062240065429",
+        appId: "1:1062240065429:web:f8e1c1e6dd61d1bd7f089c",
+        measurementId: "G-L1GEXYJQKK",
+      };
+
+      // 🔥 DÁN VAPID KEY
+      const VAPID_KEY = "BJccqytbfFieeug-j30x5BinTe__gTJ2_N8h_2VSVtaIGV5NGKrpi69CiX_y2RsTJQyshDT6K0yncHRToeGh-0A";
+
+      const app = initializeApp(firebaseConfig);
+      const messaging = getMessaging(app);
+
+      onMessage(messaging, (payload) => {
+        console.log("📩 Nhận notification:", payload);
+
+        new Notification(payload.notification.title, {
+          body: payload.notification.body,
+        });
+      });
+
+      const btn = document.getElementById("btn");
+      const output = document.getElementById("output");
+
+      btn.onclick = async () => {
+        try {
+          // ✅ đăng ký SW trước
+          if ("serviceWorker" in navigator) {
+            const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+            console.log("✅ SW registered:", registration);
+          }
+
+          // xin quyền notification
+          const permission = await Notification.requestPermission();
+
+          if (permission !== "granted") {
+            output.textContent = "❌ User không cho phép notification";
+            return;
+          }
+
+          // lấy FCM token
+          const token = await getToken(messaging, {
+            vapidKey: VAPID_KEY,
+            serviceWorkerRegistration: await navigator.serviceWorker.ready,
+          });
+
+          if (token) {
+            output.textContent = "✅ FCM TOKEN:\n\n" + token;
+            console.log("FCM Token:", token);
+          } else {
+            output.textContent = "❌ Không lấy được token";
+          }
+        } catch (err) {
+          console.error(err);
+          output.textContent = "❌ Error: " + err.message;
+        }
+      };
+    </script>
+  </body>
+</html>

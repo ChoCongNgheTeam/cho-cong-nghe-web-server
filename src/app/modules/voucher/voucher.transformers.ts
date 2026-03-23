@@ -1,13 +1,5 @@
 import { DiscountType } from "@prisma/client";
-import {
-  VoucherCard,
-  VoucherDetail,
-  UserVoucher,
-  RawVoucher,
-  TargetType,
-  VoucherListItem,
-  VoucherAvailabilityInput,
-} from "./voucher.types";
+import { VoucherCard, VoucherDetail, UserVoucher, RawVoucher, TargetType, VoucherListItem, VoucherAvailabilityInput } from "./voucher.types";
 
 // Fix BigInt serialization
 (BigInt.prototype as any).toJSON = function () {
@@ -51,6 +43,7 @@ export const transformVoucherCard = (voucher: VoucherListItem): VoucherCard => {
     description: voucher.description ?? undefined,
     discountType: voucher.discountType as DiscountType,
     discountValue: Number(voucher.discountValue),
+    maxDiscountValue: voucher.maxDiscountValue ? Number(voucher.maxDiscountValue) : undefined,
     minOrderValue: Number(voucher.minOrderValue),
     maxUses: voucher.maxUses ?? undefined,
     usesCount: voucher.usesCount,
@@ -72,6 +65,7 @@ export const transformVoucherDetail = (voucher: RawVoucher): VoucherDetail => {
     description: voucher.description ?? undefined,
     discountType: voucher.discountType as DiscountType,
     discountValue: Number(voucher.discountValue),
+    maxDiscountValue: voucher.maxDiscountValue ? Number(voucher.maxDiscountValue) : undefined,
     minOrderValue: Number(voucher.minOrderValue),
     maxUses: voucher.maxUses ?? undefined,
     maxUsesPerUser: voucher.maxUsesPerUser ?? undefined,
@@ -121,11 +115,7 @@ export const transformUserVoucher = (voucher: RawVoucher, userVoucherData?: any)
 /**
  * Calculate discount amount
  */
-export const calculateDiscount = (
-  discountType: DiscountType,
-  discountValue: number,
-  orderTotal: number,
-): number => {
+export const calculateDiscount = (discountType: DiscountType, discountValue: number, orderTotal: number): number => {
   if (discountType === DiscountType.DISCOUNT_PERCENT) {
     return Math.round((orderTotal * discountValue) / 100);
   }

@@ -141,3 +141,113 @@ export const sendResetPasswordEmail = async (email: string, resetLink: string) =
 
   await transporter.sendMail(mailOptions);
 };
+
+// Thêm vào cuối email.service.ts
+
+export const sendNotificationEmail = async (email: string, title: string, body: string, data?: Record<string, any>) => {
+  // Map type → icon + color
+  const typeConfig: Record<string, { icon: string; color: string }> = {
+    WELCOME_VOUCHER: { icon: "🎉", color: "#10b981" },
+    VOUCHER_EXPIRING: { icon: "⏰", color: "#f59e0b" },
+    VOUCHER_ASSIGNED: { icon: "🎁", color: "#8b5cf6" },
+    CAMPAIGN_PROMOTION: { icon: "🔥", color: "#ef4444" },
+    USER_INACTIVE: { icon: "👀", color: "#3b82f6" },
+    ORDER_STATUS: { icon: "📦", color: "#6366f1" },
+  };
+
+  const config = typeConfig[data?.type as string] ?? { icon: "🔔", color: "#2e3841" };
+
+  // Nếu có voucherCode → render voucher card
+  const voucherBlock = data?.voucherCode
+    ? `
+      <div style="background: linear-gradient(135deg, ${config.color}15 0%, ${config.color}08 100%);
+                  border: 2px dashed ${config.color};
+                  border-radius: 12px;
+                  padding: 24px;
+                  text-align: center;
+                  margin: 24px 0;">
+        <p style="margin: 0 0 8px; color: #666; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">
+          Mã voucher của bạn
+        </p>
+        <p style="margin: 0 0 12px; color: ${config.color}; font-size: 28px; font-weight: 800; letter-spacing: 4px;">
+          ${data.voucherCode}
+        </p>
+        ${
+          data.discountValue
+            ? `<p style="margin: 0; color: #666; font-size: 14px;">
+               Giảm <strong>${Number(data.discountValue).toLocaleString("vi-VN")}đ</strong>
+             </p>`
+            : ""
+        }
+      </div>`
+    : "";
+
+  const mailOptions = {
+    from: `"Thông báo" <${process.env.SMTP_FROM}>`,
+    to: email,
+    subject: `${config.icon} ${title}`,
+    html: `
+      <!DOCTYPE html>
+      <html lang="vi">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="margin:0;padding:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:#f4f7fa;">
+        <table role="presentation" style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="padding:40px 20px;">
+              <table role="presentation" style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+
+                <!-- Header -->
+                <tr>
+                  <td style="background:linear-gradient(135deg,${config.color} 0%,${config.color}cc 100%);padding:40px 30px;text-align:center;">
+                    <div style="font-size:48px;margin-bottom:12px;">${config.icon}</div>
+                    <h1 style="margin:0;color:#fff;font-size:22px;font-weight:600;line-height:1.3;">
+                      ${title}
+                    </h1>
+                  </td>
+                </tr>
+
+                <!-- Body -->
+                <tr>
+                  <td style="padding:40px 30px;">
+                    <p style="margin:0 0 20px;color:#555;font-size:15px;line-height:1.7;">
+                      ${body}
+                    </p>
+
+                    ${voucherBlock}
+
+                    <a href="${process.env.FRONTEND_URL}"
+                       style="display:inline-block;margin-top:16px;padding:14px 36px;
+                              background:linear-gradient(135deg,${config.color} 0%,${config.color}cc 100%);
+                              color:#fff;text-decoration:none;border-radius:8px;
+                              font-weight:600;font-size:15px;">
+                      Mua sắm ngay
+                    </a>
+                  </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                  <td style="background:#f8f9fa;padding:24px 30px;text-align:center;border-top:1px solid #e9ecef;">
+                    <p style="margin:0 0 6px;color:#999;font-size:13px;">
+                      Bạn nhận được email này vì đã đăng ký tài khoản tại cửa hàng.
+                    </p>
+                    <p style="margin:0;color:#bbb;font-size:12px;">
+                      © ${new Date().getFullYear()} Your Company. All rights reserved.
+                    </p>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `,
+  };
+
+  await transporter.sendMail(mailOptions);
+};

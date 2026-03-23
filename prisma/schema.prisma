@@ -154,9 +154,12 @@ model users {
   dateOfBirth  DateTime?
   role         UserRole  @default(CUSTOMER)
   isActive     Boolean   @default(true)
+  notifications notifications[]
+  fcmTokens     fcm_tokens[]
   avatarImage  String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  
 
   // --- Soft Delete ---
   deletedAt    DateTime?
@@ -941,4 +944,58 @@ model image_media {
   @@index([type, position])
   @@index([isActive])
   @@index([deletedAt])
+}
+
+model notifications {
+  id        String              @id @default(uuid()) @db.Uuid
+  userId    String              @db.Uuid
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  isRead    Boolean             @default(false)
+  readAt    DateTime?
+  channel   NotificationChannel
+  status    NotificationStatus  @default(PENDING)
+  sentAt    DateTime?
+  createdAt DateTime            @default(now())
+
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+model fcm_tokens {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  token     String   @unique
+  device    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum NotificationType {
+  WELCOME_VOUCHER
+  VOUCHER_EXPIRING
+  VOUCHER_ASSIGNED
+  CAMPAIGN_PROMOTION
+  ORDER_STATUS
+  USER_INACTIVE
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
 }
