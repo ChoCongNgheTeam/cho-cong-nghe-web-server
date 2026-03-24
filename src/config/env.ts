@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { OpenAI } from "openai/client.js";
 
 export const env = {
   JWT_SECRET: process.env.JWT_SECRET!,
@@ -11,5 +12,10 @@ export const env = {
 
   RESET_TOKEN_EXPIRES_IN: Number(process.env.RESET_TOKEN_EXPIRES_IN || 3600000),
 
-  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  // GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+
+  // 🔥 THÊM MỚI: URL base cho client và server (thay thế hardcode localhost)
+  CLIENT_BASE_URL: process.env.CLIENT_BASE_URL || "http://localhost:4200",
+  SERVER_BASE_URL: process.env.SERVER_BASE_URL || "http://localhost:5000",
 };

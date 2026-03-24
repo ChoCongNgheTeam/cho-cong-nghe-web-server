@@ -201,6 +201,79 @@
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 10px; }
+
+        /* Product Cards Container */
+        .product-cards-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 10px 0;
+            max-width: 100%;
+        }
+
+        .product-card {
+            display: flex;
+            gap: 12px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            max-width: 100%;
+        }
+
+        .product-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.15);
+            border-color: #007bff;
+            transform: translateY(-2px);
+        }
+
+        .product-image {
+            flex-shrink: 0;
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #f5f5f5;
+        }
+
+        .product-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .product-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            justify-content: space-between;
+        }
+
+        .product-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+            line-height: 1.3;
+        }
+
+        .product-specs {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .product-price {
+            font-weight: 700;
+            font-size: 15px;
+            color: #007bff;
+        }
+
+        .product-stock {
+            font-size: 13px;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -239,6 +312,7 @@
         
         // Mảng lưu trữ lịch sử tin nhắn để gửi lên server
         let chatHistory = [];
+        let selectedVariantId = null; // Lưu variant ID khi user click card
 
         const chatMessages = document.getElementById('chatMessages');
         const userInput = document.getElementById('userInput');
@@ -267,13 +341,16 @@
             showTyping(true);
 
             try {
-                // 3. Gọi API (Gửi mảng chatHistory)
+                // 3. Gọi API (Gửi mảng chatHistory + selectedVariantId)
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ messages: chatHistory })
+                    body: JSON.stringify({ 
+                        messages: chatHistory,
+                        selectedVariantId: selectedVariantId // Gửi kèm ID sản phẩm đã chọn
+                    })
                 });
 
                 const result = await response.json();
@@ -284,9 +361,16 @@
                     // Thêm phản hồi của bot vào lịch sử
                     chatHistory.push({ role: 'assistant', content: botReply });
                     
-                    // Hiển thị tin nhắn của bot (Sử dụng Marked.js để parse Markdown thành HTML)
-                    const parsedHtml = marked.parse(botReply);
-                    appendMessage('bot', parsedHtml, true);
+                    // Kiểm tra nếu response có HTML cards
+                    if (result.data.html && result.data.format === 'html_cards') {
+                        // Hiển thị message + HTML cards
+                        appendMessage('bot', botReply || 'Các phiên bản sản phẩm:');
+                        appendProductCards(result.data.html, result.data.variants);
+                    } else {
+                        // Hiển thị tin nhắn bình thường (Markdown)
+                        const parsedHtml = marked.parse(botReply);
+                        appendMessage('bot', parsedHtml, true);
+                    }
                 } else {
                     appendMessage('bot', 'Xin lỗi, hệ thống đang bận. Bạn thử lại sau nhé!');
                     console.error('API Error:', result);
@@ -313,6 +397,85 @@
 
             // Chèn tin nhắn mới lên TRƯỚC cái typing indicator
             chatMessages.insertBefore(messageDiv, typingIndicator);
+            scrollToBottom();
+        }
+
+        function appendProductCards(htmlCards, variants = []) {
+            const containerDiv = document.createElement('div');
+            containerDiv.innerHTML = htmlCards;
+            
+            // Attach click handlers cho mỗi product card
+            const cards = containerDiv.querySelectorAll('.product-card');
+            cards.forEach((card, idx) => {
+                card.addEventListener('click', function() {
+                    // Lưu variant ID
+                    selectedVariantId = this.getAttribute('data-variant-id');
+                    const variantName = this.getAttribute('data-variant-name');
+                    const variantPrice = this.getAttribute('data-variant-price');
+                    
+                    // Lấy structured data nếu có
+                    const variantData = variants[idx];
+                    if (variantData) {
+                        console.log(`✅ Đã chọn:`, {
+                            name: variantName,
+                            price: variantPrice,
+                            color: variantData.color,
+                            colorValue: variantData.colorValue,
+                            storage: variantData.storage,
+                            storageValue: variantData.storageValue,
+                            variantId: selectedVariantId
+                        });
+                    } else {
+                        console.log(`✅ Đã chọn: ${variantName} - ${variantPrice}`);
+                    }
+                    
+                    // 🔥 TỰ ĐỘNG GỬI MESSAGE XÁC NHẬN KHI USER CLICK CARD
+                    appendMessage('user', `Tôi chọn phiên bản: ${variantName}`);
+                    chatHistory.push({ role: 'user', content: `Tôi chọn phiên bản: ${variantName}` });
+                    
+                    showTyping(true);
+                    
+                    // Gửi lên server với selectedVariantId
+                    (async () => {
+                        try {
+                            const response = await fetch(API_URL, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ 
+                                    messages: chatHistory,
+                                    selectedVariantId: selectedVariantId
+                                })
+                            });
+
+                            const result = await response.json();
+
+                            if (response.ok && result.success) {
+                                const botReply = result.data.content;
+                                
+                                // Thêm phản hồi của bot vào lịch sử
+                                chatHistory.push({ role: 'assistant', content: botReply });
+                                
+                                // Hiển thị tin nhắn (không còn HTML cards ở đây)
+                                const parsedHtml = marked.parse(botReply);
+                                appendMessage('bot', parsedHtml, true);
+                            } else {
+                                appendMessage('bot', 'Xin lỗi, hệ thống đang bận. Bạn thử lại sau nhé!');
+                                console.error('API Error:', result);
+                            }
+                        } catch (error) {
+                            appendMessage('bot', 'Lỗi kết nối đến máy chủ.');
+                            console.error('Network Error:', error);
+                        } finally {
+                            showTyping(false);
+                        }
+                    })();
+                });
+            });
+            
+            // Thêm vào chat
+            chatMessages.insertBefore(containerDiv, typingIndicator);
             scrollToBottom();
         }
 

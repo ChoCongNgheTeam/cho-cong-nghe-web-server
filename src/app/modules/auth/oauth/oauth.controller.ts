@@ -1,10 +1,15 @@
 import { Request, Response } from "express";
-import { loginWithGoogle, loginWithFacebook, loginWithApple } from "./oauth.service";
+import { 
+  loginWithGoogle, 
+  loginWithFacebook, 
+  loginWithApple, 
+  exchangeFacebookCode 
+} from "./oauth.service";
 
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "strict" as const,
+  sameSite: "strict" as const, // Nên cân nhắc đổi thành "lax" nếu callback bị lỗi cookie
 };
 
 const setRefreshTokenCookie = (res: Response, token: string, maxAge: number) => {
@@ -35,4 +40,24 @@ export const appleLoginHandler = async (req: Request, res: Response) => {
   const result = await loginWithApple({ idToken, fullName }, buildMeta(req));
   setRefreshTokenCookie(res, result.refreshToken, result.refreshTokenTTL);
   res.json({ user: result.user, accessToken: result.accessToken, accessTokenTTL: result.accessTokenTTL, message: "Đăng nhập Apple thành công" });
+};
+
+export const facebookCallbackHandler = async (req: Request, res: Response) => {
+  const { code, state } = req.query;
+  const returnUrl = typeof state === "string" ? state : "/";
+
+  if (!code || typeof code !== "string") {
+    return res.redirect(`${process.env.FRONTEND_URL}/account`);
+  }
+
+  const redirectUri = `${process.env.API_BASE_URL}/api/v1/auth/oauth/facebook/callback`;
+  const result = await exchangeFacebookCode(code, redirectUri, buildMeta(req));
+
+  // Set refreshToken cookie — sameSite lax để browser gửi sau redirect
+  setRefreshTokenCookie(res, result.refreshToken, result.refreshTokenTTL);
+
+  // Không truyền accessToken trên URL nữa
+  return res.redirect(
+    `${process.env.FRONTEND_URL}/account/callback?returnUrl=${encodeURIComponent(returnUrl)}`
+  );
 };
