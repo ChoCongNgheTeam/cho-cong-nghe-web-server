@@ -2,6 +2,7 @@ import * as repo from "./order.repository";
 import { CreateOrderAdminInput, UpdateOrderAdminInput, OrderQuery } from "./order.validation";
 import { NotFoundError, BadRequestError, ForbiddenError } from "@/errors";
 import prisma from "@/config/db";
+import { sendOrderStatusNotification, sendOrderCreatedAdminNotification } from "../notification/notification.service";
 
 // ================== PUBLIC SERVICES (USER) ==================
 
@@ -104,6 +105,22 @@ export const getAllOrdersAdmin = async (query: OrderQuery) => repo.findAllOrders
 export const updateOrderAdmin = async (orderId: string, input: UpdateOrderAdminInput) => {
   const order = await repo.findOrderById(orderId);
   if (!order) throw new NotFoundError("Đơn hàng");
+  const updatedOrder = await prisma.orders.update({
+    where: { id: orderId },
+    data: {
+      orderStatus: input.orderStatus,
+      paymentStatus: input.paymentStatus,
+      shippingFee: input.shippingFee,
+      voucherDiscount: input.voucherDiscount,
+    },
+  });
+
+  // [THÊM MỚI] Gửi thông báo nếu trạng thái đơn hàng thay đổi
+  if (input.orderStatus && input.orderStatus !== order.orderStatus) {
+    sendOrderStatusNotification(updatedOrder.userId, updatedOrder.orderCode, input.orderStatus).catch((err) => {
+      console.error("[Notification Error] Lỗi gửi thông báo order status:", err);
+    });
+  }
   return repo.updateOrder(orderId, input);
 };
 
@@ -124,12 +141,16 @@ export const cancelOrderAdmin = async (orderId: string) => {
     }
     await tx.orders.update({ where: { id: orderId }, data: { orderStatus: "CANCELLED" } });
   });
+  // [THÊM MỚI] Gửi thông báo
+  sendOrderStatusNotification(order.userId, order.orderCode, "CANCELLED").catch((err) => {
+    console.error("[Notification Error] Lỗi gửi thông báo order status:", err);
+  });
 };
 
 export const createOrderAdmin = async (input: CreateOrderAdminInput) => {
   const { userId, shippingAddressId, customerInfo, newAddress, items, voucherCode, shippingFee, paymentMethodId, paymentStatus, orderStatus } = input;
 
-  return prisma.$transaction(async (tx) => {
+  const order = await prisma.$transaction(async (tx) => {
     let finalUserId = userId;
     let finalShippingAddressId = shippingAddressId;
     let addressSnapshot: any = {};
@@ -248,4 +269,15 @@ export const createOrderAdmin = async (input: CreateOrderAdminInput) => {
       include: { orderItems: true },
     });
   });
+
+  // 🔔 GỬI THÔNG BÁO CHO ADMIN/STAFF KHI TẠO ĐƠN HÀNG
+  try {
+    await sendOrderCreatedAdminNotification(order.orderCode);
+    console.log(`🔔 Thông báo đơn hàng mới ${order.orderCode} đã gửi cho ADMIN/STAFF`);
+  } catch (adminNotifError) {
+    console.warn(`⚠️ Lỗi gửi thông báo admin (nhưng order đã tạo):`, adminNotifError);
+    // Không throw error - order đã tạo rồi, không nên lỗi vì notification
+  }
+
+  return order;
 };

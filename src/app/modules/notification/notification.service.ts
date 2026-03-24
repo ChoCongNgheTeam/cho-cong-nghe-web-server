@@ -151,3 +151,81 @@ export const saveFcmToken = async (userId: string, token: string, device?: strin
 export const deleteFcmToken = async (token: string) => {
   return repo.deleteFcmToken(token);
 };
+
+// ── Case 5: ORDER_STATUS ──────────────────────────────────────────────────────
+
+const orderStatusMap: Record<string, string> = {
+  PENDING: "Chờ xác nhận",
+  PROCESSING: "Đang xử lý",
+  SHIPPED: "Đang giao hàng",
+  DELIVERED: "Giao thành công",
+  CANCELLED: "Đã hủy",
+};
+
+export const sendOrderStatusNotification = async (userId: string, orderCode: string, status: string) => {
+  const statusText = orderStatusMap[status] || status;
+  
+  let title = `Cập nhật đơn hàng #${orderCode}`;
+  let body = `Đơn hàng của bạn đã chuyển sang trạng thái: ${statusText}.`;
+
+  // Tùy chỉnh thông điệp cho sinh động dựa trên trạng thái
+  if (status === "SHIPPED") {
+    title = `🚚 Đơn hàng #${orderCode} đang được giao!`;
+    body = `Đơn hàng của bạn đã được giao cho đơn vị vận chuyển. Vui lòng chú ý điện thoại nhé.`;
+  } else if (status === "DELIVERED") {
+    title = `✅ Giao hàng thành công!`;
+    body = `Đơn hàng #${orderCode} đã được giao thành công. Cảm ơn bạn đã tin tưởng mua sắm!`;
+  } else if (status === "CANCELLED") {
+    title = `❌ Đơn hàng #${orderCode} đã bị hủy`;
+    body = `Đơn hàng của bạn đã bị hủy. Nếu có thắc mắc, vui lòng liên hệ CSKH.`;
+  }
+
+  // Gọi hàm core createAndSend để tự động gửi In-app, Email và Push (nếu có token)
+  return createAndSend(
+    {
+      userId,
+      type: "ORDER_STATUS",
+      title,
+      body,
+      data: { orderCode, status },
+    },
+    ["IN_APP", "EMAIL", "PUSH"], 
+  );
+};
+
+// ── Case 6: ORDER_CREATED_ADMIN ──────────────────────────────────────────────────────
+
+export const sendOrderCreatedAdminNotification = async (orderCode: string) => {
+  try {
+    // 1. Lấy danh sách ID của tất cả ADMIN và STAFF (đang hoạt động)
+    const adminsAndStaffs = await prisma.users.findMany({
+      where: { 
+        role: { in: ["ADMIN", "STAFF"] },
+        isActive: true,
+        deletedAt: null
+      },
+      select: { id: true },
+    });
+
+    if (adminsAndStaffs.length === 0) return;
+
+    // 2. Gửi thông báo cho từng người
+    const notificationPromises = adminsAndStaffs.map((user) => 
+      createAndSend(
+        {
+          userId: user.id,
+          type: "ORDER_STATUS", // Có thể dùng lại type này hoặc định nghĩa thêm type mới trong notification.types.ts
+          title: "🛒 Có đơn hàng mới!",
+          body: `Đơn hàng #${orderCode} vừa được khách hàng đặt và đang chờ xử lý.`,
+          data: { orderCode, status: "PENDING" },
+        },
+        ["IN_APP", "PUSH"] // Gửi vào chuông thông báo web admin và Push về điện thoại admin
+      )
+    );
+
+    // Chạy song song tất cả các luồng gửi
+    await Promise.all(notificationPromises);
+  } catch (error) {
+    console.error("[Notification Error] Lỗi khi gửi thông báo Admin:", error);
+  }
+};

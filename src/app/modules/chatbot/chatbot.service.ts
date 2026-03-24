@@ -1,6 +1,11 @@
 import OpenAI from 'openai';
 import { env } from '../../../config/env';
 import prisma from '../../../config/db';
+import { sendOrderConfirmationEmail } from '../../../services/email.service';
+import { sendOrderCreatedAdminNotification } from '../notification/notification.service';
+import { createMomoPaymentUrl } from '../payment/providers/momo/momo.service';
+import { createVnpayPaymentUrl, getClientIp } from '../payment/providers/vnpay/vnpay.service';
+import { createZaloPayPaymentUrl } from '../payment/providers/zalopay/zalopay.service';
 
 const openai = new OpenAI({
     apiKey: env.OPENAI_API_KEY || process.env.OPENAI_API_KEY as string,
@@ -101,32 +106,20 @@ const getOrCreateGuestUser = async (): Promise<string> => {
     }
 };
 
-// Lấy hoặc tạo payment method cho chatbot requests
-const getOrCreateChatbotPaymentMethod = async (): Promise<string> => {
+// Lấy danh sách phương thức thanh toán có sẵn
+const getAvailablePaymentMethods = async () => {
     try {
-        let paymentMethod = await prisma.payment_methods.findUnique({
-            where: { code: 'chatbot_request' },
-            select: { id: true }
+        const paymentMethods = await prisma.payment_methods.findMany({
+            where: { isActive: true },
+            select: { id: true, code: true, name: true, description: true },
+            orderBy: { createdAt: 'asc' }
         });
-
-        if (!paymentMethod) {
-            console.log("📝 Creating payment method for chatbot requests...");
-            paymentMethod = await prisma.payment_methods.create({
-                data: {
-                    name: 'Chatbot Request',
-                    code: 'chatbot_request',
-                    description: 'Phương thức thanh toán tạm thời cho yêu cầu từ chatbot, chờ xác nhận từ staff',
-                    isActive: true
-                },
-                select: { id: true }
-            });
-            console.log(`✅ Payment method created: ${paymentMethod.id}`);
-        }
-
-        return paymentMethod.id;
+        
+        console.log(`📋 Found ${paymentMethods.length} payment methods`);
+        return paymentMethods;
     } catch (error) {
-        console.error("❌ Lỗi khi lấy/tạo payment method:", error);
-        throw new Error("Không thể tạo payment method cho đơn hàng");
+        console.error("❌ Lỗi khi lấy danh sách payment methods:", error);
+        return [];
     }
 };
 
@@ -148,21 +141,37 @@ Bước 2.5: CHUYỂN BƯỚC NGAY KHI user nói "Tôi chọn phiên bản..." h
 Bước 3: Chốt chi tiết & Lấy thông tin - Hỏi:
    - "Bạn chọn bao nhiêu chiếc?"
    - "Tên của bạn là gì?"
+   - "Địa chỉ email của bạn?"
    - "Số điện thoại của bạn?"
    - "Địa chỉ nhận hàng chi tiết?"
-   → Sau đó LẠI HỎI LẠI để confirm từng field: "Bạn có chắc là Họ Tên [X], SĐT [Y], Địa chỉ [Z] không?"
 
-Bước 4: Chờ xác nhận cuối cùng - Khi khách nói "đúng", "ok", "được", "xong", "tạo đi", "đặt hàng đi" (BẤT KỲ CÂU XÁC NHẬN NÀO)
-   → PHẢI GỌI 'createOrderRequest' NGAY LẬP TỨC, KHÔNG DÙNG TOOL TUỲ CHỌN.
+Bước 3.5: Lấy & Hiển thị phương thức thanh toán - Gọi 'getPaymentMethods'
+   → Frontend sẽ hiển thị các phương thức thanh toán có sẵn
+   → Hỏi: "Bạn chọn phương thức thanh toán nào?"
+
+Bước 4: Xác nhận cuối cùng - Sau khi user chọn phương thức thanh toán, confirm từng field:
+   → "Bạn có chắc là Họ Tên [W], SĐT [X], Địa chỉ [Y], Phương thức thanh toán [Z] không?"
+
+Bước 5: Tạo đơn - Khi khách nói "đúng", "ok", "được", "xong", "tạo đi", "đặt hàng đi"
+   → PHẢI GỌI 'createOrderRequest' NGAY LẬP TỨC với payment method user đã chọn.
+
+✨ **BONUS: TRA CỨU ĐƠN HÀNG** ✨
+Nếu user hỏi về "đơn hàng", "trạng thái", "tracking", "vị trí hàng", "giao hàng", hoặc nhắc đến orderCode (CCN****)
+   → Gọi 'trackOrder' và gửi mã đơn hàng HOẶC email/số điện thoại của khách
+   → Frontend sẽ hiển thị thông tin đơn hàng chi tiết + trạng thái
 
 CÁCH PHÁT HIỆN:
 - User đã chọn sản phẩm: Nếu message chứa tên sản phẩm + màu hoặc dung lượng (VD: "iPhone 13 128GB Đen")
+- User chọn payment: Nếu message chứa tên phương thức thanh toán (VD: "chuyển khoản", "momo", "zalo pay")
 - User xác nhận: "đúng rồi", "ok", "được", "xong", "tạo đi", "đặt hàng", "chắc rồi", "vâng"
+- User muốn tra cứu: "đơn hàng hôm nay thế nào", "tôi muốn xem trạng thái", "giao hàng chưa", "CCN123456AB"... vv
 
 ⚠️ **TRÁNH LỖI LẶP:**
 ✅ Nếu user đã chọn sản phẩm → KHÔNG GỌI searchProducts LẠI, chuyển sang bước 3 ngay
+✅ Nếu user đã chọn payment → KHÔNG GỌI getPaymentMethods LẠI
 ✅ Không bao giờ hỏi thêm sau khi user xác nhận cuối cùng
-✅ Khi searchProducts trả về kết quả, frontend tự vẽ cards - bạn chỉ cần hướng dẫn
+✅ Khi getPaymentMethods trả về kết quả, frontend tự vẽ payment buttons - bạn chỉ cần hướng dẫn
+✅ Con hỏi để lấy mã đơn hàng hoặc email/SĐT nếu user không cung cấp thông tin đủ
 ✅ Luôn thân thiện, lịch sự
 `;
 
@@ -191,8 +200,20 @@ const tools = [
     {
         type: "function",
         function: {
+            name: "getPaymentMethods",
+            description: "Lấy danh sách phương thức thanh toán có sẵn. Frontend sẽ tự động hiển thị buttons UI. Gọi sau khi khách đã cung cấp đủ: số lượng, tên, SĐT, địa chỉ.",
+            parameters: {
+                type: "object",
+                properties: {},
+                required: []
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
             name: "createOrderRequest",
-            description: "⭐ PHẢI GỌI NGAY KHI KHÁCH XÁC NHẬN ⭐ Tạo yêu cầu đặt hàng từ chatbot. Gọi tool này khi user nói 'đúng', 'ok', 'được', 'xong', hoặc bất kỳ lời xác nhận nào. NẾU KHÔNG GỌI TOOL NÀY, CHATBOT SẼ KHÔNG THỂ TẠO ĐƠN.",
+            description: "⭐ PHẢI GỌI NGAY KHI KHÁCH XÁC NHẬN CUỐI CÙNG ⭐ Tạo yêu cầu đặt hàng từ chatbot. Gọi tool này khi user nói 'đúng', 'ok', 'được', 'xong', hoặc bất kỳ lời xác nhận nào SAU KHI ĐÃ CHỌN PAYMENT. NẾU KHÔNG GỌI TOOL NÀY, CHATBOT SẼ KHÔNG THỂ TẠO ĐƠN.",
             parameters: {
                 type: "object",
                 properties: {
@@ -201,9 +222,26 @@ const tools = [
                     email: { type: "string", description: "Email (tùy chọn, để trống nếu user không cung cấp)" },
                     address: { type: "string", description: "Địa chỉ nhận hàng chi tiết - cực kỳ quan trọng (lấy từ user)" },
                     productVariantId: { type: "string", description: "UUID của phiên bản sản phẩm đã chốt với user từ kết quả tìm kiếm" },
+                    paymentMethodId: { type: "string", description: "ID phương thức thanh toán mà user đã chọn" },
                     quantity: { type: "number", description: "Số lượng khách muốn đặt (default 1)" }
                 },
-                required: ["customerName", "phone", "address", "productVariantId", "quantity"],
+                required: ["customerName", "phone", "address", "productVariantId", "paymentMethodId", "quantity"],
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "trackOrder",
+            description: "Tra cứu đơn hàng. Dùng mã đơn hàng (CCN****) HOẶC email/SĐT. Gọi khi user hỏi về trạng thái, vị trí, tình hình giao hàng của đơn mình.",
+            parameters: {
+                type: "object",
+                properties: {
+                    orderCode: { type: "string", description: "Mã đơn hàng (CCN***) - nếu có thì thích dùng cái này nhất" },
+                    email: { type: "string", description: "Email khách gửi đơn - dùng khi không có orderCode" },
+                    phone: { type: "string", description: "Số điện thoại khách - dùng khi không có orderCode" }
+                },
+                required: [],
             }
         }
     }
@@ -347,7 +385,7 @@ const executeSearchProducts = async (args: { keyword: string, color?: string, st
                     : `<div class="product-price" style="font-weight: bold; color: #ff4d4f;">${finalPriceStr}đ</div>`;
 
                 cardsHtml += `
-                    <div class="product-card" data-variant-id="${v.id}" data-variant-name="${variantName}" data-variant-price="${finalPriceStr}đ">
+                    <div class="product-card" data-variant-id="${v.id}" data-product-slug="${p.slug}" data-variant-name="${variantName}" data-variant-price="${finalPriceStr}đ">
                         <div class="product-image">
                             <img src="${imageUrl || 'https://via.placeholder.com/200'}" alt="${variantName}" />
                         </div>
@@ -397,10 +435,115 @@ const executeSearchProducts = async (args: { keyword: string, color?: string, st
     }
 };
 
+// 👉 LẤY DANH SÁCH PHƯƠNG THỨC THANH TOÁN
+const executeGetPaymentMethods = async () => {
+    try {
+        const paymentMethods = await getAvailablePaymentMethods();
+        
+        if (paymentMethods.length === 0) {
+            return { error: "❌ Hệ thống chưa có phương thức thanh toán nào. Vui lòng liên hệ support." };
+        }
+
+        let paymentHtml = '<div class="payment-methods-container">';
+        
+        paymentMethods.forEach((pm: any) => {
+            paymentHtml += `
+                <div class="payment-method" data-payment-id="${pm.id}" data-payment-code="${pm.code}" data-payment-name="${pm.name}">
+                    <input type="radio" name="payment_method" value="${pm.id}" id="pm_${pm.id}" />
+                    <label for="pm_${pm.id}">
+                        <span class="payment-name">${pm.name}</span>
+                        <span class="payment-desc">${pm.description || ''}</span>
+                    </label>
+                </div>
+            `;
+        });
+
+        paymentHtml += '</div>';
+
+        return {
+            html: paymentHtml,
+            format: 'payment_methods',
+            message: `Dưới đây là các phương thức thanh toán có sẵn. Bạn chọn phương thức nào ạ?`,
+            paymentMethods: paymentMethods
+        };
+    } catch (error) {
+        console.error("Lỗi khi lấy danh sách payment methods:", error);
+        return { error: "Lỗi hệ thống khi lấy phương thức thanh toán." };
+    }
+};
+
+// ============================================================================
+// HELPER: GENERATE PAYMENT LINK FOR EMAIL QR CODE
+// ============================================================================
+const generatePaymentLinkForEmail = async (
+  paymentMethodCode: string,
+  orderId: string,
+  totalAmount: number,
+  orderCode: string
+): Promise<string | null> => {
+    try {
+        if (paymentMethodCode === 'MOMO') {
+            const momo = await createMomoPaymentUrl(orderId, totalAmount, `Thanh toán đơn hàng ${orderCode}`);
+            return momo.paymentUrl;
+        } else if (paymentMethodCode === 'VNPAY') {
+            // For chatbot, we need to get client IP - use a default for chatbot context
+            const vnpay = await createVnpayPaymentUrl(orderId, totalAmount, `Thanh toán đơn hàng ${orderCode}`, '127.0.0.1');
+            return vnpay.paymentUrl;
+        } else if (paymentMethodCode === 'ZALOPAY') {
+            const zalopay = await createZaloPayPaymentUrl(orderId, totalAmount, `Thanh toán đơn hàng ${orderCode}`);
+            return zalopay.paymentUrl;
+        }
+        return null;
+    } catch (error) {
+        console.warn(`⚠️ Lỗi tạo payment link cho ${paymentMethodCode}:`, error);
+        return null;
+    }
+};
+
+// ============================================================================
+const generateOrderCode = (): string => {
+    // Sinh 2 số ngẫu nhiên (00-99)
+    const randomNumbers1 = String(Math.floor(Math.random() * 100)).padStart(2, '0');
+    
+    // Sinh 2 chữ cái ngẫu nhiên (AA-ZZ)
+    const randomLetters1 = 
+        String.fromCharCode(65 + Math.floor(Math.random() * 26)) + 
+        String.fromCharCode(65 + Math.floor(Math.random() * 26));
+    
+    // Sinh 2 số ngẫu nhiên khác (00-99)
+    const randomNumbers2 = String(Math.floor(Math.random() * 100)).padStart(2, '0');
+    
+    // Sinh 2 chữ cái ngẫu nhiên khác (AA-ZZ)
+    const randomLetters2 = 
+        String.fromCharCode(65 + Math.floor(Math.random() * 26)) + 
+        String.fromCharCode(65 + Math.floor(Math.random() * 26));
+    
+    // Sinh 2 số ngẫu nhiên cuối (00-99)
+    const randomNumbers3 = String(Math.floor(Math.random() * 100)).padStart(2, '0');
+    
+    // Định dạng: CCN + 2 số + 2 chữ + 2 số + 2 chữ + 2 số
+    // Ví dụ: CCN12AB34CD56
+    return `CCN${randomNumbers1}${randomLetters1}${randomNumbers2}${randomLetters2}${randomNumbers3}`;
+};
+
 // 👉 TẠO YÊU CẦU ĐẶT HÀNG
 const executeCreateOrderRequest = async (args: any) => {
     try {
         console.log("🚀 Tạo yêu cầu đặt hàng từ chatbot:", args);
+        
+        // 🔧 TÁCH EMAIL VÀ ĐỊA CHỈ NẾU BỊ DÍNH
+        let cleanAddress = args.address;
+        const emailPattern = /([a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/;
+        const emailMatch = args.address.match(emailPattern);
+        
+        if (emailMatch && !args.email) {
+            // Nếu tìm thấy email trong address và user chưa cung cấp email riêng
+            args.email = emailMatch[0];
+            // Loại bỏ email khỏi address: "email, address" → "address"
+            cleanAddress = args.address.replace(emailPattern + ',? *', '').trim();
+            console.log(`🔧 Tách email khỏi address: email="${args.email}", address="${cleanAddress}"`);
+        }
+        args.address = cleanAddress;
         
         // 1. VALIDATE & LẤY ĐỦ DỮ LIỆU CHECK PROMO
         const variant = await prisma.products_variants.findUnique({ 
@@ -435,9 +578,13 @@ const executeCreateOrderRequest = async (args: any) => {
         const totalAmount = subtotal + shippingFee;
 
         // 3. TẠO ORDER
-        const orderCode = `CCN-${Math.random().toString(36).substring(7).toUpperCase()}`;
+        const orderCode = generateOrderCode();
         const guestUserId = await getOrCreateGuestUser();
-        const paymentMethodId = await getOrCreateChatbotPaymentMethod();
+        
+        if (!args.paymentMethodId) {
+            return { error: "❌ Vui lòng chọn phương thức thanh toán." };
+        }
+        const paymentMethodId = args.paymentMethodId;
         
         const order = await prisma.orders.create({
             data: {
@@ -475,10 +622,74 @@ const executeCreateOrderRequest = async (args: any) => {
 
         console.log("✅ Yêu cầu đặt hàng đã tạo:", order.orderCode);
 
-        // 4. TRẢ LẠI THÔNG TIN
+        // 4. GỬI EMAIL XÁC NHẬN ĐẶT HÀNG
+        try {
+            const paymentMethod = await prisma.payment_methods.findUnique({
+                where: { id: paymentMethodId },
+                select: { name: true, code: true }
+            });
+
+            const variant = order.orderItems[0];
+            const productName = variant.productVariantId; // Cần lấy từ DB 
+            
+            // Lấy tên sản phẩm từ variant
+            const productData = await prisma.products_variants.findUnique({
+                where: { id: variant.productVariantId },
+                select: { 
+                    code: true,
+                    product: { select: { name: true } }
+                }
+            });
+
+            // 🔗 Tạo payment link cho QR code (nếu là MOMO, VNPAY, ZALOPAY)
+            let paymentLink: string | null = null;
+            if (paymentMethod?.code && ['MOMO', 'VNPAY', 'ZALOPAY'].includes(paymentMethod.code)) {
+                paymentLink = await generatePaymentLinkForEmail(
+                    paymentMethod.code,
+                    order.id,
+                    Number(order.totalAmount),
+                    order.orderCode
+                );
+            }
+
+            await sendOrderConfirmationEmail(
+                args.email || args.phone, // Nếu không có email từ khách, dùng số điện thoại
+                args.customerName,
+                order.orderCode,
+                {
+                    productName: productData?.product.name || 'Sản phẩm',
+                    variantName: productData?.code || 'Phiên bản',
+                    quantity: variant.quantity,
+                    unitPrice: Number(variant.unitPrice),
+                    totalAmount: Number(order.totalAmount),
+                    shippingAddress: args.address,
+                    paymentMethod: paymentMethod?.name || 'Chưa xác định'
+                },
+                {
+                    paymentMethodCode: paymentMethod?.code || '',
+                    paymentLink: paymentLink || undefined
+                }
+            );
+
+            console.log("📧 Email xác nhận đơn hàng đã được gửi");
+        } catch (emailError) {
+            console.warn("⚠️ Lỗi gửi email nhưng order đã được tạo:", emailError);
+            // Không throw error - order đã tạo rồi, không nên lỗi vì email
+        }
+
+        // 🔔 GỬI THÔNG BÁO CHO ADMIN/STAFF KHI CÓ ĐƠN HÀNG MỚI TỪ CHATBOT
+        try {
+            await sendOrderCreatedAdminNotification(order.orderCode);
+            console.log(`🔔 Thông báo đơn hàng mới ${order.orderCode} từ chatbot đã gửi cho ADMIN/STAFF`);
+        } catch (adminNotifError) {
+            console.warn(`⚠️ Lỗi gửi thông báo admin (nhưng order đã tạo):`, adminNotifError);
+            // Không throw error - order đã tạo rồi, không nên lỗi vì notification
+        }
+
+        // 5. TRẢ LẠI THÔNG TIN
         return {
             success: true,
-            message: "✅ Yêu cầu của bạn đã được gửi! Staff sẽ xác nhận trong vòng 1-2 giờ. Bạn sẽ nhận được SMS khi đơn được tạo.",
+            message: "✅ Yêu cầu của bạn đã được gửi! Đơn hàng của bạn đang được xử lý. Bạn sẽ nhận được email xác nhận khi đơn được tạo.",
             orderCode: order.orderCode,
             orderId: order.id,
             totalAmount: `${totalAmount.toLocaleString('vi-VN')}đ`,
@@ -491,6 +702,152 @@ const executeCreateOrderRequest = async (args: any) => {
     }
 };
 
+// 👉 TRA CỨU ĐƠN HÀNG
+const executeTrackOrder = async (args: any) => {
+    try {
+        console.log("🔍 Tra cứu đơn hàng:", args);
+        
+        // 1. TÌM ĐƠN HÀNG
+        const where: any = {};
+        
+        if (args.orderCode) {
+            where.orderCode = args.orderCode;
+        } else if (args.email) {
+            where.user = { email: args.email };
+        } else if (args.phone) {
+            // Tìm qua shippingPhone hoặc user phone
+            where.OR = [
+                { shippingPhone: args.phone },
+                { user: { phone: args.phone } }
+            ];
+        } else {
+            return { error: "❌ Vui lòng cung cấp mã đơn hàng (CCN***) hoặc email/số điện thoại." };
+        }
+
+        const orders = await prisma.orders.findMany({
+            where,
+            include: {
+                orderItems: {
+                    include: {
+                        productVariant: {
+                            include: { product: true }
+                        }
+                    }
+                },
+                paymentMethod: true,
+                user: { select: { fullName: true, email: true } }
+            },
+            orderBy: { orderDate: 'desc' },
+            take: 5 // Lấy 5 đơn gần nhất nếu có nhiều
+        });
+
+        if (orders.length === 0) {
+            return { 
+                error: "❌ Không tìm thấy đơn hàng nào với thông tin bạn cung cấp. Vui lòng kiểm tra lại mã đơn hàng hoặc liên hệ support."
+            };
+        }
+
+        // 2. FORMAT HIỂN THỊ THÔNG TIN ĐƠN HÀNG
+        const statusMap: Record<string, { icon: string; text: string; color: string }> = {
+            'REQUEST_PENDING': { icon: '⏳', text: 'Chờ xác nhận', color: '#f59e0b' },
+            'PENDING': { icon: '⏳', text: 'Chờ xác nhận', color: '#f59e0b' },
+            'PROCESSING': { icon: '⚙️', text: 'Đang xử lý', color: '#3b82f6' },
+            'SHIPPED': { icon: '🚚', text: 'Đang giao hàng', color: '#8b5cf6' },
+            'DELIVERED': { icon: '✅', text: 'Giao thành công', color: '#10b981' },
+            'CANCELLED': { icon: '❌', text: 'Đã hủy', color: '#ef4444' }
+        };
+
+        const paymentStatusMap: Record<string, string> = {
+            'UNPAID': '❌ Chưa thanh toán',
+            'PAID': '✅ Đã thanh toán',
+            'REFUNDED': '↩️ Đã hoàn tiền'
+        };
+
+        let ordersHtml = '<div class="order-tracking-container">';
+
+        for (const order of orders) {
+            const orderStatus = statusMap[order.orderStatus] || { icon: '❓', text: order.orderStatus, color: '#6b7280' };
+            const createdDate = new Date(order.createdAt).toLocaleDateString('vi-VN', { 
+                year: 'numeric', 
+                month: '2-digit', 
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            // 🔧 TÁCH EMAIL VÀ ĐỊA CHỈ KHỎI shippingDetail nếu bị dính
+            let finalAddress = order.shippingDetail;
+            let emailFromAddress = order.user?.email;
+            const emailPattern = /([a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}),?\s*/;
+            const emailMatch = order.shippingDetail.match(emailPattern);
+            
+            if (emailMatch) {
+                emailFromAddress = emailMatch[0];
+                // Loại bỏ email khỏi address: "email, address" → "address"
+                finalAddress = order.shippingDetail.replace(emailPattern, '').trim();
+            }
+
+            ordersHtml += `
+                <div class="order-card" style="border-left: 4px solid ${orderStatus.color};">
+                    <div class="order-header">
+                        <strong>📦 Đơn hàng #${order.orderCode}</strong>
+                        <span class="order-date">${createdDate}</span>
+                    </div>
+                    
+                    <div class="order-status">
+                        <span style="font-size: 24px;">${orderStatus.icon}</span>
+                        <strong>${orderStatus.text}</strong>
+                    </div>
+
+                    <div class="order-items">
+                        <h4>🛍️ Sản phẩm:</h4>
+                        <ul>
+            `;
+
+            for (const item of order.orderItems) {
+                const productName = item.productVariant?.product?.name || 'Sản phẩm';
+                const variantCode = item.productVariant?.code || 'Phiên bản';
+                ordersHtml += `
+                            <li>
+                                <strong>${productName}</strong> (${variantCode})
+                                <br/>
+                                Số lượng: ${item.quantity} | Giá: ${Number(item.unitPrice).toLocaleString('vi-VN')}đ
+                            </li>
+                `;
+            }
+
+            ordersHtml += `
+                        </ul>
+                    </div>
+
+                    <div class="order-details">
+                        <p><strong>💰 Tổng tiền:</strong> ${Number(order.totalAmount).toLocaleString('vi-VN')}đ</p>
+                        <p><strong>📧 Email:</strong> ${emailFromAddress || order.shippingContactName}</p>
+                        <p><strong>📞 Người nhận:</strong> ${order.shippingContactName} - ${order.shippingPhone}</p>
+                        <p><strong>📍 Địa chỉ giao:</strong> ${finalAddress}</p>
+                        <p><strong>💳 Thanh toán:</strong> ${paymentStatusMap[order.paymentStatus] || order.paymentStatus}</p>
+                        <p><strong>🏦 Phương thức:</strong> ${order.paymentMethod?.name || 'Chưa xác định'}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        ordersHtml += '</div>';
+
+        return {
+            html: ordersHtml,
+            format: 'order_tracking',
+            message: orders.length === 1 
+                ? `✅ Tôi tìm thấy 1 đơn hàng của bạn. Dưới đây là thông tin chi tiết:`
+                : `✅ Tôi tìm thấy ${orders.length} đơn hàng của bạn. Dưới đây là những đơn gần nhất:`
+        };
+
+    } catch (error: any) {
+        console.error("❌ Lỗi khi tra cứu đơn hàng:", error);
+        return { error: "Hệ thống gặp lỗi khi tra cứu. Vui lòng thử lại sau hoặc liên hệ support." };
+    }
+};
+
 // ============================================================================
 // 4. UTILITIES - Detect confirmation & extract customer info
 // ============================================================================
@@ -498,58 +855,59 @@ const executeCreateOrderRequest = async (args: any) => {
 const isConfirmationMessage = (message: string): boolean => {
     const msg = message.trim().toLowerCase();
     const cleaned = msg.replace(/[.,?!;\s]/g, '');
-    const confirmPatterns = /^(đúng|ok|được|xong|chạy|tạo|đặthàng|chắcrồi|vâng|ừ|có|chấpthuận|tạođi|đặtđi|tạongay|đượcrồi|chắcchắn|tôichắc|okrồi)$/;
+    const confirmPatterns = /^(đúng|ok|được|xong|chạy|tạo|đặthàng|chắc|chắcrồi|vâng|ừ|có|chấpthuận|tạođi|đặtđi|tạongay|đượcrồi|chắcchắn|tôichắc|okrồi)$/;
     return confirmPatterns.test(cleaned);
 };
 
-const extractCustomerInfoFromHistory = (msgHistory: any[]): { name?: string; phone?: string; address?: string; productVariantId?: string } => {
+const extractCustomerInfoFromHistory = (msgHistory: any[]): { name?: string; phone?: string; email?: string; address?: string; productVariantId?: string } => {
     const result: any = {};
     
-    for (let i = msgHistory.length - 1; i >= 0; i--) {
+    // 🔍 Tìm từ tin nhắn cũ nhất đến mới nhất (để tin mới ghi đè tin cũ nếu có update)
+    for (let i = 0; i < msgHistory.length; i++) {
         const msg = msgHistory[i];
-        if (msg.role === 'user' || msg.role === 'user') { // Note: Front-end usually sends 'user', keeping logic robust
+        if (msg.role === 'user') {
             const text = msg.content || '';
             
-            if (!result.phone) {
-                const phoneMatch = text.match(/0[0-9]\d{8,}/);
-                if (phoneMatch) result.phone = phoneMatch[0];
-            }
+            // 📧 Tìm email (pattern: xxx@domain.xxx)
+            const emailMatch = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+            if (emailMatch) result.email = emailMatch[1];
             
-            if (!result.address && text.length > 20) {
+            // 📞 Tìm số điện thoại (0x với 9-10 chữ số)
+            const phoneMatch = text.match(/(0\d{9})/);
+            if (phoneMatch) result.phone = phoneMatch[1];
+            
+            // 👤 Tìm tên & 📍 Địa chỉ (Chỉ xử lý nếu tin nhắn đủ dài và có vẻ chứa thông tin cá nhân)
+            // Bỏ qua các tin nhắn xác nhận ngắn gọn hoặc tin nhắn chọn payment
+            if (text.length > 5 && !isConfirmationMessage(text) && !text.includes('chọn phương thức')) {
                 const parts = text.split(/,\s*/);
-                if (parts.length >= 3 && /0[0-9]\d{8,}/.test(parts[1])) {
-                    const addressParts = parts.slice(2).join(', ').trim();
-                    if (addressParts && addressParts.length > 5) result.address = addressParts;
-                } else if (parts.length >= 2) {
-                    const addressParts = parts.slice(1).join(', ').trim();
-                    if (addressParts && addressParts.length > 5 && /\d+/.test(addressParts)) {
-                        result.address = addressParts;
+                
+                if (parts.length >= 3) {
+                    // Cấu trúc dự kiến: Số lượng, Tên, SĐT, Địa chỉ (VD: 1, Phúc, 0798715850, 57 trần bình trọng...)
+                    // Tìm phần tử không phải là số và không phải SĐT để làm tên
+                    const possibleName = parts.find((p: string) => isNaN(Number(p)) && !p.match(/(0\d{9})/) && p.trim().length > 1 && p.trim().length < 30);
+                    if (possibleName) {
+                         result.name = possibleName.trim();
                     }
-                }
-            }
-            
-            if (!result.name) {
-                const nameMatch = text.match(/^([a-zA-Zàáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ\s]+)/i);
-                if (nameMatch) {
-                    result.name = nameMatch[1].trim().split(/[,\d]/)[0].trim();
+
+                    // Ghép các phần còn lại làm địa chỉ (bỏ số lượng, tên, SĐT)
+                    const addressParts = parts.filter((p: string) => isNaN(Number(p)) && !p.match(/(0\d{9})/) && p.trim() !== result.name);
+                    if (addressParts.length > 0) {
+                        result.address = addressParts.join(', ').trim();
+                    }
+                } else if (text.length > 15 && /\d+/.test(text)) {
+                     // Nếu không nhập dấu phẩy nhưng câu dài và có số (địa chỉ nhà)
+                     if (text.toLowerCase().includes('phường') || 
+                         text.toLowerCase().includes('thành phố') || 
+                         text.toLowerCase().includes('quận') ||
+                         text.toLowerCase().includes('đường')) {
+                         result.address = text;
+                     }
                 }
             }
         }
     }
     
-    for (let i = msgHistory.length - 1; i >= 0; i--) {
-        const msg = msgHistory[i];
-        if ((msg.role === 'assistant' || msg.role === 'model') && msg.content) {
-            const uuidMatch = msg.content.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-            if (uuidMatch) {
-                result.productVariantId = uuidMatch[0];
-                console.log(`✅ Found productVariantId: ${uuidMatch[0]}`);
-                break;
-            }
-        }
-    }
-    
-    console.log(`📋 Extract result: name="${result.name}", phone="${result.phone}", address="${result.address}", productVariantId="${result.productVariantId}"`);
+    console.log(`📋 Extract result: name="${result.name}", email="${result.email}", phone="${result.phone}", address="${result.address}"`);
     return result;
 };
 
@@ -560,13 +918,21 @@ const extractCustomerInfoFromHistory = (msgHistory: any[]): { name?: string; pho
 let lastSearchedProductVariantId: string | null = null;
 let lastSearchedProductsHtml: string | null = null;
 let lastSearchedProductsVariants: any[] = [];
+let lastPaymentMethodsHtml: string | null = null;
+let lastAvailablePaymentMethods: any[] = [];
+let lastSelectedPaymentMethodId: string | null = null;
 
-const getChatReply = async (userMessages: any[], selectedVariantId?: string) => {
+const getChatReply = async (userMessages: any[], selectedVariantId?: string, selectedPaymentMethodId?: string) => {
     try {
-        // 🔑 Nếu frontend gửi selectedVariantId, lưu lại
+        // 🔑 NẾU FRONTEND GỬI ID, LƯU LẠI VÀO BIẾN TOÀN CỤC NGAY LẬP TỨC
         if (selectedVariantId) {
             lastSearchedProductVariantId = selectedVariantId;
-            console.log(`✅ Received selectedVariantId from frontend: ${selectedVariantId}`);
+            console.log(`✅ Saved variantId to state: ${lastSearchedProductVariantId}`);
+        }
+
+        if (selectedPaymentMethodId) {
+            lastSelectedPaymentMethodId = selectedPaymentMethodId;
+            console.log(`✅ Saved paymentId to state: ${lastSelectedPaymentMethodId}`);
         }
 
         if (!userMessages || userMessages.length === 0) return { role: 'assistant', content: "Xin chào!" };
@@ -575,11 +941,35 @@ const getChatReply = async (userMessages: any[], selectedVariantId?: string) => 
         const latestMessage = messagesCopy.pop().content || " ";
         const historyMessages = messagesCopy.filter(msg => msg.role !== 'system');
 
+        // 🔍 PHÁT HIỆN NẾU USER ĐANG TÌM SẢN PHẨM MỚI (chứa từ khóa sản phẩm nhưng không phải xác nhận, không phải chọn phiên bản, không phải cung cấp info)
+        const isProductSelectionMessage = latestMessage.toLowerCase().includes('chọn') || 
+                                          latestMessage.toLowerCase().includes('phiên bản') ||
+                                          latestMessage.includes(','); // Comma = likely customer info
+        
+        const isNewSearch = !isConfirmationMessage(latestMessage) && 
+                           !isProductSelectionMessage &&
+                           (latestMessage.toLowerCase().includes('có ') ||
+                            latestMessage.toLowerCase().includes('còn ') ||
+                            latestMessage.toLowerCase().match(/iphone|samsung|macbook|lenovo|oppo|xiaomi|laptop|điện thoại|máy tính|sản phẩm|hàng/i));
+        
+        if (isNewSearch) {
+            console.log(`🔄 Detected NEW PRODUCT SEARCH - Clearing old state`);
+            // Clear ALL old product state
+            lastSearchedProductVariantId = null;
+            lastSearchedProductsHtml = null;
+            lastSearchedProductsVariants = [];
+            // Clear ALL old payment method state
+            lastPaymentMethodsHtml = null;
+            lastAvailablePaymentMethods = [];
+            lastSelectedPaymentMethodId = null;
+            console.log(`   ✅ Reset: productVariantId, productsHtml, paymentHtml, selectedPaymentId`);
+        }
+
         const confirming = isConfirmationMessage(latestMessage);
         console.log(`📌 User Message: "${latestMessage}" | Confirming: ${confirming}`);
 
         if (confirming) {
-            console.log("🎯 CONFIRMATION DETECTED! Extracting info & creating order...");
+            console.log("🎯 CONFIRMATION DETECTED!");
             
             const customerInfo = extractCustomerInfoFromHistory(historyMessages);
             
@@ -588,8 +978,34 @@ const getChatReply = async (userMessages: any[], selectedVariantId?: string) => 
                 console.log(`📌 Using saved productVariantId: ${lastSearchedProductVariantId}`);
             }
             
+            // ================== 🪄 AUTO-RECOVER PAYMENT METHOD ID ==================
+            // Nếu UI không gửi ID (khách gõ chữ hoặc server bị restart), tự động dò từ text
+            if (!lastSelectedPaymentMethodId && lastAvailablePaymentMethods.length > 0) {
+                for (let i = historyMessages.length - 1; i >= 0; i--) {
+                    if (historyMessages[i].role === 'user') {
+                        const msgText = historyMessages[i].content?.toLowerCase() || '';
+                        const found = lastAvailablePaymentMethods.find(pm => 
+                            msgText.includes(pm.code.toLowerCase()) || 
+                            msgText.includes(pm.name.toLowerCase()) ||
+                            (msgText.includes('cod') && pm.code === 'COD') ||
+                            (msgText.includes('chuyển khoản') && pm.code.includes('BANK')) ||
+                            (msgText.includes('momo') && pm.code === 'MOMO') ||
+                            (msgText.includes('zalopay') && pm.code === 'ZALOPAY') ||
+                            (msgText.includes('vnpay') && pm.code === 'VNPAY')
+                        );
+                        if (found) {
+                            lastSelectedPaymentMethodId = found.id;
+                            console.log(`🪄 Đã tự động khôi phục paymentId từ text: ${found.name} (${found.code})`);
+                            break; // Tìm thấy thì dừng luôn
+                        }
+                    }
+                }
+            }
+            // ========================================================================
+            
             console.log("📊 Final Extracted Info:", customerInfo);
             
+            // Kiểm tra xem đã có đầy đủ thông tin cơ bản chưa (không bao gồm payment confirmation)
             if (!customerInfo.name || !customerInfo.phone || !customerInfo.address || !customerInfo.productVariantId) {
                 console.warn("⚠️ Missing required info:", customerInfo);
                 
@@ -605,11 +1021,37 @@ const getChatReply = async (userMessages: any[], selectedVariantId?: string) => 
                 };
             }
             
+            // Nếu chưa hiển thị payment methods, hiển thị và không tạo order cùng lúc
+            if (!lastPaymentMethodsHtml && !lastSelectedPaymentMethodId) {
+                console.log("📊 Gửi danh sách payment methods cho user chọn...");
+                return {
+                    role: 'assistant',
+                    content: `Bạn có chắc là Họ Tên ${customerInfo.name}, SĐT ${customerInfo.phone}, Địa chỉ ${customerInfo.address} không? 
+                    
+Dưới đây là các phương thức thanh toán có sẵn, bạn chọn cách nào ạ:`,
+                    // Payment methods sẽ được gửi bởi OpenAI tool call
+                    // Chúng tôi sẽ gọi getPaymentMethods ở lần sau
+                };
+            }
+            
+            // Nếu payment methods đã hiển thị nhưng user chưa chọn, bỏ qua
+            if (!lastSelectedPaymentMethodId) {
+                console.log("⚠️ User chưa chọn payment method, chờ user chọn");
+                return {
+                    role: 'assistant',
+                    content: `Vui lòng chọn một phương thức thanh toán từ danh sách trên ạ!`
+                };
+            }
+            
+            // Nếu đã có payment method, tạo order
+            console.log("✅ Có đầy đủ thông tin, tạo order...");
             const orderResult = await executeCreateOrderRequest({
                 customerName: customerInfo.name,
                 phone: customerInfo.phone,
+                email: customerInfo.email,
                 address: customerInfo.address,
                 productVariantId: customerInfo.productVariantId,
+                paymentMethodId: lastSelectedPaymentMethodId,
                 quantity: 1
             });
             
@@ -620,6 +1062,9 @@ const getChatReply = async (userMessages: any[], selectedVariantId?: string) => 
             lastSearchedProductVariantId = null;
             lastSearchedProductsHtml = null;
             lastSearchedProductsVariants = [];
+            lastPaymentMethodsHtml = null;
+            lastAvailablePaymentMethods = [];
+            lastSelectedPaymentMethodId = null;
             
             return {
                 role: 'assistant',
@@ -645,6 +1090,14 @@ const getChatReply = async (userMessages: any[], selectedVariantId?: string) => 
             });
         }
 
+        // 🔑 NẾU ĐÃ HIỂN THỊ PAYMENT METHODS, THÊM CONTEXT NGĂN GỌI getPaymentMethods LẠI
+        if (lastPaymentMethodsHtml && !lastSelectedPaymentMethodId) {
+            openAiMessages.splice(1, 0, {
+                role: 'system',
+                content: `⚠️ DANH SÁCH PHƯƠNG THỨC THANH TOÁN ĐÃ ĐƯỢC HIỂN THỊ. KHÔNG GỌI getPaymentMethods LẠI. Chỉ chờ user chọn phương thức thanh toán từ danh sách.`
+            });
+        }
+
         // 2. Gọi API OpenAI lần 1
         const response = await openai.chat.completions.create({
             model: "gpt-4o-mini", // Model tối ưu, tốc độ tốt, có thể cân nhắc gpt-4o nếu cần
@@ -662,6 +1115,8 @@ const getChatReply = async (userMessages: any[], selectedVariantId?: string) => 
 
             openAiMessages.push(responseMessage);
 
+            let trackOrderResponse: any; // Lưu response từ trackOrder
+            
             for (const toolCall of toolCalls) {
                 const functionName = (toolCall as any).function?.name;
                 const functionArgs = JSON.parse((toolCall as any).function?.arguments || '{}');
@@ -677,9 +1132,13 @@ const getChatReply = async (userMessages: any[], selectedVariantId?: string) => 
                         lastSearchedProductsHtml = null;
                         lastSearchedProductsVariants = [];
                         lastSearchedProductVariantId = null;
+                        // 🔄 Clear payment methods state từ search cũ
+                        lastPaymentMethodsHtml = null;
+                        lastAvailablePaymentMethods = [];
+                        lastSelectedPaymentMethodId = null;
                         toolResponseForAI = { error: apiResponse.error };
                     } else {
-                        // ✅ Search thành công - cập nhật state
+                        // ✅ Search thành công - cập nhật state SẢN PHẨM & clear state THANH TOÁN cũ
                         if (apiResponse.html) {
                             lastSearchedProductsHtml = apiResponse.html;
                             console.log(`💾 Saved product cards HTML`);
@@ -702,9 +1161,47 @@ const getChatReply = async (userMessages: any[], selectedVariantId?: string) => 
                             note: "✅ Dữ liệu sản phẩm đã được gửi tới frontend. Bạn không cần liệt kê lại, chỉ cần hướng dẫn user chọn sản phẩm."
                         };
                     }
+                } else if (functionName === "getPaymentMethods") {
+                    apiResponse = await executeGetPaymentMethods();
+                    
+                    if (apiResponse.error) {
+                        console.warn(`🔄 Get payment methods FAILED - ${apiResponse.error}`);
+                        toolResponseForAI = { error: apiResponse.error };
+                    } else {
+                        // ✅ Lấy payment methods thành công - cập nhật state
+                        if (apiResponse.html) {
+                            lastPaymentMethodsHtml = apiResponse.html;
+                            console.log(`💾 Saved payment methods HTML`);
+                        }
+                        
+                        if (apiResponse.paymentMethods && Array.isArray(apiResponse.paymentMethods)) {
+                            lastAvailablePaymentMethods = apiResponse.paymentMethods;
+                            console.log(`💾 Saved ${apiResponse.paymentMethods.length} payment methods`);
+                        }
+                        
+                        toolResponseForAI = {
+                            success: true,
+                            message: apiResponse.message,
+                            methodCount: apiResponse.paymentMethods?.length || 0,
+                            note: "✅ Danh sách phương thức thanh toán đã được gửi tới frontend. Chờ user chọn."
+                        };
+                    }
                 } else if (functionName === "createOrderRequest") {
+                    // ÉP DÙNG ID THẬT: Ghi đè ID do AI tự chế bằng ID chuẩn từ giao diện
+                    if (lastSelectedPaymentMethodId) {
+                        functionArgs.paymentMethodId = lastSelectedPaymentMethodId;
+                    }
+                    if (lastSearchedProductVariantId) {
+                        functionArgs.productVariantId = lastSearchedProductVariantId;
+                    }
+
+                    // Sau khi đã gán ID chuẩn, mới gọi hàm tạo đơn
                     apiResponse = await executeCreateOrderRequest(functionArgs);
-                    // Đối với createOrderRequest, trả full response vì cần thông tin xác nhận
+                    toolResponseForAI = apiResponse;
+                } else if (functionName === "trackOrder") {
+                    // Tra cứu đơn hàng
+                    apiResponse = await executeTrackOrder(functionArgs);
+                    trackOrderResponse = apiResponse; // Lưu lại response để dùng sau
                     toolResponseForAI = apiResponse;
                 }
 
@@ -724,6 +1221,26 @@ const getChatReply = async (userMessages: any[], selectedVariantId?: string) => 
             });
 
             const responseText = finalResponse.choices[0].message.content;
+            
+            // 🔍 Nếu có kết quả tracking order
+            if (trackOrderResponse?.format === 'order_tracking') {
+                return {
+                    role: 'assistant',
+                    content: trackOrderResponse.message, // Dùng message ngắn thay vì full markdown
+                    html: trackOrderResponse.html,
+                    format: 'order_tracking'
+                } as any;
+            }
+            
+            if (lastPaymentMethodsHtml) {
+                return {
+                    role: 'assistant',
+                    content: responseText,
+                    html: lastPaymentMethodsHtml,
+                    paymentMethods: lastAvailablePaymentMethods,
+                    format: 'payment_methods'
+                } as any;
+            }
             
             if (lastSearchedProductsHtml) {
                 return {

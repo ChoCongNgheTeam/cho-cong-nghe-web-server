@@ -2,8 +2,11 @@ import * as repo from "./checkout.repository";
 import { CheckoutInput, CartValidationResult, CartItemValidation, CheckoutSummary } from "./checkout.types";
 import { BadRequestError, NotFoundError } from "@/errors";
 import { handlePrismaError } from "@/utils/handle-prisma-error";
+import prisma from "@/config/db";
 import { nanoid } from "nanoid";
 import { getCartWithPricing } from "../pricing/use-cases/getCartWithPricing.service";
+import { sendOrderConfirmationEmail } from "../../../services/email.service";
+import { sendOrderCreatedAdminNotification } from "../notification/notification.service";
 
 // =======================================================
 // 1. Cart validation (ĐÃ SỬA ĐỂ GHI NHẬN GIÁ PROMOTION)
@@ -177,7 +180,59 @@ export const prepareCheckoutData = async (userId: string, input: CheckoutInput):
 export const createOrderFromCheckout = async (userId: string, checkoutSummary: CheckoutSummary) => {
   try {
     // Gọi sang hàm lưu Database của Checkout Repository (Đã có Address Snapshot)
-    return await repo.executeOrderTransaction(userId, checkoutSummary);
+    const order = await repo.executeOrderTransaction(userId, checkoutSummary);
+
+    // 🎉 GỬI EMAIL XÁC NHẬN ĐẶT HÀNG SAU KHI ORDER TẠO THÀNH CÔNG
+    try {
+      const [user, paymentMethod] = await Promise.all([
+        prisma.users.findUnique({
+          where: { id: userId },
+          select: { email: true, fullName: true }
+        }),
+        prisma.payment_methods.findUnique({
+          where: { id: checkoutSummary.paymentMethodId },
+          select: { name: true }
+        })
+      ]);
+
+      if (user?.email) {
+        // Lấy thông tin sản phẩm từ order items
+        const firstItem = order.orderItems[0];
+        const productName = firstItem?.productVariant?.product?.name || 'Sản phẩm';
+        const variantName = firstItem?.productVariant?.code || 'Phiên bản';
+
+        await sendOrderConfirmationEmail(
+          user.email,
+          user.fullName || 'Khách hàng',
+          order.orderCode,
+          {
+            productName,
+            variantName,
+            quantity: order.orderItems.reduce((sum, item) => sum + item.quantity, 0),
+            unitPrice: Number(order.orderItems[0]?.unitPrice || 0),
+            totalAmount: Number(order.totalAmount),
+            shippingAddress: order.shippingDetail,
+            paymentMethod: paymentMethod?.name || 'Chưa xác định'
+          }
+        );
+
+        console.log(`📧 Email xác nhận đơn hàng ${order.orderCode} đã gửi tới ${user.email}`);
+      }
+    } catch (emailError) {
+      console.warn(`⚠️ Lỗi gửi email xác nhận (nhưng order đã tạo):`, emailError);
+      // Không throw error - order đã tạo rồi, không nên lỗi vì email
+    }
+
+    // 🔔 GỬI THÔNG BÁO CHO ADMIN/STAFF KHI CÓ ĐƠN HÀNG MỚI
+    try {
+      await sendOrderCreatedAdminNotification(order.orderCode);
+      console.log(`🔔 Thông báo đơn hàng mới ${order.orderCode} đã gửi cho ADMIN/STAFF`);
+    } catch (adminNotifError) {
+      console.warn(`⚠️ Lỗi gửi thông báo admin (nhưng order đã tạo):`, adminNotifError);
+      // Không throw error - order đã tạo rồi, không nên lỗi vì notification
+    }
+
+    return order;
   } catch (error: any) {
     throw new BadRequestError(`Order creation failed: ${error.message}`);
   }
