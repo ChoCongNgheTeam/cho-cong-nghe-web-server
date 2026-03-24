@@ -255,13 +255,38 @@ export const getProductGallery = async (slug: string) => {
   if (!product || !product.isActive) throw new NotFoundError("Sản phẩm");
 
   const colorImages = await repo.findColorImagesByProductId(product.id);
-  return colorImages.map((img) => ({
-    id: img.id,
-    color: img.color,
-    imageUrl: img.imageUrl,
-    altText: img.altText,
-    position: img.position,
-  }));
+
+  // Build colorVariantMap: color → variantId của default variant có màu đó
+  // Dùng để FE tự động chọn variant khi user click ảnh thuộc màu khác
+  const activeVariants = product.variants.filter((v: any) => v.isActive);
+  const colorVariantMap: Record<string, string> = {};
+
+  for (const variant of activeVariants) {
+    const colorAttr = variant.variantAttributes?.find((va: any) => va.attributeOption.attribute.code === "color");
+    if (colorAttr) {
+      const colorVal = colorAttr.attributeOption.value;
+      // Ưu tiên isDefault, sau đó first active
+      if (!colorVariantMap[colorVal] || variant.isDefault) {
+        colorVariantMap[colorVal] = variant.id;
+      }
+    }
+  }
+
+  // Trả về flat list images + colorVariantMap để FE dùng
+  return {
+    images: colorImages.map((img) => ({
+      id: img.id,
+      color: img.color,
+      imageUrl: img.imageUrl,
+      altText: img.altText,
+      position: img.position,
+      // variantId tương ứng màu này — FE dùng để sync variant selector
+      variantId: colorVariantMap[img.color] ?? null,
+    })),
+    // Map tổng: { "black": "variant-uuid", "white": "variant-uuid" }
+    // FE dùng để biết khi scroll tới ảnh màu nào → select variant nào
+    colorVariantMap,
+  };
 };
 
 export const getRelatedProducts = async (slug: string, limit = 8) => {
