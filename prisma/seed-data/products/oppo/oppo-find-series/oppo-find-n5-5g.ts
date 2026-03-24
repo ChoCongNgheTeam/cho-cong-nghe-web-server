@@ -17,5 +17,6 @@ export const oppoFindN5: SeedProductInput = {
   brandName: "OPPO",
   categoryNames: ["OPPO Find Series"],
   isFeatured: true,
+  variantDisplay: "CARD",
   highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
 };

@@ -12,5 +12,6 @@ export const lenovoYoga7_14ITP8: SeedProductInput = {
   brandName: "Lenovo",
   categoryNames: ["Lenovo Yoga"],
   isFeatured: false,
+  variantDisplay: "CARD",
   highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
 };

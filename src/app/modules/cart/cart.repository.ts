@@ -83,12 +83,7 @@ export const findByUserAndVariant = async (userId: string, variantId: string) =>
   });
 };
 
-export const create = async (data: {
-  userId: string;
-  productVariantId: string;
-  quantity: number;
-  unitPrice: number;
-}) => {
+export const create = async (data: { userId: string; productVariantId: string; quantity: number; unitPrice: number }) => {
   return prisma.cart_items.create({
     data,
     select: cartItemSelect,
@@ -114,39 +109,35 @@ export const clearCart = async (userId: string) => {
 export const transformToCartResponse = (item: any): CartResponse => {
   const colorAttr = item.productVariant.variantAttributes.find((attr: any) => {
     const code = (attr.attributeOption.attribute?.code || "").toLowerCase();
-    const name = (attr.attributeOption.attribute?.name || "").toLowerCase();
-    return ["color", "màu", "màu sắc"].includes(code || name);
+    return ["color", "màu", "màu sắc"].includes(code);
   });
 
   const storageAttr = item.productVariant.variantAttributes.find((attr: any) => {
     const code = (attr.attributeOption.attribute?.code || "").toLowerCase();
-    const name = (attr.attributeOption.attribute?.name || "").toLowerCase();
-    return ["storage", "dung lượng", "rom", "rom_capacity"].includes(code || name);
+    return ["storage", "dung lượng", "rom", "rom_capacity"].includes(code);
   });
 
   const colorValue = colorAttr?.attributeOption.value;
-
-  // BƯỚC 2: Tìm bức ảnh có trường color khớp với colorValue của Variant
-  const matchingImage = item.productVariant.product.img.find(
-    (img: any) => img.color === colorValue
-  );
-
-  // Nếu tìm thấy ảnh trùng màu thì lấy, nếu không (ví dụ sản phẩm không phân loại theo màu) thì fallback về ảnh đầu tiên
+  const matchingImage = item.productVariant.product.img.find((img: any) => img.color === colorValue);
   const finalImageUrl = matchingImage?.imageUrl || item.productVariant.product.img[0]?.imageUrl;
 
-  // BƯỚC MỚI: Build Category Path từ cục category lấy được
   const category = item.productVariant.product.category;
   const categoryPath: string[] = [];
-  
   if (category) {
-    categoryPath.push(category.id); // Level 1
+    categoryPath.push(category.id);
     if (category.parent) {
-      categoryPath.push(category.parent.id); // Level 2
+      categoryPath.push(category.parent.id);
       if (category.parent.parent) {
-        categoryPath.push(category.parent.parent.id); // Level 3
+        categoryPath.push(category.parent.parent.id);
       }
     }
   }
+
+  // ← THÊM: expose variantAttributes đã normalize
+  const variantAttributes = item.productVariant.variantAttributes.map((va: any) => ({
+    code: va.attributeOption.attribute?.code ?? "",
+    value: va.attributeOption.value ?? "",
+  }));
 
   return {
     id: item.id,
@@ -159,10 +150,11 @@ export const transformToCartResponse = (item: any): CartResponse => {
     categoryId: category?.id,
     categoryPath: categoryPath.reverse(),
     variantCode: item.productVariant.code || undefined,
-    image: finalImageUrl, // BƯỚC 3: Gán link ảnh đã lọc được
+    variantAttributes, // ← thêm field này
+    image: finalImageUrl,
     color: colorAttr?.attributeOption.label,
-    colorValue: colorValue,
-    storage: storageAttr?.attributeOption.label,      // BẮT ĐƯỢC 256GB VÀ TRẢ RA NGOÀI
+    colorValue,
+    storage: storageAttr?.attributeOption.label,
     storageValue: storageAttr?.attributeOption.value,
     quantity: item.quantity,
     unitPrice: Number(item.unitPrice),

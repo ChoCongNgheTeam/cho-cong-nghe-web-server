@@ -25,6 +25,7 @@ export const validateVoucherHandler = async (req: Request, res: Response) => {
     code: req.body.code,
     orderTotal: req.body.orderTotal,
     userId: req.user?.id,
+    cartItems: req.body.cartItems,
   };
   const result = await voucherService.validateVoucher(input);
   res.json({

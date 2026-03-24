@@ -16,5 +16,6 @@ export const redmiNote15_5G: SeedProductInput = {
   brandName: "Xiaomi",
   categoryNames: ["Redmi Note Series"],
   isFeatured: false,
+  variantDisplay: "CARD",
   highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
 };

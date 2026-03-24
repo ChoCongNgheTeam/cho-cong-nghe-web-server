@@ -6,11 +6,11 @@ export const getHomePageHandler = async (req: Request, res: Response) => {
   res.json({ data: homeData, message: "Lấy dữ liệu trang chủ thành công" });
 };
 
-export const getFlashSaleSectionHandler = async (req: Request, res: Response) => {
-  const date = req.query.date ? new Date(req.query.date as string) : undefined;
-  const result = await homeService.getFlashSaleSection(req.user?.id, date);
-  res.json({ data: result, message: "Lấy sản phẩm flash sale thành công" });
-};
+// export const getFlashSaleSectionHandler = async (req: Request, res: Response) => {
+//   const date = req.query.date ? new Date(req.query.date as string) : undefined;
+//   const result = await homeService.getFlashSaleSection(req.user?.id, date);
+//   res.json({ data: result, message: "Lấy sản phẩm flash sale thành công" });
+// };
 
 export const getBestSellingSectionHandler = async (req: Request, res: Response) => {
   const limit = req.query.limit ? parseInt(req.query.limit as string) : 12;

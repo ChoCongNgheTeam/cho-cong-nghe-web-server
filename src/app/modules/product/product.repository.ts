@@ -4,7 +4,8 @@ import { ListProductsQuery, ReviewsQuery } from "./product.validation";
 import { OrderStatus } from "@prisma/client";
 import { extractVariantOptions } from "@/helpers/variant-options";
 import { HighlightSpecificationGroup } from "./product.types";
-import { buildOrderBy, buildProductWhere } from "./product_filter.where-builder";
+import { buildOrderBy, buildProductWhere, buildSearchCategoryAndBrandIds } from "./product_filter.where-builder";
+import { validate as isUUID } from "uuid";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SELECT FRAGMENTS
@@ -69,7 +70,7 @@ const selectVariant = {
 };
 
 // Card select — public listing
-const selectProductCard = {
+export const selectProductCard = {
   id: true,
   name: true,
   slug: true,
@@ -296,16 +297,75 @@ const findAll = async (query: Record<string, any>, onlyActive: boolean) => {
   const { page = 1, limit = 12, sortBy, sortOrder } = query;
   const skip = (page - 1) * limit;
 
-  // Public filter: reuse existing where-builder (handles spec_xxx / attr_xxx)
-  const where = await buildProductWhere(query, onlyActive);
-  // Ensure deletedAt = null for public
+  let searchMeta: { categoryIds: string[]; brandIds: string[] } | undefined;
+  if (query.search?.trim()) {
+    searchMeta = await buildSearchCategoryAndBrandIds(query.search.trim(), prisma);
+  }
+
+  const where = await buildProductWhere(query, onlyActive, searchMeta);
   (where as any).deletedAt = null;
 
-  const orderBy = buildOrderBy(sortBy, sortOrder);
-
-  const [data, total] = await Promise.all([prisma.products.findMany({ where, select: selectProductCard, orderBy, skip, take: limit }), prisma.products.count({ where })]);
+  const [data, total] = await Promise.all([
+    query.search?.trim()
+      ? findAllWithBrandBalance(where, limit, skip) // ← balanced
+      : prisma.products.findMany({
+          where,
+          select: selectProductCard,
+          orderBy: buildOrderBy(sortBy, sortOrder),
+          skip,
+          take: limit,
+        }),
+    prisma.products.count({ where }),
+  ]);
 
   return { data, page, limit, total, totalPages: Math.ceil(total / limit) };
+};
+
+const findAllWithBrandBalance = async (where: Prisma.productsWhereInput, limit: number, skip: number): Promise<any[]> => {
+  // Lấy tất cả brandIds có trong kết quả
+  const brandRows = await prisma.products.findMany({
+    where,
+    select: { brandId: true },
+    distinct: ["brandId"],
+  });
+
+  if (brandRows.length <= 1) {
+    // Chỉ 1 brand → fetch bình thường
+    return prisma.products.findMany({
+      where,
+      select: selectProductCard,
+      orderBy: [{ totalSoldCount: "desc" }, { ratingAverage: "desc" }],
+      skip,
+      take: limit,
+    });
+  }
+
+  // Nhiều brands → lấy đều per brand
+  const perBrand = Math.ceil(limit / brandRows.length);
+  const allResults = await Promise.all(
+    brandRows.map(({ brandId }) =>
+      prisma.products.findMany({
+        where: { ...(where as any), brandId },
+        select: selectProductCard,
+        orderBy: [{ isFeatured: "desc" }, { totalSoldCount: "desc" }],
+        take: perBrand,
+      }),
+    ),
+  );
+
+  // Interleave: lấy lần lượt 1 sp từ mỗi brand
+  const result: any[] = [];
+  const queues = allResults.filter((q) => q.length > 0);
+  let i = 0;
+  while (result.length < limit) {
+    const active = queues.filter((q) => q.length > 0);
+    if (active.length === 0) break;
+    const queue = queues[i % queues.length];
+    if (queue.length > 0) result.push(queue.shift()!);
+    i++;
+  }
+
+  return result;
 };
 
 export const findAllPublic = async (query: ListProductsQuery) => findAll(query, true);
@@ -314,7 +374,7 @@ export const findAllPublic = async (query: ListProductsQuery) => findAll(query, 
  * Admin product list — hỗ trợ search, filter, includeDeleted, dateFrom/dateTo
  */
 export const findAllAdmin = async (query: Record<string, any>) => {
-  console.log(query);
+  // console.log(query);
 
   const { page = 1, limit = 20, sortBy = "createdAt", sortOrder = "desc" } = query;
   const skip = (page - 1) * limit;
@@ -1063,22 +1123,134 @@ export const findHighlightSpecificationGroups = async (productId: string, catego
 export const findRelatedProducts = async (productId: string, limit: number = 8) => {
   const product = await prisma.products.findUnique({
     where: { id: productId },
-    select: { brandId: true, categoryId: true },
+    select: {
+      brandId: true,
+      categoryId: true,
+      createdAt: true,
+      variants: {
+        where: { isDefault: true, isActive: true },
+        select: { price: true },
+        take: 1,
+      },
+      category: {
+        select: {
+          id: true,
+          parentId: true,
+          parent: {
+            select: { id: true, parentId: true },
+          },
+        },
+      },
+    },
   });
 
   if (!product) return [];
 
-  return prisma.products.findMany({
-    where: {
-      id: { not: productId },
-      isActive: true,
-      deletedAt: null,
-      OR: [{ brandId: product.brandId }, { categoryId: product.categoryId }],
-    },
+  const productCreatedAt = product.createdAt;
+  const parentId = product.category.parentId;
+  const grandParentId = product.category.parent?.parentId;
+
+  // CTE: lấy toàn bộ descendants của parent (cùng dòng sản phẩm)
+  const siblingScope = await prisma.$queryRaw<{ id: string }[]>`
+    WITH RECURSIVE descendants AS (
+      SELECT id FROM categories
+      WHERE id = ${parentId ?? product.categoryId}::uuid AND "deletedAt" IS NULL
+      UNION ALL
+      SELECT c.id FROM categories c
+      JOIN descendants d ON c."parentId" = d.id
+      WHERE c."deletedAt" IS NULL
+    )
+    SELECT id FROM descendants
+  `;
+  const siblingCategoryIds = siblingScope.map((r) => r.id);
+
+  // Lấy cùng series — sort theo createdAt gần nhất (= thế hệ gần nhất)
+  const sameCategory = await prisma.$queryRaw<{ id: string; time_diff: number }[]>`
+  SELECT p.id,
+         ABS(EXTRACT(EPOCH FROM (p."createdAt" - ${productCreatedAt}::timestamptz))) as time_diff
+  FROM products p
+  WHERE p.id != ${productId}::uuid
+    AND p."isActive" = true
+    AND p."deletedAt" IS NULL
+    AND p."categoryId" = ANY(${siblingCategoryIds}::uuid[])
+  ORDER BY time_diff ASC
+  LIMIT ${limit}
+`;
+
+  if (sameCategory.length >= limit) {
+    // Fetch đầy đủ data, giữ thứ tự time_diff
+    const ids = sameCategory.map((p) => p.id);
+    const fullData = await prisma.products.findMany({
+      where: { id: { in: ids } },
+      select: selectProductCard,
+    });
+    const idOrder = new Map(ids.map((id, i) => [id, i]));
+    return fullData.sort((a, b) => (idOrder.get(a.id) ?? 99) - (idOrder.get(b.id) ?? 99));
+  }
+
+  // Chưa đủ → mở rộng lên grandparent
+  const remaining = limit - sameCategory.length;
+  const existingIds = new Set([productId, ...sameCategory.map((p) => p.id)]);
+
+  let expandedCategoryIds: string[] = [];
+  if (grandParentId || parentId) {
+    const expandedScope = await prisma.$queryRaw<{ id: string }[]>`
+      WITH RECURSIVE descendants AS (
+        SELECT id FROM categories
+        WHERE id = ${grandParentId ?? parentId}::uuid AND "deletedAt" IS NULL
+        UNION ALL
+        SELECT c.id FROM categories c
+        JOIN descendants d ON c."parentId" = d.id
+        WHERE c."deletedAt" IS NULL
+      )
+      SELECT id FROM descendants
+    `;
+    expandedCategoryIds = expandedScope.map((r) => r.id).filter((id) => !siblingCategoryIds.includes(id));
+  }
+
+  let expandedRaw: { id: string }[] = [];
+
+  if (expandedCategoryIds.length > 0) {
+    expandedRaw = await prisma.$queryRaw<{ id: string }[]>`
+  SELECT p.id,
+         ABS(EXTRACT(EPOCH FROM (p."createdAt" - ${productCreatedAt}::timestamptz))) as time_diff
+  FROM products p
+  WHERE p.id != ALL(${Array.from(existingIds)}::uuid[])
+    AND p."isActive" = true
+    AND p."deletedAt" IS NULL
+    AND (
+      p."categoryId" = ANY(${expandedCategoryIds}::uuid[])
+      OR p."brandId" = ${product.brandId}::uuid
+    )
+  ORDER BY time_diff ASC
+  LIMIT ${remaining}
+`;
+  } else {
+    expandedRaw = await prisma.$queryRaw<{ id: string }[]>`
+  SELECT p.id,
+         ABS(EXTRACT(EPOCH FROM (p."createdAt" - ${productCreatedAt}::timestamptz))) as time_diff
+  FROM products p
+  WHERE p.id != ALL(${Array.from(existingIds)}::uuid[])
+    AND p."isActive" = true
+    AND p."deletedAt" IS NULL
+    AND p."brandId" = ${product.brandId}::uuid
+  ORDER BY time_diff ASC
+  LIMIT ${remaining}
+`;
+  }
+
+  const allIds = [...sameCategory.map((p) => p.id), ...expandedRaw.map((p) => p.id)];
+
+  if (allIds.length === 0) return [];
+
+  const fullData = await prisma.products.findMany({
+    where: { id: { in: allIds } },
     select: selectProductCard,
-    take: limit,
-    orderBy: { viewsCount: "desc" },
   });
+
+  // Giữ thứ tự theo time_diff
+  const idOrder = new Map(allIds.map((id, i) => [id, i]));
+  return fullData.sort((a, b) => (idOrder.get(a.id) ?? 99) - (idOrder.get(b.id) ?? 99));
 };
 
 export const getProductIdsFromPromotions = async (date: Date): Promise<{ productIds: Set<string>; promotions: any[] }> => {
@@ -1089,7 +1261,7 @@ export const getProductIdsFromPromotions = async (date: Date): Promise<{ product
       isActive: true,
       AND: [{ OR: [{ startDate: null }, { startDate: { lte: date } }] }, { OR: [{ endDate: null }, { endDate: { gte: date } }] }],
     },
-    include: { targets: true },
+    include: { targets: true }, // targets đã include targetCode, targetValue
   });
 
   for (const promotion of activePromotions) {
@@ -1115,6 +1287,24 @@ export const getProductIdsFromPromotions = async (date: Date): Promise<{ product
           select: { id: true },
         });
         products.forEach((p) => productIds.add(p.id));
+      } else if (target.targetType === "ATTRIBUTE" && target.targetCode && target.targetValue) {
+        // ← NEW
+        const matchingVariants = await prisma.products_variants.findMany({
+          where: {
+            isActive: true,
+            deletedAt: null,
+            variantAttributes: {
+              some: {
+                attributeOption: {
+                  value: { equals: target.targetValue, mode: "insensitive" },
+                  attribute: { code: { equals: target.targetCode, mode: "insensitive" } },
+                },
+              },
+            },
+          },
+          select: { productId: true },
+        });
+        matchingVariants.forEach((v) => productIds.add(v.productId));
       }
     }
   }
@@ -1577,6 +1767,7 @@ export const findTrendingSearchSuggestions = async (
  * Chỉ lấy metadata promotion theo ngày, KHÔNG lấy products.
  * FE dùng để render calendar — khi click vào ngày mới gọi findProductsOnSaleDate.
  */
+const toVNDateStr = (d: Date): string => d.toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
 export const findSaleScheduleDays = async (
   startDate: Date,
   endDate: Date,
@@ -1604,10 +1795,14 @@ export const findSaleScheduleDays = async (
     where: {
       isActive: true,
       deletedAt: null,
+      startDate: { not: null },
+      endDate: { not: null },
+      targets: {
+        some: { targetType: "PRODUCT" }, // ← chỉ lấy promotion có target PRODUCT
+      },
       OR: [
-        // Promotions giao với khoảng [startDate, endDate]
         {
-          AND: [{ OR: [{ startDate: null }, { startDate: { lte: endDate } }] }, { OR: [{ endDate: null }, { endDate: { gte: startDate } }] }],
+          AND: [{ startDate: { lte: endDate } }, { endDate: { gte: startDate } }],
         },
       ],
     },
@@ -1644,7 +1839,7 @@ export const findSaleScheduleDays = async (
     last.setHours(0, 0, 0, 0);
 
     while (cur <= last) {
-      const key = cur.toISOString().split("T")[0];
+      const key = toVNDateStr(cur);
       if (!scheduleMap.has(key)) scheduleMap.set(key, []);
       const arr = scheduleMap.get(key)!;
       if (!arr.some((p) => p.id === promo.id)) arr.push(promo);
@@ -1653,13 +1848,15 @@ export const findSaleScheduleDays = async (
     }
   }
 
+  const todayStr = toVNDateStr(new Date());
+
   return Array.from(scheduleMap.entries())
     .map(([date, promos]) => {
       const dateObj = new Date(date);
       dateObj.setHours(0, 0, 0, 0);
       return {
         date,
-        isToday: dateObj.getTime() === today.getTime(),
+        isToday: date === todayStr,
         hasActiveSale: promos.length > 0,
         promotions: promos
           .sort((a, b) => b.priority - a.priority)
@@ -1697,6 +1894,7 @@ export const findProductsOnSaleDate = async (
     limit?: number;
     page?: number;
     categoryId?: string;
+    activeNow?: boolean;
   } = {},
 ): Promise<{
   date: string;
@@ -1715,15 +1913,19 @@ export const findProductsOnSaleDate = async (
   dateStart.setHours(0, 0, 0, 0);
   const dateEnd = new Date(date);
   dateEnd.setHours(23, 59, 59, 999);
-
+  const now = new Date();
   // Tìm promotions active vào ngày đó
   const promotionWhere: any = {
     isActive: true,
     deletedAt: null,
-    OR: [
-      {
-        AND: [{ OR: [{ startDate: null }, { startDate: { lte: dateEnd } }] }, { OR: [{ endDate: null }, { endDate: { gte: dateStart } }] }],
-      },
+    startDate: { not: null },
+    endDate: { not: null },
+    targets: { some: { targetType: "PRODUCT" } },
+    AND: [
+      // Nếu activeNow=true → chỉ lấy promotion đã bắt đầu (startDate <= now)
+      // Nếu không → lấy tất cả overlap với ngày đó
+      { startDate: { lte: options.activeNow ? now : dateEnd } },
+      { endDate: { gte: dateStart } },
     ],
   };
   if (options.promotionId) {
@@ -1738,7 +1940,12 @@ export const findProductsOnSaleDate = async (
       description: true,
       priority: true,
       targets: {
-        select: { targetType: true, targetId: true },
+        select: {
+          targetType: true,
+          targetId: true,
+          targetCode: true,
+          targetValue: true,
+        },
       },
     },
     orderBy: { priority: "desc" },
@@ -1746,7 +1953,7 @@ export const findProductsOnSaleDate = async (
 
   if (activePromotions.length === 0) {
     return {
-      date: date.toISOString().split("T")[0],
+      date: toVNDateStr(date),
       promotions: [],
       products: [],
       total: 0,
@@ -1768,9 +1975,37 @@ export const findProductsOnSaleDate = async (
         includeAll = true;
         break;
       }
-      if (target.targetType === "PRODUCT" && target.targetId) directProductIds.add(target.targetId);
-      if (target.targetType === "CATEGORY" && target.targetId) categoryIds.add(target.targetId);
-      if (target.targetType === "BRAND" && target.targetId) brandIds.add(target.targetId);
+
+      if (target.targetType === "PRODUCT" && target.targetId && isUUID(target.targetId)) {
+        directProductIds.add(target.targetId);
+      }
+
+      if (target.targetType === "CATEGORY" && target.targetId && isUUID(target.targetId)) {
+        categoryIds.add(target.targetId);
+      }
+
+      if (target.targetType === "BRAND" && target.targetId && isUUID(target.targetId)) {
+        brandIds.add(target.targetId);
+      }
+      if (target.targetType === "ATTRIBUTE" && target.targetCode && target.targetValue) {
+        // Query products có variant chứa attribute này
+        const matchingVariants = await prisma.products_variants.findMany({
+          where: {
+            isActive: true,
+            deletedAt: null,
+            variantAttributes: {
+              some: {
+                attributeOption: {
+                  value: { equals: target.targetValue, mode: "insensitive" },
+                  attribute: { code: { equals: target.targetCode, mode: "insensitive" } },
+                },
+              },
+            },
+          },
+          select: { productId: true },
+        });
+        matchingVariants.forEach((v) => directProductIds.add(v.productId));
+      }
     }
     if (includeAll) break;
   }
@@ -1779,9 +2014,11 @@ export const findProductsOnSaleDate = async (
   const productWhere: any = {
     isActive: true,
     deletedAt: null,
-    ...(options.categoryId ? { categoryId: options.categoryId } : {}),
   };
 
+  if (options.categoryId && isUUID(options.categoryId)) {
+    productWhere.categoryId = options.categoryId;
+  }
   if (!includeAll) {
     const orConditions: any[] = [];
     if (directProductIds.size > 0) orConditions.push({ id: { in: Array.from(directProductIds) } });
@@ -1833,6 +2070,13 @@ export const findProductsOnSaleDate = async (
     limit,
     totalPages: Math.ceil(total / limit),
   };
+};
+
+export const findVariantById = async (variantId: string) => {
+  return prisma.products_variants.findFirst({
+    where: { id: variantId, isActive: true, deletedAt: null },
+    select: selectVariant,
+  });
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

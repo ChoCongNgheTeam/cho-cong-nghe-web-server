@@ -1,13 +1,5 @@
 import { DiscountType } from "@prisma/client";
-import {
-  VoucherCard,
-  VoucherDetail,
-  UserVoucher,
-  RawVoucher,
-  TargetType,
-  VoucherListItem,
-  VoucherAvailabilityInput,
-} from "./voucher.types";
+import { VoucherCard, VoucherDetail, UserVoucher, RawVoucher, TargetType, VoucherListItem, VoucherAvailabilityInput } from "./voucher.types";
 
 // Fix BigInt serialization
 (BigInt.prototype as any).toJSON = function () {
@@ -51,6 +43,7 @@ export const transformVoucherCard = (voucher: VoucherListItem): VoucherCard => {
     description: voucher.description ?? undefined,
     discountType: voucher.discountType as DiscountType,
     discountValue: Number(voucher.discountValue),
+    maxDiscountValue: voucher.maxDiscountValue ? Number(voucher.maxDiscountValue) : undefined,
     minOrderValue: Number(voucher.minOrderValue),
     maxUses: voucher.maxUses ?? undefined,
     usesCount: voucher.usesCount,
@@ -72,6 +65,7 @@ export const transformVoucherDetail = (voucher: RawVoucher): VoucherDetail => {
     description: voucher.description ?? undefined,
     discountType: voucher.discountType as DiscountType,
     discountValue: Number(voucher.discountValue),
+    maxDiscountValue: voucher.maxDiscountValue ? Number(voucher.maxDiscountValue) : undefined,
     minOrderValue: Number(voucher.minOrderValue),
     maxUses: voucher.maxUses ?? undefined,
     maxUsesPerUser: voucher.maxUsesPerUser ?? undefined,
@@ -119,16 +113,23 @@ export const transformUserVoucher = (voucher: RawVoucher, userVoucherData?: any)
 };
 
 /**
- * Calculate discount amount
+ * Calculate discount amount.
+ *
+ * @param discountType     DISCOUNT_PERCENT | DISCOUNT_FIXED
+ * @param discountValue    % hoặc số tiền cố định
+ * @param orderTotal       Tổng đơn hàng (để cap DISCOUNT_FIXED)
+ * @param eligibleTotal    Subtotal của các item đủ điều kiện (voucher có target).
+ *                         Nếu undefined → áp dụng toàn đơn (bằng orderTotal).
+ * @param maxDiscountValue Trần giảm tối đa (cho DISCOUNT_PERCENT)
  */
-export const calculateDiscount = (
-  discountType: DiscountType,
-  discountValue: number,
-  orderTotal: number,
-): number => {
+export const calculateDiscount = (discountType: DiscountType, discountValue: number, orderTotal: number, eligibleTotal?: number, maxDiscountValue?: number | null): number => {
+  const base = eligibleTotal ?? orderTotal;
+
   if (discountType === DiscountType.DISCOUNT_PERCENT) {
-    return Math.round((orderTotal * discountValue) / 100);
+    const raw = Math.round((base * discountValue) / 100);
+    return maxDiscountValue ? Math.min(raw, maxDiscountValue) : raw;
   }
-  // DISCOUNT_FIXED
-  return Math.min(discountValue, orderTotal);
+
+  // DISCOUNT_FIXED — không vượt quá base eligible và không vượt quá orderTotal
+  return Math.min(discountValue, base, orderTotal);
 };

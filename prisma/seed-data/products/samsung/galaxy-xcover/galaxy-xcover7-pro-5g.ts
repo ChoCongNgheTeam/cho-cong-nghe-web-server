@@ -16,5 +16,6 @@ export const galaxyXCover7Pro: SeedProductInput = {
   brandName: "Samsung",
   categoryNames: ["Galaxy XCover"],
   isFeatured: false,
+  variantDisplay: "CARD",
   highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
 };

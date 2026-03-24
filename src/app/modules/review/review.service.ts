@@ -1,9 +1,9 @@
 import * as repo from "./review.repository";
-import { moderateReview } from "./review.moderation";
 import { CreateReviewInput, UpdateReviewAdminInput, ListReviewsQuery } from "./review.validation";
 import { NotFoundError, BadRequestError, ForbiddenError } from "@/errors";
 import { ReviewStatus } from "@prisma/client";
 import prisma from "@/config/db";
+import { moderateContent } from "@/services/moderation";
 
 // ── Helper ─────────────────────────────────────────────────────────────────
 
@@ -84,7 +84,7 @@ export const createUserReview = async (userId: string, input: CreateReviewInput)
   // AI moderation nếu có comment
   if (comment) {
     try {
-      const moderation = await moderateReview(comment);
+      const moderation = await moderateContent("review", comment || "");
       if (moderation.approved) {
         await repo.updateReview(review.id, { isApproved: ReviewStatus.APPROVED });
         // Recalculate rating sau khi auto-approve

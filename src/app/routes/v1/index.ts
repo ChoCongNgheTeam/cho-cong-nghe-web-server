@@ -40,6 +40,10 @@ import specificationRouter from "@/app/modules/specifications/specification.rout
 // ===== Chatbot =====
 import { chatbotRoute } from "@/app/modules/chatbot/chatbot.route";
 
+import searchRoutes from "@/app/modules/search/search.route";
+
+import notificationRoutes from "@/app/modules/notification/notification.route";
+
 const router = Router();
 
 // ===== Core & Auth =====
@@ -81,5 +85,11 @@ router.use("/specifications", specificationRouter);
 
 // ===== Chatbot =====
 router.use("/chatbot", chatbotRoute);
+
+// ===== Search =====
+router.use("/search", searchRoutes);
+
+// ===== Notification =====
+router.use("/notifications", notificationRoutes);
 
 export default router;

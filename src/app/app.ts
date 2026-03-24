@@ -8,6 +8,8 @@ import { cleanupRefreshTokens } from "./modules/auth/auth.service";
 import { errorMiddleware } from "./middlewares/error.middleware";
 import { stripeWebhookHandler } from "./modules/payment/payment.controller";
 import { asyncHandler } from "@/utils/async-handler";
+import { initFirebase } from "@/app/modules/integrations/firebase.service";
+import { startJobs } from "@/app/modules/jobs/jobs.bootstrap";
 
 const app = express();
 
@@ -27,6 +29,9 @@ if (process.env.NODE_ENV === "production") {
     });
   });
 }
+
+initFirebase();
+startJobs();
 
 app.post("/api/v1/payments/webhook/stripe", express.raw({ type: "application/json" }), asyncHandler(stripeWebhookHandler));
 

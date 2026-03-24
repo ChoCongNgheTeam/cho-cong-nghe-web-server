@@ -16,5 +16,6 @@ export const pocoF8Pro: SeedProductInput = {
   brandName: "Xiaomi",
   categoryNames: ["Poco Series"],
   isFeatured: true,
+  variantDisplay: "CARD",
   highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
 };

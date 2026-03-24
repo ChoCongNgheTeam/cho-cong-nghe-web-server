@@ -16,5 +16,6 @@ export const xiaomi15T: SeedProductInput = {
   brandName: "Xiaomi",
   categoryNames: ["Xiaomi Series"],
   isFeatured: false,
+  variantDisplay: "CARD",
   highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
 };

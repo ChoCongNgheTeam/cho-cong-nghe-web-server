@@ -3,7 +3,7 @@ import { PrismaClient, categories } from "@prisma/client";
 const CATEGORY_ATTRIBUTE_OVERRIDE: Record<string, string[]> = {
   "dien-thoai": ["color", "storage"],
   "oppo-reno-series": ["storage"],
-  tivi: ["size"],
+  tivi: ["color", "size"],
 };
 
 /**
@@ -11,10 +11,7 @@ const CATEGORY_ATTRIBUTE_OVERRIDE: Record<string, string[]> = {
  * - Nếu category có override → dùng
  * - Không có → tìm cha
  */
-async function resolveAttributeCodes(
-  prisma: PrismaClient,
-  category: categories,
-): Promise<string[]> {
+async function resolveAttributeCodes(prisma: PrismaClient, category: categories): Promise<string[]> {
   let current: categories | null = category;
 
   while (current) {

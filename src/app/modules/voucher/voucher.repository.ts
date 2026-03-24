@@ -15,11 +15,17 @@ const selectVoucherCard = {
   minOrderValue: true,
   maxDiscountValue: true,
   maxUses: true,
+  maxUsesPerUser: true,
   usesCount: true,
   startDate: true,
   endDate: true,
   isActive: true,
+  priority: true,
   createdAt: true,
+  voucherUsers: {
+    select: { id: true },
+    take: 1,
+  },
 };
 
 const selectVoucherDetail = {
@@ -55,6 +61,9 @@ const buildVoucherWhere = (query: ListVouchersQuery, onlyActive = false): Prisma
 
   if (onlyActive) {
     where.isActive = true;
+    // Không trả về voucher chưa bắt đầu hoặc đã hết hạn
+    const now = new Date();
+    where.AND = [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }];
   } else if (query.isActive !== undefined) {
     where.isActive = query.isActive;
   }
@@ -86,8 +95,8 @@ const buildVoucherWhere = (query: ListVouchersQuery, onlyActive = false): Prisma
 export const findAll = async (query: ListVouchersQuery) => {
   const { page, limit, sortBy, sortOrder } = query;
   const skip = (page - 1) * limit;
-  const where = buildVoucherWhere(query);
-
+  const where = buildVoucherWhere(query, true);
+  where.voucherUsers = { none: {} };
   const now = new Date();
   const baseWhere: Prisma.vouchersWhereInput = { deletedAt: null };
 
@@ -165,6 +174,16 @@ export const findUserVouchers = async (userId: string) => {
 export const findUserVoucherUsage = (userId: string, voucherId: string) =>
   prisma.voucher_user.findUnique({
     where: { voucherId_userId: { voucherId, userId } },
+  });
+
+export const hasVoucherUsers = (voucherId: string) =>
+  prisma.voucher_user.count({
+    where: { voucherId },
+  });
+
+export const countVoucherUsage = (userId: string, voucherId: string) =>
+  prisma.voucher_usages.count({
+    where: { userId, voucherId },
   });
 
 export const checkVoucherCode = async (code: string, excludeId?: string) => {

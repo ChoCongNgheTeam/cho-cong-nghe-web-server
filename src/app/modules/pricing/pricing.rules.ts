@@ -6,28 +6,48 @@ import {
   PromotionRuleData,
   VoucherTargetData,
   DisplayPromotion,
+  AppliedDiscount,
+  StackingGroup,
+  StackedPromotionResult,
 } from "./pricing.types";
 import { TargetType, PromotionActionType, DiscountType } from "@prisma/client";
 import { DISCOUNT_CALCULATION } from "./pricing.constants";
+import { formatPromotionDescription } from "./pricing.helpers";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TARGET MATCHING
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Kiểm tra target có áp dụng cho sản phẩm không
+ * isPromotionTargetApplicable
+ *
+ * Priority hierarchy (cao → thấp):
+ *   PRODUCT (100) > FLASH_SALE/ALL (50) > ATTRIBUTE (30) > CATEGORY (20) > BRAND (10) > GLOBAL/ALL (5)
+ *
+ * Promotion priority được set ở promotion.priority, không ở đây.
+ * Hàm này chỉ check: target có match variant này không?
  */
-export const isPromotionTargetApplicable = (
-  target: PromotionTargetData,
-  productId: string,
-  brandId?: string,
-  context?: PricingContext,
-): boolean => {
+export const isPromotionTargetApplicable = (target: PromotionTargetData, productId: string, brandId?: string, context?: PricingContext): boolean => {
   switch (target.targetType) {
     case TargetType.PRODUCT:
+      // targetId = product UUID
       return target.targetId === productId;
 
     case TargetType.CATEGORY:
-      return !!target.targetId && context?.categoryPath?.includes(target.targetId) === true;
+      // targetId = category UUID — match bất kỳ node nào trong categoryPath (bao gồm ancestors)
+      return !!target.targetId && (context?.categoryPath?.includes(target.targetId) ?? false);
 
     case TargetType.BRAND:
-      return brandId ? target.targetId === brandId : false;
+      // targetId = brand UUID
+      return !!brandId && target.targetId === brandId;
+
+    case TargetType.ATTRIBUTE: {
+      // targetCode = attribute code (e.g. "storage")
+      // targetValue = attribute value (e.g. "128GB") — case-insensitive match
+      if (!target.targetCode || !target.targetValue) return false;
+      const attrs = context?.variantAttributes ?? [];
+      return attrs.some((a) => a.code.toLowerCase() === target.targetCode!.toLowerCase() && a.value.toLowerCase() === target.targetValue!.toLowerCase());
+    }
 
     case TargetType.ALL:
       return true;
@@ -37,9 +57,10 @@ export const isPromotionTargetApplicable = (
   }
 };
 
-/**
- * Kiểm tra promotion có valid không (time-based và usage limit)
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// PROMOTION VALIDITY
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const isPromotionValid = (promotion: PromotionData, context?: PricingContext): boolean => {
   if (!promotion.isActive) return false;
 
@@ -49,84 +70,46 @@ export const isPromotionValid = (promotion: PromotionData, context?: PricingCont
     if (promotion.endDate && now > promotion.endDate) return false;
   }
 
-  // Check usage limit
-  if (promotion.usageLimit && promotion.usedCount >= promotion.usageLimit) {
-    return false;
-  }
+  if (promotion.usageLimit && promotion.usedCount >= promotion.usageLimit) return false;
 
   return true;
 };
 
-/**
- * Lấy các rule áp dụng được cho sản phẩm (WITH quantity check)
- * Trả về các rule của promotion nếu có ít nhất 1 target match
- */
-export const getApplicablePromotionRules = (
-  promotion: PromotionData,
-  productId: string,
-  quantity: number,
-  brandId?: string,
-  context?: PricingContext,
-): PromotionRuleData[] => {
-  // Check promotion validity
-  if (!isPromotionValid(promotion, context)) {
-    return [];
-  }
+// ─────────────────────────────────────────────────────────────────────────────
+// APPLICABLE RULES (with quantity check — for cart/apply)
+// ─────────────────────────────────────────────────────────────────────────────
 
-  // Check if ANY target applies to this product
-  const hasApplicableTarget = promotion.targets.some((target) =>
-    isPromotionTargetApplicable(target, productId, brandId, context),
-  );
+export const getApplicablePromotionRules = (promotion: PromotionData, productId: string, quantity: number, brandId?: string, context?: PricingContext): PromotionRuleData[] => {
+  if (!isPromotionValid(promotion, context)) return [];
 
-  if (!hasApplicableTarget) {
-    return [];
-  }
+  const hasApplicableTarget = promotion.targets.some((t) => isPromotionTargetApplicable(t, productId, brandId, context));
+  if (!hasApplicableTarget) return [];
 
-  // Filter rules based on quantity requirement
-  const applicableRules = promotion.rules.filter((rule) => {
-    // Check buy quantity requirement
-    if (rule.buyQuantity && quantity < rule.buyQuantity) {
-      return false;
-    }
-
+  return promotion.rules.filter((rule) => {
+    if (rule.buyQuantity && quantity < rule.buyQuantity) return false;
     return true;
   });
-
-  return applicableRules;
 };
 
-/**
- * Lấy TẤT CẢ promotions có thể áp dụng (KHÔNG check quantity)
- * Dùng cho product detail để hiển thị tất cả chương trình
- */
-export const getAllAvailablePromotions = (
-  productId: string,
-  brandId?: string,
-  context?: PricingContext,
-): DisplayPromotion[] => {
+// ─────────────────────────────────────────────────────────────────────────────
+// ALL AVAILABLE PROMOTIONS (no quantity check — for product detail display)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getAllAvailablePromotions = (productId: string, brandId?: string, context?: PricingContext): DisplayPromotion[] => {
   if (!context?.availablePromotions) return [];
 
   const promotions: DisplayPromotion[] = [];
-  const addedPromotionRules = new Set<string>();
+  const addedKeys = new Set<string>();
 
   for (const promotion of context.availablePromotions) {
-    // Check time validity only
-    if (!isPromotionValid(promotion, context)) {
-      continue;
-    }
+    if (!isPromotionValid(promotion, context)) continue;
 
-    // Check if any target applies to this product (NO quantity check)
-    const hasApplicableTarget = promotion.targets.some((target) =>
-      isPromotionTargetApplicable(target, productId, brandId, context),
-    );
-
+    const hasApplicableTarget = promotion.targets.some((t) => isPromotionTargetApplicable(t, productId, brandId, context));
     if (!hasApplicableTarget) continue;
 
-    // Add all rules of this promotion
     for (const rule of promotion.rules) {
-      const ruleKey = `${promotion.id}-${rule.actionType}`;
-
-      if (!addedPromotionRules.has(ruleKey)) {
+      const key = `${promotion.id}-${rule.actionType}`;
+      if (!addedKeys.has(key)) {
         promotions.push({
           id: promotion.id,
           name: promotion.name,
@@ -136,8 +119,7 @@ export const getAllAvailablePromotions = (
           getQuantity: rule.getQuantity,
           discountValue: rule.discountValue ? Number(rule.discountValue) : undefined,
         });
-
-        addedPromotionRules.add(ruleKey);
+        addedKeys.add(key);
       }
     }
   }
@@ -145,9 +127,10 @@ export const getAllAvailablePromotions = (
   return promotions;
 };
 
-/**
- * Tính discount amount từ promotion rule
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// DISCOUNT CALCULATION
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const calculatePromotionRuleDiscount = (
   rule: PromotionRuleData,
   basePrice: number,
@@ -155,32 +138,22 @@ export const calculatePromotionRuleDiscount = (
   maxDiscountValue?: number | null,
 ): { discountAmount: number; applicableQuantity: number } => {
   let discountAmount = 0;
-  let applicableQuantity = quantity;
 
-  // Calculate based on action type
   switch (rule.actionType) {
     case PromotionActionType.DISCOUNT_PERCENT:
       if (rule.discountValue) {
-        discountAmount = DISCOUNT_CALCULATION.DISCOUNT_PERCENT(
-          basePrice * quantity,
-          Number(rule.discountValue),
-          maxDiscountValue ? Number(maxDiscountValue) : undefined,
-        );
+        discountAmount = DISCOUNT_CALCULATION.DISCOUNT_PERCENT(basePrice * quantity, Number(rule.discountValue), maxDiscountValue ? Number(maxDiscountValue) : undefined);
       }
       break;
 
     case PromotionActionType.DISCOUNT_FIXED:
       if (rule.discountValue) {
-        discountAmount = DISCOUNT_CALCULATION.DISCOUNT_FIXED(
-          basePrice * quantity,
-          Number(rule.discountValue),
-        );
+        discountAmount = DISCOUNT_CALCULATION.DISCOUNT_FIXED(basePrice * quantity, Number(rule.discountValue));
       }
       break;
 
     case PromotionActionType.BUY_X_GET_Y:
     case PromotionActionType.GIFT_PRODUCT:
-      // Gift product không giảm giá, chỉ tặng quà
       discountAmount = 0;
       break;
 
@@ -188,187 +161,291 @@ export const calculatePromotionRuleDiscount = (
       break;
   }
 
-  return { discountAmount: Math.round(discountAmount), applicableQuantity };
+  return { discountAmount: Math.round(discountAmount), applicableQuantity: quantity };
 };
 
-/**
- * Lấy promotion rule tốt nhất cho sản phẩm
- */
-export const getBestPromotionRule = (
-  productId: string,
-  basePrice: number,
-  quantity: number,
-  categoryPath?: string[],
-  brandId?: string,
-  context?: PricingContext,
-): { promotion: PromotionData; rule: PromotionRuleData } | null => {
-  if (!context?.availablePromotions) return null;
+// ─────────────────────────────────────────────────────────────────────────────
+// BEST PROMOTION SELECTOR
+//
+// Luật chọn:
+//   1. Lấy promotion có discountAmount cao nhất
+//   2. Nếu bằng nhau → promotion có priority NUMBER CAO HƠN thắng
+//      (PRODUCT=100 > FLASH_SALE=50 > ATTRIBUTE=30 > CATEGORY=20 > BRAND=10 > GLOBAL=5)
+//
+// Chỉ 1 promotion được áp dụng per product (MAX_PROMOTIONS_PER_PRODUCT = 1)
+// ─────────────────────────────────────────────────────────────────────────────
 
-  let bestResult: {
+// const PRICE_AFFECTING_ACTIONS: PromotionActionType[] = [PromotionActionType.DISCOUNT_PERCENT, PromotionActionType.DISCOUNT_FIXED];
+
+// export const getBestPromotionRule = (
+//   productId: string,
+//   basePrice: number,
+//   quantity: number,
+//   categoryPath?: string[],
+//   brandId?: string,
+//   context?: PricingContext,
+// ): { promotion: PromotionData; rule: PromotionRuleData } | null => {
+//   if (!context?.availablePromotions) return null;
+
+//   let best: {
+//     promotion: PromotionData;
+//     rule: PromotionRuleData;
+//     discountAmount: number;
+//   } | null = null;
+
+//   for (const promotion of context.availablePromotions) {
+//     const applicableRules = getApplicablePromotionRules(promotion, productId, quantity, brandId, context);
+
+//     for (const rule of applicableRules) {
+//       if (!PRICE_AFFECTING_ACTIONS.includes(rule.actionType)) continue;
+
+//       const { discountAmount } = calculatePromotionRuleDiscount(rule, basePrice, quantity, promotion.maxDiscountValue);
+
+//       if (!best) {
+//         best = { promotion, rule, discountAmount };
+//         continue;
+//       }
+
+//       // Rule 1: higher discount wins
+//       if (discountAmount > best.discountAmount) {
+//         best = { promotion, rule, discountAmount };
+//         continue;
+//       }
+
+//       // Rule 2: tie-break by priority (higher number = more specific = wins)
+//       if (discountAmount === best.discountAmount && promotion.priority > best.promotion.priority) {
+//         best = { promotion, rule, discountAmount };
+//       }
+//     }
+//   }
+
+//   return best ? { promotion: best.promotion, rule: best.rule } : null;
+// };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STACKED PROMOTIONS ENGINE
+// Thay thế getBestPromotionRule — hỗ trợ stack nhiều promotion theo rules
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getStackedPromotions = (productId: string, basePrice: number, quantity: number, categoryPath?: string[], brandId?: string, context?: PricingContext): StackedPromotionResult => {
+  if (!context?.availablePromotions) {
+    return {
+      appliedPromotions: [],
+      availablePromotions: [],
+      finalPrice: basePrice,
+      totalDiscount: 0,
+      discountBreakdown: {},
+      giftProducts: [],
+    };
+  }
+
+  // 1. Lọc promotions applicable + sort priority DESC
+  const candidates: Array<{
     promotion: PromotionData;
     rule: PromotionRuleData;
-    discountAmount: number;
-  } | null = null;
+  }> = [];
 
-  const PRICE_AFFECTING_ACTIONS: PromotionActionType[] = [
-    PromotionActionType.DISCOUNT_PERCENT,
-    PromotionActionType.DISCOUNT_FIXED,
-  ];
-
-  // Check each promotion
   for (const promotion of context.availablePromotions) {
-    const applicableRules = getApplicablePromotionRules(
-      promotion,
-      productId,
-      quantity,
-      brandId,
-      context,
-    );
+    const applicableRules = getApplicablePromotionRules(promotion, productId, quantity, brandId, context);
+    if (applicableRules.length === 0) continue;
 
-    // Find best rule in this promotion
-    for (const rule of applicableRules) {
-      if (!PRICE_AFFECTING_ACTIONS.includes(rule.actionType)) {
-        continue;
-      }
+    // Lấy rule price-affecting đầu tiên (PERCENT/FIXED) để compete
+    // Gift/BuyXGetY xử lý riêng bên dưới
+    const priceRule = applicableRules.find((r) => PRICE_AFFECTING_ACTIONS.includes(r.actionType));
+    if (priceRule) {
+      candidates.push({ promotion, rule: priceRule });
+    }
 
-      const { discountAmount } = calculatePromotionRuleDiscount(
-        rule,
-        basePrice,
-        quantity,
-        promotion.maxDiscountValue,
-      );
-
-      if (!bestResult || discountAmount > bestResult.discountAmount) {
-        bestResult = { promotion, rule, discountAmount };
-      } else if (
-        discountAmount === bestResult.discountAmount &&
-        promotion.priority < bestResult.promotion.priority
-      ) {
-        bestResult = { promotion, rule, discountAmount };
-      }
+    // Gift rules — collect riêng, không compete với price rules
+    const giftRules = applicableRules.filter((r) => r.actionType === PromotionActionType.GIFT_PRODUCT);
+    for (const gr of giftRules) {
+      candidates.push({ promotion, rule: gr });
     }
   }
 
-  return bestResult ? { promotion: bestResult.promotion, rule: bestResult.rule } : null;
+  // Sort priority DESC
+  candidates.sort((a, b) => b.promotion.priority - a.promotion.priority);
+
+  // 2. Build availablePromotions (tất cả applicable — cho UI)
+  const availablePromotions: DisplayPromotion[] = [];
+  const seenAvailable = new Set<string>();
+  let stoppedForAvailable = false;
+
+  for (const { promotion, rule } of candidates) {
+    if (stoppedForAvailable) break;
+
+    if (!seenAvailable.has(promotion.id)) {
+      availablePromotions.push({
+        id: promotion.id,
+        name: promotion.name,
+        description: promotion.description,
+        actionType: rule.actionType,
+        buyQuantity: rule.buyQuantity,
+        getQuantity: rule.getQuantity,
+        discountValue: rule.discountValue ? Number(rule.discountValue) : undefined,
+      });
+      seenAvailable.add(promotion.id);
+    }
+
+    // Nếu EXCLUSIVE → chỉ show promotion đó, dừng
+    if (promotion.applyType === "EXCLUSIVE") {
+      stoppedForAvailable = true;
+    }
+  }
+
+  // 3. Apply stacking logic
+  let currentPrice = basePrice;
+  const appliedPromotions: AppliedDiscount[] = [];
+  const discountBreakdown: Partial<Record<StackingGroup, number>> = {};
+  const usedGroups = new Set<StackingGroup>();
+  const giftProducts: { variantId: string; quantity: number }[] = [];
+  let stopped = false;
+
+  for (const { promotion, rule } of candidates) {
+    if (stopped) break;
+
+    // Gift rules — luôn apply, không tính vào stacking group
+    if (rule.actionType === PromotionActionType.GIFT_PRODUCT) {
+      if (rule.giftProductVariantId && rule.getQuantity) {
+        const sets = rule.buyQuantity ? Math.floor(quantity / rule.buyQuantity) : 1;
+        const giftQty = sets * rule.getQuantity;
+        if (giftQty > 0) {
+          giftProducts.push({
+            variantId: rule.giftProductVariantId,
+            quantity: giftQty,
+          });
+          appliedPromotions.push({
+            type: "PROMOTION",
+            id: promotion.id,
+            name: promotion.name,
+            discountAmount: 0,
+            description: formatPromotionDescription(rule),
+            actionType: rule.actionType,
+            stackingGroup: promotion.stackingGroup,
+          });
+        }
+      }
+      continue;
+    }
+
+    // EXCLUSIVE — apply và dừng hẳn
+    if (promotion.applyType === "EXCLUSIVE") {
+      const { discountAmount } = calculatePromotionRuleDiscount(rule, currentPrice, quantity, promotion.maxDiscountValue);
+      if (discountAmount > 0) {
+        currentPrice = currentPrice - discountAmount / quantity;
+        appliedPromotions.push({
+          type: "PROMOTION",
+          id: promotion.id,
+          name: promotion.name,
+          discountAmount,
+          description: formatPromotionDescription(rule),
+          actionType: rule.actionType,
+          stackingGroup: promotion.stackingGroup,
+        });
+        discountBreakdown[promotion.stackingGroup] = (discountBreakdown[promotion.stackingGroup] ?? 0) + discountAmount;
+      }
+      stopped = true;
+      break;
+    }
+
+    // STACKABLE — check group đã dùng chưa
+    if (usedGroups.has(promotion.stackingGroup)) continue;
+
+    const { discountAmount } = calculatePromotionRuleDiscount(rule, currentPrice, quantity, promotion.maxDiscountValue);
+    if (discountAmount <= 0) continue;
+
+    currentPrice = currentPrice - discountAmount / quantity;
+    usedGroups.add(promotion.stackingGroup);
+
+    appliedPromotions.push({
+      type: "PROMOTION",
+      id: promotion.id,
+      name: promotion.name,
+      discountAmount,
+      description: formatPromotionDescription(rule),
+      actionType: rule.actionType,
+      stackingGroup: promotion.stackingGroup,
+    });
+
+    discountBreakdown[promotion.stackingGroup] = (discountBreakdown[promotion.stackingGroup] ?? 0) + discountAmount;
+
+    if (promotion.stopProcessing) {
+      stopped = true;
+      break;
+    }
+  }
+
+  const totalDiscount = basePrice * quantity - currentPrice * quantity;
+
+  return {
+    appliedPromotions,
+    availablePromotions,
+    finalPrice: currentPrice,
+    totalDiscount: Math.round(totalDiscount),
+    discountBreakdown,
+    giftProducts,
+  };
 };
 
-/**
- * Kiểm tra voucher target có áp dụng cho sản phẩm không
- */
-export const isVoucherTargetApplicable = (
-  target: VoucherTargetData,
-  productId: string,
-  categoryId?: string,
-  brandId?: string,
-): boolean => {
+const PRICE_AFFECTING_ACTIONS: PromotionActionType[] = [PromotionActionType.DISCOUNT_PERCENT, PromotionActionType.DISCOUNT_FIXED];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VOUCHER
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const isVoucherTargetApplicable = (target: VoucherTargetData, productId: string, categoryId?: string, brandId?: string): boolean => {
   switch (target.targetType) {
     case TargetType.PRODUCT:
       return target.targetId === productId;
-
     case TargetType.CATEGORY:
       return categoryId ? target.targetId === categoryId : false;
-
     case TargetType.BRAND:
       return brandId ? target.targetId === brandId : false;
-
     case TargetType.ALL:
       return true;
-
     default:
       return false;
   }
 };
 
-/**
- * Kiểm tra voucher có thể áp dụng không
- */
-export const isVoucherValid = (
-  voucher: VoucherData,
-  cartTotal: number,
-  context?: PricingContext,
-): { valid: boolean; error?: string } => {
-  if (!voucher.isActive) {
-    return { valid: false, error: "Voucher không còn hoạt động" };
-  }
+export const isVoucherValid = (voucher: VoucherData, cartTotal: number, context?: PricingContext): { valid: boolean; error?: string } => {
+  if (!voucher.isActive) return { valid: false, error: "Voucher không còn hoạt động" };
 
   const now = context?.currentDate ?? new Date();
 
-  // Check time
-  if (voucher.startDate && now < voucher.startDate) {
-    return { valid: false, error: "Voucher chưa có hiệu lực" };
-  }
-  if (voucher.endDate && now > voucher.endDate) {
-    return { valid: false, error: "Voucher đã hết hạn" };
-  }
+  if (voucher.startDate && now < voucher.startDate) return { valid: false, error: "Voucher chưa có hiệu lực" };
+  if (voucher.endDate && now > voucher.endDate) return { valid: false, error: "Voucher đã hết hạn" };
 
-  // Check min order value
   if (cartTotal < voucher.minOrderValue) {
-    return {
-      valid: false,
-      error: `Đơn hàng tối thiểu ${voucher.minOrderValue.toLocaleString()}đ`,
-    };
+    return { valid: false, error: `Đơn hàng tối thiểu ${voucher.minOrderValue.toLocaleString()}đ` };
   }
 
-  // Check max uses
   if (voucher.maxUses && voucher.usesCount >= voucher.maxUses) {
     return { valid: false, error: "Voucher đã hết lượt sử dụng" };
   }
 
-  // Check user usage limit
-  if (
-    voucher.maxUsesPerUser &&
-    voucher.userUsedCount !== undefined &&
-    voucher.userUsedCount >= voucher.maxUsesPerUser
-  ) {
+  if (voucher.maxUsesPerUser && voucher.userUsedCount !== undefined && voucher.userUsedCount >= voucher.maxUsesPerUser) {
     return { valid: false, error: "Bạn đã dùng hết lượt sử dụng voucher này" };
   }
 
-  // Check user-specific max uses (from voucher_user)
-  if (
-    voucher.userMaxUses !== undefined &&
-    voucher.userUsedCount !== undefined &&
-    voucher.userUsedCount >= voucher.userMaxUses
-  ) {
+  if (voucher.userMaxUses !== undefined && voucher.userUsedCount !== undefined && voucher.userUsedCount >= voucher.userMaxUses) {
     return { valid: false, error: "Bạn đã dùng hết lượt sử dụng voucher này" };
   }
 
   return { valid: true };
 };
 
-/**
- * Tính discount từ voucher cho các items áp dụng được
- */
-export const calculateVoucherDiscount = (
-  voucher: VoucherData,
-  items: Array<{
-    productId: string;
-    categoryPath?: string[];
-    brandId?: string;
-    totalPrice: number;
-  }>,
-): number => {
-  // Filter items that voucher applies to
-  const applicableItems = items.filter((item) =>
-    voucher.targets.some((target) =>
-      isVoucherTargetApplicable(target, item.productId, item.categoryPath?.[0], item.brandId),
-    ),
-  );
+export const calculateVoucherDiscount = (voucher: VoucherData, items: Array<{ productId: string; categoryPath?: string[]; brandId?: string; totalPrice: number }>): number => {
+  const applicableItems = items.filter((item) => voucher.targets.some((t) => isVoucherTargetApplicable(t, item.productId, item.categoryPath?.[0], item.brandId)));
 
   if (applicableItems.length === 0) return 0;
 
-  // Calculate total of applicable items
   const applicableTotal = applicableItems.reduce((sum, item) => sum + item.totalPrice, 0);
 
   let discount = 0;
-
   if (voucher.discountType === DiscountType.DISCOUNT_PERCENT) {
-    discount = DISCOUNT_CALCULATION.DISCOUNT_PERCENT(
-      applicableTotal,
-      Number(voucher.discountValue),
-      voucher.maxDiscountValue ? Number(voucher.maxDiscountValue) : undefined,
-    );
+    discount = DISCOUNT_CALCULATION.DISCOUNT_PERCENT(applicableTotal, Number(voucher.discountValue), voucher.maxDiscountValue ? Number(voucher.maxDiscountValue) : undefined);
   } else {
-    // DISCOUNT_FIXED
     discount = DISCOUNT_CALCULATION.DISCOUNT_FIXED(applicableTotal, Number(voucher.discountValue));
   }
 

@@ -1,6 +1,18 @@
 import { DiscountType, TargetType, PromotionActionType } from "@prisma/client";
 
-// ===== INPUT TYPES =====
+// ─────────────────────────────────────────────────────────────────────────────
+// INPUT TYPES
+// ─────────────────────────────────────────────────────────────────────────────
+export type StackingGroup = "PERCENT" | "FIXED" | "FLASH" | "BANK" | "GIFT";
+export type ApplyType = "STACKABLE" | "EXCLUSIVE";
+/**
+ * Attribute của 1 variant — dùng để match ATTRIBUTE promotion target.
+ * Map từ: variantAttributes[].attributeOption.attribute.code + .value
+ */
+export interface VariantAttributeInput {
+  code: string; // e.g. "storage", "color", "ram"
+  value: string; // e.g. "128GB", "black", "8GB"
+}
 
 export interface PricingProductInput {
   productId: string;
@@ -9,6 +21,8 @@ export interface PricingProductInput {
   quantity: number;
   brandId?: string;
   categoryPath?: string[];
+  /** Attributes của variant — cần để match ATTRIBUTE target */
+  variantAttributes?: VariantAttributeInput[];
 }
 
 export interface PricingContext {
@@ -19,11 +33,14 @@ export interface PricingContext {
 
   categoryPath?: string[];
   brandId?: string;
+  /** Forward từ PricingProductInput */
+  variantAttributes?: VariantAttributeInput[];
 }
 
 export interface PricingContextInput {
   brandId?: string;
   categoryPath?: string[];
+  variantAttributes?: VariantAttributeInput[];
 }
 
 export interface PricingCartInput {
@@ -32,11 +49,10 @@ export interface PricingCartInput {
   userId?: string;
 }
 
-// ===== PROMOTION DATA =====
+// ─────────────────────────────────────────────────────────────────────────────
+// PROMOTION DATA
+// ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Promotion Rule - action để áp dụng
- */
 export interface PromotionRuleData {
   id: string;
   promotionId: string;
@@ -48,18 +64,19 @@ export interface PromotionRuleData {
 }
 
 /**
- * Promotion Target - đối tượng áp dụng
+ * Promotion Target — thêm targetCode + targetValue cho ATTRIBUTE type
  */
 export interface PromotionTargetData {
   id: string;
   promotionId: string;
   targetType: TargetType;
   targetId: string | null;
+  /** ATTRIBUTE: attribute code, e.g. "storage" */
+  targetCode: string | null;
+  /** ATTRIBUTE: attribute value, e.g. "128GB" */
+  targetValue: string | null;
 }
 
-/**
- * Promotion đầy đủ với rules và targets
- */
 export interface PromotionData {
   id: string;
   name: string;
@@ -73,12 +90,26 @@ export interface PromotionData {
   usageLimit: number | null;
   usedCount: number;
 
-  // Relations
+  applyType: ApplyType;
+  stackingGroup: StackingGroup;
+  stopProcessing: boolean;
+
   rules: PromotionRuleData[];
   targets: PromotionTargetData[];
 }
 
-// ===== VOUCHER DATA =====
+export interface StackedPromotionResult {
+  appliedPromotions: AppliedDiscount[];
+  availablePromotions: DisplayPromotion[];
+  finalPrice: number;
+  totalDiscount: number;
+  discountBreakdown: Partial<Record<StackingGroup, number>>;
+  giftProducts: { variantId: string; quantity: number }[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VOUCHER DATA
+// ─────────────────────────────────────────────────────────────────────────────
 
 export interface VoucherTargetData {
   id: string;
@@ -102,15 +133,15 @@ export interface VoucherData {
   priority: number;
   isActive: boolean;
 
-  // Relations
   targets: VoucherTargetData[];
 
-  // User-specific data
   userUsedCount?: number;
   userMaxUses?: number;
 }
 
-// ===== OUTPUT TYPES =====
+// ─────────────────────────────────────────────────────────────────────────────
+// OUTPUT TYPES
+// ─────────────────────────────────────────────────────────────────────────────
 
 export interface AppliedDiscount {
   type: "PROMOTION" | "VOUCHER";
@@ -119,6 +150,7 @@ export interface AppliedDiscount {
   discountAmount: number;
   description: string;
   actionType?: PromotionActionType | DiscountType;
+  stackingGroup?: StackingGroup;
 }
 
 export interface DisplayPromotion {
@@ -126,15 +158,9 @@ export interface DisplayPromotion {
   name: string;
   description: string | null;
   actionType: PromotionActionType | DiscountType;
-
-  // chỉ để hiển thị điều kiện
   buyQuantity?: number | null;
   getQuantity?: number | null;
-
-  // chỉ có với discount
   discountValue?: number;
-
-  // UI dùng để show "đã áp dụng / chưa"
   isApplicable?: boolean;
 }
 
@@ -143,48 +169,35 @@ export interface PricedProduct {
   variantId: string;
   quantity: number;
 
-  // Prices
   basePrice: number;
   finalPrice: number;
   totalBasePrice: number;
   totalFinalPrice: number;
   totalDiscount: number;
 
-  // Applied promotions
   appliedPromotions: AppliedDiscount[];
   availablePromotions: DisplayPromotion[];
 
-  // Gifts (if any)
-  giftProducts?: {
-    variantId: string;
-    quantity: number;
-  }[];
+  giftProducts?: { variantId: string; quantity: number }[];
 
-  // Metadata
   hasPromotion: boolean;
   discountPercentage: number;
+  discountBreakdown?: Partial<Record<StackingGroup, number>>;
 }
 
 export interface PricingResult {
   items: PricedProduct[];
 
-  // Summary
   subtotal: number;
   totalPromotionDiscount: number;
   totalVoucherDiscount: number;
   totalDiscount: number;
   finalTotal: number;
 
-  // Applied
   appliedVoucher?: AppliedDiscount;
 
-  // Gifts
-  totalGifts: {
-    variantId: string;
-    quantity: number;
-  }[];
+  totalGifts: { variantId: string; quantity: number }[];
 
-  // Validation
   isValid: boolean;
   errors: string[];
 }

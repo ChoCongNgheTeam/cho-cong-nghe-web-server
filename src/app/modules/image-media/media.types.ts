@@ -19,6 +19,7 @@ export interface Media {
   type: MediaType;
   position: MediaPosition;
   title: string | null;
+  subTitle: string | null;
   imageUrl: string | null;
   linkUrl: string | null;
   order: number;
@@ -36,6 +37,7 @@ export interface RawMedia {
   type: MediaType;
   position: MediaPosition;
   title: string | null;
+  subTitle: string | null;
   imageUrl: string | null;
   linkUrl: string | null;
   order: number;
@@ -48,6 +50,7 @@ export interface CreateMediaInput {
   type: MediaType;
   position: MediaPosition;
   title?: string;
+  subTitle?: string;
   imagePath?: string;
   imageUrl?: string;
   linkUrl?: string;
@@ -59,6 +62,7 @@ export interface UpdateMediaInput {
   type?: MediaType;
   position?: MediaPosition;
   title?: string;
+  subTitle?: string;
   imagePath?: string;
   imageUrl?: string;
   linkUrl?: string;

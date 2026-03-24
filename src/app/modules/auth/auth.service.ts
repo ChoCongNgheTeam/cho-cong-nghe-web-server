@@ -25,6 +25,7 @@ import { sendResetPasswordEmail } from "@/services/email.service";
 import { forgotPasswordRateLimit } from "@/utils/rateLimiter";
 import { Request } from "express";
 import prisma from "prisma/client";
+import { sendWelcomeVoucherNotification } from "@/app/modules/notification/notification.service";
 
 export const register = async (input: RegisterInput) => {
   const { email, password, ...rest } = input;
@@ -40,14 +41,48 @@ export const register = async (input: RegisterInput) => {
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  return createUser({
+  const user = await createUser({
     email: normalizedEmail,
     passwordHash,
     role: "CUSTOMER",
     avatarImage: null,
     ...rest,
   }).catch(handlePrismaError);
+
+  // tạo WELCOME voucher + gửi notification (fire and forget)
+  setImmediate(async () => {
+    try {
+      // Tạo voucher riêng cho user này
+      const welcomeVoucher = await prisma.vouchers.create({
+        data: {
+          code: `WELCOME_${user.id.slice(0, 8).toUpperCase()}`,
+          description: "Voucher chào mừng thành viên mới",
+          discountType: "DISCOUNT_FIXED",
+          discountValue: "100000",
+          minOrderValue: "500000",
+          maxDiscountValue: "100000",
+          maxUses: 1,
+          maxUsesPerUser: 1,
+          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          isActive: true,
+          priority: 10,
+          targets: { create: [{ targetType: "ALL" }] },
+        },
+      });
+
+      await prisma.voucher_user.create({
+        data: { voucherId: welcomeVoucher.id, userId: user.id, maxUses: 1, usedCount: 0 },
+      });
+
+      await sendWelcomeVoucherNotification(user.id, welcomeVoucher.code, 100000);
+    } catch (err) {
+      console.error("[Register] Failed to create welcome voucher:", err);
+    }
+  });
+
+  return user;
 };
+
 export const login = async (input: LoginInput, meta?: { userAgent?: string; ip?: string }) => {
   const { userName, password, rememberMe } = input;
 

@@ -12,5 +12,6 @@ export const lenovoLOQ15IAX9E: SeedProductInput = {
   brandName: "Lenovo",
   categoryNames: ["Lenovo Gaming LOQ"],
   isFeatured: false,
+  variantDisplay: "CARD",
   highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
 };

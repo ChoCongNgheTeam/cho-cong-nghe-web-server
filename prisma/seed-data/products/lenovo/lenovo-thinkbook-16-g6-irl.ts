@@ -12,5 +12,6 @@ export const lenovoThinkBook16G6: SeedProductInput = {
   brandName: "Lenovo",
   categoryNames: ["Lenovo ThinkBook"],
   isFeatured: false,
+  variantDisplay: "CARD",
   highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
 };

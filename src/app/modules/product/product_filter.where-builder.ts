@@ -152,22 +152,80 @@ export const buildOrderBy = (sortBy?: string, sortOrder?: "asc" | "desc"): any =
   // Default: hot products
   return [{ totalSoldCount: "desc" }, { ratingAverage: "desc" }, { createdAt: "desc" }, { id: "asc" }];
 };
+
+export const buildSearchCategoryAndBrandIds = async (
+  keyword: string,
+  prismaClient: any, // truyền prisma instance từ ngoài vào
+): Promise<{ categoryIds: string[]; brandIds: string[] }> => {
+  // Tìm categories match keyword
+  const matchedCats = await prismaClient.categories.findMany({
+    where: {
+      deletedAt: null,
+      OR: [{ name: { contains: keyword, mode: "insensitive" } }, { slug: { contains: keyword, mode: "insensitive" } }],
+    },
+    select: { id: true },
+  });
+
+  // Với mỗi category match → lấy toàn bộ descendants qua CTE
+  const categoryIds: string[] = [];
+  for (const cat of matchedCats) {
+    const rows: { id: string }[] = await prismaClient.$queryRaw`
+      WITH RECURSIVE descendants AS (
+        SELECT id FROM categories WHERE id = ${cat.id}::uuid AND "deletedAt" IS NULL
+        UNION ALL
+        SELECT c.id FROM categories c
+        JOIN descendants d ON c."parentId" = d.id
+        WHERE c."deletedAt" IS NULL
+      )
+      SELECT id FROM descendants
+    `;
+    rows.forEach((r) => categoryIds.push(r.id));
+  }
+
+  // Tìm brands match keyword
+  const matchedBrands = await prismaClient.brands.findMany({
+    where: {
+      deletedAt: null,
+      OR: [{ name: { contains: keyword, mode: "insensitive" } }, { slug: { contains: keyword, mode: "insensitive" } }],
+    },
+    select: { id: true },
+  });
+
+  return {
+    categoryIds: [...new Set(categoryIds)],
+    brandIds: matchedBrands.map((b: any) => b.id),
+  };
+};
+
 // MAIN: buildProductWhere — thay thế hoàn toàn hàm cũ trong product.repository
 //
 // Nhận TOÀN BỘ query object (bao gồm cả dynamic spec_xxx và attr_xxx)
 // Type: Record<string, any> để tương thích với passthrough() schema
-export const buildProductWhere = async (query: Record<string, any>, onlyActive: boolean): Promise<Prisma.productsWhereInput> => {
+export const buildProductWhere = async (
+  query: Record<string, any>,
+  onlyActive: boolean,
+  // NEW: pre-fetched search IDs (truyền từ product.repository.ts)
+  searchMeta?: { categoryIds: string[]; brandIds: string[] },
+): Promise<Prisma.productsWhereInput> => {
   const andConditions: Prisma.productsWhereInput[] = [];
-
   const where: Prisma.productsWhereInput = {};
 
-  //  Active / soft delete
   if (onlyActive) where.isActive = true;
   where.deletedAt = null;
 
-  //  Search
+  // Search — dùng searchMeta nếu có
   if (query.search?.trim()) {
-    where.OR = [{ name: { contains: query.search.trim(), mode: "insensitive" } }, { description: { contains: query.search.trim(), mode: "insensitive" } }];
+    const keyword = query.search.trim();
+    const orConditions: Prisma.productsWhereInput[] = [{ name: { contains: keyword, mode: "insensitive" } }, { description: { contains: keyword, mode: "insensitive" } }];
+
+    if (searchMeta?.categoryIds && searchMeta.categoryIds.length > 0) {
+      orConditions.push({ categoryId: { in: searchMeta.categoryIds } });
+    }
+    if (searchMeta?.brandIds && searchMeta.brandIds.length > 0) {
+      orConditions.push({ brandId: { in: searchMeta.brandIds } });
+    }
+
+    where.OR = orConditions;
   }
 
   //  Category (slug → toàn bộ sub-category IDs)
@@ -178,12 +236,10 @@ export const buildProductWhere = async (query: Record<string, any>, onlyActive: 
     }
   }
 
-  // categoryId override category slug nếu cả 2 cùng có
   if (query.categoryId) {
     where.categoryId = query.categoryId;
   }
 
-  //  Brand (multi-select: ?brandId=a&brandId=b)
   if (query.brandId) {
     const brandIds = toArray(query.brandId as string | string[]);
     if (brandIds.length === 1) {
@@ -193,46 +249,30 @@ export const buildProductWhere = async (query: Record<string, any>, onlyActive: 
     }
   }
 
-  //  isFeatured
   if (query.isFeatured !== undefined) {
     where.isFeatured = query.isFeatured;
   }
 
-  //  Price range — gộp với inStock vào variants.some
-  // Tránh ghi đè nhau (Prisma chỉ cho 1 variants filter)
-  const variantWhere: Prisma.products_variantsWhereInput = {
-    isActive: true,
-  };
-
+  const variantWhere: Prisma.products_variantsWhereInput = { isActive: true };
   if (query.minPrice) variantWhere.price = { gte: query.minPrice };
   if (query.maxPrice) {
-    variantWhere.price = {
-      ...(variantWhere.price as object),
-      lte: query.maxPrice,
-    };
+    variantWhere.price = { ...(variantWhere.price as object), lte: query.maxPrice };
   }
   if (query.inStock) {
     variantWhere.quantity = { gt: 0 };
   }
-
-  // Chỉ add nếu có ít nhất 1 điều kiện ngoài isActive
   const hasVariantFilter = query.minPrice || query.maxPrice || query.inStock;
   if (hasVariantFilter) {
     where.variants = { some: variantWhere };
   }
 
-  //  Rating
   if (query.minRating) {
     where.ratingAverage = { gte: query.minRating };
   }
 
-  //  Dynamic: spec_xxx & attr_xxx
   const { specFilters, attrFilters } = parseDynamicFilters(query);
-
   const specConditions = buildSpecConditions(specFilters);
   const attrConditions = buildAttrConditions(attrFilters);
-
-  // Tất cả dynamic conditions là AND (mỗi filter phải thỏa mãn)
   andConditions.push(...specConditions, ...attrConditions);
 
   if (andConditions.length > 0) {

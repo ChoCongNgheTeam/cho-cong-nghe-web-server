@@ -5,11 +5,9 @@ import { mapPricingToSummary } from "../pricing.helpers";
 export const getBestSellingProductsWithPricing = async (limit: number = 12, userId?: string) => {
   const result = await getBestSellingProducts(limit);
 
-  const productsWithPricing = await Promise.all(
+  return Promise.all(
     result.map(async ({ card, pricingContext }) => {
-      if (!pricingContext) {
-        return { ...card, price: null };
-      }
+      if (!pricingContext) return { ...card, price: null };
 
       const pricing = await getVariantPricing(
         pricingContext.productId,
@@ -18,14 +16,10 @@ export const getBestSellingProductsWithPricing = async (limit: number = 12, user
         pricingContext.brandId,
         pricingContext.categoryPath,
         userId,
+        pricingContext.variantAttributes,
       );
 
-      return {
-        ...card,
-        price: mapPricingToSummary(pricing),
-      };
+      return { ...card, price: mapPricingToSummary(pricing) };
     }),
   );
-
-  return productsWithPricing;
 };

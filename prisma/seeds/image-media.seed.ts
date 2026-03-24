@@ -14,6 +14,7 @@ export async function seedImageMedia(prisma: PrismaClient) {
           type: data.type as MediaType,
           position: data.position as MediaPosition,
           title: data.title,
+          subTitle: data.subTitle,
           imagePath: data.imagePath,
           imageUrl: null, // luôn để null như yêu cầu
           linkUrl: data.linkUrl,
@@ -23,14 +24,9 @@ export async function seedImageMedia(prisma: PrismaClient) {
       });
 
       createdCount++;
-      console.log(
-        `  → Created: ${media.type} - ${media.position} (order ${media.order}) - ${media.title || "No title"}`,
-      );
+      console.log(`  → Created: ${media.type} - ${media.position} (order ${media.order}) - ${media.title || "No title"}`);
     } catch (err) {
-      console.error(
-        `Lỗi khi tạo media: ${data.type} - ${data.position} - order ${data.order}:`,
-        err,
-      );
+      console.error(`Lỗi khi tạo media: ${data.type} - ${data.position} - order ${data.order}:`, err);
       skippedCount++;
     }
   }

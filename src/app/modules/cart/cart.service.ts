@@ -4,20 +4,6 @@ import { mapPricingToSummary } from "../pricing/pricing.helpers";
 import { AddToCartInput, UpdateCartItemInput, LocalStorageCartItem, SyncCartResult, ChangeVariantInput } from "./cart.types";
 import { NotFoundError, BadRequestError } from "@/errors";
 
-export const enrichItemWithPricing = async (item: ReturnType<typeof repo.transformToCartResponse>, userId?: string) => {
-  const fullPricing = await getVariantPricing(item.productId, item.productVariantId, item.unitPrice, item.brandId, item.categoryPath, userId);
-
-  const priceSummary = mapPricingToSummary(fullPricing);
-  const finalPrice = fullPricing.final ?? fullPricing.base;
-
-  return {
-    ...item,
-    price: priceSummary,
-    totalBasePrice: item.unitPrice * item.quantity,
-    totalFinalPrice: finalPrice * item.quantity,
-  };
-};
-
 export const validateCartItemStatus = async (variantId: string, quantity: number) => {
   const variant = await repo.findVariantWithProductById(variantId);
 
@@ -130,9 +116,7 @@ export const changeCartItemVariant = async (userId: string, cartItemId: string, 
   let updatedRaw: any;
 
   if (existingNewVariantItem && existingNewVariantItem.id !== cartItemId) {
-    const newQty = existingNewVariantItem.quantity + input.quantity;
-    const safeQty = Math.min(newQty, check.availableQuantity);
-
+    const safeQty = Math.min(existingNewVariantItem.quantity + input.quantity, check.availableQuantity);
     updatedRaw = await repo.update(existingNewVariantItem.id, {
       quantity: safeQty,
       unitPrice: check.currentPrice,
@@ -147,9 +131,9 @@ export const changeCartItemVariant = async (userId: string, cartItemId: string, 
     });
   }
 
-  // Enrich với pricing trước khi trả về — cùng cấu trúc với getCart
-  const cartResponse = repo.transformToCartResponse(updatedRaw);
-  return enrichItemWithPricing(cartResponse, userId);
+  // ← CHỈ trả về cart response thô, KHÔNG tính pricing
+  // FE sẽ gọi getCart để lấy pricing đầy đủ
+  return repo.transformToCartResponse(updatedRaw);
 };
 
 export const removeFromCart = (userId: string, id: string) => repo.remove(id);

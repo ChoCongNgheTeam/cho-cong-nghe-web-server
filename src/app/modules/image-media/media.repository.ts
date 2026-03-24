@@ -7,6 +7,7 @@ const selectMedia = {
   type: true,
   position: true,
   title: true,
+  subTitle: true,
   imagePath: true,
   imageUrl: true,
   linkUrl: true,
@@ -16,11 +17,7 @@ const selectMedia = {
   updatedAt: true,
 };
 
-const buildMediaWhere = (
-  type?: MediaType,
-  position?: MediaPosition,
-  onlyActive: boolean = false,
-): Prisma.image_mediaWhereInput => {
+const buildMediaWhere = (type?: MediaType, position?: MediaPosition, onlyActive: boolean = false): Prisma.image_mediaWhereInput => {
   const where: Prisma.image_mediaWhereInput = {};
 
   if (onlyActive) {
@@ -68,11 +65,7 @@ export const findByPosition = async (position: MediaPosition, onlyActive: boolea
   });
 };
 
-export const findByTypeAndPosition = async (
-  type: MediaType,
-  position: MediaPosition,
-  onlyActive: boolean = true,
-) => {
+export const findByTypeAndPosition = async (type: MediaType, position: MediaPosition, onlyActive: boolean = true) => {
   const where = buildMediaWhere(type, position, onlyActive);
 
   return prisma.image_media.findMany({

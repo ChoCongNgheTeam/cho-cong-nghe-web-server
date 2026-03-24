@@ -10,6 +10,7 @@ export const transformMedia = (media: any): Media => {
     type: media.type,
     position: media.position,
     title: media.title ?? null,
+    subTitle: media.subTitle ?? null,
     imageUrl: media.imageUrl ?? null,
     linkUrl: media.linkUrl ?? null,
     order: media.order,

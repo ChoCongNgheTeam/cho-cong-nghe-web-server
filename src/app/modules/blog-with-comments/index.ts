@@ -30,10 +30,7 @@ export const getBlogsWithCommentsCount = async (query: ListBlogsQuery) => {
   }
 
   // 3. Get comments count for each blog
-  const commentsCountMap = await commentService.getCommentsCountByTargets(
-    CommentTargetType.BLOG,
-    blogIds,
-  );
+  const commentsCountMap = await commentService.getCommentsCountByTargets(CommentTargetType.BLOG, blogIds);
 
   // 4. Merge data
   const dataWithComments = result.data.map((blog) => ({
@@ -105,10 +102,7 @@ export const getBlogsWithCommentsCountAdmin = async (query: ListBlogsQuery) => {
   }
 
   // 3. Get comments count for each blog (including not approved)
-  const commentsCountMap = await commentService.getCommentsCountByTargets(
-    CommentTargetType.BLOG,
-    blogIds,
-  );
+  const commentsCountMap = await commentService.getCommentsCountByTargets(CommentTargetType.BLOG, blogIds);
 
   // 4. Merge data
   const dataWithComments = result.data.map((blog) => ({
@@ -146,6 +140,7 @@ export const getBlogWithCommentsAdmin = async (
     targetId: blog.id,
     sortBy: "createdAt" as const,
     sortOrder: "desc" as const,
+    includeDeleted: false,
   };
 
   const comments = await commentService.getCommentsAdmin(commentsQuery);

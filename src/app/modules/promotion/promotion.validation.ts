@@ -15,24 +15,18 @@ export const PromotionActionTypeEnum = z.enum(["DISCOUNT_PERCENT", "DISCOUNT_FIX
 const queryBoolean = z.preprocess((v) => (v === "true" ? true : v === "false" ? false : v), z.boolean().optional());
 
 export const listPromotionsSchema = z.object({
-  // Pagination
   page: z.coerce.number().positive().default(1),
   limit: z.coerce.number().positive().max(100).default(20),
-
-  // Search & filter
   search: z.string().optional(),
   isActive: queryBoolean,
-  isExpired: queryBoolean,
 
-  // Date range filter (theo createdAt)
+  // ← THÊM: filter theo status rõ ràng
+  status: z.enum(["active", "inactive", "expired", "upcoming"]).optional(),
+
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),
-
-  // Sort
-  sortBy: z.enum(["createdAt", "name", "priority", "startDate", "endDate"]).default("createdAt"),
-  sortOrder: z.enum(["asc", "desc"]).default("desc"),
-
-  // Admin only: xem cả promotion đã soft delete
+  sortBy: z.enum(["createdAt", "name", "priority", "startDate", "endDate"]).default("startDate"), // ← đổi default sang startDate
+  sortOrder: z.enum(["asc", "desc"]).default("asc"), // ← đổi default sang asc để sort theo ngày tăng dần
   includeDeleted: queryBoolean.pipe(z.boolean().optional().default(false)),
 });
 

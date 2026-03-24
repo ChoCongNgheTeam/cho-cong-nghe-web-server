@@ -2,17 +2,12 @@ import { getRecentlyViewedProducts } from "../../product/product.service";
 import { getVariantPricing } from "../pricing.service";
 import { mapPricingToSummary } from "../pricing.helpers";
 
-export const getRecentlyViewedProductsWithPricing = async (
-  productIds: string[],
-  userId?: string,
-) => {
+export const getRecentlyViewedProductsWithPricing = async (productIds: string[], userId?: string) => {
   const result = await getRecentlyViewedProducts(productIds);
 
-  const productsWithPricing = await Promise.all(
+  return Promise.all(
     result.map(async ({ card, pricingContext }) => {
-      if (!pricingContext) {
-        return { ...card, price: null };
-      }
+      if (!pricingContext) return { ...card, price: null };
 
       const pricing = await getVariantPricing(
         pricingContext.productId,
@@ -21,14 +16,10 @@ export const getRecentlyViewedProductsWithPricing = async (
         pricingContext.brandId,
         pricingContext.categoryPath,
         userId,
+        pricingContext.variantAttributes,
       );
 
-      return {
-        ...card,
-        price: mapPricingToSummary(pricing),
-      };
+      return { ...card, price: mapPricingToSummary(pricing) };
     }),
   );
-
-  return productsWithPricing;
 };

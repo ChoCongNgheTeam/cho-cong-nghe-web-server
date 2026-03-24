@@ -12,5 +12,6 @@ export const lenovoIdeaPadSlim5_14IML9: SeedProductInput = {
   brandName: "Lenovo",
   categoryNames: ["Lenovo IdeaPad"],
   isFeatured: false,
+  variantDisplay: "CARD",
   highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
 };

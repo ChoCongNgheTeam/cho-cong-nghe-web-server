@@ -12,5 +12,6 @@ export const lenovoThinkPadX1CarbonGen12: SeedProductInput = {
   brandName: "Lenovo",
   categoryNames: ["Lenovo ThinkPad"],
   isFeatured: false,
+  variantDisplay: "CARD",
   highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
 };

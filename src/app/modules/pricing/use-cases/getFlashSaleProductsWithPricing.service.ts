@@ -2,23 +2,12 @@ import { getFlashSaleProducts } from "../../product/product.service";
 import { getVariantPricing } from "../pricing.service";
 import { mapPricingToSummary } from "../pricing.helpers";
 
-export const getFlashSaleProductsWithPricing = async (
-  date: Date,
-  options: {
-    limit?: number;
-    categoryId?: string;
-  },
-  userId?: string,
-) => {
+export const getFlashSaleProductsWithPricing = async (date: Date, options: { limit?: number; categoryId?: string }, userId?: string) => {
   const result = await getFlashSaleProducts(date, options);
-
-  // console.log(result);
 
   const data = await Promise.all(
     result.data.map(async ({ card, pricingContext }) => {
-      if (!pricingContext) {
-        return { ...card, price: null };
-      }
+      if (!pricingContext) return { ...card, price: null };
 
       const pricing = await getVariantPricing(
         pricingContext.productId,
@@ -27,17 +16,12 @@ export const getFlashSaleProductsWithPricing = async (
         pricingContext.brandId,
         pricingContext.categoryPath,
         userId,
+        pricingContext.variantAttributes,
       );
 
-      return {
-        ...card,
-        price: mapPricingToSummary(pricing),
-      };
+      return { ...card, price: mapPricingToSummary(pricing) };
     }),
   );
 
-  return {
-    ...result,
-    data,
-  };
+  return { ...result, data };
 };

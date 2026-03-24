@@ -49,6 +49,8 @@ const selectPromotionAdmin = {
       id: true,
       targetType: true,
       targetId: true,
+      targetCode: true,
+      targetValue: true,
     },
   },
 } satisfies Prisma.promotionsSelect;
@@ -63,6 +65,9 @@ const selectPromotionDetail = {
   endDate: true,
   minOrderValue: true,
   maxDiscountValue: true,
+  applyType: true,
+  stackingGroup: true,
+  stopProcessing: true,
   usageLimit: true,
   usedCount: true,
   createdAt: true,
@@ -81,6 +86,8 @@ const selectPromotionDetail = {
       id: true,
       targetType: true,
       targetId: true,
+      targetCode: true,
+      targetValue: true,
     },
   },
 } satisfies Prisma.promotionsSelect;
@@ -90,27 +97,44 @@ const selectPromotionDetail = {
 // =====================
 
 const buildPromotionWhere = (query: ListPromotionsQuery, isAdmin: boolean): Prisma.promotionsWhereInput => {
+  const now = new Date();
   const where: Prisma.promotionsWhereInput = {};
 
   if (!isAdmin || !query.includeDeleted) {
     where.deletedAt = null;
   }
 
-  if (query.isActive !== undefined) {
-    where.isActive = query.isActive;
-  }
-
   if (query.search) {
     where.OR = [{ name: { contains: query.search, mode: "insensitive" } }, { description: { contains: query.search, mode: "insensitive" } }];
   }
 
-  if (query.isExpired !== undefined) {
-    const now = new Date();
-    if (query.isExpired) {
-      where.endDate = { lt: now };
-    } else {
-      where.AND = [{ OR: [{ endDate: null }, { endDate: { gte: now } }] }];
+  // ← THAY TOÀN BỘ status filter cũ bằng cái này
+  if (query.status) {
+    switch (query.status) {
+      case "active":
+        // isActive=true + đã bắt đầu + chưa hết hạn
+        where.isActive = true;
+        where.AND = [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }];
+        break;
+
+      case "inactive":
+        where.isActive = false;
+        break;
+
+      case "expired":
+        // endDate đã qua (dù isActive true hay false)
+        where.endDate = { lt: now };
+        break;
+
+      case "upcoming":
+        // isActive=true + startDate chưa tới
+        where.isActive = true;
+        where.startDate = { gt: now };
+        break;
     }
+  } else if (query.isActive !== undefined) {
+    // Fallback nếu FE truyền isActive trực tiếp
+    where.isActive = query.isActive;
   }
 
   if (query.dateFrom || query.dateTo) {
@@ -147,44 +171,56 @@ export const findAllAdmin = async (query: ListPromotionsQuery) => {
   const skip = (page - 1) * limit;
   const where = buildPromotionWhere(query, true);
   const orderBy = buildPromotionOrderBy(query);
-
   const now = new Date();
-  const baseWhere: Prisma.promotionsWhereInput = { deletedAt: null };
+  const base: Prisma.promotionsWhereInput = { deletedAt: null };
 
   const [data, total, activeCount, inactiveCount, expiredCount, upcomingCount] = await prisma.$transaction([
     prisma.promotions.findMany({ where, orderBy, select: selectPromotionAdmin, skip, take: limit }),
     prisma.promotions.count({ where }),
-    // active: isActive=true + chưa hết hạn + đã bắt đầu
+
+    // active: isActive=true + đã bắt đầu + chưa hết hạn
     prisma.promotions.count({
       where: {
-        ...baseWhere,
+        ...base,
         isActive: true,
         AND: [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }],
       },
     }),
-    // inactive: isActive=false
-    prisma.promotions.count({ where: { ...baseWhere, isActive: false } }),
-    // expired: endDate đã qua
-    prisma.promotions.count({ where: { ...baseWhere, endDate: { lt: now } } }),
-    // upcoming: isActive=true + startDate chưa tới
+
+    // inactive: isActive=false (không tính expired)
     prisma.promotions.count({
       where: {
-        ...baseWhere,
-        isActive: true,
-        startDate: { gt: now },
+        ...base,
+        isActive: false,
+        OR: [{ endDate: null }, { endDate: { gte: now } }], // chưa hết hạn
       },
+    }),
+
+    // expired: endDate đã qua
+    prisma.promotions.count({
+      where: { ...base, endDate: { lt: now } },
+    }),
+
+    // upcoming: isActive=true + startDate chưa tới
+    prisma.promotions.count({
+      where: { ...base, isActive: true, startDate: { gt: now } },
     }),
   ]);
 
-  const statusCounts = {
-    ALL: activeCount + inactiveCount,
-    active: activeCount,
-    inactive: inactiveCount,
-    expired: expiredCount,
-    upcoming: upcomingCount,
+  return {
+    data,
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
+    statusCounts: {
+      ALL: total,
+      active: activeCount,
+      inactive: inactiveCount,
+      expired: expiredCount,
+      upcoming: upcomingCount,
+    },
   };
-
-  return { data, page, limit, total, totalPages: Math.ceil(total / limit), statusCounts };
 };
 
 export const findById = async (id: string, options: { includeDeleted?: boolean; isAdmin?: boolean } = {}) => {
@@ -378,6 +414,9 @@ export const getActivePromotions = async () => {
     maxDiscountValue: promo.maxDiscountValue ? Number(promo.maxDiscountValue) : null,
     usageLimit: promo.usageLimit,
     usedCount: promo.usedCount,
+    applyType: promo.applyType,
+    stackingGroup: promo.stackingGroup,
+    stopProcessing: promo.stopProcessing,
     rules: promo.rules.map((r) => ({
       id: r.id,
       promotionId: promo.id,
@@ -392,6 +431,8 @@ export const getActivePromotions = async () => {
       promotionId: promo.id,
       targetType: t.targetType,
       targetId: t.targetId,
+      targetCode: t.targetCode,
+      targetValue: t.targetValue,
     })),
   }));
 };
