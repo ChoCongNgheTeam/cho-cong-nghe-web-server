@@ -953,7 +953,7 @@ export const findSearchSuggestions = async (keyword: string, options: { limit?: 
     where: {
       isActive: true,
       deletedAt: null,
-      name: { contains: keyword.trim(), mode: "insensitive" },
+      OR: [{ name: { contains: keyword.trim(), mode: "insensitive" } }, { slug: { contains: keyword.trim(), mode: "insensitive" } }],
       ...(categoryIds && { categoryId: { in: categoryIds } }),
     },
     select: {

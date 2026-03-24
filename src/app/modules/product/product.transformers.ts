@@ -124,7 +124,7 @@ const buildAvailableOptionsWithStatus = (variants: RawVariant[], colorImages: an
  *
  * Trả về AvailableOption[] với type = "bundle" để FE phân biệt mode.
  */
-const buildVariantBundles = (variants: RawVariant[], selectedVariantId: string): AvailableOption[] => {
+const buildVariantBundles = (variants: RawVariant[], selectedVariantId: string, colorImages: any[]): AvailableOption[] => {
   const BUNDLE_ATTR_ORDER = ["ram", "storage", "gpu", "capacity_cooling", "capacity_washing", "capacity_fridge", "connection"];
 
   const bundleValues = variants
@@ -142,8 +142,8 @@ const buildVariantBundles = (variants: RawVariant[], selectedVariantId: string):
       const label = labelParts.length > 0 ? labelParts.join(" / ") : v.code || v.id;
 
       return {
-        id: v.id, // dùng variantId làm id để FE navigate
-        value: v.id, // value = variantId
+        id: v.id,
+        value: v.id,
         label,
         enabled: v.isActive,
         selected: v.id === selectedVariantId,
@@ -152,7 +152,40 @@ const buildVariantBundles = (variants: RawVariant[], selectedVariantId: string):
       };
     });
 
-  return [{ type: "bundle", values: bundleValues }];
+  const result: AvailableOption[] = [{ type: "bundle", values: bundleValues }];
+
+  // Thêm color selector riêng nếu có nhiều màu khác nhau
+  // (hoặc chỉ 1 màu — vẫn render để user biết đang chọn màu nào)
+  const colorMap = new Map<string, any>();
+  for (const v of variants) {
+    if (!v.isActive) continue;
+    const colorAttr = v.variantAttributes.find((va) => va.attributeOption.attribute.code === "color");
+    if (colorAttr && !colorMap.has(colorAttr.attributeOption.value)) {
+      const colorVal = colorAttr.attributeOption.value;
+      const colorImg = colorImages.find((img: any) => img.color === colorVal) ?? null;
+      colorMap.set(colorVal, {
+        id: colorAttr.attributeOption.id,
+        value: colorVal,
+        label: colorAttr.attributeOption.label,
+        enabled: true,
+        image: colorImg
+          ? {
+              id: colorImg.id,
+              color: colorImg.color,
+              imageUrl: colorImg.imageUrl || "",
+              altText: colorImg.altText || "",
+              position: colorImg.position,
+            }
+          : null,
+      });
+    }
+  }
+
+  if (colorMap.size > 0) {
+    result.push({ type: "color", values: Array.from(colorMap.values()) });
+  }
+
+  return result;
 };
 
 export const calculateOverallStockStatus = (variants: RawVariant[]): "in_stock" | "low_stock" | "out_of_stock" | "pre_order" => {
@@ -244,7 +277,7 @@ export const transformProductDetail = (product: any, reviewStats?: ReviewStats):
 
   let availableOptions: AvailableOption[];
   if (isBundleMode) {
-    availableOptions = buildVariantBundles(validVariants, currentVariant.id);
+    availableOptions = buildVariantBundles(validVariants, currentVariant.id, product.img || []);
   } else {
     const selectedOptions: Record<string, string> = {};
     for (const va of currentVariant.variantAttributes) {
@@ -307,7 +340,7 @@ export const transformProductVariantResponse = (product: any, variant: RawVarian
 
   let availableOptions: AvailableOption[];
   if (isBundleMode) {
-    availableOptions = buildVariantBundles(validVariants, variant.id);
+    availableOptions = buildVariantBundles(validVariants, variant.id, product.img || []);
   } else {
     const selectedOptions: Record<string, string> = {};
     for (const va of variant.variantAttributes) {
