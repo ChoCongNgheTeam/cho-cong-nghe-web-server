@@ -8,5 +8,5 @@ export const nintendoSwitchOled: SeedProductInput = {
   categoryNames: ["Thiết bị chơi game"],
   isFeatured: true,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "screen_size" }, { key: "rom_capacity" }, { key: "battery_life" }],
 };

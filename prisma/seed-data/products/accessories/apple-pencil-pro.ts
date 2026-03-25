@@ -8,5 +8,5 @@ export const applePencilPro: SeedProductInput = {
   categoryNames: ["Bút cảm ứng"],
   isFeatured: true,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "bluetooth_version" }, { key: "battery_life" }, { key: "water_resistance" }],
 };

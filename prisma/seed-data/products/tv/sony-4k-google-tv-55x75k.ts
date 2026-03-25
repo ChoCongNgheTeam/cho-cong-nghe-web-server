@@ -8,5 +8,5 @@ export const sony4KGoogleTv55X75K: SeedProductInput = {
   categoryNames: ["Tivi 4K"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "tivi_screen_size" }, { key: "tivi_screen_tech" }, { key: "tivi_refresh_rate" }],
 };

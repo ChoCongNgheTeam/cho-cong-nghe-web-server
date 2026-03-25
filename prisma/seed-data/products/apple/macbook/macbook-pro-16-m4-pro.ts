@@ -19,5 +19,5 @@ export const macbookPro16M4Pro: SeedProductInput = {
   categoryNames: ["MacBook Pro 16 inch"],
   isFeatured: true,
   variantDisplay: "CARD",
-  highlights: [{ key: "chip_m4_pro" }, { key: "xdr_display" }, { key: "six_speaker" }],
+  highlights: [{ key: "laptop_cpu_version" }, { key: "laptop_ram_capacity" }, { key: "laptop_gpu_model" }],
 };

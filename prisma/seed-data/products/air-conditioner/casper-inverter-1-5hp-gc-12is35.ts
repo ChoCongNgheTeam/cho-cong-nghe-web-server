@@ -12,5 +12,5 @@ export const casperInverter15_GC12IS35: SeedProductInput = {
   brandName: "Casper",
   categoryNames: ["Máy lạnh - Điều hòa Inverter"],
   isFeatured: true,
-  highlights: [{ key: "inverter_tech" }, { key: "energy_label" }, { key: "cooling_capacity" }],
+  highlights: [{ key: "ac_capacity_hp" }, { key: "ac_inverter" }, { key: "ac_room_size" }],
 };

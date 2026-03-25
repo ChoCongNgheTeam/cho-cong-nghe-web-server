@@ -8,5 +8,5 @@ export const candyNgungTu9kg: SeedProductInput = {
   categoryNames: ["Sấy ngưng tụ"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "wash_capacity" }, { key: "wash_dry_type" }, { key: "wash_power_consumption" }],
 };

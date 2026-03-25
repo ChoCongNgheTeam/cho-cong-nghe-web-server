@@ -7,5 +7,5 @@ export const sanaky1Ngan100L: SeedProductInput = {
   categoryNames: ["Tủ đông"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "fridge_capacity" }, { key: "fridge_freezer_capacity" }, { key: "fridge_no_frost" }],
 };

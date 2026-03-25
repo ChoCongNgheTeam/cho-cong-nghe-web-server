@@ -13,5 +13,5 @@ export const macbookPro16M5Pro: SeedProductInput = {
   categoryNames: ["MacBook Pro 16 inch"],
   isFeatured: true,
   variantDisplay: "CARD",
-  highlights: [{ key: "chip_m5_max" }, { key: "max_performance" }, { key: "pro_audio" }],
+  highlights: [{ key: "laptop_cpu_version" }, { key: "laptop_ram_capacity" }, { key: "laptop_gpu_model" }],
 };

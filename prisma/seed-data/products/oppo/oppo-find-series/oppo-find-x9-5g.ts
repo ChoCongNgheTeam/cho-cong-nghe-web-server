@@ -23,5 +23,5 @@ export const oppoFindX9: SeedProductInput = {
   categoryNames: ["OPPO Find Series"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "cpu_type" }, { key: "ram_capacity" }, { key: "rear_cam_1" }],
 };

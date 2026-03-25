@@ -17,5 +17,5 @@ export const galaxyZFlip7: SeedProductInput = {
   categoryNames: ["Galaxy AI"],
   isFeatured: true,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "cpu_type" }, { key: "fold_cover_screen_size" }, { key: "battery_capacity" }],
 };

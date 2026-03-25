@@ -8,5 +8,5 @@ export const logitechC922Pro: SeedProductInput = {
   categoryNames: ["Webcam"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "charging_port" }, { key: "bluetooth_version" }, { key: "weight" }],
 };

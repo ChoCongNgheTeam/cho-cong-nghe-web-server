@@ -8,5 +8,5 @@ export const hpEnvyX36014Fa0045au: SeedProductInput = {
   categoryNames: ["HP Envy"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "laptop_cpu_version" }, { key: "laptop_ram_capacity" }, { key: "laptop_battery_life" }],
 };

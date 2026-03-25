@@ -8,5 +8,5 @@ export const ankerSacDuPhongMagGo10000mah: SeedProductInput = {
   categoryNames: ["Sạc dự phòng"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "battery_capacity" }, { key: "charging_port" }, { key: "weight" }],
 };

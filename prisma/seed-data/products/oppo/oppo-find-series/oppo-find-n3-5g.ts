@@ -18,5 +18,5 @@ export const oppoFindN3: SeedProductInput = {
   categoryNames: ["OPPO Find Series"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "cpu_type" }, { key: "fold_main_screen_size" }, { key: "ram_capacity" }],
 };

@@ -17,5 +17,5 @@ export const pocoM6Pro: SeedProductInput = {
   categoryNames: ["Poco Series"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "inverter_tech" }, { key: "energy_label" }, { key: "cooling_capacity" }],
+  highlights: [{ key: "cpu_type" }, { key: "ram_capacity" }, { key: "battery_capacity" }],
 };

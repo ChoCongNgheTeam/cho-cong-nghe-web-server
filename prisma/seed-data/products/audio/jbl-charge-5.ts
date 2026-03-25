@@ -8,5 +8,5 @@ export const jblCharge5: SeedProductInput = {
   categoryNames: ["Loa Bluetooth"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "battery_capacity" }, { key: "bluetooth_version" }, { key: "water_resistance" }],
 };

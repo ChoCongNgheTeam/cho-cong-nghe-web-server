@@ -12,5 +12,5 @@ export const appleEarPodsLightning_MW: SeedProductInput = {
   brandName: "Apple",
   categoryNames: ["Tai nghe nhét tai"],
   isFeatured: false,
-  highlights: [{ key: "lightning" }, { key: "mic_control" }],
+  highlights: [{ key: "battery_capacity" }, { key: "bluetooth_version" }, { key: "water_resistance" }],
 };

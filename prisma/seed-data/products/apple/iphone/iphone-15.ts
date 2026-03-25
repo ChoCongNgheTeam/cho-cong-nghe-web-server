@@ -91,5 +91,5 @@ export const iphone15: SeedProductInput = {
   brandName: "Apple",
   categoryNames: ["iPhone 15 Series"],
   isFeatured: false,
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "cpu_type" }, { key: "rom_capacity" }, { key: "rear_cam_1" }],
 };

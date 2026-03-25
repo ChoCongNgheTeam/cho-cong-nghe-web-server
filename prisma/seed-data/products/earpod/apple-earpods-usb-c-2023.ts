@@ -12,5 +12,5 @@ export const appleEarPodsUSBC: SeedProductInput = {
   brandName: "Apple",
   categoryNames: ["Tai nghe nhét tai"],
   isFeatured: false,
-  highlights: [{ key: "usb_c" }, { key: "lossless_audio" }, { key: "mic_control" }],
+  highlights: [{ key: "battery_capacity" }, { key: "bluetooth_version" }, { key: "water_resistance" }],
 };

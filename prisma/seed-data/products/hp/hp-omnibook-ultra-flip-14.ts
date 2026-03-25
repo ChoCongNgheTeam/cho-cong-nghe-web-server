@@ -8,5 +8,5 @@ export const hpOmnibookUltraFlip14: SeedProductInput = {
   categoryNames: ["HP Omnibook U/X"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "laptop_cpu_version" }, { key: "laptop_ram_capacity" }, { key: "laptop_battery_life" }],
 };

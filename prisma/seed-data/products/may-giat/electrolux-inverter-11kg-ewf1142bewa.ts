@@ -8,5 +8,5 @@ export const electroluxInverter11kg: SeedProductInput = {
   categoryNames: ["Máy giặt cửa trước"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "wash_capacity" }, { key: "wash_motor_type" }, { key: "wash_spin_speed" }],
 };

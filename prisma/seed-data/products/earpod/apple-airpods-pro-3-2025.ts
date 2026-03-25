@@ -12,5 +12,5 @@ export const appleAirPodsPro3: SeedProductInput = {
   brandName: "Apple",
   categoryNames: ["Tai nghe không dây"],
   isFeatured: true,
-  highlights: [{ key: "anc" }, { key: "spatial_audio" }, { key: "usb_c" }],
+  highlights: [{ key: "battery_capacity" }, { key: "bluetooth_version" }, { key: "water_resistance" }],
 };

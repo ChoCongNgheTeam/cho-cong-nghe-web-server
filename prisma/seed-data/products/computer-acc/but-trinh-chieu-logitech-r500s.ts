@@ -8,5 +8,5 @@ export const logitechR500s: SeedProductInput = {
   categoryNames: ["Bút trình chiếu"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "bluetooth_version" }, { key: "battery_life" }, { key: "weight" }],
 };

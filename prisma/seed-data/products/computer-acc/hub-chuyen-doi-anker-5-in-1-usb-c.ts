@@ -8,5 +8,5 @@ export const ankerHub5in1: SeedProductInput = {
   categoryNames: ["Hub chuyển đổi"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "charging_port" }, { key: "weight" }, { key: "dimensions" }],
 };

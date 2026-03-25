@@ -13,5 +13,5 @@ export const lenovoLegionSlim5_16APH8: SeedProductInput = {
   categoryNames: ["Lenovo Legion Gaming"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "laptop_cpu_version" }, { key: "laptop_gpu_model" }, { key: "laptop_refresh_rate" }],
 };

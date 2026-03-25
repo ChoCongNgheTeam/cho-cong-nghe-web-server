@@ -8,5 +8,5 @@ export const panasonic2ChieuInverterYZ9WKH8: SeedProductInput = {
   categoryNames: ["Máy lạnh - Điều hòa 2 chiều"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "ac_capacity_hp" }, { key: "ac_inverter" }, { key: "ac_room_size" }],
 };

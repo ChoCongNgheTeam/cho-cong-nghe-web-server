@@ -127,5 +127,5 @@ export const iphone13: SeedProductInput = {
   brandName: "Apple",
   categoryNames: ["iPhone 13 Series"],
   isFeatured: false,
-  highlights: [{ key: "cpu_type" }, { key: "gpu_chip" }, { key: "rom_capacity" }],
+  highlights: [{ key: "cpu_type" }, { key: "rom_capacity" }, { key: "screen_size" }],
 };

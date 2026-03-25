@@ -25,15 +25,15 @@ interface CampaignSeedData {
 
 const campaignsData: CampaignSeedData[] = [
   // ────────────────────────────────────────────────
-  // CAMPAIGN-1: Back To Work Setup (22/02 → 05/03)
+  // CAMPAIGN-1: Back To Work Setup (25/03 → 05/04)
   // ────────────────────────────────────────────────
   {
     name: "Sẵn Sàng Trở Lại Công Việc",
     slug: "san-sang-tro-lai-cong-viec",
     type: "EVENT",
     description: "Nâng cấp không gian làm việc chuyên nghiệp. Ưu đãi cực hời cho MacBook, Laptop và các thiết bị ngoại vi giúp tăng hiệu suất tối đa.",
-    startDate: new Date("2026-02-21"),
-    endDate: new Date("2026-03-05"),
+    startDate: new Date("2026-03-25"),
+    endDate: new Date("2026-04-05"),
     isActive: true,
     categoryLinks: [
       { position: 1, imagePath: "campaigns/CAMPAIGN-1_Back-To-Work-Setup/1.png", title: "MacBook Pro", description: "Hiệu năng đồ họa đỉnh cao", categorySlug: "macbook-pro-14-inch" },
@@ -45,69 +45,39 @@ const campaignsData: CampaignSeedData[] = [
   },
 
   // ────────────────────────────────────────────────
-  // CAMPAIGN-2: Deal Sinh Viên (06/03 → 20/03)
+  // CAMPAIGN-2: Deal Sinh Viên (05/04 → 20/04)
   // ────────────────────────────────────────────────
   {
     name: "Deal Sinh Viên",
     slug: "deal-sinh-vien",
     type: "EVENT",
     description: "Combo học tập hoàn hảo cho sinh viên: Laptop mạnh mẽ, phụ kiện tiện lợi với mức giá ưu đãi đặc quyền.",
-    startDate: new Date("2026-03-05"),
-    endDate: new Date("2026-03-20"),
+    startDate: new Date("2026-04-05"),
+    endDate: new Date("2026-04-20"),
     isActive: true,
     categoryLinks: [
-      {
-        position: 6,
-        imagePath: "campaigns/CAMPAIGN-2_Deal-Sinh-Vien/6.png",
-        title: "Laptop Sinh Viên",
-        description: "Người bạn đồng hành tin cậy",
-        categorySlug: "laptop",
-      },
-      {
-        position: 7,
-        imagePath: "campaigns/CAMPAIGN-2_Deal-Sinh-Vien/7.png",
-        title: "Tai Nghe Không Dây",
-        description: "Tập trung học tập mọi nơi",
-        categorySlug: "tai-nghe-khong-day",
-      },
-      {
-        position: 8,
-        imagePath: "campaigns/CAMPAIGN-2_Deal-Sinh-Vien/8.png",
-        title: "Balo, Túi Xách",
-        description: "Thời trang và bền bỉ",
-        categorySlug: "balo-tui-xach",
-      },
-      {
-        position: 9,
-        imagePath: "campaigns/CAMPAIGN-2_Deal-Sinh-Vien/9.png",
-        title: "Chuột Máy Tính",
-        description: "Nhỏ gọn, dễ mang theo",
-        categorySlug: "chuot",
-      },
-      {
-        position: 10,
-        imagePath: "campaigns/CAMPAIGN-2_Deal-Sinh-Vien/10.png",
-        title: "Bàn Phím Rời",
-        description: "Nâng tầm trải nghiệm gõ",
-        categorySlug: "ban-phim",
-      },
+      { position: 1, imagePath: "campaigns/CAMPAIGN-2_Deal-Sinh-Vien/6.png", title: "Laptop Sinh Viên", description: "Người bạn đồng hành tin cậy", categorySlug: "laptop" },
+      { position: 2, imagePath: "campaigns/CAMPAIGN-2_Deal-Sinh-Vien/7.png", title: "Tai Nghe Không Dây", description: "Tập trung học tập mọi nơi", categorySlug: "tai-nghe-khong-day" },
+      { position: 3, imagePath: "campaigns/CAMPAIGN-2_Deal-Sinh-Vien/8.png", title: "Balo, Túi Xách", description: "Thời trang và bền bỉ", categorySlug: "balo-tui-xach" },
+      { position: 4, imagePath: "campaigns/CAMPAIGN-2_Deal-Sinh-Vien/9.png", title: "Chuột Máy Tính", description: "Nhỏ gọn, dễ mang theo", categorySlug: "chuot-2" },
+      { position: 5, imagePath: "campaigns/CAMPAIGN-2_Deal-Sinh-Vien/10.png", title: "Bàn Phím Rời", description: "Nâng tầm trải nghiệm gõ", categorySlug: "ban-phim-2" },
     ],
   },
 
   // ────────────────────────────────────────────────
-  // CAMPAIGN-3: Smartphone Festival (21/03 → 05/04)
+  // CAMPAIGN-3: Smartphone Festival (20/04 → 05/05)
   // ────────────────────────────────────────────────
   {
     name: "Lễ Hội Smartphone",
     slug: "le-hoi-smartphone",
     type: "EVENT",
     description: "Đại tiệc công nghệ di động. Quy tụ những mẫu smartphone hot nhất hiện nay từ các thương hiệu hàng đầu.",
-    startDate: new Date("2026-03-20"),
-    endDate: new Date("2026-04-05"),
+    startDate: new Date("2026-04-20"),
+    endDate: new Date("2026-05-05"),
     isActive: true,
     categoryLinks: [
       { position: 1, imagePath: "campaigns/CAMPAIGN-3_Smartphone-Festival/11.png", title: "Apple iPhone", description: "iPhone 16 & 17 mới nhất", categorySlug: "apple-iphone" },
-      { position: 2, imagePath: "campaigns/CAMPAIGN-3_Smartphone-Festival/12.png", title: "Samsung Galaxy", description: "Trải nghiệm Galaxy AI", categorySlug: "samsung" },
+      { position: 2, imagePath: "campaigns/CAMPAIGN-3_Smartphone-Festival/12.png", title: "Samsung Galaxy", description: "Trải nghiệm Galaxy AI", categorySlug: "galaxy-s-series" },
       { position: 3, imagePath: "campaigns/CAMPAIGN-3_Smartphone-Festival/13.png", title: "Xiaomi Series", description: "Cấu hình mạnh, giá tốt", categorySlug: "xiaomi-series" },
       { position: 4, imagePath: "campaigns/CAMPAIGN-3_Smartphone-Festival/14.png", title: "OPPO Series", description: "Thiết kế thời thượng", categorySlug: "oppo" },
       { position: 5, imagePath: "campaigns/CAMPAIGN-3_Smartphone-Festival/15.png", title: "Galaxy Z Series", description: "Đẳng cấp điện thoại gập", categorySlug: "galaxy-z-series" },
@@ -115,19 +85,19 @@ const campaignsData: CampaignSeedData[] = [
   },
 
   // ────────────────────────────────────────────────
-  // CAMPAIGN-4: Laptop Performance Week (06/04 → 20/04)
+  // CAMPAIGN-4: Laptop Performance Week (05/05 → 20/05)
   // ────────────────────────────────────────────────
   {
     name: "Tuần Lễ Laptop Hiệu Năng",
     slug: "tuan-le-laptop-hieu-nang",
     type: "EVENT",
     description: "Tuần lễ của những 'quái vật' hiệu năng. Những dòng Laptop Gaming và Workstation đỉnh nhất thế giới.",
-    startDate: new Date("2026-04-05"),
-    endDate: new Date("2026-04-20"),
+    startDate: new Date("2026-05-05"),
+    endDate: new Date("2026-05-20"),
     isActive: true,
     categoryLinks: [
       { position: 1, imagePath: "campaigns/CAMPAIGN-4_Laptop-Performance-Week/16.png", title: "Asus ROG", description: "Vũ khí của game thủ", categorySlug: "asus-rog" },
-      { position: 2, imagePath: "campaigns/CAMPAIGN-4_Laptop-Performance-Week/17.png", title: "Lenovo Legion", description: "Hiệu năng thực thụ", categorySlug: "lenovo-legion-gaming" },
+      { position: 2, imagePath: "campaigns/CAMPAIGN-4_Laptop-Performance-Week/17.png", title: "Lenovo Legion", description: "Hiệu năng thực thụ", categorySlug: "lenovo-gaming-loq" },
       { position: 3, imagePath: "campaigns/CAMPAIGN-4_Laptop-Performance-Week/18.png", title: "MacBook Pro", description: "Đỉnh cao đồ họa sáng tạo", categorySlug: "macbook-pro-16-inch" },
       { position: 4, imagePath: "campaigns/CAMPAIGN-4_Laptop-Performance-Week/19.png", title: "Acer Predator", description: "Kẻ săn mồi tốc độ", categorySlug: "acer-predator" },
       { position: 5, imagePath: "campaigns/CAMPAIGN-4_Laptop-Performance-Week/20.png", title: "Dell XPS", description: "Hoàn hảo mọi góc nhìn", categorySlug: "dell-xps" },
@@ -135,15 +105,15 @@ const campaignsData: CampaignSeedData[] = [
   },
 
   // ────────────────────────────────────────────────
-  // CAMPAIGN-5: Sale Điện Máy Gia Đình (21/04 → 10/05)
+  // CAMPAIGN-5: Sale Điện Máy Gia Đình (20/05 → 10/06)
   // ────────────────────────────────────────────────
   {
     name: "Sale Điện Máy Gia Đình",
     slug: "sale-dien-may-gia-dinh",
     type: "SEASONAL",
     description: "Nâng cấp không gian sống với ưu đãi điện máy lớn nhất mùa. Tiết kiệm chi phí cho cả gia đình.",
-    startDate: new Date("2026-04-20"),
-    endDate: new Date("2026-05-10"),
+    startDate: new Date("2026-05-20"),
+    endDate: new Date("2026-06-10"),
     isActive: true,
     categoryLinks: [
       {
@@ -153,7 +123,7 @@ const campaignsData: CampaignSeedData[] = [
         description: "Mát lạnh không gian sống",
         categorySlug: "may-lanh-dieu-hoa-inverter",
       },
-      { position: 2, imagePath: "campaigns/CAMPAIGN-5_Sale-Dien-May-Gia-Dinh/22.png", title: "Tivi Giải Trí", description: "Hình ảnh sống động 4K", categorySlug: "tivi" },
+      { position: 2, imagePath: "campaigns/CAMPAIGN-5_Sale-Dien-May-Gia-Dinh/22.png", title: "Tivi Giải Trí", description: "Hình ảnh sống động 4K", categorySlug: "tivi-4k" },
       { position: 3, imagePath: "campaigns/CAMPAIGN-5_Sale-Dien-May-Gia-Dinh/23.png", title: "Máy Giặt Thông Minh", description: "Chăm sóc sợi vải tối ưu", categorySlug: "may-giat-cua-truoc" },
       { position: 4, imagePath: "campaigns/CAMPAIGN-5_Sale-Dien-May-Gia-Dinh/24.png", title: "Tủ Lạnh Inverter", description: "Thực phẩm tươi ngon lâu hơn", categorySlug: "tu-lanh-inverter" },
       { position: 5, imagePath: "campaigns/CAMPAIGN-5_Sale-Dien-May-Gia-Dinh/25.png", title: "Tủ Đông", description: "Trữ đông chuyên dụng", categorySlug: "tu-dong" },

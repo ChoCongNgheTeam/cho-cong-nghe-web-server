@@ -8,5 +8,5 @@ export const appleCapUsbCToLightning1m: SeedProductInput = {
   categoryNames: ["Sạc, Cáp"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "material" }, { key: "dimensions" }, { key: "water_resistance" }],
 };

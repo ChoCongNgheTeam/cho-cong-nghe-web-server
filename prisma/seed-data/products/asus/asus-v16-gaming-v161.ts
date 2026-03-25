@@ -8,5 +8,5 @@ export const asusV16GamingV161: SeedProductInput = {
   categoryNames: ["Asus ROG"],
   isFeatured: false,
   variantDisplay: "CARD", // Mặc định vào ROG hoặc TUF tùy theo phân khúc Gaming bạn muốn
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "laptop_cpu_version" }, { key: "laptop_gpu_model" }, { key: "laptop_refresh_rate" }],
 };

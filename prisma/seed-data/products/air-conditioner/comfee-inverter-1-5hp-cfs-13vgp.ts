@@ -12,5 +12,5 @@ export const comfeeInverter15_CFS13: SeedProductInput = {
   brandName: "Comfee",
   categoryNames: ["Máy lạnh - Điều hòa Inverter"],
   isFeatured: true,
-  highlights: [{ key: "inverter_tech" }, { key: "energy_label" }, { key: "cooling_capacity" }],
+  highlights: [{ key: "ac_capacity_hp" }, { key: "ac_inverter" }, { key: "ac_room_size" }],
 };

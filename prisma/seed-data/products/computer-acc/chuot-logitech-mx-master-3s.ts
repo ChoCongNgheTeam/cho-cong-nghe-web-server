@@ -7,5 +7,5 @@ export const logitechMxMaster3s: SeedProductInput = {
   categoryNames: ["Chuột"],
   isFeatured: true,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "bluetooth_version" }, { key: "battery_life" }, { key: "charging_port" }],
 };

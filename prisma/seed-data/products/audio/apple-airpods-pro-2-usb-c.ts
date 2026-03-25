@@ -7,5 +7,5 @@ export const appleAirpodsPro2: SeedProductInput = {
   categoryNames: ["Tai nghe không dây"],
   isFeatured: true,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "battery_capacity" }, { key: "bluetooth_version" }, { key: "water_resistance" }],
 };

@@ -8,5 +8,5 @@ export const sharpInverter401L: SeedProductInput = {
   categoryNames: ["Tủ lạnh Inverter"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "fridge_capacity" }, { key: "fridge_inverter" }, { key: "fridge_no_frost" }],
 };

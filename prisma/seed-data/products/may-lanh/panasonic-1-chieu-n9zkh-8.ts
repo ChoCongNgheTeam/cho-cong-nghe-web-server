@@ -8,5 +8,5 @@ export const panasonic1ChieuN9ZKH8: SeedProductInput = {
   categoryNames: ["Máy lạnh - Điều hòa 1 chiều"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "ac_capacity_hp" }, { key: "ac_inverter" }, { key: "ac_room_size" }],
 };

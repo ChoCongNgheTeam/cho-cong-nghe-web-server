@@ -7,5 +7,5 @@ export const appleAdapter20W: SeedProductInput = {
   categoryNames: ["Sạc, Cáp"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "battery_capacity" }, { key: "charging_port" }, { key: "weight" }],
 };

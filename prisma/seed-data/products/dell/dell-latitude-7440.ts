@@ -13,5 +13,5 @@ export const dellLatitude7440: SeedProductInput = {
   categoryNames: ["Dell Latitude"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "laptop_cpu_version" }, { key: "laptop_ram_capacity" }, { key: "laptop_battery_life" }],
 };

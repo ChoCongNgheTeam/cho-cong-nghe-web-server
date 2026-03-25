@@ -8,5 +8,5 @@ export const logitechDeskMat: SeedProductInput = {
   categoryNames: ["Miếng lót chuột"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "material" }, { key: "dimensions" }, { key: "weight" }],
 };

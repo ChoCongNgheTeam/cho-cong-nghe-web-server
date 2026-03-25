@@ -13,5 +13,5 @@ export const galaxyZFold6: SeedProductInput = {
   categoryNames: ["Galaxy AI"],
   isFeatured: true,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "cpu_type" }, { key: "fold_main_screen_size" }, { key: "ram_capacity" }],
 };

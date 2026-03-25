@@ -13,5 +13,5 @@ export const macbookAir15M5: SeedProductInput = {
   categoryNames: ["MacBook Air 15 inch"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "chip_m2" }, { key: "battery_life" }, { key: "no_fan_design" }],
+  highlights: [{ key: "laptop_cpu_version" }, { key: "laptop_ram_capacity" }, { key: "laptop_storage_capacity" }],
 };

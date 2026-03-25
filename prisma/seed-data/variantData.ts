@@ -93,20 +93,17 @@ export const variantData: Record<string, VariantEntry[]> = {
   ],
 
   "iphone-17": [
-    { storage: "128gb", color: "black", price: 46990000, isDefault: true },
-    { storage: "256gb", color: "black", price: 49990000 },
+    { storage: "256gb", color: "black", price: 49990000, isDefault: true },
     { storage: "512gb", color: "black", price: 52990000 },
   ],
 
   "iphone-17-pro": [
-    { storage: "128gb", color: "silver", price: 50990000, isDefault: true },
-    { storage: "256gb", color: "silver", price: 53990000 },
+    { storage: "256gb", color: "silver", price: 53990000, isDefault: true },
     { storage: "512gb", color: "silver", price: 56990000 },
   ],
 
   "iphone-17-pro-max": [
-    { storage: "128gb", color: "orange", price: 53990000, isDefault: true },
-    { storage: "256gb", color: "orange", price: 56990000 },
+    { storage: "256gb", color: "orange", price: 56990000, isDefault: true },
     { storage: "512gb", color: "orange", price: 59990000 },
   ],
 

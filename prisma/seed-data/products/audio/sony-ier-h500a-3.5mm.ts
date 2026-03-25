@@ -8,5 +8,5 @@ export const sonyIerH500a: SeedProductInput = {
   categoryNames: ["Tai nghe nhét tai"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "battery_capacity" }, { key: "bluetooth_version" }, { key: "battery_life" }],
 };

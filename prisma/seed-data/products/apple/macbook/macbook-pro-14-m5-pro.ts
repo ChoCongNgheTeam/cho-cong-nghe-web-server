@@ -13,5 +13,5 @@ export const macbookPro14M5Pro: SeedProductInput = {
   categoryNames: ["MacBook Pro 14 inch"],
   isFeatured: true,
   variantDisplay: "CARD",
-  highlights: [{ key: "chip_m5_pro" }, { key: "xdr_display" }, { key: "thunderbolt5" }],
+  highlights: [{ key: "laptop_cpu_version" }, { key: "laptop_ram_capacity" }, { key: "laptop_gpu_model" }],
 };

@@ -8,5 +8,5 @@ export const mikingCuongLucIphone15ProMax: SeedProductInput = {
   categoryNames: ["Miếng dán màn hình"],
   isFeatured: false,
   variantDisplay: "CARD",
-  highlights: [{ key: "screen_glass" }, { key: "max_brightness" }, { key: "selfie_camera_count" }],
+  highlights: [{ key: "material" }, { key: "dimensions" }, { key: "water_resistance" }],
 };
