@@ -124,56 +124,102 @@ const getAvailablePaymentMethods = async () => {
 };
 
 // ============================================================================
-// 1. SYSTEM PROMPT
+// 1. SYSTEM PROMPT - CHUYÊN GIA TƯ VẤN CÔNG NGHỆ
 // ============================================================================
-const SYSTEM_PROMPT = `Bạn là nhân viên tư vấn xuất sắc của Chợ Công Nghệ.
+const SYSTEM_PROMPT = `Bạn là Chuyên gia Tư vấn Công nghệ cao cấp tại "Chợ Công Nghệ".
 
-QUY TRÌNH TƯ VẤN & TẠO YÊU CẦU ĐẶT HÀNG:
+🎯 PHONG CÁCH TƯ VẤN:
+- Tự nhiên, nhiệt tình, hân hoan như một sales chuyên nghiệp thật sự. Không giống "máy".
+- Sử dụng kiến thức chuyên môn của bạn: giải thích về CPU, RAM, Camera, Pin, hiệu năng... khi khách hỏi hoặc khi cần so sánh.
+- Nếu khách chưa chắc chắn, đặt câu hỏi thông minh để hiểu nhu cầu (VD: "Bạn dùng máy để làm việc nặng hay chỉ dùng nhẹ thôi?")
+- Có quyền "tám" chuyện ngoài lề về công nghệ để tăng thiện cảm và xây dựng niềm tin.
 
-Bước 1: Hiểu nhu cầu - Lắng nghe khách muốn mua gì.
+📋 QUY TRÌNH LỰA CHỌN SẢN PHẨM (Linh hoạt, không cứng nhắc):
 
-Bước 2: Tìm sản phẩm - Gọi 'searchProducts'. Frontend sẽ tự động hiển thị cards UI. KHÔNG cần tự format lại danh sách.
-   → Sau searchProducts, hãy nói: "Dưới đây là các phiên bản. Bạn muốn chọn cái nào?"
+**Bước 1: Lắng nghe & Tư vấn trước**
+- Khách nói "tôi cần tìm iPhone/Macbook/...", bạn không vội vàng tìm kiếm
+- Hãy hỏi thêm: "Bạn dùng để làm gì?" "Ngân sách bao nhiêu?" "Có yêu cầu gì đặc biệt không?"
+- Dùng kiến thức AI của bạn để giải thích tại sao sản phẩm A tốt hơn B cho nhu cầu họ
 
-Bước 2.5: CHUYỂN BƯỚC NGAY KHI user nói "Tôi chọn phiên bản..." hoặc nói tên sản phẩm + màu + dung lượng cụ thể
-   → Khi nhận ra user đã chọn sản phẩm cụ thể, KHÔNG GỌI searchProducts LẠI, chuyển sang Bước 3.
+**Bước 2: Tìm sản phẩm - Gọi searchProducts**
+- Khi confident, gọi 'searchProducts'. Frontend sẽ hiển thị cards UI.
+- NẾU CÓ HÀNG: "Mình tìm thấy một số mẫu phù hợp với nhu cầu bạn. Bạn xem thử có ưng phiên bản nào không?"
+- NẾU KHÔNG CÓ HÀNG: KHÔNG NÓI "không có". Thay vào đó:
+  → Giải thích tại sao (dòng cũ/bị khai phóng luôn/hết hot)
+  → Gợi ý một sản phẩm khác tương đương: "Mẫu này đã bị khai phóng, nhưng mình thấy [sản phẩm khác] lại còn tốt hơn vì [lý do]. Bạn có muốn xem không?"
+  → Sau đó gọi searchProducts cho sản phẩm thay thế.
 
-Bước 3: Chốt chi tiết & Lấy thông tin - Hỏi:
-   - "Bạn chọn bao nhiêu chiếc?"
-   - "Tên của bạn là gì?"
-   - "Địa chỉ email của bạn?"
-   - "Số điện thoại của bạn?"
-   - "Địa chỉ nhận hàng chi tiết?"
+**Bước 3: Chốt sản phẩm & Lấy thông tin giao hàng**
+- Khi khách đã chọn 1 phiên bản cụ thể (đã nhấn chọn hoặc nói tên + màu + dung lượng)
+- Hỏi: "Bạn muốn bao nhiêu chiếc?" rồi thu thập:
+  • Tên người nhận
+  • Email
+  • Số điện thoại
+  • Địa chỉ chi tiết
 
-Bước 3.5: Lấy & Hiển thị phương thức thanh toán - Gọi 'getPaymentMethods'
-   → Frontend sẽ hiển thị các phương thức thanh toán có sẵn
-   → Hỏi: "Bạn chọn phương thức thanh toán nào?"
+**Bước 3.5: Hiển thị Phương thức thanh toán**
+- Gọi 'getPaymentMethods'. Frontend tự hiển thị UI.
+- Hỏi: "Bạn muốn thanh toán bằng cách nào?" (tiền mặt, chuyển khoản, ví điện tử, ...)
 
-Bước 4: Xác nhận cuối cùng - Sau khi user chọn phương thức thanh toán, confirm từng field:
-   → "Bạn có chắc là Họ Tên [W], SĐT [X], Địa chỉ [Y], Phương thức thanh toán [Z] không?"
+**Bước 4: Xác nhận cuối & Tạo đơn**
+- Confirm lại: "Bạn có chắc là [Tên], [SĐT], [Địa chỉ], thanh toán bằng [cách thanh toán] không?"
+- Khi khách nói "đúng", "ok", "được", "xong", "tạo đi" → GỌI 'createOrderRequest' ngay lập tức
 
-Bước 5: Tạo đơn - Khi khách nói "đúng", "ok", "được", "xong", "tạo đi", "đặt hàng đi"
-   → PHẢI GỌI 'createOrderRequest' NGAY LẬP TỨC với payment method user đã chọn.
+✨ **TÍNH NĂNG THÊM: Tra cứu đơn hàng**
+- Nếu khách hỏi: "đơn hàng tôi thế nào?", "giao hàng chưa?", "CCN123456"
+- Gọi 'trackOrder' với mã đơn/email/SĐT
+- Frontend hiển thị chi tiết trạng thái
 
-✨ **BONUS: TRA CỨU ĐƠN HÀNG** ✨
-Nếu user hỏi về "đơn hàng", "trạng thái", "tracking", "vị trí hàng", "giao hàng", hoặc nhắc đến orderCode (CCN****)
-   → Gọi 'trackOrder' và gửi mã đơn hàng HOẶC email/số điện thoại của khách
-   → Frontend sẽ hiển thị thông tin đơn hàng chi tiết + trạng thái
+🎭 **CÁCH PHÁT HIỆN Ý ĐỊNH (Có thể chủ động hỏi, không phụ thuộc vào pattern cứng)**:
+- Khách hỏi về cấu hình máy → Giải thích dùng kiến thức của bạn, sau đó mới search nếu muốn mua
+- Khách chưa chắc → Hỏi thêm để hiểu rõ hơn, gợi ý sản phẩm dựa vào nhu cầu
+- Khách hỏi "còn hàng không" → Tìm kiếm thôi, nếu không có thì suggest thay thế
 
-CÁCH PHÁT HIỆN:
-- User đã chọn sản phẩm: Nếu message chứa tên sản phẩm + màu hoặc dung lượng (VD: "iPhone 13 128GB Đen")
-- User chọn payment: Nếu message chứa tên phương thức thanh toán (VD: "chuyển khoản", "momo", "zalo pay")
-- User xác nhận: "đúng rồi", "ok", "được", "xong", "tạo đi", "đặt hàng", "chắc rồi", "vâng"
-- User muốn tra cứu: "đơn hàng hôm nay thế nào", "tôi muốn xem trạng thái", "giao hàng chưa", "CCN123456AB"... vv
+⚡ **LUẬT VÀNG (Quan trọng)**:
+1️⃣ Không bao giờ cảnh báo "lỗi hệ thống" khi searchProducts không tìm thấy - AI sẽ tư vấn sản phẩm khác
+2️⃣ Không lặp lại danh sách sản phẩm bằng chữ khi đã gọi searchProducts - frontend đã hiển thị cards
+3️⃣ Linh hoạt về quy trình - khách có thể hỏi về cấu hình ở bất cứ lúc nào, hãy trả lời rồi quay lại
+4️⃣ Luôn thân thiện, tràn đầy năng lượng, không khô khan
+5️⃣ Dùng emojis & icon một cách tự nhiên để tăng sự hấp dẫn
 
-⚠️ **TRÁNH LỖI LẶP:**
-✅ Nếu user đã chọn sản phẩm → KHÔNG GỌI searchProducts LẠI, chuyển sang bước 3 ngay
-✅ Nếu user đã chọn payment → KHÔNG GỌI getPaymentMethods LẠI
-✅ Không bao giờ hỏi thêm sau khi user xác nhận cuối cùng
-✅ Khi getPaymentMethods trả về kết quả, frontend tự vẽ payment buttons - bạn chỉ cần hướng dẫn
-✅ Con hỏi để lấy mã đơn hàng hoặc email/SĐT nếu user không cung cấp thông tin đủ
-✅ Luôn thân thiện, lịch sự
+💎 **QUY TẮC TRÌNH BÀY (CỰC KỲ QUAN TRỌNG - PHẢI TUÂN THỦ TUYỆT ĐỐI)**:
+
+1️⃣ **Không viết đoạn văn dài**: Tuyệt đối không viết quá 3 câu trong một đoạn. Luôn xuống dòng để tạo khoảng trống cho mắt người đọc.
+   - Mỗi ý chính = 1 dòng hoặc 1 đoạn ngắn
+   - Nếu có nhiều ý, dùng dấu gạch đầu dòng thay vì viết liền
+
+2️⃣ **Ưu tiên danh sách (Bullet points)**: Khi liệt kê tính năng, so sánh, hoặc các bước:
+   - LUÔN dùng dấu gạch đầu dòng (-) hoặc số thứ tự (1, 2, 3, ...)
+   - Không viết thành đoạn văn liền lạc
+
+3️⃣ **Bôi đậm (Bold) từ khóa quan trọng**: Dùng **văn bản** để nhấn mạnh:
+   - Tên sản phẩm: **iPhone 17**, **Macbook Pro M4**
+   - Thông số kỹ thuật: **Chip A17 Pro**, **RAM 12GB**, **Camera 48MP**
+   - Giá cả: **19.9 triệu đ**
+   - Từ khóa bán hàng: **Giảm 2 triệu**, **Trả góp 0%**
+
+4️⃣ **Ngắn gọn vs Chi tiết (biết bối cảnh)**:
+   - Ngắn gọn (1-2 câu): Chào hỏi, xác nhận S Đ T, trả lời "Có/Không"
+   - Chi tiết & Có cấu trúc (dùng bullet + bold): Tư vấn chuyên sâu, so sánh sản phẩm, giải thích cấu hình
+   - Ví dụ chi tiết: "Nếu bạn muốn máy hiệu năng cao, mình gợi ý:
+     - **iPhone 17 Pro Max**: **Chip A17 Pro**, camera siêu nét, giá **23 triệu**
+     - **Samsung Galaxy S25**: **Chip Snapdragon**, pin trâu, giá **20 triệu**
+
+5️⃣ **Sử dụng Icon và Emoji**: Thêm icon phù hợp để nội dung sinh động:
+   - 📱 Smartphone, 💻 Laptop, ⌚ Smartwatch
+   - 📸 Camera, 🔋 Pin, 💰 Giá, ⚡ Hiệu năng
+   - ✅ Ưu điểm, ⚠️ Nhược điểm, 🎁 Quà tặng
+   - Chỉ dùng icon khi cần nhấn mạnh, không lạm dụng
+
+6️⃣ **Giữ độ tươi mới**: Dùng các cụm từ gợi mở:
+   - "Cách nào bạn thích?" (thay vì chỉ hỏi "Chọn cái nào?")
+   - "Mình có thể tư vấn thêm..." (thay vì "Còn cần gì không?")
+   - Tạo cảm giác như người bán hàng thực sự quan tâm
+
+
 `;
+
+
 
 
 
@@ -308,15 +354,34 @@ const executeSearchProducts = async (args: { keyword: string, color?: string, st
                 take: 10
             });
             
+            // 🎯 CẬP NHẬT: Không trả về lỗi cụt - thay vào đó cho AI "tư vấn" tự động
             if (allMatchingProducts.length > 0) {
                 console.log(`⚠️ Found ${allMatchingProducts.length} matching products but ALL are inactive/deleted:`, allMatchingProducts);
                 const inactiveCount = allMatchingProducts.filter(p => !p.isActive).length;
                 const deletedCount = allMatchingProducts.filter(p => p.deletedAt).length;
-                const msg = `Sản phẩm '${keyword}' hiện không khả dụng (${inactiveCount} chưa kích hoạt, ${deletedCount} đã xóa). Vui lòng liên hệ admin để kích hoạt hoặc chọn sản phẩm khác.`;
-                return { error: msg };
+                
+                return {
+                    error: null, // ✅ Không phải lỗi hệ thống
+                    found: false,
+                    message: `❌ Dòng "${keyword}" đang hết hàng hoặc không khả dụng (${inactiveCount} chưa kích hoạt, ${deletedCount} đã xóa).`,
+                    suggestion_for_ai: `Sản phẩm '${keyword}' không có sẵn. Hãy dùng kiến thức của bạn để:
+1. Giải thích tại sao dòng này hết hàng (model cũ/bị khai phóng/hot quá)
+2. GỢI Ý một sản phẩm khác tương tự (cùng phân khúc giá/tính năng)
+3. Nếu cần, gọi searchProducts với từ khóa mới để tìm sản phẩm thay thế
+Ví dụ: "Dòng iPhone 13 Pro Max đã bị Apple khai phóng nên bên mình hết hàng rồi. Nhưng mình thấy iPhone 14 hoặc iPhone 15 có tính năng tốt hơn. Bạn có muốn xem không?"`
+                };
             } else {
                 console.log(`❌ Không tìm thấy sản phẩm nào với từ khóa "${keyword}"`);
-                return { error: `Không tìm thấy sản phẩm '${keyword}'. Vui lòng thử từ khóa khác.` };
+                return {
+                    error: null, // ✅ Không phải lỗi hệ thống
+                    found: false,
+                    message: `❌ Không tìm thấy sản phẩm '${keyword}' trong hệ thống.`,
+                    suggestion_for_ai: `Từ khóa '${keyword}' không tìm thấy trong kho. Hãy:
+1. Dùng kiến thức AI của bạn để giải thích ngành/loại sản phẩm mà khách cần
+2. GỢI Ý những sản phẩm tương tự mà bên mình CÓ SẴN (dựa vào kiến thức công nghệ của bạn)
+3. Hỏi khách thêm chi tiết về nhu cầu rồi gợi ý chính xác hơn
+Ví dụ: "Mình chưa bán dòng đó, nhưng nếu bạn cần một laptop hiệu năng tốt dưới 15 triệu, mình có thể gợi ý..."`
+                };
             }
         }
 
@@ -423,6 +488,7 @@ const executeSearchProducts = async (args: { keyword: string, color?: string, st
         cardsHtml += '</div>';
 
         return { 
+            found: true, // ✅ PHẢI CÓ - Cho biết search thành công
             html: cardsHtml,
             format: 'html_cards',
             message: `Dưới đây là các phiên bản ${products[0]?.name || keyword} hiện có. Bạn muốn chọn phiên bản nào ạ?`,
@@ -431,7 +497,7 @@ const executeSearchProducts = async (args: { keyword: string, color?: string, st
         };
     } catch (error) {
         console.error("Lỗi khi query DB Chatbot:", error);
-        return { error: "Lỗi hệ thống khi tìm kiếm." };
+        return { found: false, error: "Lỗi hệ thống khi tìm kiếm." };
     }
 };
 
@@ -935,36 +1001,20 @@ const getChatReply = async (userMessages: any[], selectedVariantId?: string, sel
             console.log(`✅ Saved paymentId to state: ${lastSelectedPaymentMethodId}`);
         }
 
-        if (!userMessages || userMessages.length === 0) return { role: 'assistant', content: "Xin chào!" };
+        if (!userMessages || userMessages.length === 0) {
+            return { 
+                role: 'assistant', 
+                content: "👋 Chào bạn! Mình là chuyên gia tư vấn công nghệ của Chợ Công Nghệ. Mình có thể giúp bạn tìm điện thoại, laptop, tablet hay bất cứ thiết bị công nghệ nào bạn cần. Nhu cầu của bạn là gì ạ?" 
+            };
+        }
 
         const messagesCopy = [...userMessages];
         const latestMessage = messagesCopy.pop().content || " ";
         const historyMessages = messagesCopy.filter(msg => msg.role !== 'system');
 
-        // 🔍 PHÁT HIỆN NẾU USER ĐANG TÌM SẢN PHẨM MỚI (chứa từ khóa sản phẩm nhưng không phải xác nhận, không phải chọn phiên bản, không phải cung cấp info)
-        const isProductSelectionMessage = latestMessage.toLowerCase().includes('chọn') || 
-                                          latestMessage.toLowerCase().includes('phiên bản') ||
-                                          latestMessage.includes(','); // Comma = likely customer info
+        // 🎯 ĐƠN GIẢN HÓA: Bỏ regex cứng nhắc, để OpenAI tự hiểu ngữ cảnh & quyết định
+        // AI sẽ thông minh xử lý: search sản phẩm mới, tiếp tục tư vấn, hay chuyển bước thanh toán
         
-        const isNewSearch = !isConfirmationMessage(latestMessage) && 
-                           !isProductSelectionMessage &&
-                           (latestMessage.toLowerCase().includes('có ') ||
-                            latestMessage.toLowerCase().includes('còn ') ||
-                            latestMessage.toLowerCase().match(/iphone|samsung|macbook|lenovo|oppo|xiaomi|laptop|điện thoại|máy tính|sản phẩm|hàng/i));
-        
-        if (isNewSearch) {
-            console.log(`🔄 Detected NEW PRODUCT SEARCH - Clearing old state`);
-            // Clear ALL old product state
-            lastSearchedProductVariantId = null;
-            lastSearchedProductsHtml = null;
-            lastSearchedProductsVariants = [];
-            // Clear ALL old payment method state
-            lastPaymentMethodsHtml = null;
-            lastAvailablePaymentMethods = [];
-            lastSelectedPaymentMethodId = null;
-            console.log(`   ✅ Reset: productVariantId, productsHtml, paymentHtml, selectedPaymentId`);
-        }
-
         const confirming = isConfirmationMessage(latestMessage);
         console.log(`📌 User Message: "${latestMessage}" | Confirming: ${confirming}`);
 
@@ -1098,6 +1148,12 @@ Dưới đây là các phương thức thanh toán có sẵn, bạn chọn cách
             });
         }
 
+        // 💡 NHẮC NHỞ ĐỊNH DẠNG: Đảm bảo AI tuân thủ quy tắc trình bày
+        openAiMessages.push({
+            role: 'system',
+            content: `NHẮC NHỞ TRÌNH BÀY: Luôn xuống dòng, dùng bullet points cho các ý chính, bôi đậm từ khóa quan trọng, tránh đoạn văn dài quá 3 câu. Sử dụng icon (📱 📸 💰 ⚡) một cách tự nhiên.`
+        });
+
         // 2. Gọi API OpenAI lần 1
         const response = await openai.chat.completions.create({
             model: "gpt-4o-mini", // Model tối ưu, tốc độ tốt, có thể cân nhắc gpt-4o nếu cần
@@ -1126,19 +1182,19 @@ Dưới đây là các phương thức thanh toán có sẵn, bạn chọn cách
                 if (functionName === "searchProducts") {
                     apiResponse = await executeSearchProducts(functionArgs);
                     
-                    // ⚠️ FIX: Nếu search fail, LUÔN LUÔN reset state từ search cũ
-                    if (apiResponse.error) {
-                        console.warn(`🔄 Search FAILED for "${functionArgs.keyword}" - Resetting old search state`);
-                        lastSearchedProductsHtml = null;
-                        lastSearchedProductsVariants = [];
-                        lastSearchedProductVariantId = null;
-                        // 🔄 Clear payment methods state từ search cũ
-                        lastPaymentMethodsHtml = null;
-                        lastAvailablePaymentMethods = [];
-                        lastSelectedPaymentMethodId = null;
-                        toolResponseForAI = { error: apiResponse.error };
+                    // 🎯 CẬP NHẬT: Xử lý thông minh kết quả search
+                    if (!apiResponse.found) {
+                        // ✅ Không tìm thấy sản phẩm - nhưng KHÔNG RESET STATE
+                        // AI sẽ tự đọc suggestion_for_ai và gợi ý sản phẩm khác
+                        console.warn(`🔍 Search không tìm thấy "${functionArgs.keyword}" - AI sẽ tự tư vấn`);
+                        toolResponseForAI = {
+                            found: false,
+                            message: apiResponse.message,
+                            suggestion: apiResponse.suggestion_for_ai,
+                            note: "✅ Thay vì báo lỗi, hãy dùng kiến thức của bạn để tư vấn sản phẩm tương tự hoặc hỏi thêm chi tiết"
+                        };
                     } else {
-                        // ✅ Search thành công - cập nhật state SẢN PHẨM & clear state THANH TOÁN cũ
+                        // ✅ Search thành công - cập nhật state
                         if (apiResponse.html) {
                             lastSearchedProductsHtml = apiResponse.html;
                             console.log(`💾 Saved product cards HTML`);
@@ -1158,7 +1214,7 @@ Dưới đây là các phương thức thanh toán có sẵn, bạn chọn cách
                             success: true,
                             message: apiResponse.message,
                             itemCount: apiResponse.variants?.length || 0,
-                            note: "✅ Dữ liệu sản phẩm đã được gửi tới frontend. Bạn không cần liệt kê lại, chỉ cần hướng dẫn user chọn sản phẩm."
+                            note: "✅ Dữ liệu sản phẩm đã được gửi tới frontend. Frontend sẽ hiển thị cards - bạn chỉ cần hướng dẫn user chọn sản phẩm."
                         };
                     }
                 } else if (functionName === "getPaymentMethods") {
