@@ -767,7 +767,7 @@ const executeTrackOrder = async (args: any) => {
 
         for (const order of orders) {
             const orderStatus = statusMap[order.orderStatus] || { icon: '❓', text: order.orderStatus, color: '#6b7280' };
-            const createdDate = new Date(order.createdAt).toLocaleDateString('vi-VN', { 
+            const createdDate = new Date(order.orderDate).toLocaleDateString('vi-VN', { 
                 year: 'numeric', 
                 month: '2-digit', 
                 day: '2-digit',

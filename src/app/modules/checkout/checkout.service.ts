@@ -191,7 +191,7 @@ export const createOrderFromCheckout = async (userId: string, checkoutSummary: C
         }),
         prisma.payment_methods.findUnique({
           where: { id: checkoutSummary.paymentMethodId },
-          select: { name: true }
+          select: { name: true, code: true } // Lấy thêm code để phục vụ logic QR ở email
         })
       ]);
 
@@ -201,9 +201,15 @@ export const createOrderFromCheckout = async (userId: string, checkoutSummary: C
         const productName = firstItem?.productVariant?.product?.name || 'Sản phẩm';
         const variantName = firstItem?.productVariant?.code || 'Phiên bản';
 
+        // Lấy các thuộc tính thanh toán online đã được sinh sẵn
+        const { paymentRedirectUrl, bankTransferQrUrl } = checkoutSummary.paymentFields || {};
+
+        // Nối chuỗi địa chỉ đầy đủ từ snapshot của order
+        const fullShippingAddress = `${order.shippingContactName} - ${order.shippingPhone} | ${order.shippingDetail}, ${order.shippingWard}, ${order.shippingProvince}`;
+
         await sendOrderConfirmationEmail(
           user.email,
-          user.fullName || 'Khách hàng',
+          user.fullName || order.shippingContactName, // Tên hiển thị lời chào ưu tiên User fullName, fallback qua Tên người nhận
           order.orderCode,
           {
             productName,
@@ -211,8 +217,12 @@ export const createOrderFromCheckout = async (userId: string, checkoutSummary: C
             quantity: order.orderItems.reduce((sum, item) => sum + item.quantity, 0),
             unitPrice: Number(order.orderItems[0]?.unitPrice || 0),
             totalAmount: Number(order.totalAmount),
-            shippingAddress: order.shippingDetail,
+            shippingAddress: fullShippingAddress, // Truyền chuỗi đã nối vào đây
             paymentMethod: paymentMethod?.name || 'Chưa xác định'
+          },
+          {
+            paymentMethodCode: paymentMethod?.code || '',
+            paymentLink: paymentRedirectUrl || bankTransferQrUrl || undefined 
           }
         );
 

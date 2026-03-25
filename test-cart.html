@@ -68,12 +68,23 @@
                 <h2>2. Giỏ hàng (Cart)</h2>
                 <button class="btn-green" onclick="testGetCart()">🔄 Lấy Giỏ Hàng</button>
                 <button class="btn-red" onclick="testClearCart()">🗑️ Xóa sạch Giỏ Hàng</button>
+                <button class="btn-cyan" onclick="testSyncCart()">🔀 Sync Cart (sau khi login)</button>
                 <hr style="border: 0; border-top: 1px dashed #ddd; margin: 15px 0;">
                 
                 <h3>Thêm vào giỏ</h3>
                 <input type="text" id="addVariantId" placeholder="Variant ID (VD: c831e285-026e-43e2-90d0-5ac0d8259209)">
                 <input type="number" id="addQty" placeholder="Số lượng" value="1" min="1">
                 <button class="btn-green" onclick="testAddToCart()">➕ Thêm sản phẩm</button>
+                <button class="btn-orange" onclick="testValidateItem()">✓ Validate Tồn kho</button>
+                
+                <hr style="border: 0; border-top: 1px dashed #ddd; margin: 15px 0;">
+                <h3>Quản lý item trong giỏ</h3>
+                <input type="text" id="editCartItemId" placeholder="Cart Item ID">
+                <input type="number" id="editQty" placeholder="Số lượng mới" value="1" min="1">
+                <button class="btn-orange" onclick="testUpdateCartItemQuantity()">📝 Cập nhật SL</button>
+                <input type="text" id="editVariantId" placeholder="Variant ID mới (để đổi loại)">
+                <button class="btn-orange" onclick="testChangeCartItemVariant()">🔄 Đổi Variant</button>
+                <button class="btn-red" onclick="testRemoveCartItem()">🗑️ Xóa Item</button>
 
                 <div style="margin-top: 15px; background: #f8f9fa; padding: 15px; border-radius: 6px;">
                     <h3>Sản phẩm trong giỏ (Hiển thị nháp UI)</h3>
@@ -131,6 +142,7 @@
                 <input type="text" id="chkPaymentId" placeholder="Payment Method ID (Bắt buộc)">
                 <input type="text" id="chkVoucherId" placeholder="Voucher ID (Tùy chọn)">
                 
+                <button class="btn-cyan" onclick="testValidateCheckout()">✓ Validate Checkout</button>
                 <button class="btn-purple" onclick="testCheckoutPreview()">👁️ Xem trước Đơn (Preview)</button>
                 <button class="btn-orange" onclick="testCheckout()">💰 Đặt Hàng Ngay</button>
                 
@@ -144,20 +156,53 @@
                 <h2>5. Đơn hàng của tôi (My Orders)</h2>
                 <button onclick="testGetMyOrders()">🔄 Tải danh sách Đơn hàng</button>
                 
+                <hr style="margin: 20px 0;">
+                <h3>Tìm đơn hàng theo mã</h3>
+                <input type="text" id="searchOrderCode" placeholder="Mã đơn hàng (ORDER-xxx)">
+                <button class="btn-cyan" onclick="testGetPaymentInfo()">💳 Lấy Thông tin Thanh toán</button>
+                
                 <div id="my-orders-container" style="margin-top: 15px; max-height: 600px; overflow-y: auto; padding-right: 5px;">
                     <i>Chưa tải dữ liệu...</i>
                 </div>
                 
                 <hr style="margin: 20px 0;">
-                <h2>6. Dành cho Admin (Quản lý đơn)</h2>
+                <h2>6. Quản lý đơn hàng (Admin)</h2>
+                
+                <div style="background: #fef3cd; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #ffeaa7;">
+                    <h4 style="margin-top: 0;">📋 Tạo Đơn Hàng (Admin)</h4>
+                    <input type="text" id="adminOrderUserId" placeholder="User ID">
+                    <input type="text" id="adminOrderAddressId" placeholder="Address ID">
+                    <input type="text" id="adminOrderPaymentId" placeholder="Payment Method ID">
+                    <input type="text" id="adminOrderNote" placeholder="Ghi chú (tùy chọn)">
+                    <button class="btn-green" style="width: 100%;" onclick="testCreateOrderAdmin()">➕ Tạo Đơn Admin</button>
+                </div>
+                
                 <div class="tabs">
                     <div class="tab active" onclick="filterAdminOrders('ALL', this)">Tất cả</div>
                     <div class="tab" onclick="filterAdminOrders('PENDING', this)">Chờ xác nhận</div>
                     <div class="tab" onclick="filterAdminOrders('PROCESSING', this)">Đang xử lý</div>
+                    <div class="tab" onclick="filterAdminOrders('SHIPPED', this)">Đã gửi</div>
                     <div class="tab" onclick="filterAdminOrders('DELIVERED', this)">Đã giao</div>
                     <div class="tab" onclick="filterAdminOrders('CANCELLED', this)">Đã hủy</div>
                 </div>
                 <button class="btn-red" onclick="testGetAdminOrders()">Lấy Đơn Hàng Admin</button>
+                
+                <div style="background: #fff3cd; padding: 10px; border-radius: 6px; margin: 10px 0; border: 1px solid #ffeaa7;">
+                    <small><b>💡 Để cập nhật đơn:</b> Bấm "Chi tiết" ở admin orders, rồi điền Order ID + Status (PENDING/PROCESSING/SHIPPED/DELIVERED/CANCELLED)</small>
+                    <div style="margin-top: 10px;">
+                        <input type="text" id="adminUpdateOrderId" placeholder="Order ID (để cập nhật)">
+                        <select id="adminUpdateStatus">
+                            <option value="">-- Chọn Status --</option>
+                            <option value="PENDING">Chờ xác nhận</option>
+                            <option value="PROCESSING">Đang xử lý</option>
+                            <option value="SHIPPED">Đã gửi</option>
+                            <option value="DELIVERED">Đã giao</option>
+                            <option value="CANCELLED">Hủy đơn</option>
+                        </select>
+                        <button class="btn-orange" onclick="testUpdateOrderAdmin()">🔄 Cập nhật Status</button>
+                        <button class="btn-red" onclick="testCancelOrderAdmin()">❌ Hủy Đơn (Admin)</button>
+                    </div>
+                </div>
                 
                 <div id="admin-orders-container" style="margin-top: 15px; max-height: 400px; overflow-y: auto; padding-right: 5px;">
                     <i>Chưa tải dữ liệu...</i>
@@ -229,12 +274,89 @@
         }
 
         function testClearCart() {
-            fetch(`${BASE_URL}/cart/clear`, { method: 'DELETE', headers: getHeaders() })
+            fetch(`${BASE_URL}/cart`, { method: 'DELETE', headers: getHeaders() })
                 .then(res => res.json())
                 .then(res => {
                     log('log-cart', res);
                     testGetCart();
                 });
+        }
+
+        // ===== CART API MỚI =====
+        function testValidateItem() {
+            const body = {
+                productVariantId: document.getElementById('addVariantId').value,
+                quantity: parseInt(document.getElementById('addQty').value)
+            };
+            fetch(`${BASE_URL}/cart/validate-item`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-cart', res);
+                    alert(res.message || (res.data?.inStock ? '✅ Còn hàng' : '❌ Hết hàng'));
+                })
+                .catch(err => log('log-cart', err.message));
+        }
+
+        function testSyncCart() {
+            if (!confirm('Sync giỏ hàng từ localStorage lên DB?')) return;
+            fetch(`${BASE_URL}/cart/sync`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({}) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-cart', res);
+                    alert(res.message || 'Sync thành công');
+                    testGetCart();
+                })
+                .catch(err => log('log-cart', err.message));
+        }
+
+        function testUpdateCartItemQuantity() {
+            const cartItemId = document.getElementById('editCartItemId').value;
+            const newQty = parseInt(document.getElementById('editQty').value);
+            if (!cartItemId) {
+                alert('Vui lòng nhập Cart Item ID');
+                return;
+            }
+            const body = { quantity: newQty };
+            fetch(`${BASE_URL}/cart/${cartItemId}/change-quantity`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(body) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-cart', res);
+                    testGetCart();
+                })
+                .catch(err => log('log-cart', err.message));
+        }
+
+        function testChangeCartItemVariant() {
+            const cartItemId = document.getElementById('editCartItemId').value;
+            const newVariantId = document.getElementById('editVariantId').value;
+            if (!cartItemId || !newVariantId) {
+                alert('Vui lòng nhập Cart Item ID và Variant ID mới');
+                return;
+            }
+            const body = { productVariantId: newVariantId };
+            fetch(`${BASE_URL}/cart/${cartItemId}/change-variant`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(body) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-cart', res);
+                    testGetCart();
+                })
+                .catch(err => log('log-cart', err.message));
+        }
+
+        function testRemoveCartItem() {
+            const cartItemId = document.getElementById('editCartItemId').value;
+            if (!cartItemId) {
+                alert('Vui lòng nhập Cart Item ID');
+                return;
+            }
+            if (!confirm('Xóa item này khỏi giỏ?')) return;
+            fetch(`${BASE_URL}/cart/${cartItemId}`, { method: 'DELETE', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-cart', res);
+                    testGetCart();
+                })
+                .catch(err => log('log-cart', err.message));
         }
 
         function renderCartUI(cartData) {
@@ -389,6 +511,16 @@
             return data;
         }
 
+        function testValidateCheckout() {
+            fetch(`${BASE_URL}/checkout/validate`, { method: 'GET', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-checkout', res);
+                    alert(res.message || (res.data?.valid ? '✅ Giỏ hàng hợp lệ' : '❌ Giỏ hàng không hợp lệ'));
+                })
+                .catch(err => log('log-checkout', err.message));
+        }
+
         function testCheckoutPreview() {
             const query = buildCheckoutQueryOrBody(true);
             fetch(`${BASE_URL}/checkout/preview${query}`, { method: 'GET', headers: getHeaders() })
@@ -459,6 +591,7 @@
                             </div>
                             <div style="margin-top: 10px; text-align: right; display:flex; justify-content: flex-end; gap: 5px;">
                                 <button class="btn-cyan" style="padding: 5px 10px; font-size: 12px;" onclick="showOrderDetail('${o.id}', false)">👁️ Chi tiết</button>
+                                ${(o.orderStatus === 'DELIVERED' || o.orderStatus === 'CANCELLED') ? `<button class="btn-orange" style="padding: 5px 10px; font-size: 12px;" onclick="testReorderOrder('${o.id}')">🔄 Tạo lại</button>` : ''}
                                 ${(o.orderStatus === 'PENDING' || o.orderStatus === 'PROCESSING') ? `<button class="btn-red" style="padding: 5px 10px; font-size: 12px;" onclick="testCancelOrder('${o.id}')">❌ Hủy Đơn</button>` : ''}
                             </div>
                         </div>`;
@@ -474,6 +607,91 @@
                     alert(res.message);
                     testGetMyOrders();
                 });
+        }
+
+        // ===== ORDER API MỚI - USER =====
+        function testGetPaymentInfo() {
+            const orderCode = document.getElementById('searchOrderCode').value;
+            if (!orderCode) {
+                alert('Vui lòng nhập mã đơn hàng');
+                return;
+            }
+            fetch(`${BASE_URL}/orders/by-code/${orderCode}/payment-info`, { method: 'GET', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-admin-orders', res);
+                    alert('Xem log result để xem thông tin thanh toán');
+                })
+                .catch(err => log('log-admin-orders', err.message));
+        }
+
+        function testReorderOrder(orderId) {
+            if (!confirm('Tạo lại đơn hàng này?')) return;
+            fetch(`${BASE_URL}/orders/my/${orderId}/reorder`, { method: 'POST', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-admin-orders', res);
+                    alert(res.message || 'Tạo lại đơn thành công');
+                    testGetMyOrders();
+                })
+                .catch(err => log('log-admin-orders', err.message));
+        }
+
+        // ===== ORDER API MỚI - ADMIN =====
+        function testCreateOrderAdmin() {
+            const body = {
+                userId: document.getElementById('adminOrderUserId').value,
+                shippingAddressId: document.getElementById('adminOrderAddressId').value,
+                paymentMethodId: document.getElementById('adminOrderPaymentId').value,
+                note: document.getElementById('adminOrderNote').value || undefined
+            };
+            if (!body.userId || !body.shippingAddressId || !body.paymentMethodId) {
+                alert('Vui lòng nhập User ID, Address ID, Payment ID');
+                return;
+            }
+            fetch(`${BASE_URL}/orders/admin`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-admin-orders', res);
+                    alert(res.message || 'Tạo đơn thành công');
+                    testGetAdminOrders();
+                })
+                .catch(err => log('log-admin-orders', err.message));
+        }
+
+        function testUpdateOrderAdmin() {
+            const orderId = document.getElementById('adminUpdateOrderId').value;
+            const status = document.getElementById('adminUpdateStatus').value;
+            if (!orderId || !status) {
+                alert('Vui lòng nhập Order ID và Status');
+                return;
+            }
+            const body = { orderStatus: status };
+            fetch(`${BASE_URL}/orders/admin/${orderId}`, { method: 'PATCH', headers: getHeaders(), body: JSON.stringify(body) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-admin-orders', res);
+                    alert(res.message || 'Cập nhật thành công');
+                    testGetAdminOrders();
+                })
+                .catch(err => log('log-admin-orders', err.message));
+        }
+
+        function testCancelOrderAdmin() {
+            const orderId = document.getElementById('adminUpdateOrderId').value;
+            if (!orderId) {
+                alert('Vui lòng nhập Order ID');
+                return;
+            }
+            if (!confirm('Hủy đơn hàng này (Admin)?')) return;
+            fetch(`${BASE_URL}/orders/admin/${orderId}/cancel`, { method: 'POST', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-admin-orders', res);
+                    alert(res.message || 'Hủy đơn thành công');
+                    testGetAdminOrders();
+                })
+                .catch(err => log('log-admin-orders', err.message));
         }
 
         let currentAdminOrders = [];
@@ -510,11 +728,25 @@
                         <span class="badge status-${o.orderStatus}">${o.orderStatus}</span>
                     </div>
                     <div style="margin-top: 5px; font-size: 13px;">Tổng tiền: <b style="color:#d32f2f;">${Number(o.totalAmount).toLocaleString('vi-VN')} đ</b></div>
-                    <div style="margin-top: 10px;">
+                    <div style="margin-top: 10px; display: flex; gap: 5px; flex-wrap: wrap;">
                         <button class="btn-cyan" style="padding: 4px 10px; font-size: 12px;" onclick="showOrderDetail('${o.id}', true)">👁️ Chi tiết</button>
+                        <button class="btn-orange" style="padding: 4px 10px; font-size: 12px;" onclick="usOrderId('${o.id}')">📋 Chọn Cập nhật</button>
+                        <button class="btn-red" style="padding: 4px 10px; font-size: 12px;" onclick="usOrderIdAndCancel('${o.id}')">❌ Hủy Ngay</button>
                     </div>
                 </div>
             `).join('');
+        }
+
+        function usOrderId(id) {
+            document.getElementById('adminUpdateOrderId').value = id;
+            alert('✅ Đã điền Order ID. Chọn Status rồi bấm Cập nhật!');
+        }
+
+        function usOrderIdAndCancel(id) {
+            document.getElementById('adminUpdateOrderId').value = id;
+            if (confirm('Hủy đơn này?')) {
+                testCancelOrderAdmin();
+            }
         }
 
         // HÀM MỞ MODAL XEM CHI TIẾT CHUNG CHO CẢ USER & ADMIN
