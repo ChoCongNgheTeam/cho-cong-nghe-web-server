@@ -9,23 +9,20 @@ export const dienMayCategoryData = [
   // Tivi
   {
     name: "Tivi",
-    description:
-      "Trung tâm giải trí gia đình với công nghệ hình ảnh sắc nét và âm thanh sống động.",
+    description: "Trung tâm giải trí gia đình với công nghệ hình ảnh sắc nét và âm thanh sống động.",
     imagePath: "categories/tivi.webp",
     isFeatured: true,
     parentName: "Điện máy",
   },
   {
     name: "Tivi QLED",
-    description:
-      "Công nghệ chấm lượng tử cho màu sắc rực rỡ và độ sáng vượt trội trong mọi điều kiện.",
+    description: "Công nghệ chấm lượng tử cho màu sắc rực rỡ và độ sáng vượt trội trong mọi điều kiện.",
     imagePath: "categories/tivi-qled.webp",
     parentName: "Tivi",
   },
   {
     name: "Tivi 4K",
-    description:
-      "Độ phân giải siêu nét gấp 4 lần Full HD, mang lại trải nghiệm xem chân thực nhất.",
+    description: "Độ phân giải siêu nét gấp 4 lần Full HD, mang lại trải nghiệm xem chân thực nhất.",
     imagePath: "categories/tivi-4k.webp",
     parentName: "Tivi",
   },
@@ -58,8 +55,7 @@ export const dienMayCategoryData = [
   },
   {
     name: "Máy giặt sấy",
-    description:
-      "Sự kết hợp hoàn hảo 2 trong 1, vừa giặt sạch vừa sấy khô tiện lợi trong mọi thời tiết.",
+    description: "Sự kết hợp hoàn hảo 2 trong 1, vừa giặt sạch vừa sấy khô tiện lợi trong mọi thời tiết.",
     imagePath: "categories/washer-dryer-combo.webp",
     parentName: "Máy giặt",
   },
@@ -106,8 +102,7 @@ export const dienMayCategoryData = [
   },
   {
     name: "Tủ lạnh nhiều cửa",
-    description:
-      "Thiết kế Multidoor sang trọng, phân chia ngăn chứa thông minh tránh lẫn mùi thực phẩm.",
+    description: "Thiết kế Multidoor sang trọng, phân chia ngăn chứa thông minh tránh lẫn mùi thực phẩm.",
     imagePath: "categories/multidoor-refrigerator.webp",
     parentName: "Tủ lạnh",
   },
@@ -122,6 +117,32 @@ export const dienMayCategoryData = [
     description: "Thiết kế nhỏ gọn, tiện lợi cho phòng trọ, khách sạn hoặc phòng ngủ cá nhân.",
     imagePath: "categories/mini-fridge.webp",
     parentName: "Tủ lạnh",
+  },
+
+  // --- Máy sấy ---
+  {
+    name: "Máy sấy",
+    description: "Giải pháp làm khô quần áo nhanh chóng, kháng khuẩn và bảo vệ sợi vải tối ưu trong mọi thời tiết.",
+    imagePath: "categories/dryer.webp",
+    parentName: "Điện máy",
+  },
+  {
+    name: "Sấy thông hơi",
+    description: "Cơ chế sấy thổi hơi ẩm trực tiếp ra ngoài, chi phí rẻ và làm khô cực nhanh.",
+    imagePath: "categories/vented-dryer.webp",
+    parentName: "Máy sấy",
+  },
+  {
+    name: "Sấy ngưng tụ",
+    description: "Giữ lại hơi nước trong bình chứa, không cần lắp ống thoát khí, phù hợp cho không gian kín.",
+    imagePath: "categories/condenser-dryer.webp",
+    parentName: "Máy sấy",
+  },
+  {
+    name: "Sấy bơm nhiệt",
+    description: "Công nghệ Heatpump hiện đại, siêu tiết kiệm điện và bảo vệ quần áo bền màu ở nhiệt độ thấp.",
+    imagePath: "categories/heatpump-dryer.webp",
+    parentName: "Máy sấy",
   },
 
   // Tủ đông

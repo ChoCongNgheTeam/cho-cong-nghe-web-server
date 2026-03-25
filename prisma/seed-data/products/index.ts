@@ -5,6 +5,20 @@ import * as Xiaomi from "./xiaomi";
 import * as AirConditioner from "./air-conditioner";
 import * as EarPods from "./earpod";
 import * as Lenovo from "./lenovo";
+import * as Dell from "./dell";
+import * as Asus from "./asus";
+import * as Acer from "./acer";
+import * as HP from "./hp";
+import * as Tivi from "./tv";
+import * as MayLanh from "./may-lanh";
+import * as TuLanh from "./tu-lanh";
+import * as MayGiat from "./may-giat";
+import * as MaySay from "./may-say";
+import * as TuDong from "./tu-dong";
+import * as Audio from "./audio";
+import * as Gaming from "./gaming";
+import * as Accessories from "./accessories";
+import * as ComputerAcc from "./computer-acc";
 
 export const allProducts = [
   // ================================================================
@@ -66,6 +80,45 @@ export const allProducts = [
   Lenovo.lenovoYoga7_14ITP8,
   Lenovo.lenovoYogaSlim7_14IMH9,
   Lenovo.lenovoYogaBook9,
+
+  // Dell
+  Dell.dellXps13_9340,
+  Dell.dellXps14_9440,
+  Dell.dellInspiron14_5440,
+  Dell.dellInspiron16_5640,
+  Dell.dellLatitude3440,
+  Dell.dellLatitude7440,
+  Dell.dellVostro15_3530,
+  Dell.dellPrecision16_5680,
+
+  // Asus
+  Asus.asusZenbook14OledUX3405,
+  Asus.asusZenbookS13OledUX5304,
+  Asus.asusVivobook15X1504,
+  Asus.asusVivobookGo14E1404,
+  Asus.asusTufGamingA15FA506,
+  Asus.asusTufGamingF15FX507,
+  Asus.asusRogStrixG16G614,
+  Asus.asusRogZephyrusG14GA403,
+  Asus.asusV16GamingV161,
+
+  // Acer
+  Acer.acerAspire3A315,
+  Acer.acerAspire5A515,
+  Acer.acerAspire7GamingA715,
+  Acer.acerNitro5TigerAn515,
+  Acer.acerNitroV15Anv15,
+  Acer.acerSwiftGo14Sfg14,
+  Acer.acerPredatorHeliosNeo16Phn16,
+
+  // HP
+  HP.hp15sFq5111tu,
+  HP.hpProbook450G10,
+  HP.hpEnvyX36014Fa0045au,
+  HP.hpVictus15Fa1139tx,
+  HP.hpOmen16Xf0071ax,
+  HP.hpOmnibookX14Fe0053au,
+  HP.hpOmnibookUltraFlip14,
 
   // EarPods & AirPods
   EarPods.appleEarPodsUSBC,
@@ -174,4 +227,94 @@ export const allProducts = [
   AirConditioner.casperInverter15_GC12IB36,
   AirConditioner.casperInverter1_TC09IS35,
   AirConditioner.casperInverter15_GC12IS35,
+
+  // Tivi
+  Tivi.samsungQled65Q70C,
+  Tivi.tclQled4K55C645,
+  Tivi.sony4KGoogleTv55X75K,
+  Tivi.samsungCrystal4K50AU7700,
+  Tivi.xiaomiGoogleTvAPro55,
+  Tivi.coocaaGoogleTv70Y72,
+
+  // May Lanh
+  MayLanh.daikin1ChieuATF25,
+  MayLanh.panasonic1ChieuN9ZKH8,
+  MayLanh.daikin2ChieuInverterF25VAVMV,
+  MayLanh.panasonic2ChieuInverterYZ9WKH8,
+  MayLanh.samsungInverterAR10CYH,
+  MayLanh.casperInverterTC09IS33,
+  // MayGiat
+  MayGiat.lgInverter9kg,
+  MayGiat.samsungAiInverter10kg,
+  MayGiat.electroluxInverter11kg,
+  MayGiat.panasonicInverter85kg,
+  MayGiat.toshiba7kg,
+  MayGiat.aqua12kg,
+  MayGiat.samsungGiatSay14kg,
+  MayGiat.lgGiatSay105kg,
+
+  // Tu Lanh
+  TuLanh.samsungInverter236L,
+  TuLanh.panasonicInverter255L,
+  TuLanh.casperMultiDoor430L,
+  TuLanh.sharpInverter401L,
+  TuLanh.samsungSideBySide648L,
+  TuLanh.lgSideBySide635L,
+
+  // May Say
+  MaySay.electroluxSayThongHoi8kg,
+  MaySay.casperThongHoi7kg,
+  MaySay.candyNgungTu9kg,
+  MaySay.lgNgungTu8kg,
+  MaySay.samsungHeatpump9kg,
+  MaySay.lgHeatpump9kg,
+
+  // Tu Dong
+  TuDong.sanaky1Ngan100L,
+  TuDong.kangaroo1Ngan140L,
+  TuDong.sanaky2Ngan280L,
+  TuDong.sunhouse2Ngan250L,
+  TuDong.alaskaDung210L,
+  TuDong.hoaPhatDung106L,
+
+  // Audio
+  Audio.appleAirpodsPro2,
+  Audio.samsungGalaxyBuds3Pro,
+  Audio.sonyIerH500a,
+  Audio.sonyWh1000xm5,
+  Audio.marshallMajorV,
+  Audio.jblCharge5,
+  Audio.marshallEmbertonIi,
+  Audio.microlabX2,
+  Audio.daltonTs12g450x,
+
+  // Gaming
+  Gaming.sonyPs5Slim,
+  Gaming.nintendoSwitchOled,
+  Gaming.logitechGProXSuperlight2,
+  Gaming.razerDeathadderV3Pro,
+  Gaming.asusRogFalchionRxLowProfile,
+  Gaming.corsairK70RgbTkl,
+  Gaming.razerBlacksharkV2Pro,
+  Gaming.logitechG560Lightsync,
+
+  // Accessories
+  Accessories.appleAdapter20W,
+  Accessories.appleCapUsbCToLightning1m,
+  Accessories.samsungSacDuPhong10000mah25w,
+  Accessories.ankerSacDuPhongMagGo10000mah,
+  Accessories.appleOpLungIphone15ProMaxMagsafe,
+  Accessories.mikingCuongLucIphone15ProMax,
+  Accessories.applePencilPro,
+
+  // Computer Accessories
+  ComputerAcc.logitechMxMaster3s,
+  ComputerAcc.logitechMxKeysS,
+  ComputerAcc.baloTargus156,
+  ComputerAcc.logitechR500s,
+  ComputerAcc.logitechC922Pro,
+  ComputerAcc.ankerHub5in1,
+  ComputerAcc.hyperworkL01,
+  ComputerAcc.logitechDeskMat,
+  ComputerAcc.jcpalPhuBanPhim,
 ] as const;

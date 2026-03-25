@@ -80,9 +80,9 @@ export async function seedSpecifications(prisma: PrismaClient) {
     }
   }
 
-  console.log(`\n Seeded Specifications & connects categories`);
-  console.log(`- Tổng ${totalSpecs} specifications`);
-  console.log(`- Tổng ${totalLinks} liên kết category ↔ specification\n`);
+  // console.log(`\n Seeded Specifications & connects categories`);
+  // console.log(`- Tổng ${totalSpecs} specifications`);
+  // console.log(`- Tổng ${totalLinks} liên kết category ↔ specification\n`);
 
   return { totalSpecs, totalLinks };
 }

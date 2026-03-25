@@ -212,6 +212,36 @@ const brandData: {
     imagePath: "brands/beko.webp",
     categoryGroup: "Điện máy",
   },
+  {
+    name: "Sanaky",
+    description: "Thương hiệu hàng đầu về tủ đông, tủ mát tại Việt Nam",
+    imagePath: "brands/sanaky.webp",
+    categoryGroup: "Điện máy",
+  },
+  {
+    name: "Kangaroo",
+    description: "Tủ đông, máy lọc nước - thương hiệu gia dụng hàng đầu Việt Nam",
+    imagePath: "brands/kangaroo.webp",
+    categoryGroup: "Điện máy",
+  },
+  {
+    name: "Sunhouse",
+    description: "Gia dụng, tủ đông, điện mát - niềm tự hào thương hiệu Việt",
+    imagePath: "brands/sunhouse.webp",
+    categoryGroup: "Điện máy",
+  },
+  {
+    name: "Alaska",
+    description: "Chuyên các dòng tủ đông, tủ mát chất lượng tiêu chuẩn Mỹ",
+    imagePath: "brands/alaska.webp",
+    categoryGroup: "Điện máy",
+  },
+  {
+    name: "Hòa Phát",
+    description: "Tủ đông, tủ lạnh - thương hiệu quốc dân bền bỉ của người Việt",
+    imagePath: "brands/hoa-phat.webp",
+    categoryGroup: "Điện máy",
+  },
 
   // ─────────────────────────────────────────────────────────
   // ÂM THANH
@@ -288,6 +318,95 @@ const brandData: {
     name: "Belkin",
     description: "Sạc MagSafe, cáp, phụ kiện Apple chính hãng",
     imagePath: "brands/belkin.webp",
+    categoryGroup: "Phụ kiện",
+  },
+  // ─────────────────────────────────────────────────────────
+  // THIẾT BỊ ĐIỆN MÁY (Tivi, Máy lạnh, Tủ lạnh, Máy giặt)
+  // ─────────────────────────────────────────────────────────
+  {
+    name: "Casper",
+    description: "Máy lạnh, tủ lạnh, máy giặt sấy - thương hiệu Thái Lan bền bỉ",
+    imagePath: "brands/casper.webp",
+    categoryGroup: "Điện máy",
+  },
+  {
+    name: "Coocaa",
+    description: "Tivi thông minh - thiết kế hiện đại, giá thành tối ưu",
+    imagePath: "brands/coocaa.webp",
+    categoryGroup: "Điện máy",
+  },
+  {
+    name: "Sharp",
+    description: "Tủ lạnh, đồ gia dụng - công nghệ Nhật Bản tiên tiến",
+    imagePath: "brands/sharp.webp",
+    categoryGroup: "Điện máy",
+  },
+  {
+    name: "Candy",
+    description: "Máy sấy, máy giặt - thương hiệu Ý với hơn 70 năm lịch sử",
+    imagePath: "brands/candy.webp",
+    categoryGroup: "Điện máy",
+  },
+
+  // ─────────────────────────────────────────────────────────
+  // ÂM THANH & GIẢI TRÍ (Audio & Gaming)
+  // ─────────────────────────────────────────────────────────
+  {
+    name: "Marshall",
+    description: "Loa, tai nghe Bluetooth - âm thanh rock n roll biểu tượng",
+    imagePath: "brands/marshall.webp",
+    categoryGroup: "Phụ kiện",
+  },
+  {
+    name: "Microlab",
+    description: "Hệ thống loa vi tính, âm thanh giải trí gia đình",
+    imagePath: "brands/microlab.webp",
+    categoryGroup: "Phụ kiện",
+  },
+  {
+    name: "Dalton",
+    description: "Chuyên gia âm thanh, loa kéo Karaoke công suất lớn",
+    imagePath: "brands/dalton.webp",
+    categoryGroup: "Phụ kiện",
+  },
+  {
+    name: "Nintendo",
+    description: "Máy chơi game cầm tay và phụ kiện gaming độc quyền",
+    imagePath: "brands/nintendo.webp",
+    categoryGroup: "Phụ kiện",
+  },
+  {
+    name: "Corsair",
+    description: "Bàn phím, linh kiện máy tính chuyên dụng cho game thủ",
+    imagePath: "brands/corsair.webp",
+    categoryGroup: "Phụ kiện",
+  },
+
+  // ─────────────────────────────────────────────────────────
+  // PHỤ KIỆN CÔNG NGHỆ (Accessories & Computer-acc)
+  // ─────────────────────────────────────────────────────────
+  {
+    name: "Miking",
+    description: "Miếng dán cường lực, bảo vệ màn hình điện thoại cao cấp",
+    imagePath: "brands/miking.webp",
+    categoryGroup: "Phụ kiện",
+  },
+  {
+    name: "Targus",
+    description: "Balo, túi xách laptop - giải pháp bảo vệ máy tính từ Mỹ",
+    imagePath: "brands/targus.webp",
+    categoryGroup: "Phụ kiện",
+  },
+  {
+    name: "HyperWork",
+    description: "Giá đỡ, phụ kiện setup góc làm việc công thái học",
+    imagePath: "brands/hyperwork.webp",
+    categoryGroup: "Phụ kiện",
+  },
+  {
+    name: "JCPAL",
+    description: "Phụ kiện cao cấp cho MacBook: Phủ phím, dán bảo vệ",
+    imagePath: "brands/jcpal.webp",
     categoryGroup: "Phụ kiện",
   },
 ];

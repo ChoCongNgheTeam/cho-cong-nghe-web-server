@@ -54,7 +54,7 @@ export async function seedVariants(prisma: PrismaClient, { products }: SeedVaria
       continue;
     }
 
-    console.log(`  Processing: ${product.name} → ${variantsForThisProduct.length} variants`);
+    // console.log(`  Processing: ${product.name} → ${variantsForThisProduct.length} variants`);
 
     for (const v of variantsForThisProduct) {
       const code = buildVariantCode(product.slug, v);
@@ -83,6 +83,9 @@ export async function seedVariants(prisma: PrismaClient, { products }: SeedVaria
         await attachAttributeOption(prisma, variant.id, "gpu", v.gpu);
         await attachAttributeOption(prisma, variant.id, "size", v.size);
         await attachAttributeOption(prisma, variant.id, "capacity_cooling", v.capacity_cooling);
+        await attachAttributeOption(prisma, variant.id, "capacity_washing", v.capacity_washing);
+        await attachAttributeOption(prisma, variant.id, "capacity_fridge", v.capacity_fridge);
+        await attachAttributeOption(prisma, variant.id, "connection", v.connection);
 
         createdVariants.push(variant);
       } catch (err) {

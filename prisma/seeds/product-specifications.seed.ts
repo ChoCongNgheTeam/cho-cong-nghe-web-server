@@ -62,9 +62,9 @@ export async function seedProductSpecifications(prisma: PrismaClient) {
     }
   }
 
-  console.log(`🚀 Successfully seeded specifications`);
-  console.log(`   - Created / Updated: ${totalCreated}`);
-  console.log(`   - Skipped: ${totalSkipped}`);
+  // console.log(`🚀 Successfully seeded specifications`);
+  // console.log(`   - Created / Updated: ${totalCreated}`);
+  // console.log(`   - Skipped: ${totalSkipped}`);
 
   return { created: totalCreated, skipped: totalSkipped };
 }

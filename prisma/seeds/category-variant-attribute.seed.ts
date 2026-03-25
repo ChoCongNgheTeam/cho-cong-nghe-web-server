@@ -112,8 +112,8 @@ const CATEGORY_ATTRIBUTE_MAP: Record<string, string[]> = {
   // LAPTOP — HP (Đã thêm color)
   // -------------------------------------------------------
   "hp-14-15-14s-15s": ["color", "ram", "storage"],
-  "hp-co-ban": ["color", "ram", "storage"],
-  "hp-pavilion": ["color", "ram", "storage"],
+  // "hp-co-ban": ["color", "ram", "storage"],
+  // "hp-pavilion": ["color", "ram", "storage"],
   "hp-envy": ["color", "ram", "storage"],
   "hp-victus": ["color", "ram", "storage"],
   "hp-probook": ["color", "ram", "storage"],

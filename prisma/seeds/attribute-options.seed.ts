@@ -211,12 +211,18 @@ const attributeOptionsData: Record<
       { value: "150l", label: "150 lít" },
       { value: "200l", label: "200 lít" },
       { value: "230l", label: "230 lít" },
+      { value: "236l", label: "236 lít" }, // Thêm mới từ Samsung RT22
       { value: "253l", label: "253 lít" },
+      { value: "255l", label: "255 lít" }, // Thêm mới từ Panasonic NR-BV280
       { value: "300l", label: "300 lít" },
       { value: "350l", label: "350 lít" },
       { value: "400l", label: "400 lít" },
+      { value: "401l", label: "401 lít" }, // Thêm mới từ Sharp SJ-FX52
+      { value: "430l", label: "430 lít" }, // Thêm mới từ Casper RM-520
       { value: "500l", label: "500 lít" },
       { value: "600l", label: "600 lít" },
+      { value: "635l", label: "635 lít" }, // Thêm mới từ LG GR-D257
+      { value: "648l", label: "648 lít" }, // Thêm mới từ Samsung RS64
     ],
   },
 

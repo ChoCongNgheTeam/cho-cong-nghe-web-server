@@ -2,51 +2,44 @@ export const laptopCategoryData = [
   // ROOT Laptop
   {
     name: "Laptop",
-    description:
-      "Hệ thống máy tính xách tay đa dạng từ học tập, văn phòng đến đồ họa và gaming chuyên nghiệp.",
+    description: "Hệ thống máy tính xách tay đa dạng từ học tập, văn phòng đến đồ họa và gaming chuyên nghiệp.",
     imagePath: "categories/laptop.webp",
     isFeatured: true,
   },
   // Apple (Macbook)
   {
     name: "Apple (Macbook)",
-    description:
-      "Dòng máy tính cao cấp từ Apple với thiết kế nhôm nguyên khối và chip Apple Silicon mạnh mẽ.",
+    description: "Dòng máy tính cao cấp từ Apple với thiết kế nhôm nguyên khối và chip Apple Silicon mạnh mẽ.",
     imagePath: "categories/apple-macbook.webp",
     parentName: "Laptop",
   },
   {
     name: "MacBook Air 13 inch",
-    description:
-      "Sự lựa chọn hoàn hảo cho tính di động, mỏng nhẹ bậc nhất và hiệu năng ổn định cho văn phòng.",
+    description: "Sự lựa chọn hoàn hảo cho tính di động, mỏng nhẹ bậc nhất và hiệu năng ổn định cho văn phòng.",
     imagePath: "categories/macbook-air-13.webp",
     parentName: "Apple (Macbook)",
   },
   {
     name: "MacBook Air 15 inch",
-    description:
-      "Màn hình lớn hơn trong một thân máy siêu mỏng, mang lại không gian làm việc rộng rãi.",
+    description: "Màn hình lớn hơn trong một thân máy siêu mỏng, mang lại không gian làm việc rộng rãi.",
     imagePath: "categories/macbook-air-15.webp",
     parentName: "Apple (Macbook)",
   },
   {
     name: "MacBook Pro 14 inch",
-    description:
-      "Cấu hình chuyên nghiệp, màn hình Liquid Retina XDR dành cho các nhà sáng tạo nội dung.",
+    description: "Cấu hình chuyên nghiệp, màn hình Liquid Retina XDR dành cho các nhà sáng tạo nội dung.",
     imagePath: "categories/macbook-pro-14.webp",
     parentName: "Apple (Macbook)",
   },
   {
     name: "MacBook Pro 16 inch",
-    description:
-      "Quái vật hiệu năng với kích thước màn hình lớn nhất, đáp ứng mọi tác vụ đồ họa nặng nhất.",
+    description: "Quái vật hiệu năng với kích thước màn hình lớn nhất, đáp ứng mọi tác vụ đồ họa nặng nhất.",
     imagePath: "categories/macbook-pro-16.webp",
     parentName: "Apple (Macbook)",
   },
   {
     name: "MacBook M5 Series",
-    description:
-      "Thế hệ MacBook mới nhất tích hợp chip xử lý thế hệ 5 với khả năng tính toán vượt trội.",
+    description: "Thế hệ MacBook mới nhất tích hợp chip xử lý thế hệ 5 với khả năng tính toán vượt trội.",
     imagePath: "categories/macbook-m5.webp",
     parentName: "Apple (Macbook)",
   },
@@ -202,6 +195,20 @@ export const laptopCategoryData = [
     parentName: "Dell",
   },
 
+  {
+    name: "Dell 15",
+    description: "Thừa hưởng DNA Alienware, cung cấp hiệu năng chiến game mượt mà trong phân khúc 15.6 inch phổ biến.",
+    imagePath: "categories/dell-g15.webp", // Cập nhật tên ảnh cụ thể cho dòng 15
+    parentName: "Dell",
+  },
+
+  {
+    name: "Dell 16",
+    description: "Nâng tầm trải nghiệm với màn hình 16 inch (tỷ lệ 16:10) rộng rãi và tản nhiệt tối ưu mạnh mẽ hơn.",
+    imagePath: "categories/dell-g16.webp", // Cập nhật tên ảnh cụ thể cho dòng 16
+    parentName: "Dell",
+  },
+
   // HP
   {
     name: "HP",
@@ -216,15 +223,9 @@ export const laptopCategoryData = [
     parentName: "HP",
   },
   {
-    name: "HP cơ bản",
-    description: "Các dòng máy tập trung vào tính thực dụng và giá thành tiết kiệm.",
-    imagePath: "categories/hp-essential.webp",
-    parentName: "HP",
-  },
-  {
-    name: "HP Pavilion",
-    description: "Dòng laptop giải trí đa phương tiện with âm thanh B&O chất lượng cao.",
-    imagePath: "categories/hp-pavilion.webp",
+    name: "HP ProBook",
+    description: "Laptop làm việc tin cậy cho doanh nhân với thiết kế vỏ nhôm chắc chắn.",
+    imagePath: "categories/hp-probook.webp",
     parentName: "HP",
   },
   {
@@ -235,14 +236,32 @@ export const laptopCategoryData = [
   },
   {
     name: "HP Victus",
-    description: "Dòng laptop gaming mới với thiết kế tối giản nhưng hiệu năng cực kỳ mạnh.",
+    description: "Dòng laptop gaming phổ thông với thiết kế tối giản nhưng hiệu năng mạnh mẽ.",
     imagePath: "categories/hp-victus.webp",
     parentName: "HP",
   },
   {
-    name: "HP ProBook",
-    description: "Laptop làm việc tin cậy cho doanh nhân với thiết kế vỏ nhôm chắc chắn.",
-    imagePath: "categories/hp-probook.webp",
+    name: "HP Omen",
+    description: "Dòng laptop gaming cao cấp nhất với hiệu năng đỉnh cao và tản nhiệt tối ưu.",
+    imagePath: "categories/hp-omen.webp",
+    parentName: "HP",
+  },
+  {
+    name: "HP Omnibook 5",
+    description: "Dòng laptop phổ thông thế hệ mới, cân bằng giữa hiệu suất và tính linh hoạt.",
+    imagePath: "categories/hp-omnibook-5.webp",
+    parentName: "HP",
+  },
+  {
+    name: "HP Omnibook 7",
+    description: "Phân khúc laptop cao cấp mới với thiết kế tinh xảo và trải nghiệm AI thông minh.",
+    imagePath: "categories/hp-omnibook-7.webp",
+    parentName: "HP",
+  },
+  {
+    name: "HP Omnibook U/X",
+    description: "Dòng laptop AI tiên tiến nhất (Ultra/X), mỏng nhẹ vượt trội và hiệu năng đột phá.",
+    imagePath: "categories/hp-omnibook-ux.webp",
     parentName: "HP",
   },
 ];
