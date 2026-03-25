@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test E-commerce API - Cart & Checkout & Orders</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; line-height: 1.6; max-width: 1200px; margin: 0 auto; background-color: #f4f7f6; }
+        h1, h2 { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+        h3 { margin-top: 0; color: #555; }
+        h4 { margin: 10px 0 5px 0; }
+        
+        .section { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .auth-zone { border-left: 5px solid #6c757d; }
+        .cart-zone { border-left: 5px solid #28a745; }
+        .address-zone { border-left: 5px solid #17a2b8; }
+        .checkout-zone { border-left: 5px solid #6f42c1; }
+        .order-zone { border-left: 5px solid #fd7e14; }
+        
+        button { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; background-color: #007bff; margin: 5px 2px; transition: 0.2s;}
+        button:hover { opacity: 0.8; }
+        .btn-green { background-color: #28a745; }
+        .btn-red { background-color: #dc3545; }
+        .btn-orange { background-color: #fd7e14; }
+        .btn-purple { background-color: #6f42c1; }
+        .btn-cyan { background-color: #17a2b8; }
+        
+        input, select { padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; width: 100%; box-sizing: border-box; }
+        input[type="radio"], input[type="checkbox"] { width: auto; margin-right: 5px; }
+        
+        pre { background: #2d2d2d; color: #4af626; padding: 15px; border-radius: 5px; overflow-x: auto; max-height: 300px; font-size: 13px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        
+        /* Modal Styles */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 600px; max-width: 90%; max-height: 85vh; overflow-y: auto; }
+        .close-btn { float: right; cursor: pointer; font-size: 20px; font-weight: bold; color: #888; }
+        .close-btn:hover { color: #333; }
+        
+        /* Status Badges */
+        .badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; color: white; display: inline-block; }
+        .status-PENDING { background: #ffc107; color: #000; }
+        .status-PROCESSING { background: #17a2b8; }
+        .status-SHIPPED { background: #007bff; }
+        .status-DELIVERED { background: #28a745; }
+        .status-CANCELLED { background: #dc3545; }
+        .status-DEFAULT { background: #6c757d; }
+        
+        .tabs { display: flex; gap: 10px; margin-bottom: 15px; overflow-x: auto; }
+        .tab { padding: 8px 15px; background: #e9ecef; border-radius: 20px; cursor: pointer; font-size: 14px; white-space: nowrap; }
+        .tab.active { background: #007bff; color: white; }
+    </style>
+</head>
+<body>
+
+    <h1>🛒 E-commerce API Tester</h1>
+
+    <div class="section auth-zone">
+        <h2>1. Xác thực (Authorization)</h2>
+        <p style="font-size: 14px; color: #666;">Nhập Access Token của bạn vào đây:</p>
+        <input type="text" id="tokenInput" placeholder="Bearer eyJhbGciOiJIUzI1NiIsInR5cCI...">
+        <button onclick="saveToken()">💾 Lưu Token</button>
+    </div>
+
+    <div class="grid-2">
+        <div>
+            <div class="section cart-zone">
+                <h2>2. Giỏ hàng (Cart)</h2>
+                <button class="btn-green" onclick="testGetCart()">🔄 Lấy Giỏ Hàng</button>
+                <button class="btn-red" onclick="testClearCart()">🗑️ Xóa sạch Giỏ Hàng</button>
+                <button class="btn-cyan" onclick="testSyncCart()">🔀 Sync Cart (sau khi login)</button>
+                <hr style="border: 0; border-top: 1px dashed #ddd; margin: 15px 0;">
+                
+                <h3>Thêm vào giỏ</h3>
+                <input type="text" id="addVariantId" placeholder="Variant ID (VD: c831e285-026e-43e2-90d0-5ac0d8259209)">
+                <input type="number" id="addQty" placeholder="Số lượng" value="1" min="1">
+                <button class="btn-green" onclick="testAddToCart()">➕ Thêm sản phẩm</button>
+                <button class="btn-orange" onclick="testValidateItem()">✓ Validate Tồn kho</button>
+                
+                <hr style="border: 0; border-top: 1px dashed #ddd; margin: 15px 0;">
+                <h3>Quản lý item trong giỏ</h3>
+                <input type="text" id="editCartItemId" placeholder="Cart Item ID">
+                <input type="number" id="editQty" placeholder="Số lượng mới" value="1" min="1">
+                <button class="btn-orange" onclick="testUpdateCartItemQuantity()">📝 Cập nhật SL</button>
+                <input type="text" id="editVariantId" placeholder="Variant ID mới (để đổi loại)">
+                <button class="btn-orange" onclick="testChangeCartItemVariant()">🔄 Đổi Variant</button>
+                <button class="btn-red" onclick="testRemoveCartItem()">🗑️ Xóa Item</button>
+
+                <div style="margin-top: 15px; background: #f8f9fa; padding: 15px; border-radius: 6px;">
+                    <h3>Sản phẩm trong giỏ (Hiển thị nháp UI)</h3>
+                    <div id="cart-ui-container"><i>Bấm Lấy giỏ hàng để hiển thị...</i></div>
+                </div>
+
+                <h4>Log Result:</h4>
+                <pre id="log-cart">No data yet...</pre>
+            </div>
+
+            <div class="section address-zone">
+                <h2>3. Sổ địa chỉ (Addresses)</h2>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <button class="btn-cyan" onclick="testGetAddresses()">📍 Lấy TẤT CẢ Địa chỉ</button>
+                    <button class="btn-orange" onclick="testGetDefaultAddress()">⭐ Xem Đ/C Mặc định</button>
+                </div>
+                
+                <div style="background: #f0f9fa; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #bce8f1;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h4 style="margin: 0; color: #0c5460;">➕ Tạo Địa Chỉ Mới</h4>
+                        <button class="btn-cyan" style="font-size: 12px; padding: 4px 10px;" onclick="loadProvinces()">🔄 Tải Tỉnh/Thành</button>
+                    </div>
+                    <div class="grid-2" style="margin-top: 10px;">
+                        <input type="text" id="newAddrName" placeholder="Tên người nhận">
+                        <input type="text" id="newAddrPhone" placeholder="Số điện thoại (09...)">
+                    </div>
+                    <div class="grid-2">
+                        <select id="newAddrProvince" onchange="loadWards(this.value)">
+                            <option value="">-- Bấm Tải Tỉnh/Thành trước --</option>
+                        </select>
+                        <select id="newAddrWard">
+                            <option value="">-- Chọn Phường/Xã --</option>
+                        </select>
+                    </div>
+                    <input type="text" id="newAddrDetail" placeholder="Địa chỉ chi tiết (Số nhà, hẻm, đường...)">
+                    <div style="display: flex; gap: 15px; margin-top: 10px; font-size: 14px;">
+                        <label><input type="radio" name="newAddrType" value="HOME" checked> Nhà riêng</label>
+                        <label><input type="radio" name="newAddrType" value="WORK"> Công ty</label>
+                        <label style="margin-left: auto;"><input type="checkbox" id="newAddrDefault"> Đặt làm Mặc định</label>
+                    </div>
+                    <button class="btn-green" style="width: 100%; margin-top: 10px;" onclick="testCreateAddress()">Lưu Địa Chỉ Mới</button>
+                </div>
+                
+                <div id="address-container" style="margin-top: 15px; max-height: 250px; overflow-y: auto; padding-right: 5px;">
+                    <i>Chưa tải dữ liệu...</i>
+                </div>
+
+                <h4>Log Result:</h4>
+                <pre id="log-address">No data yet...</pre>
+            </div>
+            
+            <div class="section checkout-zone">
+                <h2>4. Đặt hàng (Checkout)</h2>
+                <input type="text" id="chkAddressId" placeholder="Address ID (Bấm 'Chọn' ở trên để điền)">
+                <input type="text" id="chkPaymentId" placeholder="Payment Method ID (Bắt buộc)">
+                <input type="text" id="chkVoucherId" placeholder="Voucher ID (Tùy chọn)">
+                
+                <button class="btn-cyan" onclick="testValidateCheckout()">✓ Validate Checkout</button>
+                <button class="btn-purple" onclick="testCheckoutPreview()">👁️ Xem trước Đơn (Preview)</button>
+                <button class="btn-orange" onclick="testCheckout()">💰 Đặt Hàng Ngay</button>
+                
+                <h4>Log Result:</h4>
+                <pre id="log-checkout">No data yet...</pre>
+            </div>
+        </div>
+
+        <div>
+            <div class="section order-zone">
+                <h2>5. Đơn hàng của tôi (My Orders)</h2>
+                <button onclick="testGetMyOrders()">🔄 Tải danh sách Đơn hàng</button>
+                
+                <hr style="margin: 20px 0;">
+                <h3>Tìm đơn hàng theo mã</h3>
+                <input type="text" id="searchOrderCode" placeholder="Mã đơn hàng (ORDER-xxx)">
+                <button class="btn-cyan" onclick="testGetPaymentInfo()">💳 Lấy Thông tin Thanh toán</button>
+                
+                <div id="my-orders-container" style="margin-top: 15px; max-height: 600px; overflow-y: auto; padding-right: 5px;">
+                    <i>Chưa tải dữ liệu...</i>
+                </div>
+                
+                <hr style="margin: 20px 0;">
+                <h2>6. Quản lý đơn hàng (Admin)</h2>
+                
+                <div style="background: #fef3cd; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #ffeaa7;">
+                    <h4 style="margin-top: 0;">📋 Tạo Đơn Hàng (Admin)</h4>
+                    <input type="text" id="adminOrderUserId" placeholder="User ID">
+                    <input type="text" id="adminOrderAddressId" placeholder="Address ID">
+                    <input type="text" id="adminOrderPaymentId" placeholder="Payment Method ID">
+                    <input type="text" id="adminOrderNote" placeholder="Ghi chú (tùy chọn)">
+                    <button class="btn-green" style="width: 100%;" onclick="testCreateOrderAdmin()">➕ Tạo Đơn Admin</button>
+                </div>
+                
+                <div class="tabs">
+                    <div class="tab active" onclick="filterAdminOrders('ALL', this)">Tất cả</div>
+                    <div class="tab" onclick="filterAdminOrders('PENDING', this)">Chờ xác nhận</div>
+                    <div class="tab" onclick="filterAdminOrders('PROCESSING', this)">Đang xử lý</div>
+                    <div class="tab" onclick="filterAdminOrders('SHIPPED', this)">Đã gửi</div>
+                    <div class="tab" onclick="filterAdminOrders('DELIVERED', this)">Đã giao</div>
+                    <div class="tab" onclick="filterAdminOrders('CANCELLED', this)">Đã hủy</div>
+                </div>
+                <button class="btn-red" onclick="testGetAdminOrders()">Lấy Đơn Hàng Admin</button>
+                
+                <div style="background: #fff3cd; padding: 10px; border-radius: 6px; margin: 10px 0; border: 1px solid #ffeaa7;">
+                    <small><b>💡 Để cập nhật đơn:</b> Bấm "Chi tiết" ở admin orders, rồi điền Order ID + Status (PENDING/PROCESSING/SHIPPED/DELIVERED/CANCELLED)</small>
+                    <div style="margin-top: 10px;">
+                        <input type="text" id="adminUpdateOrderId" placeholder="Order ID (để cập nhật)">
+                        <select id="adminUpdateStatus">
+                            <option value="">-- Chọn Status --</option>
+                            <option value="PENDING">Chờ xác nhận</option>
+                            <option value="PROCESSING">Đang xử lý</option>
+                            <option value="SHIPPED">Đã gửi</option>
+                            <option value="DELIVERED">Đã giao</option>
+                            <option value="CANCELLED">Hủy đơn</option>
+                        </select>
+                        <button class="btn-orange" onclick="testUpdateOrderAdmin()">🔄 Cập nhật Status</button>
+                        <button class="btn-red" onclick="testCancelOrderAdmin()">❌ Hủy Đơn (Admin)</button>
+                    </div>
+                </div>
+                
+                <div id="admin-orders-container" style="margin-top: 15px; max-height: 400px; overflow-y: auto; padding-right: 5px;">
+                    <i>Chưa tải dữ liệu...</i>
+                </div>
+                
+                <h4>Log Result (Admin):</h4>
+                <pre id="log-admin-orders">No data yet...</pre>
+            </div>
+        </div>
+    </div>
+
+    <div id="orderModal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <h2 style="margin-top: 0;">Chi tiết đơn hàng</h2>
+            <div id="modal-body">
+                Loading...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ================= CONFIG & HELPERS =================
+        const BASE_URL = 'http://localhost:5000/api/v1'; 
+        
+        let token = localStorage.getItem('accessToken') || '';
+        document.getElementById('tokenInput').value = token;
+
+        function saveToken() {
+            token = document.getElementById('tokenInput').value;
+            localStorage.setItem('accessToken', token);
+            alert('Đã lưu Token thành công!');
+        }
+
+        function getHeaders(isJson = true) {
+            const headers = { 'Authorization': `Bearer ${token}` };
+            if (isJson) headers['Content-Type'] = 'application/json';
+            return headers;
+        }
+
+        function log(elementId, data) {
+            console.log(data);
+            document.getElementById(elementId).innerText = JSON.stringify(data, null, 2);
+        }
+
+        // ================= CART API =================
+        function testGetCart() {
+            fetch(`${BASE_URL}/cart`, { method: 'GET', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-cart', res);
+                    renderCartUI(res.data);
+                })
+                .catch(err => log('log-cart', err.message));
+        }
+
+        function testAddToCart() {
+            const body = {
+                productVariantId: document.getElementById('addVariantId').value,
+                quantity: parseInt(document.getElementById('addQty').value)
+            };
+            fetch(`${BASE_URL}/cart`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-cart', res);
+                    testGetCart();
+                })
+                .catch(err => log('log-cart', err.message));
+        }
+
+        function testClearCart() {
+            fetch(`${BASE_URL}/cart`, { method: 'DELETE', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-cart', res);
+                    testGetCart();
+                });
+        }
+
+        // ===== CART API MỚI =====
+        function testValidateItem() {
+            const body = {
+                productVariantId: document.getElementById('addVariantId').value,
+                quantity: parseInt(document.getElementById('addQty').value)
+            };
+            fetch(`${BASE_URL}/cart/validate-item`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-cart', res);
+                    alert(res.message || (res.data?.inStock ? '✅ Còn hàng' : '❌ Hết hàng'));
+                })
+                .catch(err => log('log-cart', err.message));
+        }
+
+        function testSyncCart() {
+            if (!confirm('Sync giỏ hàng từ localStorage lên DB?')) return;
+            fetch(`${BASE_URL}/cart/sync`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({}) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-cart', res);
+                    alert(res.message || 'Sync thành công');
+                    testGetCart();
+                })
+                .catch(err => log('log-cart', err.message));
+        }
+
+        function testUpdateCartItemQuantity() {
+            const cartItemId = document.getElementById('editCartItemId').value;
+            const newQty = parseInt(document.getElementById('editQty').value);
+            if (!cartItemId) {
+                alert('Vui lòng nhập Cart Item ID');
+                return;
+            }
+            const body = { quantity: newQty };
+            fetch(`${BASE_URL}/cart/${cartItemId}/change-quantity`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(body) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-cart', res);
+                    testGetCart();
+                })
+                .catch(err => log('log-cart', err.message));
+        }
+
+        function testChangeCartItemVariant() {
+            const cartItemId = document.getElementById('editCartItemId').value;
+            const newVariantId = document.getElementById('editVariantId').value;
+            if (!cartItemId || !newVariantId) {
+                alert('Vui lòng nhập Cart Item ID và Variant ID mới');
+                return;
+            }
+            const body = { productVariantId: newVariantId };
+            fetch(`${BASE_URL}/cart/${cartItemId}/change-variant`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(body) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-cart', res);
+                    testGetCart();
+                })
+                .catch(err => log('log-cart', err.message));
+        }
+
+        function testRemoveCartItem() {
+            const cartItemId = document.getElementById('editCartItemId').value;
+            if (!cartItemId) {
+                alert('Vui lòng nhập Cart Item ID');
+                return;
+            }
+            if (!confirm('Xóa item này khỏi giỏ?')) return;
+            fetch(`${BASE_URL}/cart/${cartItemId}`, { method: 'DELETE', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-cart', res);
+                    testGetCart();
+                })
+                .catch(err => log('log-cart', err.message));
+        }
+
+        function renderCartUI(cartData) {
+            const container = document.getElementById('cart-ui-container');
+            if (!cartData || !cartData.items || cartData.items.length === 0) {
+                container.innerHTML = '<i>Giỏ hàng trống!</i>';
+                return;
+            }
+            container.innerHTML = cartData.items.map(item => `
+                <div style="display:flex; gap:15px; margin-bottom:10px; background: white; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    <img src="${item.image || 'https://via.placeholder.com/60'}" width="60" height="60" style="object-fit: cover; border-radius: 4px; border: 1px solid #eee;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600;">${item.productName}</div>
+                        <div style="font-size: 12px; color: #777;">Phân loại: ${item.color || ''} ${item.storage ? '- ' + item.storage : ''}</div>
+                        <div style="color: #d32f2f; font-weight: bold;">${Number(item.unitPrice).toLocaleString('vi-VN')} đ <span style="color:#555; font-size:12px; font-weight:normal;">x ${item.quantity}</span></div>
+                    </div>
+                </div>
+            `).join('');
+            container.innerHTML += `<div style="text-align:right; font-weight:bold; margin-top:10px;">Tổng tiền: ${Number(cartData.subtotal).toLocaleString('vi-VN')} đ</div>`;
+        }
+
+        // ================= ADDRESS API =================
+        function loadProvinces() {
+            fetch(`${BASE_URL}/addresses/locations/provinces`, { method: 'GET', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    if (res.data) {
+                        const sel = document.getElementById('newAddrProvince');
+                        sel.innerHTML = '<option value="">-- Chọn Tỉnh/Thành --</option>' + 
+                            res.data.map(p => `<option value="${p.id}">${p.fullName}</option>`).join('');
+                        alert('Đã tải Tỉnh/Thành công!');
+                    }
+                }).catch(err => alert('Lỗi tải Tỉnh/Thành: ' + err.message));
+        }
+
+        function loadWards(provinceId) {
+            if (!provinceId) return;
+            fetch(`${BASE_URL}/addresses/locations/${provinceId}/wards?perPage=1000`, { method: 'GET', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    if (res.data) {
+                        const sel = document.getElementById('newAddrWard');
+                        sel.innerHTML = '<option value="">-- Chọn Phường/Xã --</option>' + 
+                            res.data.map(w => `<option value="${w.id}">${w.fullName}</option>`).join('');
+                    }
+                });
+        }
+
+        function testGetAddresses() {
+            fetch(`${BASE_URL}/addresses`, { method: 'GET', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-address', res);
+                    renderAddressUI(res.data);
+                });
+        }
+
+        function testGetDefaultAddress() {
+            fetch(`${BASE_URL}/addresses/default`, { method: 'GET', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-address', res);
+                    if (res.data) {
+                        renderAddressUI([res.data]);
+                        alert('Đã hiển thị Địa chỉ mặc định');
+                    } else {
+                        alert(res.message || 'Không có địa chỉ mặc định');
+                    }
+                });
+        }
+
+        function testCreateAddress() {
+            const body = {
+                contactName: document.getElementById('newAddrName').value,
+                phone: document.getElementById('newAddrPhone').value,
+                provinceId: document.getElementById('newAddrProvince').value,
+                wardId: document.getElementById('newAddrWard').value,
+                detailAddress: document.getElementById('newAddrDetail').value,
+                type: document.querySelector('input[name="newAddrType"]:checked').value,
+                isDefault: document.getElementById('newAddrDefault').checked
+            };
+
+            fetch(`${BASE_URL}/addresses`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-address', res);
+                    if (res.success) {
+                        alert('🎉 Tạo địa chỉ thành công!');
+                        testGetAddresses(); 
+                    } else alert('Lỗi: ' + res.message);
+                });
+        }
+
+        function testSetDefaultAddress(id) {
+            fetch(`${BASE_URL}/addresses/${id}/set-default`, { method: 'PUT', headers: getHeaders() })
+                .then(res => res.json()).then(res => { testGetAddresses(); });
+        }
+
+        function testDeleteAddress(id) {
+            if (!confirm('Xóa địa chỉ này?')) return;
+            fetch(`${BASE_URL}/addresses/${id}`, { method: 'DELETE', headers: getHeaders() })
+                .then(res => res.json()).then(res => { testGetAddresses(); });
+        }
+
+        function renderAddressUI(addresses) {
+            const container = document.getElementById('address-container');
+            if (!addresses || addresses.length === 0) {
+                container.innerHTML = '<p style="color:#666;">Chưa có địa chỉ nào.</p>';
+                return;
+            }
+
+            container.innerHTML = addresses.map(addr => `
+                <div style="border: 1px solid ${addr.isDefault ? '#17a2b8' : '#ddd'}; padding: 12px; margin-bottom: 10px; border-radius: 6px; background: ${addr.isDefault ? '#f0f9fa' : 'white'}; position: relative;">
+                    ${addr.isDefault ? '<span class="badge status-DEFAULT" style="position: absolute; top: 10px; right: 10px;">Mặc định</span>' : ''}
+                    <div style="font-weight: bold; color: #222;">
+                        ${addr.contactName} - ${addr.phone} 
+                        <span style="font-size:10px; background:#eee; padding:2px 5px; border-radius:3px;">${addr.type || 'N/A'}</span>
+                    </div>
+                    <div style="font-size: 13px; color: #555; margin: 5px 0;">${addr.fullAddress || addr.detailAddress}</div>
+                    
+                    <div style="margin-top: 10px;">
+                        <code style="background: #e9ecef; padding: 3px 6px; font-size: 11px; border-radius: 4px; color: #d63384; display:block; margin-bottom:10px;">ID: ${addr.id}</code>
+                        <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                            <button class="btn-cyan" style="padding: 4px 10px; font-size: 12px; margin:0;" onclick="useAddress('${addr.id}')">🎯 Chọn Đặt hàng</button>
+                            ${!addr.isDefault ? `<button class="btn-orange" style="padding: 4px 10px; font-size: 12px; margin:0;" onclick="testSetDefaultAddress('${addr.id}')">⭐ Đặt Mặc định</button>` : ''}
+                            <button class="btn-red" style="padding: 4px 10px; font-size: 12px; margin:0;" onclick="testDeleteAddress('${addr.id}')">🗑️ Xóa</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function useAddress(id) {
+            document.getElementById('chkAddressId').value = id;
+            alert('✅ Đã điền Address ID xuống form Đặt hàng (Checkout)!');
+        }
+
+        // ================= CHECKOUT API =================
+        function buildCheckoutQueryOrBody(isQuery = false) {
+            const data = {
+                shippingAddressId: document.getElementById('chkAddressId').value,
+                paymentMethodId: document.getElementById('chkPaymentId').value,
+                voucherId: document.getElementById('chkVoucherId').value || undefined
+            };
+            if (isQuery) {
+                const params = new URLSearchParams();
+                if (data.shippingAddressId) params.append('shippingAddressId', data.shippingAddressId);
+                if (data.paymentMethodId) params.append('paymentMethodId', data.paymentMethodId);
+                if (data.voucherId) params.append('voucherId', data.voucherId);
+                return '?' + params.toString();
+            }
+            return data;
+        }
+
+        function testValidateCheckout() {
+            fetch(`${BASE_URL}/checkout/validate`, { method: 'GET', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-checkout', res);
+                    alert(res.message || (res.data?.valid ? '✅ Giỏ hàng hợp lệ' : '❌ Giỏ hàng không hợp lệ'));
+                })
+                .catch(err => log('log-checkout', err.message));
+        }
+
+        function testCheckoutPreview() {
+            const query = buildCheckoutQueryOrBody(true);
+            fetch(`${BASE_URL}/checkout/preview${query}`, { method: 'GET', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => log('log-checkout', res))
+                .catch(err => log('log-checkout', err.message));
+        }
+
+        function testCheckout() {
+            const body = buildCheckoutQueryOrBody(false);
+            if (!body.shippingAddressId || !body.paymentMethodId) {
+                alert("Vui lòng nhập Address ID và Payment ID!");
+                return;
+            }
+            fetch(`${BASE_URL}/checkout`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-checkout', res);
+                    if (res.success) {
+                        alert('🎉 Đặt hàng thành công!');
+                        testGetCart(); 
+                        testGetMyOrders(); 
+                    }
+                })
+                .catch(err => log('log-checkout', err.message));
+        }
+
+        // ================= ORDER API (CẬP NHẬT FLATTEN DATA) =================
+        function testGetMyOrders() {
+            fetch(`${BASE_URL}/orders/my`, { method: 'GET', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    const container = document.getElementById('my-orders-container');
+                    if (!res.data || res.data.length === 0) {
+                        container.innerHTML = '<p style="color:#666;">Chưa có đơn hàng nào.</p>';
+                        return;
+                    }
+
+                    container.innerHTML = res.data.map(o => {
+                        // LOGIC MỚI: Đọc trực tiếp cấu trúc phẳng (Flattened Data)
+                        const itemsHtml = o.orderItems ? o.orderItems.map(item => {
+                            const productName = item.productName || 'Không rõ tên';
+                            const image = item.image || 'https://via.placeholder.com/40';
+                            const color = item.color || '';
+                            const storage = item.storage || '';
+                            const variantText = [color, storage].filter(Boolean).join(' - ');
+
+                            return `
+                            <div style="display:flex; align-items:center; gap:10px; margin-top:10px;">
+                                <img src="${image}" width="40" height="40" style="border-radius:4px; object-fit:cover; border:1px solid #ddd;">
+                                <div style="font-size:13px; line-height:1.4;">
+                                    <b>${productName}</b><br>
+                                    <span style="color:#777;">${variantText} | SL: ${item.quantity}</span>
+                                </div>
+                            </div>
+                            `;
+                        }).join('') : '';
+
+                        return `
+                        <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 6px; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                            <div style="display:flex; justify-content:space-between; border-bottom: 1px dashed #eee; padding-bottom: 10px;">
+                                <div><b>Mã đơn:</b> <span style="color:#007bff; font-weight:bold;">${o.orderCode}</span></div>
+                                <span class="badge status-${o.orderStatus}">${o.orderStatus}</span>
+                            </div>
+                            ${itemsHtml}
+                            <div style="margin-top: 15px; text-align: right;">
+                                <b>Tổng tiền:</b> <span style="color:#d32f2f; font-size:16px; font-weight:bold;">${Number(o.totalAmount).toLocaleString('vi-VN')} đ</span>
+                            </div>
+                            <div style="margin-top: 10px; text-align: right; display:flex; justify-content: flex-end; gap: 5px;">
+                                <button class="btn-cyan" style="padding: 5px 10px; font-size: 12px;" onclick="showOrderDetail('${o.id}', false)">👁️ Chi tiết</button>
+                                ${(o.orderStatus === 'DELIVERED' || o.orderStatus === 'CANCELLED') ? `<button class="btn-orange" style="padding: 5px 10px; font-size: 12px;" onclick="testReorderOrder('${o.id}')">🔄 Tạo lại</button>` : ''}
+                                ${(o.orderStatus === 'PENDING' || o.orderStatus === 'PROCESSING') ? `<button class="btn-red" style="padding: 5px 10px; font-size: 12px;" onclick="testCancelOrder('${o.id}')">❌ Hủy Đơn</button>` : ''}
+                            </div>
+                        </div>`;
+                    }).join('');
+                }).catch(err => alert('Lỗi tải đơn hàng: ' + err.message));
+        }
+
+        function testCancelOrder(orderId) {
+            if (!confirm('Bạn có chắc chắn muốn hủy đơn hàng này không?')) return;
+            fetch(`${BASE_URL}/orders/my/${orderId}/cancel`, { method: 'POST', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    alert(res.message);
+                    testGetMyOrders();
+                });
+        }
+
+        // ===== ORDER API MỚI - USER =====
+        function testGetPaymentInfo() {
+            const orderCode = document.getElementById('searchOrderCode').value;
+            if (!orderCode) {
+                alert('Vui lòng nhập mã đơn hàng');
+                return;
+            }
+            fetch(`${BASE_URL}/orders/by-code/${orderCode}/payment-info`, { method: 'GET', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-admin-orders', res);
+                    alert('Xem log result để xem thông tin thanh toán');
+                })
+                .catch(err => log('log-admin-orders', err.message));
+        }
+
+        function testReorderOrder(orderId) {
+            if (!confirm('Tạo lại đơn hàng này?')) return;
+            fetch(`${BASE_URL}/orders/my/${orderId}/reorder`, { method: 'POST', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-admin-orders', res);
+                    alert(res.message || 'Tạo lại đơn thành công');
+                    testGetMyOrders();
+                })
+                .catch(err => log('log-admin-orders', err.message));
+        }
+
+        // ===== ORDER API MỚI - ADMIN =====
+        function testCreateOrderAdmin() {
+            const body = {
+                userId: document.getElementById('adminOrderUserId').value,
+                shippingAddressId: document.getElementById('adminOrderAddressId').value,
+                paymentMethodId: document.getElementById('adminOrderPaymentId').value,
+                note: document.getElementById('adminOrderNote').value || undefined
+            };
+            if (!body.userId || !body.shippingAddressId || !body.paymentMethodId) {
+                alert('Vui lòng nhập User ID, Address ID, Payment ID');
+                return;
+            }
+            fetch(`${BASE_URL}/orders/admin`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-admin-orders', res);
+                    alert(res.message || 'Tạo đơn thành công');
+                    testGetAdminOrders();
+                })
+                .catch(err => log('log-admin-orders', err.message));
+        }
+
+        function testUpdateOrderAdmin() {
+            const orderId = document.getElementById('adminUpdateOrderId').value;
+            const status = document.getElementById('adminUpdateStatus').value;
+            if (!orderId || !status) {
+                alert('Vui lòng nhập Order ID và Status');
+                return;
+            }
+            const body = { orderStatus: status };
+            fetch(`${BASE_URL}/orders/admin/${orderId}`, { method: 'PATCH', headers: getHeaders(), body: JSON.stringify(body) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-admin-orders', res);
+                    alert(res.message || 'Cập nhật thành công');
+                    testGetAdminOrders();
+                })
+                .catch(err => log('log-admin-orders', err.message));
+        }
+
+        function testCancelOrderAdmin() {
+            const orderId = document.getElementById('adminUpdateOrderId').value;
+            if (!orderId) {
+                alert('Vui lòng nhập Order ID');
+                return;
+            }
+            if (!confirm('Hủy đơn hàng này (Admin)?')) return;
+            fetch(`${BASE_URL}/orders/admin/${orderId}/cancel`, { method: 'POST', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-admin-orders', res);
+                    alert(res.message || 'Hủy đơn thành công');
+                    testGetAdminOrders();
+                })
+                .catch(err => log('log-admin-orders', err.message));
+        }
+
+        let currentAdminOrders = [];
+        function testGetAdminOrders() {
+            fetch(`${BASE_URL}/orders/admin/all`, { method: 'GET', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    currentAdminOrders = res.data || [];
+                    log('log-admin-orders', res);
+                    renderAdminOrdersUI(currentAdminOrders);
+                });
+        }
+
+        function filterAdminOrders(status, element) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            element.classList.add('active');
+            let filtered = status === 'ALL' ? currentAdminOrders : currentAdminOrders.filter(o => o.orderStatus === status);
+            log('log-admin-orders', { message: `Lọc trạng thái: ${status}`, count: filtered.length, data: filtered });
+            renderAdminOrdersUI(filtered);
+        }
+
+        // Render UI Admin List
+        function renderAdminOrdersUI(orders) {
+            const container = document.getElementById('admin-orders-container');
+            if (!orders || orders.length === 0) {
+                container.innerHTML = '<p style="color:#666;">Không có đơn hàng nào.</p>';
+                return;
+            }
+
+            container.innerHTML = orders.map(o => `
+                <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 6px; background: white;">
+                    <div style="display:flex; justify-content:space-between; align-items: center;">
+                        <div><b>${o.orderCode}</b> - <span style="font-size:12px;color:#666;">Khách: ${o.user?.fullName || o.shippingContactName}</span></div>
+                        <span class="badge status-${o.orderStatus}">${o.orderStatus}</span>
+                    </div>
+                    <div style="margin-top: 5px; font-size: 13px;">Tổng tiền: <b style="color:#d32f2f;">${Number(o.totalAmount).toLocaleString('vi-VN')} đ</b></div>
+                    <div style="margin-top: 10px; display: flex; gap: 5px; flex-wrap: wrap;">
+                        <button class="btn-cyan" style="padding: 4px 10px; font-size: 12px;" onclick="showOrderDetail('${o.id}', true)">👁️ Chi tiết</button>
+                        <button class="btn-orange" style="padding: 4px 10px; font-size: 12px;" onclick="usOrderId('${o.id}')">📋 Chọn Cập nhật</button>
+                        <button class="btn-red" style="padding: 4px 10px; font-size: 12px;" onclick="usOrderIdAndCancel('${o.id}')">❌ Hủy Ngay</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function usOrderId(id) {
+            document.getElementById('adminUpdateOrderId').value = id;
+            alert('✅ Đã điền Order ID. Chọn Status rồi bấm Cập nhật!');
+        }
+
+        function usOrderIdAndCancel(id) {
+            document.getElementById('adminUpdateOrderId').value = id;
+            if (confirm('Hủy đơn này?')) {
+                testCancelOrderAdmin();
+            }
+        }
+
+        // HÀM MỞ MODAL XEM CHI TIẾT CHUNG CHO CẢ USER & ADMIN
+        function showOrderDetail(id, isAdmin = false) {
+            // Chọn API tùy theo vai trò
+            const url = isAdmin ? `${BASE_URL}/orders/admin/${id}` : `${BASE_URL}/orders/my/${id}`;
+
+            fetch(url, { headers: getHeaders() })
+                .then(res => res.json()).then(res => {
+                    if (res.data) {
+                        const o = res.data;
+                        document.getElementById('orderModal').style.display = 'flex';
+                        
+                        const fullAddress = `${o.shippingDetail || ''}, ${o.shippingWard || ''}, ${o.shippingProvince || ''}`;
+                        
+                        // LOGIC MỚI: Đọc trực tiếp cấu trúc phẳng (Flattened Data)
+                        const items = o.orderItems ? o.orderItems.map(item => {
+                            const productName = item.productName || 'Không rõ tên';
+                            const image = item.image || 'https://via.placeholder.com/60';
+                            const color = item.color || '';
+                            const storage = item.storage || '';
+                            const variantText = [color, storage].filter(Boolean).join(' - ');
+
+                            return `
+                            <div style="display:flex; gap:15px; margin-bottom:10px; background: #fff; padding: 10px; border: 1px solid #eee; border-radius: 6px;">
+                                <img src="${image}" width="60" height="60" style="object-fit: cover; border-radius: 4px; border: 1px solid #ddd;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 600; color: #222;">${productName}</div>
+                                    <div style="font-size: 12px; color: #777; margin: 4px 0;">
+                                        Phân loại: ${variantText}
+                                    </div>
+                                    <div style="color: #d32f2f; font-weight: bold; display: flex; justify-content: space-between;">
+                                        <span>${Number(item.unitPrice).toLocaleString('vi-VN')} đ</span>
+                                        <span style="color:#555; font-size: 13px;">x ${item.quantity}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            `;
+                        }).join('') : '<p>Không có sản phẩm</p>';
+
+                        document.getElementById('modal-body').innerHTML = `
+                            <div style="display:flex; justify-content: space-between; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;">
+                                <b>Mã ĐH: <span style="color:#007bff">${o.orderCode}</span></b>
+                                <span class="badge status-${o.orderStatus}">${o.orderStatus}</span>
+                            </div>
+                            <div style="background:#f8f9fa; padding:15px; border-radius:6px; margin-bottom:15px;">
+                                <b>📍 Giao tới:</b> ${o.shippingContactName || 'N/A'} - ${o.shippingPhone || 'N/A'}<br>
+                                <span style="color:#555; font-size: 14px;">${fullAddress}</span>
+                            </div>
+                            <h4>Sản phẩm đã mua:</h4>
+                            ${items}
+                            <div style="margin-top:20px; text-align:right; line-height: 1.8; background: #fffaf0; padding: 15px; border-radius: 6px; border: 1px solid #ffeeba;">
+                                Tổng tiền hàng: ${Number(o.subtotalAmount).toLocaleString('vi-VN')} đ<br>
+                                Phí vận chuyển: ${Number(o.shippingFee).toLocaleString('vi-VN')} đ<br>
+                                Voucher giảm giá: -${Number(o.voucherDiscount).toLocaleString('vi-VN')} đ<br>
+                                <h3 style="color:#d32f2f; margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 10px;">Thành tiền: ${Number(o.totalAmount).toLocaleString('vi-VN')} đ</h3>
+                            </div>`;
+                    } else {
+                        document.getElementById('modal-body').innerHTML = 'Không tìm thấy dữ liệu đơn hàng.';
+                    }
+                }).catch(err => alert('Lỗi lấy chi tiết: ' + err.message));
+        }
+
+        function closeModal() { 
+            document.getElementById('orderModal').style.display = 'none'; 
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('orderModal');
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+    </script>
+</body>
+</html>

@@ -201,6 +201,229 @@
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 10px; }
+
+        /* Product Cards Container */
+        .product-cards-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 10px 0;
+            max-width: 100%;
+        }
+
+        .product-card {
+            display: flex;
+            gap: 12px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            max-width: 100%;
+        }
+
+        .product-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.15);
+            border-color: #007bff;
+            transform: translateY(-2px);
+        }
+
+        .product-image {
+            flex-shrink: 0;
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #f5f5f5;
+        }
+
+        .product-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .product-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            justify-content: space-between;
+        }
+
+        .product-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+            line-height: 1.3;
+        }
+
+        .product-specs {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .product-price {
+            font-weight: 700;
+            font-size: 15px;
+            color: #007bff;
+        }
+
+        .product-stock {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        /* Payment Methods Container */
+        .payment-methods-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 10px 0;
+            max-width: 100%;
+        }
+
+        .payment-method {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            gap: 12px;
+        }
+
+        .payment-method:hover {
+            border-color: #007bff;
+            background-color: #f9f9f9;
+            box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
+        }
+
+        .payment-method input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #007bff;
+        }
+
+        .payment-method label {
+            flex: 1;
+            cursor: pointer;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .payment-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .payment-desc {
+            font-size: 13px;
+            color: #666;
+        }
+
+        /* Order Tracking Container */
+        .order-tracking-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 10px 0;
+            max-width: 100%;
+        }
+
+        .order-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .order-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            gap: 10px;
+        }
+
+        .order-header strong {
+            font-size: 15px;
+            color: #333;
+        }
+
+        .order-date {
+            font-size: 12px;
+            color: #999;
+            white-space: nowrap;
+        }
+
+        .order-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .order-items {
+            margin-bottom: 10px;
+        }
+
+        .order-items h4 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            color: #333;
+        }
+
+        .order-items ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .order-items li {
+            font-size: 13px;
+            color: #555;
+            line-height: 1.4;
+        }
+
+        .order-details {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
+
+        .order-details p {
+            margin: 0;
+            font-size: 13px;
+            color: #555;
+            line-height: 1.5;
+        }
+
+        .order-details strong {
+            color: #333;
+        }
     </style>
 </head>
 <body>
@@ -239,6 +462,8 @@
         
         // Mảng lưu trữ lịch sử tin nhắn để gửi lên server
         let chatHistory = [];
+        let selectedVariantId = null; // Lưu variant ID khi user click card
+        let selectedPaymentMethodId = null; // Lưu payment method ID khi user chọn
 
         const chatMessages = document.getElementById('chatMessages');
         const userInput = document.getElementById('userInput');
@@ -267,13 +492,17 @@
             showTyping(true);
 
             try {
-                // 3. Gọi API (Gửi mảng chatHistory)
+                // 3. Gọi API (Gửi mảng chatHistory + selectedVariantId + selectedPaymentMethodId)
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ messages: chatHistory })
+                    body: JSON.stringify({ 
+                        messages: chatHistory,
+                        selectedVariantId: selectedVariantId,
+                        selectedPaymentMethodId: selectedPaymentMethodId
+                    })
                 });
 
                 const result = await response.json();
@@ -284,9 +513,29 @@
                     // Thêm phản hồi của bot vào lịch sử
                     chatHistory.push({ role: 'assistant', content: botReply });
                     
-                    // Hiển thị tin nhắn của bot (Sử dụng Marked.js để parse Markdown thành HTML)
-                    const parsedHtml = marked.parse(botReply);
-                    appendMessage('bot', parsedHtml, true);
+                    // Kiểm tra nếu response có HTML cards (Products)
+                    if (result.data.html && result.data.format === 'html_cards') {
+                        // Hiển thị message + HTML cards
+                        appendMessage('bot', botReply || 'Các phiên bản sản phẩm:');
+                        appendProductCards(result.data.html, result.data.variants);
+                    } 
+                    // Kiểm tra nếu response có HTML payment methods
+                    else if (result.data.html && result.data.format === 'payment_methods') {
+                        // Hiển thị message + payment methods
+                        appendMessage('bot', botReply || 'Danh sách phương thức thanh toán:');
+                        appendPaymentMethods(result.data.html, result.data.paymentMethods);
+                    }
+                    // Kiểm tra nếu response có HTML order tracking
+                    else if (result.data.html && result.data.format === 'order_tracking') {
+                        // Hiển thị message + order tracking
+                        appendMessage('bot', botReply || 'Thông tin đơn hàng của bạn:');
+                        appendOrderTracking(result.data.html);
+                    }
+                    else {
+                        // Hiển thị tin nhắn bình thường (Markdown)
+                        const parsedHtml = marked.parse(botReply);
+                        appendMessage('bot', parsedHtml, true);
+                    }
                 } else {
                     appendMessage('bot', 'Xin lỗi, hệ thống đang bận. Bạn thử lại sau nhé!');
                     console.error('API Error:', result);
@@ -313,6 +562,73 @@
 
             // Chèn tin nhắn mới lên TRƯỚC cái typing indicator
             chatMessages.insertBefore(messageDiv, typingIndicator);
+            scrollToBottom();
+        }
+
+        function appendProductCards(htmlCards, variants = []) {
+            const containerDiv = document.createElement('div');
+            containerDiv.innerHTML = htmlCards;
+            
+            // Attach click handlers cho mỗi product card
+            const cards = containerDiv.querySelectorAll('.product-card');
+            cards.forEach((card, idx) => {
+                card.addEventListener('click', function() {
+                    // Lưu variant ID
+                    selectedVariantId = this.getAttribute('data-variant-id');
+                    const variantName = this.getAttribute('data-variant-name');
+                    
+                    console.log(`✅ Đã chọn: ${variantName}, variantId: ${selectedVariantId}`);
+                    
+                    // 🔥 TỰ ĐỘNG NHẬP TEXT VÀO Ô INPUT VÀ GỬI
+                    userInput.value = `Tôi chọn phiên bản: ${variantName}`;
+                    sendMessage(); // Dùng lại đúng hàm gửi chuẩn
+                });
+            });
+            
+            // Thêm vào chat
+            chatMessages.insertBefore(containerDiv, typingIndicator);
+            scrollToBottom();
+        }
+
+        function appendPaymentMethods(htmlPaymentMethods, paymentMethods = []) {
+            const containerDiv = document.createElement('div');
+            containerDiv.innerHTML = htmlPaymentMethods;
+            
+            // Attach click handlers cho mỗi payment method
+            const paymentItems = containerDiv.querySelectorAll('.payment-method');
+            paymentItems.forEach((item, idx) => {
+                const radioInput = item.querySelector('input[type="radio"]');
+                const label = item.querySelector('label');
+                
+                // Click vào radio hoặc label để select
+                [radioInput, label].forEach(el => {
+                    el.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        
+                        // Lưu payment method ID và gửi message
+                        selectedPaymentMethodId = item.getAttribute('data-payment-id');
+                        const paymentName = item.getAttribute('data-payment-name');
+                        
+                        console.log(`✅ Đã chọn phương thức thanh toán: ${paymentName} (ID: ${selectedPaymentMethodId})`);
+                        
+                        // Sử dụng standard sendMessage flow
+                        userInput.value = `Tôi chọn phương thức: ${paymentName}`;
+                        sendMessage();
+                    });
+                });
+            });
+            
+            // Thêm vào chat
+            chatMessages.insertBefore(containerDiv, typingIndicator);
+            scrollToBottom();
+        }
+
+        function appendOrderTracking(htmlOrderTracking) {
+            const containerDiv = document.createElement('div');
+            containerDiv.innerHTML = htmlOrderTracking;
+            
+            // Thêm vào chat
+            chatMessages.insertBefore(containerDiv, typingIndicator);
             scrollToBottom();
         }
 

@@ -7,6 +7,8 @@ const chatSchema = z.object({
       content: z.string(),
     })
   ),
+  selectedVariantId: z.string().uuid().nullish(), // Allow null, undefined, or valid UUID
+  selectedPaymentMethodId: z.string().uuid().nullish(), // Allow null, undefined, or valid UUID
 });
 
 export const chatbotValidation = {

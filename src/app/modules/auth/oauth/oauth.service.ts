@@ -205,8 +205,7 @@ export const loginWithGoogle = async (idToken: string, meta?: OAuthLoginMeta) =>
 // ─── Facebook ─────────────────────────────────────────────────────────────────
 
 export const loginWithFacebook = async (accessToken: string, meta?: OAuthLoginMeta) => {
-  // Bổ sung birthday và gender vào fields
-  const fields = "id,name,picture.type(large),birthday,gender";
+  const fields = "id,name,email,picture.type(large)";
   const url = `https://graph.facebook.com/me?fields=${fields}&access_token=${accessToken}`;
 
   const response = await fetch(url);
@@ -228,36 +227,49 @@ export const loginWithFacebook = async (accessToken: string, meta?: OAuthLoginMe
     fullName: data.name ?? "Facebook User",
     avatarImage: data.picture?.data?.url,
     accessToken,
-    // Lấy thêm 2 trường từ Data trả về
-    gender: data.gender,
-    birthday: data.birthday,
+    // Xóa gender và birthday
   };
 
   return findOrCreateOAuthUser("facebook", profile, meta);
 };
 
+export const exchangeFacebookCode = async (code: string, redirectUri: string, meta?: OAuthLoginMeta) => {
+  const params = new URLSearchParams({
+    client_id: process.env.FB_APP_ID!,
+    client_secret: process.env.FB_APP_SECRET!,
+    redirect_uri: redirectUri,
+    code,
+  });
+
+  const tokenRes = await fetch(
+    `https://graph.facebook.com/v25.0/oauth/access_token?${params}`
+  );
+  const tokenData = (await tokenRes.json()) as any;
+
+  if (!tokenRes.ok || tokenData.error) {
+    console.log("==== LỖI EXCHANGE FACEBOOK CODE ====");
+    console.log("redirect_uri gửi lên:", redirectUri);
+    console.log("Facebook error:", JSON.stringify(tokenData.error, null, 2));
+    throw new UnauthorizedError("Không thể exchange Facebook code");
+  }
+
+  return loginWithFacebook(tokenData.access_token, meta);
+};
+
 // ─── Apple ────────────────────────────────────────────────────────────────────
 
-/**
- * Verify Apple identity token (JWT signed bởi Apple).
- * Apple trả về id_token dạng JWT, ta verify bằng public key của Apple.
- * Lần đầu đăng nhập Apple mới trả fullName trong body request.
- */
 export const loginWithApple = async (input: { idToken: string; fullName?: string }, meta?: OAuthLoginMeta) => {
-  // Fetch Apple public keys
   const keysRes = await fetch("https://appleid.apple.com/auth/keys");
   if (!keysRes.ok) throw new BadRequestError("Không thể xác thực với Apple");
 
   const { keys } = (await keysRes.json()) as { keys: any[] };
 
-  // Decode header để lấy kid
   const [headerB64] = input.idToken.split(".");
   const header = JSON.parse(Buffer.from(headerB64, "base64url").toString());
 
   const appleKey = keys.find((k: any) => k.kid === header.kid);
   if (!appleKey) throw new UnauthorizedError("Apple public key không khớp");
 
-  // Convert JWK → PEM
   const { createPublicKey } = await import("crypto");
   const publicKey = createPublicKey({ key: appleKey, format: "jwk" });
   const pem = publicKey.export({ type: "spki", format: "pem" }).toString();
@@ -278,7 +290,6 @@ export const loginWithApple = async (input: { idToken: string; fullName?: string
   const profile: OAuthUserProfile = {
     providerAccountId: payload.sub,
     email: payload.email ?? `apple_${payload.sub}@noemail.local`,
-    // Apple chỉ gửi tên lần đầu đăng nhập
     fullName: input.fullName ?? "Apple User",
   };
 
