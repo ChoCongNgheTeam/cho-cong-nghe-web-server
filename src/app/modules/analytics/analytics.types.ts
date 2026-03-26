@@ -1,6 +1,6 @@
 // ─── Time Range ───────────────────────────────────────────────────────────────
 
-export type TimeGranularity = "day" | "week" | "month";
+export type TimeGranularity = "hour" | "day" | "week" | "month";
 
 export interface TimeRangeQuery {
   from: Date;
@@ -10,25 +10,20 @@ export interface TimeRangeQuery {
 
 // ─── Dashboard Summary ────────────────────────────────────────────────────────
 
+export interface MetricWithTrend {
+  total: number;
+  change: number; // % so sánh kỳ trước
+  sparkline: number[]; // 7 điểm gần nhất để vẽ mini chart
+}
+
 export interface DashboardSummary {
-  revenue: {
-    total: number;
-    change: number; // % so sánh kỳ trước
-  };
-  orders: {
-    total: number;
-    change: number;
-    pendingChatbot: number; // Đơn chatbot chờ staff confirm
-  };
-  customers: {
-    total: number;
-    newThisPeriod: number;
-    change: number;
-  };
+  revenue: MetricWithTrend;
+  orders: MetricWithTrend & { pendingChatbot: number };
+  customers: MetricWithTrend & { newThisPeriod: number };
   products: {
     totalActive: number;
-    lowStock: number; // quantity <= 5
-    outOfStock: number; // quantity = 0
+    lowStock: number;
+    outOfStock: number;
   };
 }
 
@@ -43,11 +38,21 @@ export interface RecentOrder {
   orderCode: string;
   customerName: string;
   customerEmail: string;
+  customerPhone: string | null;
+  customerAddress: string | null;
   totalAmount: number;
   orderStatus: string;
   paymentStatus: string;
   orderDate: Date;
   isChatbotRequest: boolean;
+  items: OrderItemSummary[];
+}
+
+export interface OrderItemSummary {
+  productName: string;
+  variantCode: string | null;
+  quantity: number;
+  unitPrice: number;
 }
 
 export interface TopProduct {
@@ -58,20 +63,22 @@ export interface TopProduct {
   totalSold: number;
   totalRevenue: number;
   imageUrl: string | null;
+  currentStock: number; // tồn kho hiện tại
+  daysUntilStockout: number | null; // dự báo hết hàng (null = không xác định)
 }
 
 export interface DashboardResponse {
   summary: DashboardSummary;
   orderStatusBreakdown: OrderStatusBreakdown[];
   recentOrders: RecentOrder[];
-  topProducts: TopProduct[];
   chatbotPendingOrders: RecentOrder[];
+  topProducts: TopProduct[];
 }
 
 // ─── Revenue Analytics ────────────────────────────────────────────────────────
 
 export interface RevenueDataPoint {
-  period: string; // "2024-01-15" | "2024-W03" | "2024-01"
+  period: string;
   revenue: number;
   orderCount: number;
   averageOrderValue: number;
@@ -104,28 +111,63 @@ export interface TopCustomer {
 }
 
 export interface ConversionFunnel {
-  requested: number; // REQUEST_PENDING (chatbot)
-  pending: number; // PENDING
-  processing: number; // PROCESSING
-  shipped: number; // SHIPPED
-  delivered: number; // DELIVERED
-  cancelled: number; // CANCELLED
+  requested: number;
+  pending: number;
+  processing: number;
+  shipped: number;
+  delivered: number;
+  cancelled: number;
+}
+
+// ─── Comparison (kỳ trước) ────────────────────────────────────────────────────
+
+export interface ComparisonDataPoint {
+  period: string;
+  revenue: number;
+  orderCount: number;
+  averageOrderValue: number;
+}
+
+// ─── Heatmap ──────────────────────────────────────────────────────────────────
+
+/** Mỗi ô trong heatmap: day 0–6 (Sun–Sat), hour 0–23 */
+export interface HeatmapCell {
+  day: number; // 0 = CN, 1 = T2, ..., 6 = T7
+  hour: number; // 0–23
+  count: number; // số đơn
+}
+
+// ─── Forecast ─────────────────────────────────────────────────────────────────
+
+export interface ForecastPoint {
+  period: string; // "YYYY-MM-DD"
+  revenue: number; // dự báo
+  isForcast: true;
+}
+
+// ─── Full Analytics Response ──────────────────────────────────────────────────
+
+export interface AnalyticsSummaryData {
+  totalRevenue: number;
+  totalOrders: number;
+  totalDelivered: number;
+  averageOrderValue: number;
+  cancellationRate: number;
+  deliveryRate: number;
+  revenueChange: number; // % so với kỳ trước
+  ordersChange: number; // % so với kỳ trước
 }
 
 export interface AnalyticsResponse {
   revenueOverTime: RevenueDataPoint[];
+  comparisonOverTime: ComparisonDataPoint[]; // kỳ trước — cùng độ dài
+  forecast: ForecastPoint[]; // 7 ngày tới (linear regression)
   revenueByPaymentMethod: RevenueByPaymentMethod[];
   revenueByCategory: RevenueByCategory[];
   topCustomers: TopCustomer[];
   conversionFunnel: ConversionFunnel;
-  summary: {
-    totalRevenue: number;
-    totalOrders: number;
-    totalDelivered: number;
-    averageOrderValue: number;
-    cancellationRate: number;
-    deliveryRate: number;
-  };
+  heatmap: HeatmapCell[];
+  summary: AnalyticsSummaryData;
 }
 
 // ─── Query Params ─────────────────────────────────────────────────────────────
