@@ -225,13 +225,49 @@ export const findAllAdmin = async (query: ListPromotionsQuery) => {
 
 export const findById = async (id: string, options: { includeDeleted?: boolean; isAdmin?: boolean } = {}) => {
   const { includeDeleted = false, isAdmin = false } = options;
-  return prisma.promotions.findFirst({
+  const promotion = await prisma.promotions.findFirst({
     where: {
       id,
       ...(!isAdmin || !includeDeleted ? { deletedAt: null } : {}),
     },
     select: isAdmin ? selectPromotionAdmin : selectPromotionDetail,
   });
+  if (!promotion) return null;
+  const targetsWithName = await Promise.all(
+    promotion.targets.map(async (target) => {
+      if (!target.targetId) return { ...target, targetName: undefined };
+      let targetName: string | undefined;
+      switch (target.targetType) {
+        case "BRAND":
+          targetName = (
+            await prisma.brands.findUnique({
+              where: { id: target.targetId },
+              select: { name: true },
+            })
+          )?.name;
+          break;
+        case "CATEGORY":
+          targetName = (
+            await prisma.categories.findUnique({
+              where: { id: target.targetId },
+              select: { name: true },
+            })
+          )?.name;
+          break;
+        case "PRODUCT":
+          targetName = (
+            await prisma.products.findUnique({
+              where: { id: target.targetId },
+              select: { name: true },
+            })
+          )?.name;
+          break;
+      }
+
+      return { ...target, targetName };
+    }),
+  );
+  return { ...promotion, targets: targetsWithName };
 };
 
 export const checkPromotionName = async (name: string, excludeId?: string): Promise<boolean> => {
@@ -320,6 +356,8 @@ export const create = async (data: CreatePromotionInput) => {
 };
 
 export const update = async (id: string, data: UpdatePromotionInput) => {
+  console.log(data);
+
   const { rules, targets, ...updateData } = data;
 
   if (rules !== undefined) {

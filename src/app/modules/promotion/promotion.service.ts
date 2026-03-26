@@ -1,6 +1,6 @@
 import * as repo from "./promotion.repository";
 import { CreatePromotionInput, UpdatePromotionInput, ListPromotionsQuery } from "./promotion.validation";
-import { transformPromotionCard, transformPromotionDetail } from "./promotion.transformers";
+import { transformPromotionCard, transformPromotionDetail, transformPromotionDetailWithExisting } from "./promotion.transformers";
 import { NotFoundError, BadRequestError, ForbiddenError } from "@/errors";
 
 // Helper — đảm bảo promotion tồn tại
@@ -68,13 +68,17 @@ export const createPromotion = async (input: CreatePromotionInput) => {
 export const updatePromotion = async (id: string, input: UpdatePromotionInput) => {
   const existing = await assertPromotionExists(id, { isAdmin: true });
 
+  console.log(existing);
+
   if (input.name && input.name !== (existing as any).name) {
     const nameExists = await repo.checkPromotionName(input.name, id);
     if (nameExists) throw new BadRequestError("Tên khuyến mãi đã tồn tại");
   }
 
   const promotion = await repo.update(id, input);
-  return transformPromotionDetail(promotion as any);
+  // console.log(promotion);
+
+  return transformPromotionDetailWithExisting(promotion as any, existing.targets);
 };
 
 // =====================

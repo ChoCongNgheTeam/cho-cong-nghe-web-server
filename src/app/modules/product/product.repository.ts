@@ -1374,7 +1374,7 @@ export const getSaleProductsCountByCategories = async (date: Date) => {
 
 export const findFeaturedProducts = async (limit: number = 12) => {
   return prisma.products.findMany({
-    where: { isActive: true, deletedAt: null },
+    where: { isActive: true, isFeatured: true, deletedAt: null },
     select: selectProductCard,
     orderBy: { viewsCount: "desc" },
     take: limit,
