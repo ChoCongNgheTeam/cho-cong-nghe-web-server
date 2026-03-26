@@ -69,6 +69,7 @@ export const createMomoPaymentUrl = async (orderId: string, amount: number, orde
       "Content-Type": "application/json",
       "Content-Length": Buffer.byteLength(requestBody),
     },
+    timeout: 8000, // 8 giây timeout để tránh hang
   });
 
   if (data.resultCode !== 0) {

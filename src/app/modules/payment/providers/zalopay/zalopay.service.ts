@@ -46,6 +46,7 @@ export const createZaloPayPaymentUrl = async (orderId: string, amount: number, d
 
   const { data } = await axios.post(process.env.ZALOPAY_API_URL!, body, {
     headers: { "Content-Type": "application/json" },
+    timeout: 8000, // 8 giây timeout để tránh hang
   });
 
   if (data.return_code !== 1) {

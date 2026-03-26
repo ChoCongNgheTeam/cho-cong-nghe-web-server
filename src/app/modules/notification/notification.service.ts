@@ -219,7 +219,7 @@ export const sendOrderCreatedAdminNotification = async (orderCode: string) => {
           body: `Đơn hàng #${orderCode} vừa được khách hàng đặt và đang chờ xử lý.`,
           data: { orderCode, status: "PENDING" },
         },
-        ["IN_APP", "PUSH"] // Gửi vào chuông thông báo web admin và Push về điện thoại admin
+        ["IN_APP"] // Gửi vào chuông thông báo web admin
       )
     );
 

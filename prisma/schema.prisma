@@ -34,7 +34,6 @@ enum AddressType {
 }
 
 enum OrderStatus {
-  REQUEST_PENDING    // Yêu cầu từ chatbot (chưa được staff confirm)
   PENDING            // Đơn thật đã được staff confirm / Chờ xử lý
   PROCESSING
   SHIPPED
