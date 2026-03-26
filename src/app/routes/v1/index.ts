@@ -44,6 +44,8 @@ import searchRoutes from "@/app/modules/search/search.route";
 
 import notificationRoutes from "@/app/modules/notification/notification.route";
 
+import analyticsRouter from "@/app/modules/analytics/analytics.route";
+
 const router = Router();
 
 // ===== Core & Auth =====
@@ -91,5 +93,8 @@ router.use("/search", searchRoutes);
 
 // ===== Notification =====
 router.use("/notifications", notificationRoutes);
+
+// ===== Analytics =====
+router.use("/analytics", analyticsRouter);
 
 export default router;
