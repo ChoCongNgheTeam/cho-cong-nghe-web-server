@@ -110,6 +110,23 @@ export const transformPromotionDetail = (promotion: RawPromotion): PromotionDeta
         id: target.id,
         targetType: target.targetType as TargetType,
         targetId: target.targetId ?? undefined,
+        targetName: target.targetName ?? undefined,
+      })) || [],
+  };
+};
+
+export const transformPromotionDetailWithExisting = (promotion: RawPromotion, existingTargets?: RawPromotion["targets"]): PromotionDetail => {
+  const targetMap = new Map(existingTargets?.map((t) => [t.targetId, t.targetName]));
+
+  return {
+    ...transformPromotionDetail(promotion),
+
+    targets:
+      promotion.targets?.map((target) => ({
+        id: target.id,
+        targetType: target.targetType as TargetType,
+        targetId: target.targetId ?? undefined,
+        targetName: target.targetName ?? targetMap.get(target.targetId) ?? undefined,
       })) || [],
   };
 };

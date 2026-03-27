@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ta } from "zod/v4/locales";
 
 // =====================
 // === ENUMS ===
@@ -97,6 +98,7 @@ const promotionTargetSchema = z
   .object({
     targetType: TargetTypeEnum,
     targetId: z.string().uuid().optional(),
+    targetName: z.string().optional(),
   })
   .refine(
     (data) => {

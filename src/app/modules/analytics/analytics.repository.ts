@@ -1,11 +1,8 @@
 import prisma from "@/config/db";
-import { TimeGranularity } from "./analytics.types";
+import { TimeGranularity, HeatmapCell, OrderItemSummary } from "./analytics.types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/**
- * Trả về { from, to } của kỳ trước tương ứng để so sánh % thay đổi
- */
 export const getPreviousPeriodRange = (from: Date, to: Date) => {
   const diff = to.getTime() - from.getTime();
   return {
@@ -16,7 +13,6 @@ export const getPreviousPeriodRange = (from: Date, to: Date) => {
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
-/** Tổng doanh thu (chỉ tính đơn DELIVERED hoặc đã thanh toán) */
 export const getTotalRevenue = async (from: Date, to: Date): Promise<number> => {
   const result = await prisma.orders.aggregate({
     where: {
@@ -29,7 +25,6 @@ export const getTotalRevenue = async (from: Date, to: Date): Promise<number> => 
   return Number(result._sum.totalAmount ?? 0);
 };
 
-/** Tổng số đơn hàng trong khoảng thời gian */
 export const getTotalOrders = async (from: Date, to: Date): Promise<number> => {
   return prisma.orders.count({
     where: {
@@ -39,51 +34,33 @@ export const getTotalOrders = async (from: Date, to: Date): Promise<number> => {
   });
 };
 
-/** Số đơn chatbot đang chờ staff xác nhận */
 export const getPendingChatbotOrders = async (): Promise<number> => {
   return prisma.orders.count({
-    where: {
-      isChatbotRequest: true,
-      orderStatus: "REQUEST_PENDING",
-    },
+    where: { isChatbotRequest: true, orderStatus: "REQUEST_PENDING" },
   });
 };
 
-/** Tổng số customer đang active */
 export const getTotalCustomers = async (): Promise<number> => {
   return prisma.users.count({
     where: { role: "CUSTOMER", isActive: true, deletedAt: null },
   });
 };
 
-/** Số customer mới đăng ký trong khoảng thời gian */
 export const getNewCustomers = async (from: Date, to: Date): Promise<number> => {
   return prisma.users.count({
-    where: {
-      role: "CUSTOMER",
-      createdAt: { gte: from, lte: to },
-      deletedAt: null,
-    },
+    where: { role: "CUSTOMER", createdAt: { gte: from, lte: to }, deletedAt: null },
   });
 };
 
-/** Sản phẩm active, sắp hết hàng, hết hàng */
 export const getProductStockSummary = async () => {
   const [totalActive, lowStock, outOfStock] = await prisma.$transaction([
-    prisma.products_variants.count({
-      where: { isActive: true, deletedAt: null },
-    }),
-    prisma.products_variants.count({
-      where: { isActive: true, deletedAt: null, quantity: { gt: 0, lte: 5 } },
-    }),
-    prisma.products_variants.count({
-      where: { isActive: true, deletedAt: null, quantity: 0 },
-    }),
+    prisma.products_variants.count({ where: { isActive: true, deletedAt: null } }),
+    prisma.products_variants.count({ where: { isActive: true, deletedAt: null, quantity: { gt: 0, lte: 5 } } }),
+    prisma.products_variants.count({ where: { isActive: true, deletedAt: null, quantity: 0 } }),
   ]);
   return { totalActive, lowStock, outOfStock };
 };
 
-/** Breakdown số lượng đơn theo từng status */
 export const getOrderStatusBreakdown = async (from: Date, to: Date) => {
   const result = await prisma.orders.groupBy({
     by: ["orderStatus"],
@@ -91,64 +68,125 @@ export const getOrderStatusBreakdown = async (from: Date, to: Date) => {
     _count: { _all: true },
     orderBy: { _count: { orderStatus: "desc" } },
   });
-  return result.map((r) => ({
-    status: r.orderStatus,
-    count: r._count._all,
-  }));
+  return result.map((r) => ({ status: r.orderStatus, count: r._count._all }));
 };
 
-/** 10 đơn hàng mới nhất */
+/**
+ * Sparkline: doanh thu 7 ngày (hoặc 7 điểm) gần nhất để vẽ mini trend chart
+ */
+export const getSparkline = async (from: Date, to: Date, points = 7): Promise<number[]> => {
+  const rows = await prisma.$queryRaw<Array<{ revenue: number }>>`
+    SELECT
+      SUM(o."totalAmount")::FLOAT AS revenue
+    FROM orders o
+    WHERE
+      o."orderDate" BETWEEN ${from} AND ${to}
+      AND o."orderStatus" != 'CANCELLED'
+      AND o."paymentStatus" = 'PAID'
+    GROUP BY DATE_TRUNC('day', o."orderDate")
+    ORDER BY DATE_TRUNC('day', o."orderDate") ASC
+    LIMIT ${points}
+  `;
+  return rows.map((r) => Number(r.revenue));
+};
+
+/**
+ * Sparkline tổng quát cho bất kỳ metric nào dựa trên count
+ */
+export const getOrderCountSparkline = async (from: Date, to: Date, points = 7): Promise<number[]> => {
+  const rows = await prisma.$queryRaw<Array<{ cnt: bigint }>>`
+    SELECT COUNT(o.id)::BIGINT AS cnt
+    FROM orders o
+    WHERE
+      o."orderDate" BETWEEN ${from} AND ${to}
+      AND o."orderStatus" != 'REQUEST_PENDING'
+    GROUP BY DATE_TRUNC('day', o."orderDate")
+    ORDER BY DATE_TRUNC('day', o."orderDate") ASC
+    LIMIT ${points}
+  `;
+  return rows.map((r) => Number(r.cnt));
+};
+
+export const getNewCustomerSparkline = async (from: Date, to: Date, points = 7): Promise<number[]> => {
+  const rows = await prisma.$queryRaw<Array<{ cnt: bigint }>>`
+    SELECT COUNT(u.id)::BIGINT AS cnt
+    FROM users u
+    WHERE
+      u."createdAt" BETWEEN ${from} AND ${to}
+      AND u.role = 'CUSTOMER'
+      AND u."deletedAt" IS NULL
+    GROUP BY DATE_TRUNC('day', u."createdAt")
+    ORDER BY DATE_TRUNC('day', u."createdAt") ASC
+    LIMIT ${points}
+  `;
+  return rows.map((r) => Number(r.cnt));
+};
+
+// ─── Shared select shape cho orders (recent + chatbot pending) ───────────────
+
+const ORDER_SELECT = {
+  id: true,
+  orderCode: true,
+  totalAmount: true,
+  orderStatus: true,
+  paymentStatus: true,
+  orderDate: true,
+  isChatbotRequest: true,
+  // Shipping snapshot lưu thẳng trên order — không cần JOIN address
+  shippingContactName: true,
+  shippingPhone: true,
+  shippingProvince: true,
+  shippingWard: true,
+  shippingDetail: true,
+  user: {
+    select: {
+      fullName: true,
+      email: true,
+      phone: true,
+    },
+  },
+  orderItems: {
+    take: 3,
+    select: {
+      quantity: true,
+      unitPrice: true,
+      productVariant: {
+        select: {
+          code: true,
+          product: {
+            select: { name: true },
+          },
+        },
+      },
+    },
+  },
+} as const;
+
+/**
+ * Recent orders: kèm thông tin khách hàng + sản phẩm đã mua
+ * Địa chỉ lấy từ shipping snapshot (shippingProvince, shippingWard, shippingDetail)
+ * vì user_addresses có thể đã bị soft delete sau khi đặt hàng
+ */
 export const getRecentOrders = async (limit = 10) => {
   return prisma.orders.findMany({
     where: { orderStatus: { not: "REQUEST_PENDING" } },
     orderBy: { orderDate: "desc" },
     take: limit,
-    select: {
-      id: true,
-      orderCode: true,
-      totalAmount: true,
-      orderStatus: true,
-      paymentStatus: true,
-      orderDate: true,
-      isChatbotRequest: true,
-      user: {
-        select: { fullName: true, email: true },
-      },
-    },
+    select: ORDER_SELECT,
   });
 };
 
-/** Đơn chatbot đang chờ confirm (REQUEST_PENDING) */
 export const getChatbotPendingOrders = async (limit = 10) => {
   return prisma.orders.findMany({
-    where: {
-      isChatbotRequest: true,
-      orderStatus: "REQUEST_PENDING",
-    },
-    orderBy: { orderDate: "asc" }, // FIFO — cũ nhất lên trước
+    where: { isChatbotRequest: true, orderStatus: "REQUEST_PENDING" },
+    orderBy: { orderDate: "asc" },
     take: limit,
-    select: {
-      id: true,
-      orderCode: true,
-      totalAmount: true,
-      orderStatus: true,
-      paymentStatus: true,
-      orderDate: true,
-      isChatbotRequest: true,
-      user: {
-        select: { fullName: true, email: true },
-      },
-    },
+    select: ORDER_SELECT,
   });
 };
 
 /**
- * Top sản phẩm bán chạy theo số lượng
- *
- * Dùng raw query vì cần tính totalRevenue = quantity * unitPrice
- * theo từng variant, Prisma groupBy chưa hỗ trợ computed expression này.
- *
- * Tên cột dùng camelCase trong dấu nháy kép vì Prisma map camelCase → PostgreSQL.
+ * Top sản phẩm bán chạy + tồn kho để tính dự báo hết hàng
  */
 export const getTopProducts = async (from: Date, to: Date, limit = 5) => {
   const rows = await prisma.$queryRaw<
@@ -156,16 +194,19 @@ export const getTopProducts = async (from: Date, to: Date, limit = 5) => {
       product_id: string;
       product_name: string;
       product_slug: string;
+      variant_id: string;
       variant_code: string | null;
       total_sold: bigint;
       total_revenue: number;
       image_url: string | null;
+      current_stock: number;
     }>
   >`
     SELECT
       p.id                                              AS product_id,
       p.name                                            AS product_name,
       p.slug                                            AS product_slug,
+      pv.id                                             AS variant_id,
       pv.code                                           AS variant_code,
       SUM(oi.quantity)::BIGINT                          AS total_sold,
       SUM(oi.quantity * oi."unitPrice")::FLOAT          AS total_revenue,
@@ -175,7 +216,8 @@ export const getTopProducts = async (from: Date, to: Date, limit = 5) => {
         WHERE pci."productId" = p.id
         ORDER BY pci.position ASC
         LIMIT 1
-      )                                                 AS image_url
+      )                                                 AS image_url,
+      pv.quantity                                       AS current_stock
     FROM order_items oi
     JOIN products_variants pv ON pv.id = oi."productVariantId"
     JOIN products p            ON p.id = pv."productId"
@@ -183,91 +225,78 @@ export const getTopProducts = async (from: Date, to: Date, limit = 5) => {
     WHERE
       o."orderDate" BETWEEN ${from} AND ${to}
       AND o."orderStatus" != 'CANCELLED'
-    GROUP BY p.id, p.name, p.slug, pv.id, pv.code
+    GROUP BY p.id, p.name, p.slug, pv.id, pv.code, pv.quantity
     ORDER BY total_sold DESC
     LIMIT ${limit}
   `;
 
-  return rows.map((r) => ({
-    productId: r.product_id,
-    productName: r.product_name,
-    productSlug: r.product_slug,
-    variantCode: r.variant_code,
-    totalSold: Number(r.total_sold),
-    totalRevenue: Number(r.total_revenue),
-    imageUrl: r.image_url,
-  }));
+  const periodDays = Math.max((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24), 1);
+
+  return rows.map((r) => {
+    const totalSold = Number(r.total_sold);
+    const dailyRate = totalSold / periodDays; // tốc độ bán trung bình / ngày
+    const daysUntilStockout = dailyRate > 0 ? Math.floor(r.current_stock / dailyRate) : null;
+
+    return {
+      productId: r.product_id,
+      productName: r.product_name,
+      productSlug: r.product_slug,
+      variantCode: r.variant_code,
+      totalSold,
+      totalRevenue: Number(r.total_revenue),
+      imageUrl: r.image_url,
+      currentStock: r.current_stock,
+      daysUntilStockout,
+    };
+  });
 };
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
 /**
- * Doanh thu theo thời gian (group by granularity)
- *
- * Phải dùng raw query vì Prisma chưa hỗ trợ DATE_TRUNC natively.
- * Truyền granularity qua interpolation an toàn (đã validate bởi Zod ở tầng trên).
+ * Doanh thu theo thời gian — hỗ trợ thêm granularity "hour"
  */
 export const getRevenueOverTime = async (from: Date, to: Date, granularity: TimeGranularity) => {
-  // Dùng tagged template literal riêng cho từng case thay vì dynamic string
-  // để tránh SQL injection và đảm bảo Prisma xử lý đúng tham số.
   type RawRow = { period: Date; revenue: number; order_count: bigint };
 
-  let rows: RawRow[];
+  const truncMap: Record<TimeGranularity, string> = {
+    hour: "hour",
+    day: "day",
+    week: "week",
+    month: "month",
+  };
+  const trunc = truncMap[granularity];
 
-  if (granularity === "week") {
-    rows = await prisma.$queryRaw<RawRow[]>`
-      SELECT
-        DATE_TRUNC('week', o."orderDate")  AS period,
-        SUM(o."totalAmount")::FLOAT        AS revenue,
-        COUNT(o.id)::BIGINT                AS order_count
-      FROM orders o
-      WHERE
-        o."orderDate" BETWEEN ${from} AND ${to}
-        AND o."orderStatus" != 'CANCELLED'
-        AND o."paymentStatus" = 'PAID'
-      GROUP BY period
-      ORDER BY period ASC
-    `;
-  } else if (granularity === "month") {
-    rows = await prisma.$queryRaw<RawRow[]>`
-      SELECT
-        DATE_TRUNC('month', o."orderDate") AS period,
-        SUM(o."totalAmount")::FLOAT        AS revenue,
-        COUNT(o.id)::BIGINT                AS order_count
-      FROM orders o
-      WHERE
-        o."orderDate" BETWEEN ${from} AND ${to}
-        AND o."orderStatus" != 'CANCELLED'
-        AND o."paymentStatus" = 'PAID'
-      GROUP BY period
-      ORDER BY period ASC
-    `;
-  } else {
-    // default: day
-    rows = await prisma.$queryRaw<RawRow[]>`
-      SELECT
-        DATE_TRUNC('day', o."orderDate")   AS period,
-        SUM(o."totalAmount")::FLOAT        AS revenue,
-        COUNT(o.id)::BIGINT                AS order_count
-      FROM orders o
-      WHERE
-        o."orderDate" BETWEEN ${from} AND ${to}
-        AND o."orderStatus" != 'CANCELLED'
-        AND o."paymentStatus" = 'PAID'
-      GROUP BY period
-      ORDER BY period ASC
-    `;
-  }
+  // Dùng dynamic string an toàn vì giá trị đã được Zod enum validate
+  const rows = await prisma.$queryRawUnsafe<RawRow[]>(
+    `
+    SELECT
+      DATE_TRUNC('${trunc}', o."orderDate") AS period,
+      SUM(o."totalAmount")::FLOAT           AS revenue,
+      COUNT(o.id)::BIGINT                   AS order_count
+    FROM orders o
+    WHERE
+      o."orderDate" BETWEEN $1 AND $2
+      AND o."orderStatus" != 'CANCELLED'
+      AND o."paymentStatus" = 'PAID'
+    GROUP BY period
+    ORDER BY period ASC
+    `,
+    from,
+    to,
+  );
 
   return rows.map((r) => ({
-    period: r.period.toISOString().split("T")[0],
+    period:
+      granularity === "hour"
+        ? r.period.toISOString() // giữ full ISO để FE format giờ
+        : r.period.toISOString().split("T")[0],
     revenue: Number(r.revenue),
     orderCount: Number(r.order_count),
     averageOrderValue: Number(r.order_count) > 0 ? Number(r.revenue) / Number(r.order_count) : 0,
   }));
 };
 
-/** Doanh thu theo phương thức thanh toán */
 export const getRevenueByPaymentMethod = async (from: Date, to: Date) => {
   const rows = await prisma.orders.groupBy({
     by: ["paymentMethodId"],
@@ -297,21 +326,8 @@ export const getRevenueByPaymentMethod = async (from: Date, to: Date) => {
   }));
 };
 
-/**
- * Doanh thu theo danh mục sản phẩm
- *
- * Phải dùng raw query vì cần JOIN nhiều bảng + SUM computed expression.
- * Tên cột camelCase trong dấu nháy kép.
- */
 export const getRevenueByCategory = async (from: Date, to: Date) => {
-  const rows = await prisma.$queryRaw<
-    Array<{
-      category_id: string;
-      category_name: string;
-      revenue: number;
-      units_sold: bigint;
-    }>
-  >`
+  const rows = await prisma.$queryRaw<Array<{ category_id: string; category_name: string; revenue: number; units_sold: bigint }>>`
     SELECT
       c.id                                              AS category_id,
       c.name                                            AS category_name,
@@ -331,7 +347,6 @@ export const getRevenueByCategory = async (from: Date, to: Date) => {
   `;
 
   const totalRevenue = rows.reduce((acc, r) => acc + Number(r.revenue), 0);
-
   return rows.map((r) => ({
     categoryId: r.category_id,
     categoryName: r.category_name,
@@ -341,7 +356,6 @@ export const getRevenueByCategory = async (from: Date, to: Date) => {
   }));
 };
 
-/** Top khách hàng chi tiêu nhiều nhất */
 export const getTopCustomers = async (from: Date, to: Date, limit = 10) => {
   const rows = await prisma.orders.groupBy({
     by: ["userId"],
@@ -363,7 +377,6 @@ export const getTopCustomers = async (from: Date, to: Date, limit = 10) => {
   });
 
   const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
-
   return rows.map((r) => ({
     userId: r.userId,
     fullName: userMap[r.userId]?.fullName ?? null,
@@ -375,16 +388,13 @@ export const getTopCustomers = async (from: Date, to: Date, limit = 10) => {
   }));
 };
 
-/** Conversion funnel — số lượng đơn ở từng bước trạng thái */
 export const getConversionFunnel = async (from: Date, to: Date) => {
   const result = await prisma.orders.groupBy({
     by: ["orderStatus"],
     where: { orderDate: { gte: from, lte: to } },
     _count: { _all: true },
   });
-
   const map = Object.fromEntries(result.map((r) => [r.orderStatus, r._count._all]));
-
   return {
     requested: map["REQUEST_PENDING"] ?? 0,
     pending: map["PENDING"] ?? 0,
@@ -395,7 +405,6 @@ export const getConversionFunnel = async (from: Date, to: Date) => {
   };
 };
 
-/** Tổng hợp analytics summary */
 export const getAnalyticsSummary = async (from: Date, to: Date) => {
   const [revenueResult, totalOrders, deliveredOrders, cancelledOrders] = await prisma.$transaction([
     prisma.orders.aggregate({
@@ -429,4 +438,29 @@ export const getAnalyticsSummary = async (from: Date, to: Date) => {
     cancellationRate: totalOrders > 0 ? (cancelledOrders / totalOrders) * 100 : 0,
     deliveryRate: totalOrders > 0 ? (deliveredOrders / totalOrders) * 100 : 0,
   };
+};
+
+/**
+ * Heatmap: đơn hàng theo giờ x ngày trong tuần
+ * Trả về mảng { day: 0–6, hour: 0–23, count }
+ */
+export const getOrderHeatmap = async (from: Date, to: Date): Promise<HeatmapCell[]> => {
+  const rows = await prisma.$queryRaw<Array<{ dow: number; hour: number; cnt: bigint }>>`
+    SELECT
+      EXTRACT(DOW FROM o."orderDate")::INT   AS dow,
+      EXTRACT(HOUR FROM o."orderDate")::INT  AS hour,
+      COUNT(o.id)::BIGINT                    AS cnt
+    FROM orders o
+    WHERE
+      o."orderDate" BETWEEN ${from} AND ${to}
+      AND o."orderStatus" != 'REQUEST_PENDING'
+    GROUP BY dow, hour
+    ORDER BY dow, hour
+  `;
+
+  return rows.map((r) => ({
+    day: r.dow,
+    hour: r.hour,
+    count: Number(r.cnt),
+  }));
 };

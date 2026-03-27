@@ -7,6 +7,16 @@ import { HighlightSpecificationGroup } from "./product.types";
 import { buildOrderBy, buildProductWhere, buildSearchCategoryAndBrandIds } from "./product_filter.where-builder";
 import { validate as isUUID } from "uuid";
 
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import tz from "dayjs/plugin/timezone";
+
+dayjs.extend(utc);
+dayjs.extend(tz);
+
+import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
+
+dayjs.extend(isSameOrBefore);
 // ─────────────────────────────────────────────────────────────────────────────
 // SELECT FRAGMENTS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1374,7 +1384,7 @@ export const getSaleProductsCountByCategories = async (date: Date) => {
 
 export const findFeaturedProducts = async (limit: number = 12) => {
   return prisma.products.findMany({
-    where: { isActive: true, deletedAt: null },
+    where: { isActive: true, isFeatured: true, deletedAt: null },
     select: selectProductCard,
     orderBy: { viewsCount: "desc" },
     take: limit,
@@ -1829,22 +1839,46 @@ export const findSaleScheduleDays = async (
   today.setHours(0, 0, 0, 0);
 
   // Phân bổ promotions vào từng ngày trong range
+  // for (const promo of promotions) {
+  //   const promoStart = promo.startDate ? new Date(promo.startDate) : startDate;
+  //   const promoEnd = promo.endDate ? new Date(promo.endDate) : endDate;
+
+  //   let cur = new Date(Math.max(promoStart.getTime(), startDate.getTime()));
+  //   cur.setHours(0, 0, 0, 0);
+  //   const last = new Date(Math.min(promoEnd.getTime(), endDate.getTime()));
+  //   last.setHours(0, 0, 0, 0);
+
+  //   while (cur <= last) {
+  //     const key = toVNDateStr(cur);
+  //     if (!scheduleMap.has(key)) scheduleMap.set(key, []);
+  //     const arr = scheduleMap.get(key)!;
+  //     if (!arr.some((p) => p.id === promo.id)) arr.push(promo);
+  //     cur = new Date(cur);
+  //     cur.setDate(cur.getDate() + 1);
+  //   }
+  // }
   for (const promo of promotions) {
-    const promoStart = promo.startDate ? new Date(promo.startDate) : startDate;
-    const promoEnd = promo.endDate ? new Date(promo.endDate) : endDate;
+    const promoStart = dayjs(promo.startDate).tz("Asia/Ho_Chi_Minh");
+    const promoEnd = dayjs(promo.endDate).tz("Asia/Ho_Chi_Minh");
 
-    let cur = new Date(Math.max(promoStart.getTime(), startDate.getTime()));
-    cur.setHours(0, 0, 0, 0);
-    const last = new Date(Math.min(promoEnd.getTime(), endDate.getTime()));
-    last.setHours(0, 0, 0, 0);
+    const rangeStart = dayjs(startDate).tz("Asia/Ho_Chi_Minh");
+    const rangeEnd = dayjs(endDate).tz("Asia/Ho_Chi_Minh");
 
-    while (cur <= last) {
-      const key = toVNDateStr(cur);
+    let cur = promoStart.isAfter(rangeStart) ? promoStart.startOf("day") : rangeStart.startOf("day");
+
+    const last = promoEnd.isBefore(rangeEnd) ? promoEnd.startOf("day") : rangeEnd.startOf("day");
+
+    while (cur.isSameOrBefore(last, "day")) {
+      const key = cur.format("YYYY-MM-DD");
+
       if (!scheduleMap.has(key)) scheduleMap.set(key, []);
       const arr = scheduleMap.get(key)!;
-      if (!arr.some((p) => p.id === promo.id)) arr.push(promo);
-      cur = new Date(cur);
-      cur.setDate(cur.getDate() + 1);
+
+      if (!arr.some((p) => p.id === promo.id)) {
+        arr.push(promo);
+      }
+
+      cur = cur.add(1, "day");
     }
   }
 
