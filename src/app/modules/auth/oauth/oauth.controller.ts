@@ -9,7 +9,7 @@ import {
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "strict" as const, // Nên cân nhắc đổi thành "lax" nếu callback bị lỗi cookie
+  sameSite: "lax" as const,
 };
 
 const setRefreshTokenCookie = (res: Response, token: string, maxAge: number) => {
