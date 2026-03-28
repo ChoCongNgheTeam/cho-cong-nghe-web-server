@@ -3,6 +3,13 @@ import { Prisma } from "@prisma/client";
 import { ListPromotionsQuery, CreatePromotionInput, UpdatePromotionInput } from "./promotion.validation";
 
 // =====================
+// === CACHE CONFIG ===
+// =====================
+let promotionsCache: any[] | null = null;
+let promotionsCacheTime = 0;
+const PROMOTIONS_CACHE_TTL = 5 * 60 * 1000; // Cache 5 phút
+
+// =====================
 // === SELECT OBJECTS ===
 // =====================
 
@@ -345,7 +352,7 @@ export const findActivePromotionsForBrand = async (brandId: string) => {
 
 export const create = async (data: CreatePromotionInput) => {
   const { rules, targets, ...promotionData } = data;
-  return prisma.promotions.create({
+  const result = await prisma.promotions.create({
     data: {
       ...promotionData,
       rules: { create: rules ?? [] },
@@ -353,6 +360,8 @@ export const create = async (data: CreatePromotionInput) => {
     },
     select: selectPromotionAdmin,
   });
+  clearPromotionsCache();
+  return result;
 };
 
 export const update = async (id: string, data: UpdatePromotionInput) => {
@@ -367,7 +376,7 @@ export const update = async (id: string, data: UpdatePromotionInput) => {
     await prisma.promotion_targets.deleteMany({ where: { promotionId: id } });
   }
 
-  return prisma.promotions.update({
+  const result = await prisma.promotions.update({
     where: { id, deletedAt: null },
     data: {
       ...updateData,
@@ -376,6 +385,8 @@ export const update = async (id: string, data: UpdatePromotionInput) => {
     },
     select: selectPromotionAdmin,
   });
+  clearPromotionsCache();
+  return result;
 };
 
 // =====================
@@ -383,10 +394,12 @@ export const update = async (id: string, data: UpdatePromotionInput) => {
 // =====================
 
 export const softDelete = async (id: string, deletedById: string) => {
-  return prisma.promotions.update({
+  const result = await prisma.promotions.update({
     where: { id, deletedAt: null },
     data: { deletedAt: new Date(), deletedBy: deletedById, isActive: false },
   });
+  clearPromotionsCache();
+  return result;
 };
 
 export const restore = async (id: string) => {
@@ -424,23 +437,30 @@ export const findAllDeleted = async (options: { page?: number; limit?: number } 
 // =====================
 
 export const getActivePromotions = async () => {
-  const now = new Date();
+  // ✅ Check cache trước
+  const now = Date.now();
+  if (promotionsCache && now - promotionsCacheTime < PROMOTIONS_CACHE_TTL) {
+    console.log("[Cache] Sử dụng cached promotions");
+    return promotionsCache;
+  }
+
+  const nowDate = new Date();
   const promotions = await prisma.promotions.findMany({
     where: {
       isActive: true,
       deletedAt: null,
       OR: [
-        { AND: [{ startDate: { lte: now } }, { endDate: { gte: now } }] },
+        { AND: [{ startDate: { lte: nowDate } }, { endDate: { gte: nowDate } }] },
         { AND: [{ startDate: null }, { endDate: null }] },
-        { AND: [{ startDate: { lte: now } }, { endDate: null }] },
-        { AND: [{ startDate: null }, { endDate: { gte: now } }] },
+        { AND: [{ startDate: { lte: nowDate } }, { endDate: null }] },
+        { AND: [{ startDate: null }, { endDate: { gte: nowDate } }] },
       ],
     },
     select: selectPromotionDetail,
     orderBy: { priority: "asc" },
   });
 
-  return promotions.map((promo) => ({
+  const result = promotions.map((promo) => ({
     id: promo.id,
     name: promo.name,
     description: promo.description,
@@ -473,4 +493,17 @@ export const getActivePromotions = async () => {
       targetValue: t.targetValue,
     })),
   }));
+
+  // ✅ Lưu vào cache
+  promotionsCache = result;
+  promotionsCacheTime = Date.now();
+
+  return result;
+};
+
+// ✅ Hàm clear cache khi update promotion
+export const clearPromotionsCache = () => {
+  promotionsCache = null;
+  promotionsCacheTime = 0;
+  console.log("[Cache] Cleared promotions cache");
 };

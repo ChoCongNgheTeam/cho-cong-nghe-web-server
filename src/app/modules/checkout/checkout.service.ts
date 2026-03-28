@@ -182,65 +182,64 @@ export const createOrderFromCheckout = async (userId: string, checkoutSummary: C
     // Gọi sang hàm lưu Database của Checkout Repository (Đã có Address Snapshot)
     const order = await repo.executeOrderTransaction(userId, checkoutSummary);
 
-    // 🎉 GỬI EMAIL XÁC NHẬN ĐẶT HÀNG SAU KHI ORDER TẠO THÀNH CÔNG
-    try {
-      const [user, paymentMethod] = await Promise.all([
-        prisma.users.findUnique({
-          where: { id: userId },
-          select: { email: true, fullName: true }
-        }),
-        prisma.payment_methods.findUnique({
-          where: { id: checkoutSummary.paymentMethodId },
-          select: { name: true, code: true } // Lấy thêm code để phục vụ logic QR ở email
-        })
-      ]);
+    // 🎉 GỬI EMAIL XÁC NHẬN ĐẶT HÀNG (ASYNC — không chặn response)
+    // Chạy ở background, không cần await
+    (async () => {
+      try {
+        const [user, paymentMethod] = await Promise.all([
+          prisma.users.findUnique({
+            where: { id: userId },
+            select: { email: true, fullName: true },
+          }),
+          prisma.payment_methods.findUnique({
+            where: { id: checkoutSummary.paymentMethodId },
+            select: { name: true, code: true },
+          }),
+        ]);
 
-      if (user?.email) {
-        // Lấy thông tin sản phẩm từ order items
-        const firstItem = order.orderItems[0];
-        const productName = firstItem?.productVariant?.product?.name || 'Sản phẩm';
-        const variantName = firstItem?.productVariant?.code || 'Phiên bản';
+        if (user?.email) {
+          const firstItem = order.orderItems[0];
+          const productName = firstItem?.productVariant?.product?.name || "Sản phẩm";
+          const variantName = firstItem?.productVariant?.code || "Phiên bản";
 
-        // Lấy các thuộc tính thanh toán online đã được sinh sẵn
-        const { paymentRedirectUrl, bankTransferQrUrl } = checkoutSummary.paymentFields || {};
+          const { paymentRedirectUrl, bankTransferQrUrl } = checkoutSummary.paymentFields || {};
+          const fullShippingAddress = `${order.shippingContactName} - ${order.shippingPhone} | ${order.shippingDetail}, ${order.shippingWard}, ${order.shippingProvince}`;
 
-        // Nối chuỗi địa chỉ đầy đủ từ snapshot của order
-        const fullShippingAddress = `${order.shippingContactName} - ${order.shippingPhone} | ${order.shippingDetail}, ${order.shippingWard}, ${order.shippingProvince}`;
+          await sendOrderConfirmationEmail(
+            user.email,
+            user.fullName || order.shippingContactName,
+            order.orderCode,
+            {
+              productName,
+              variantName,
+              quantity: order.orderItems.reduce((sum, item) => sum + item.quantity, 0),
+              unitPrice: Number(order.orderItems[0]?.unitPrice || 0),
+              totalAmount: Number(order.totalAmount),
+              shippingAddress: fullShippingAddress,
+              paymentMethod: paymentMethod?.name || "Chưa xác định",
+            },
+            {
+              paymentMethodCode: paymentMethod?.code || "",
+              paymentLink: paymentRedirectUrl || bankTransferQrUrl || undefined,
+            },
+          );
 
-        await sendOrderConfirmationEmail(
-          user.email,
-          user.fullName || order.shippingContactName, // Tên hiển thị lời chào ưu tiên User fullName, fallback qua Tên người nhận
-          order.orderCode,
-          {
-            productName,
-            variantName,
-            quantity: order.orderItems.reduce((sum, item) => sum + item.quantity, 0),
-            unitPrice: Number(order.orderItems[0]?.unitPrice || 0),
-            totalAmount: Number(order.totalAmount),
-            shippingAddress: fullShippingAddress, // Truyền chuỗi đã nối vào đây
-            paymentMethod: paymentMethod?.name || 'Chưa xác định'
-          },
-          {
-            paymentMethodCode: paymentMethod?.code || '',
-            paymentLink: paymentRedirectUrl || bankTransferQrUrl || undefined 
-          }
-        );
-
-        console.log(`📧 Email xác nhận đơn hàng ${order.orderCode} đã gửi tới ${user.email}`);
+          console.log(`📧 Email xác nhận đơn hàng ${order.orderCode} đã gửi tới ${user.email}`);
+        }
+      } catch (emailError) {
+        console.warn(`⚠️ Lỗi gửi email xác nhận:`, emailError);
       }
-    } catch (emailError) {
-      console.warn(`⚠️ Lỗi gửi email xác nhận (nhưng order đã tạo):`, emailError);
-      // Không throw error - order đã tạo rồi, không nên lỗi vì email
-    }
+    })(); // Fire and forget
 
-    // 🔔 GỬI THÔNG BÁO CHO ADMIN/STAFF KHI CÓ ĐƠN HÀNG MỚI
-    try {
-      await sendOrderCreatedAdminNotification(order.orderCode);
-      console.log(`🔔 Thông báo đơn hàng mới ${order.orderCode} đã gửi cho ADMIN/STAFF`);
-    } catch (adminNotifError) {
-      console.warn(`⚠️ Lỗi gửi thông báo admin (nhưng order đã tạo):`, adminNotifError);
-      // Không throw error - order đã tạo rồi, không nên lỗi vì notification
-    }
+    // 🔔 GỬI THÔNG BÁO CHO ADMIN/STAFF (ASYNC — không chặn response)
+    (async () => {
+      try {
+        await sendOrderCreatedAdminNotification(order.orderCode);
+        console.log(`🔔 Thông báo đơn hàng mới ${order.orderCode} đã gửi cho ADMIN/STAFF`);
+      } catch (adminNotifError) {
+        console.warn(`⚠️ Lỗi gửi thông báo admin:`, adminNotifError);
+      }
+    })(); // Fire and forget
 
     return order;
   } catch (error: any) {

@@ -1,15 +1,10 @@
 import { Request, Response } from "express";
-import { 
-  loginWithGoogle, 
-  loginWithFacebook, 
-  loginWithApple, 
-  exchangeFacebookCode 
-} from "./oauth.service";
+import { loginWithGoogle, loginWithFacebook, loginWithApple, exchangeFacebookCode } from "./oauth.service";
 
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "strict" as const, // Nên cân nhắc đổi thành "lax" nếu callback bị lỗi cookie
+  sameSite: "lax" as const,
 };
 
 const setRefreshTokenCookie = (res: Response, token: string, maxAge: number) => {
@@ -57,7 +52,5 @@ export const facebookCallbackHandler = async (req: Request, res: Response) => {
   setRefreshTokenCookie(res, result.refreshToken, result.refreshTokenTTL);
 
   // Không truyền accessToken trên URL nữa
-  return res.redirect(
-    `${process.env.FRONTEND_URL}/account/callback?returnUrl=${encodeURIComponent(returnUrl)}`
-  );
+  return res.redirect(`${process.env.FRONTEND_URL}/account/callback?returnUrl=${encodeURIComponent(returnUrl)}`);
 };

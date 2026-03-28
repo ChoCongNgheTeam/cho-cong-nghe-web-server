@@ -670,7 +670,7 @@ const executeCreateOrderRequest = async (args: any) => {
         voucherDiscount: 0,
         totalAmount,
 
-        orderStatus: "REQUEST_PENDING" as any,
+        orderStatus: "PENDING" as any,
         paymentStatus: "UNPAID",
         isChatbotRequest: true,
 
