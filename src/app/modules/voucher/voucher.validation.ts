@@ -17,7 +17,7 @@ export const listVouchersSchema = z.object({
   search: z.string().optional(),
   discountType: DiscountTypeEnum.optional(),
   isActive: z.coerce.boolean().optional(),
-  isExpired: z.coerce.boolean().optional(),
+  status: z.enum(["active", "inactive", "expired", "upcoming"]).optional(),
   includeDeleted: z.coerce.boolean().optional().default(false),
   sortBy: z.enum(["createdAt", "code", "discountValue", "usesCount", "priority"]).default("createdAt"),
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
