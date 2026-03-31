@@ -93,14 +93,14 @@ const buildVoucherWhere = (query: ListVouchersQuery, onlyActive = false): Prisma
     where.discountType = query.discountType;
   }
 
-  if (query.isExpired !== undefined) {
-    const now = new Date();
-    if (query.isExpired) {
-      where.endDate = { lt: now };
-    } else {
-      where.OR = [{ endDate: null }, { endDate: { gte: now } }];
-    }
-  }
+  // if (query.isExpired !== undefined) {
+  //   const now = new Date();
+  //   if (query.isExpired) {
+  //     where.endDate = { lt: now };
+  //   } else {
+  //     where.OR = [{ endDate: null }, { endDate: { gte: now } }];
+  //   }
+  // }
 
   return where;
 };

@@ -1,4 +1,5 @@
 import * as repo from "./analytics.repository";
+import { RecentOrderRaw } from "./analytics.repository";
 import { DashboardQuery, AnalyticsQuery, DashboardResponse, AnalyticsResponse, OrderStatusBreakdown, RecentOrder, OrderItemSummary, ForecastPoint, ComparisonDataPoint } from "./analytics.types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -32,7 +33,7 @@ const calcChange = (current: number, previous: number): number => {
 };
 
 /** Map raw order từ repo → RecentOrder response */
-const mapToRecentOrder = (order: Awaited<ReturnType<typeof repo.getRecentOrders>>[number]): RecentOrder => {
+const mapToRecentOrder = (order: RecentOrderRaw): RecentOrder => {
   // Địa chỉ lấy từ shipping snapshot lưu trực tiếp trên order
   const addressParts = [order.shippingDetail, order.shippingWard, order.shippingProvince].filter(Boolean);
 

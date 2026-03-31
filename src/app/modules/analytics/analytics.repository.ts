@@ -1,5 +1,9 @@
 import prisma from "@/config/db";
 import { TimeGranularity, HeatmapCell, OrderItemSummary } from "./analytics.types";
+import { Prisma } from "@prisma/client";
+export type RecentOrderRaw = Prisma.ordersGetPayload<{
+  select: typeof ORDER_SELECT;
+}>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -29,14 +33,17 @@ export const getTotalOrders = async (from: Date, to: Date): Promise<number> => {
   return prisma.orders.count({
     where: {
       orderDate: { gte: from, lte: to },
-      orderStatus: { not: "REQUEST_PENDING" },
+      isChatbotRequest: false, // thay not: "REQUEST_PENDING"
     },
   });
 };
 
 export const getPendingChatbotOrders = async (): Promise<number> => {
   return prisma.orders.count({
-    where: { isChatbotRequest: true, orderStatus: "REQUEST_PENDING" },
+    where: {
+      isChatbotRequest: true,
+      orderStatus: "PENDING", // chatbot orders chờ confirm = PENDING
+    },
   });
 };
 
@@ -124,20 +131,58 @@ export const getNewCustomerSparkline = async (from: Date, to: Date, points = 7):
 
 // ─── Shared select shape cho orders (recent + chatbot pending) ───────────────
 
-const ORDER_SELECT = {
+// const ORDER_SELECT = {
+//   id: true,
+//   orderCode: true,
+//   totalAmount: true,
+//   orderStatus: true,
+//   paymentStatus: true,
+//   orderDate: true,
+//   isChatbotRequest: true,
+//   // Shipping snapshot lưu thẳng trên order — không cần JOIN address
+//   shippingContactName: true,
+//   shippingPhone: true,
+//   shippingProvince: true,
+//   shippingWard: true,
+//   shippingDetail: true,
+//   user: {
+//     select: {
+//       fullName: true,
+//       email: true,
+//       phone: true,
+//     },
+//   },
+//   orderItems: {
+//     take: 3,
+//     select: {
+//       quantity: true,
+//       unitPrice: true,
+//       productVariant: {
+//         select: {
+//           code: true,
+//           product: {
+//             select: { name: true },
+//           },
+//         },
+//       },
+//     },
+//   },
+// } as const;
+export const ORDER_SELECT = Prisma.validator<Prisma.ordersSelect>()({
   id: true,
   orderCode: true,
+  userId: true,
+  shippingContactName: true,
+  shippingPhone: true,
+  shippingDetail: true,
+  shippingWard: true,
+  shippingProvince: true,
   totalAmount: true,
   orderStatus: true,
   paymentStatus: true,
   orderDate: true,
   isChatbotRequest: true,
-  // Shipping snapshot lưu thẳng trên order — không cần JOIN address
-  shippingContactName: true,
-  shippingPhone: true,
-  shippingProvince: true,
-  shippingWard: true,
-  shippingDetail: true,
+
   user: {
     select: {
       fullName: true,
@@ -145,8 +190,8 @@ const ORDER_SELECT = {
       phone: true,
     },
   },
+
   orderItems: {
-    take: 3,
     select: {
       quantity: true,
       unitPrice: true,
@@ -154,34 +199,38 @@ const ORDER_SELECT = {
         select: {
           code: true,
           product: {
-            select: { name: true },
+            select: {
+              name: true,
+            },
           },
         },
       },
     },
   },
-} as const;
-
+});
 /**
  * Recent orders: kèm thông tin khách hàng + sản phẩm đã mua
  * Địa chỉ lấy từ shipping snapshot (shippingProvince, shippingWard, shippingDetail)
  * vì user_addresses có thể đã bị soft delete sau khi đặt hàng
  */
-export const getRecentOrders = async (limit = 10) => {
+export const getRecentOrders = async (limit = 10): Promise<RecentOrderRaw[]> => {
   return prisma.orders.findMany({
-    where: { orderStatus: { not: "REQUEST_PENDING" } },
+    where: { isChatbotRequest: false }, // Chỉ lấy đơn thật, không phải chatbot
     orderBy: { orderDate: "desc" },
     take: limit,
     select: ORDER_SELECT,
   });
 };
 
-export const getChatbotPendingOrders = async (limit = 10) => {
+export const getChatbotPendingOrders = async (limit = 10): Promise<RecentOrderRaw[]> => {
   return prisma.orders.findMany({
-    where: { isChatbotRequest: true, orderStatus: "REQUEST_PENDING" },
-    orderBy: { orderDate: "asc" },
+    where: {
+      isChatbotRequest: true,
+      orderStatus: "PENDING", // Sau khi bỏ REQUEST_PENDING, chatbot orders chờ confirm sẽ là PENDING
+    },
+    orderBy: { orderDate: "desc" },
     take: limit,
-    select: ORDER_SELECT,
+    select: ORDER_SELECT, // 👈 Fix thiếu select
   });
 };
 
@@ -396,7 +445,6 @@ export const getConversionFunnel = async (from: Date, to: Date) => {
   });
   const map = Object.fromEntries(result.map((r) => [r.orderStatus, r._count._all]));
   return {
-    requested: map["REQUEST_PENDING"] ?? 0,
     pending: map["PENDING"] ?? 0,
     processing: map["PROCESSING"] ?? 0,
     shipped: map["SHIPPED"] ?? 0,
@@ -417,7 +465,10 @@ export const getAnalyticsSummary = async (from: Date, to: Date) => {
       _count: { _all: true },
     }),
     prisma.orders.count({
-      where: { orderDate: { gte: from, lte: to }, orderStatus: { not: "REQUEST_PENDING" } },
+      where: {
+        orderDate: { gte: from, lte: to },
+        isChatbotRequest: false, // thay not: "REQUEST_PENDING"
+      },
     }),
     prisma.orders.count({
       where: { orderDate: { gte: from, lte: to }, orderStatus: "DELIVERED" },
