@@ -187,7 +187,12 @@ export const getProductsAdminHandler = async (req: Request, res: Response) => {
  * Lấy danh sách sản phẩm đã bị soft-delete
  */
 export const getProductsTrashHandler = async (req: Request, res: Response) => {
-  const result = await productService.getDeletedProducts(req.query as Record<string, any>);
+  const query = {
+    ...req.query,
+    page: req.query.page ? parseInt(req.query.page as string, 10) : 1,
+    limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 20,
+  };
+  const result = await productService.getDeletedProducts(query);
   res.json(paginatedResponse(result, "Lấy danh sách sản phẩm đã xóa thành công"));
 };
 

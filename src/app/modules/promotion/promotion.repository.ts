@@ -367,6 +367,8 @@ export const create = async (data: CreatePromotionInput) => {
 export const update = async (id: string, data: UpdatePromotionInput) => {
   console.log(data);
 
+  console.log(data);
+
   const { rules, targets, ...updateData } = data;
 
   if (rules !== undefined) {
@@ -437,10 +439,10 @@ export const findAllDeleted = async (options: { page?: number; limit?: number } 
 // =====================
 
 export const getActivePromotions = async () => {
-  // ✅ Check cache trước
+  // Check cache trước
   const now = Date.now();
-  if (promotionsCache && (now - promotionsCacheTime) < PROMOTIONS_CACHE_TTL) {
-    console.log("[Cache] Sử dụng cached promotions");
+  if (promotionsCache && now - promotionsCacheTime < PROMOTIONS_CACHE_TTL) {
+    // console.log("[Cache] Sử dụng cached promotions");
     return promotionsCache;
   }
 
@@ -497,7 +499,7 @@ export const getActivePromotions = async () => {
   // ✅ Lưu vào cache
   promotionsCache = result;
   promotionsCacheTime = Date.now();
-  
+
   return result;
 };
 

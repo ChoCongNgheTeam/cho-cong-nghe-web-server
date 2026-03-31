@@ -164,7 +164,7 @@ const orderStatusMap: Record<string, string> = {
 
 export const sendOrderStatusNotification = async (userId: string, orderCode: string, status: string) => {
   const statusText = orderStatusMap[status] || status;
-  
+
   let title = `Cập nhật đơn hàng #${orderCode}`;
   let body = `Đơn hàng của bạn đã chuyển sang trạng thái: ${statusText}.`;
 
@@ -189,7 +189,7 @@ export const sendOrderStatusNotification = async (userId: string, orderCode: str
       body,
       data: { orderCode, status },
     },
-    ["IN_APP", "EMAIL", "PUSH"], 
+    ["IN_APP", "EMAIL", "PUSH"],
   );
 };
 
@@ -199,10 +199,10 @@ export const sendOrderCreatedAdminNotification = async (orderCode: string) => {
   try {
     // 1. Lấy danh sách ID của tất cả ADMIN và STAFF (đang hoạt động)
     const adminsAndStaffs = await prisma.users.findMany({
-      where: { 
+      where: {
         role: { in: ["ADMIN", "STAFF"] },
         isActive: true,
-        deletedAt: null
+        deletedAt: null,
       },
       select: { id: true },
     });
@@ -210,7 +210,7 @@ export const sendOrderCreatedAdminNotification = async (orderCode: string) => {
     if (adminsAndStaffs.length === 0) return;
 
     // 2. Gửi thông báo cho từng người
-    const notificationPromises = adminsAndStaffs.map((user) => 
+    const notificationPromises = adminsAndStaffs.map((user) =>
       createAndSend(
         {
           userId: user.id,
@@ -219,8 +219,8 @@ export const sendOrderCreatedAdminNotification = async (orderCode: string) => {
           body: `Đơn hàng #${orderCode} vừa được khách hàng đặt và đang chờ xử lý.`,
           data: { orderCode, status: "PENDING" },
         },
-        ["IN_APP"] // Gửi vào chuông thông báo web admin
-      )
+        ["IN_APP"], // Gửi vào chuông thông báo web admin
+      ),
     );
 
     // Chạy song song tất cả các luồng gửi

@@ -52,6 +52,7 @@ const getActiveHomeCampaigns = async (): Promise<HomeCampaign[]> => {
     campaignService.getActiveCampaigns(CampaignType.CAMPAIGN),
     campaignService.getActiveCampaigns(CampaignType.SEASONAL),
     campaignService.getActiveCampaigns(CampaignType.EVENT),
+    campaignService.getActiveCampaigns(CampaignType.FLASH_SALE),
   ]);
 
   const campaigns = allCampaigns.flat().filter((campaign) => {

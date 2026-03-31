@@ -13,6 +13,7 @@ enum CampaignType {
   CAMPAIGN
   SEASONAL
   EVENT
+  FLASH_SALE
 }
 
 enum Gender {
@@ -357,8 +358,8 @@ model campaigns {
   slug        String       @unique
   type        CampaignType
   description String?
-  startDate   DateTime?
-  endDate     DateTime?
+  startDate  DateTime? @db.Timestamptz
+  endDate    DateTime? @db.Timestamptz
   isActive    Boolean      @default(true)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -732,8 +733,8 @@ model vouchers {
   maxUses          Int?
   maxUsesPerUser   Int?
   usesCount        Int          @default(0)
-  startDate        DateTime?
-  endDate          DateTime?
+  startDate  DateTime? @db.Timestamptz
+  endDate    DateTime? @db.Timestamptz
   priority         Int          @default(0)
   isActive         Boolean      @default(true)
   createdAt        DateTime     @default(now())
@@ -797,8 +798,8 @@ model promotions {
   description      String?
   priority         Int       @default(0)
   isActive         Boolean   @default(true)
-  startDate        DateTime?
-  endDate          DateTime?
+  startDate  DateTime? @db.Timestamptz
+  endDate    DateTime? @db.Timestamptz
   minOrderValue    Decimal?  @db.Decimal(12, 2)
   maxDiscountValue Decimal?  @db.Decimal(12, 2)
   usageLimit       Int?

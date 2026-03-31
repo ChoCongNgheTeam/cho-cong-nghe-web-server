@@ -189,18 +189,18 @@ export const createOrderFromCheckout = async (userId: string, checkoutSummary: C
         const [user, paymentMethod] = await Promise.all([
           prisma.users.findUnique({
             where: { id: userId },
-            select: { email: true, fullName: true }
+            select: { email: true, fullName: true },
           }),
           prisma.payment_methods.findUnique({
             where: { id: checkoutSummary.paymentMethodId },
-            select: { name: true, code: true }
-          })
+            select: { name: true, code: true },
+          }),
         ]);
 
         if (user?.email) {
           const firstItem = order.orderItems[0];
-          const productName = firstItem?.productVariant?.product?.name || 'Sản phẩm';
-          const variantName = firstItem?.productVariant?.code || 'Phiên bản';
+          const productName = firstItem?.productVariant?.product?.name || "Sản phẩm";
+          const variantName = firstItem?.productVariant?.code || "Phiên bản";
 
           const { paymentRedirectUrl, bankTransferQrUrl } = checkoutSummary.paymentFields || {};
           const fullShippingAddress = `${order.shippingContactName} - ${order.shippingPhone} | ${order.shippingDetail}, ${order.shippingWard}, ${order.shippingProvince}`;
@@ -216,12 +216,12 @@ export const createOrderFromCheckout = async (userId: string, checkoutSummary: C
               unitPrice: Number(order.orderItems[0]?.unitPrice || 0),
               totalAmount: Number(order.totalAmount),
               shippingAddress: fullShippingAddress,
-              paymentMethod: paymentMethod?.name || 'Chưa xác định'
+              paymentMethod: paymentMethod?.name || "Chưa xác định",
             },
             {
-              paymentMethodCode: paymentMethod?.code || '',
-              paymentLink: paymentRedirectUrl || bankTransferQrUrl || undefined 
-            }
+              paymentMethodCode: paymentMethod?.code || "",
+              paymentLink: paymentRedirectUrl || bankTransferQrUrl || undefined,
+            },
           );
 
           console.log(`📧 Email xác nhận đơn hàng ${order.orderCode} đã gửi tới ${user.email}`);

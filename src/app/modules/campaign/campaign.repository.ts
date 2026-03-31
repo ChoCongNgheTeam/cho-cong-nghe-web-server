@@ -6,11 +6,34 @@ const prisma = new PrismaClient();
 // ── Query builders ─────────────────────────────────────────────────────────────
 
 const buildCampaignWhere = (query: ListCampaignsQuery, onlyActive: boolean): Prisma.campaignsWhereInput => {
+  const now = new Date();
   const where: Prisma.campaignsWhereInput = { deletedAt: null };
 
   if (onlyActive) {
     where.isActive = true;
+  } else if (query.status) {
+    // status filter — cùng pattern với promotions
+    switch (query.status) {
+      case "active":
+        // isActive=true + đã bắt đầu + chưa hết hạn
+        where.isActive = true;
+        where.AND = [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }];
+        break;
+      case "inactive":
+        where.isActive = false;
+        break;
+      case "upcoming":
+        // isActive=true + startDate chưa tới
+        where.isActive = true;
+        where.startDate = { gt: now };
+        break;
+      case "expired":
+        // endDate đã qua (dù isActive true hay false)
+        where.endDate = { lt: now };
+        break;
+    }
   } else if (query.isActive !== undefined) {
+    // Fallback nếu FE truyền isActive trực tiếp
     where.isActive = query.isActive;
   }
 
@@ -45,7 +68,7 @@ const selectCampaignPublic = {
   _count: { select: { categories: true } },
 } satisfies Prisma.campaignsSelect;
 
-// ── Repository class ───────────────────────────────────────────────────────────
+// ── Repository ─────────────────────────────────────────────────────────────────
 
 export class CampaignRepository {
   // ── Slug / Name checks ──────────────────────────────────────────────────────
@@ -90,6 +113,7 @@ export class CampaignRepository {
         include: { _count: { select: { categories: true } } },
       }),
       prisma.campaigns.count({ where }),
+
       // active: isActive=true + đã bắt đầu + chưa hết hạn
       prisma.campaigns.count({
         where: {
@@ -108,8 +132,12 @@ export class CampaignRepository {
       prisma.campaigns.count({ where: { ...baseWhere, endDate: { lt: now } } }),
     ]);
 
+    // ALL = tổng không filter status (active + inactive + upcoming vv)
+    // Dùng total của query ALL (không filter) thay vì total của query hiện tại
+    const [allTotal] = await prisma.$transaction([prisma.campaigns.count({ where: { deletedAt: null } })]);
+
     const statusCounts = {
-      ALL: activeCount + inactiveCount,
+      ALL: allTotal,
       active: activeCount,
       inactive: inactiveCount,
       upcoming: upcomingCount,
@@ -119,7 +147,6 @@ export class CampaignRepository {
     return { data, page, limit, total, totalPages: Math.ceil(total / limit), statusCounts };
   }
 
-  /** Thùng rác */
   async findDeleted() {
     return prisma.campaigns.findMany({
       where: { deletedAt: { not: null } },
@@ -150,9 +177,7 @@ export class CampaignRepository {
       include: {
         categories: {
           orderBy: { position: "asc" },
-          include: {
-            category: { select: { id: true, name: true, slug: true, imageUrl: true, imagePath: true } },
-          },
+          include: { category: { select: { id: true, name: true, slug: true, imageUrl: true, imagePath: true } } },
         },
       },
     });
@@ -164,10 +189,9 @@ export class CampaignRepository {
       include: {
         categories: {
           orderBy: { position: "asc" },
-          include: {
-            category: { select: { id: true, name: true, slug: true, imageUrl: true, imagePath: true } },
-          },
+          include: { category: { select: { id: true, name: true, slug: true, imageUrl: true, imagePath: true } } },
         },
+        _count: { select: { categories: true } },
       },
     });
   }
@@ -197,7 +221,20 @@ export class CampaignRepository {
     if (data.startDate !== undefined) updateData.startDate = data.startDate;
     if (data.endDate !== undefined) updateData.endDate = data.endDate;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
-    return prisma.campaigns.update({ where: { id }, data: updateData });
+    return prisma.campaigns.update({
+      where: { id },
+      data: updateData,
+      // Thêm include để trả về categories
+      include: {
+        categories: {
+          orderBy: { position: "asc" },
+          include: {
+            category: { select: { id: true, name: true, slug: true, imageUrl: true, imagePath: true } },
+          },
+        },
+        _count: { select: { categories: true } },
+      },
+    });
   }
 
   async softDelete(id: string, deletedBy: string) {

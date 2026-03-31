@@ -15,6 +15,8 @@ export const listCampaignsQuerySchema = z.object({
   search: z.string().optional(),
   type: z.nativeEnum(CampaignType).optional(),
   isActive: z.coerce.boolean().optional(),
+  // status filter — cùng pattern với promotions
+  status: z.enum(["active", "inactive", "upcoming", "expired"]).optional(),
   sortBy: z.enum(["name", "createdAt", "startDate", "endDate"]).default("createdAt"),
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
   includeDeleted: z.coerce.boolean().optional().default(false),

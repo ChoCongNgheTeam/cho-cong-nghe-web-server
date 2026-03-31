@@ -111,7 +111,7 @@ export interface TopCustomer {
 }
 
 export interface ConversionFunnel {
-  requested: number;
+  // requested: number;
   pending: number;
   processing: number;
   shipped: number;

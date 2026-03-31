@@ -57,13 +57,30 @@ const selectVoucherDetail = {
 // =====================
 
 const buildVoucherWhere = (query: ListVouchersQuery, onlyActive = false): Prisma.vouchersWhereInput => {
+  const now = new Date();
   const where: Prisma.vouchersWhereInput = { deletedAt: null };
 
   if (onlyActive) {
     where.isActive = true;
-    // Không trả về voucher chưa bắt đầu hoặc đã hết hạn
-    const now = new Date();
     where.AND = [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }];
+  } else if (query.status) {
+    // Thêm block này
+    switch (query.status) {
+      case "active":
+        where.isActive = true;
+        where.AND = [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }];
+        break;
+      case "inactive":
+        where.isActive = false;
+        break;
+      case "expired":
+        where.endDate = { lt: now };
+        break;
+      case "upcoming":
+        where.isActive = true;
+        where.startDate = { gt: now };
+        break;
+    }
   } else if (query.isActive !== undefined) {
     where.isActive = query.isActive;
   }
@@ -76,14 +93,14 @@ const buildVoucherWhere = (query: ListVouchersQuery, onlyActive = false): Prisma
     where.discountType = query.discountType;
   }
 
-  if (query.isExpired !== undefined) {
-    const now = new Date();
-    if (query.isExpired) {
-      where.endDate = { lt: now };
-    } else {
-      where.OR = [{ endDate: null }, { endDate: { gte: now } }];
-    }
-  }
+  // if (query.isExpired !== undefined) {
+  //   const now = new Date();
+  //   if (query.isExpired) {
+  //     where.endDate = { lt: now };
+  //   } else {
+  //     where.OR = [{ endDate: null }, { endDate: { gte: now } }];
+  //   }
+  // }
 
   return where;
 };
@@ -95,7 +112,7 @@ const buildVoucherWhere = (query: ListVouchersQuery, onlyActive = false): Prisma
 export const findAll = async (query: ListVouchersQuery) => {
   const { page, limit, sortBy, sortOrder } = query;
   const skip = (page - 1) * limit;
-  const where = buildVoucherWhere(query, true);
+  const where = buildVoucherWhere(query, false);
   where.voucherUsers = { none: {} };
   const now = new Date();
   const baseWhere: Prisma.vouchersWhereInput = { deletedAt: null };

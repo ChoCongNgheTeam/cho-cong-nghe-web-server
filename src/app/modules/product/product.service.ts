@@ -380,7 +380,21 @@ export const createProduct = async (input: CreateProductInput) => {
 export const updateProduct = async (id: string, input: UpdateProductInput) => {
   await assertProductExists(id);
 
-  const updateData: any = { ...input };
+  const { brandId, categoryId, ...rest } = input;
+
+  const updateData: any = {
+    ...rest,
+    ...(brandId && {
+      brand: {
+        connect: { id: brandId },
+      },
+    }),
+    ...(categoryId && {
+      category: {
+        connect: { id: categoryId },
+      },
+    }),
+  };
 
   if (input.name) {
     const baseSlug = slugify(input.name).toLowerCase();
