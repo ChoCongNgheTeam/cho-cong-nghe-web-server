@@ -367,6 +367,8 @@ export const create = async (data: CreatePromotionInput) => {
 export const update = async (id: string, data: UpdatePromotionInput) => {
   console.log(data);
 
+  console.log(data);
+
   const { rules, targets, ...updateData } = data;
 
   if (rules !== undefined) {

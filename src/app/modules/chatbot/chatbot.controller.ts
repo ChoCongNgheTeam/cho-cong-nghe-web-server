@@ -5,8 +5,8 @@ import { chatbotService } from './chatbot.service';
 const chat = asyncHandler(async (req: Request, res: Response) => {
     const { messages, selectedVariantId, selectedPaymentMethodId } = req.body;
     
-    // Đảm bảo client chỉ gửi mảng tối đa 20 tin nhắn gần nhất để AI có đủ trí nhớ
-    const recentMessages = messages.slice(-20); 
+    // Đảm bảo client chỉ gửi mảng tối đa 50 tin nhắn gần nhất để AI có đủ trí nhớ
+    const recentMessages = messages.slice(-50); 
 
     const reply = await chatbotService.getChatReply(recentMessages, selectedVariantId, selectedPaymentMethodId);
     

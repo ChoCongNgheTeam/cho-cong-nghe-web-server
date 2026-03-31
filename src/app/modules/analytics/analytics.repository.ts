@@ -106,7 +106,7 @@ export const getOrderCountSparkline = async (from: Date, to: Date, points = 7): 
     FROM orders o
     WHERE
       o."orderDate" BETWEEN ${from} AND ${to}
-      AND o."orderStatus" != 'REQUEST_PENDING'
+      AND o."isChatbotRequest" = false
     GROUP BY DATE_TRUNC('day', o."orderDate")
     ORDER BY DATE_TRUNC('day', o."orderDate") ASC
     LIMIT ${points}
@@ -504,7 +504,7 @@ export const getOrderHeatmap = async (from: Date, to: Date): Promise<HeatmapCell
     FROM orders o
     WHERE
       o."orderDate" BETWEEN ${from} AND ${to}
-      AND o."orderStatus" != 'REQUEST_PENDING'
+      AND o."isChatbotRequest" = false
     GROUP BY dow, hour
     ORDER BY dow, hour
   `;
