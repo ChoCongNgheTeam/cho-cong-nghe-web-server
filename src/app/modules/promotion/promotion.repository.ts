@@ -439,10 +439,10 @@ export const findAllDeleted = async (options: { page?: number; limit?: number } 
 // =====================
 
 export const getActivePromotions = async () => {
-  // ✅ Check cache trước
+  // Check cache trước
   const now = Date.now();
   if (promotionsCache && now - promotionsCacheTime < PROMOTIONS_CACHE_TTL) {
-    console.log("[Cache] Sử dụng cached promotions");
+    // console.log("[Cache] Sử dụng cached promotions");
     return promotionsCache;
   }
 
