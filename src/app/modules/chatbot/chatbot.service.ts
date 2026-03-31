@@ -167,10 +167,30 @@ Nhận diện: Khách nói "tôi muốn mua", "cho tôi cái này", "tìm giúp 
   *Trường hợp 2.2: Khách muốn theo giá tiền*
   - Gọi searchProducts với keyword mầu mộ (loại sản phẩm) thôi, không chỉ định màu/dung lượng
   - Nhìn danh sách có variant nào match giá khách yêu cầu không?
-    ✅ CÓ: Gợi ý khách variant đó → chuyển sang lấy thông tin khách hàng
-    ❌ KHÔNG: Gợi ý các variant cùng loại với giá gần nhất (chênh 500K - 1M bên trên/dưới)
-      → Nếu khách thích variant khác → qua lấy thông tin
-      → Nếu khách không thích → tìm tiếp loại sản phẩm khác
+    ✅ CÓ (exactPriceMatch = true): Gợi ý khách variant đó → chuyển sang lấy thông tin khách hàng
+    
+    ❌ KHÔNG (priceNotMatched = true): PHẢI XỬ LÝ RÕ RÀNG:
+      **Bước A: Khẳng định minh bạch**
+      - Nói rõ: "Dạ em không có [tên sản phẩm] với giá chính xác [giá khách yêu cầu] ạ."
+      - ❌ TRÁNH: "Không tìm thấy", "Hết hàng", "Không có" (mơ hồ)
+      - ✅ ĐÚNG: "Em không có iPhone 15 với giá 15 triệu đ. Nhưng em có..."
+      
+      **Bước B: Giải thích lý do** (1 câu ngắn)
+      - "Dòng này hết hàng / mới bán / model cũ hơn..."
+      - Dùng kiến thức AI để giải thích tự nhiên
+      
+      **Bước C: Gợi ý sản phẩm cùng loại với giá gần nhất**
+      - Hiển thị 3-5 sản phẩm cùng loại với giá gần nhất (chênh 500K - 1M)
+      - Nhấn mạnh: các model cùng phân khúc
+      - So sánh ưu điểm của variant gợi ý so với giá khách muốn
+      
+      **Ví dụ:**
+      Khách muốn iPhone 15 giá 15 triệu, shop không có chính xác
+      → AI: Dạ em không có iPhone 15 với giá chính xác 15 triệu ạ. 
+             Dòng này hết hàng rồi. Nhưng em có những iPhone cùng phân khúc:
+             - iPhone 14 Pro: 14.9 triệu (rẻ hơn 100K, chip A16 mạnh)
+             - iPhone 15 Pro: 18.9 triệu (đắt hơn 3.9 triệu, chip A17 mới)
+             Bạn thích cái nào?
 
   *Trường hợp 2.3: Khách nêu yêu cầu đặc biệt (camera tốt, pin lâu, etc)*
   - Giải thích nhanh (1-2 câu) loại nào phù hợp nhất
@@ -205,9 +225,22 @@ Nhận diện: Khách nói "tôi muốn mua", "cho tôi cái này", "tìm giúp 
 1️⃣ **KHÔNG bắt buộc** màu + dung lượng - linh hoạt theo yêu cầu khách (có thể theo tên, giá, hay bất kỳ tiêu chí nào)
 2️⃣ Không bao giờ cảnh báo "lỗi hệ thống" khi search không tìm thấy - AI tư vấn sản phẩm tương tự
 3️⃣ Không lặp lại danh sách sản phẩm bằng chữ khi đã gọi searchProducts - frontend đã hiển thị cards
-4️⃣ Khi khách muốn mua theo **GIÁ TIỀN**, hãy gợi ý variant có giá gần nhất (chênh lệch 500K-1M)
+4️⃣ **KHÔNG CÓ GIÁ CHÍNH XÁC** - Khi tool trả về priceNotMatched=true:
+   • KHÔNG nói: "Hết hàng", "Không có", "Không tìm thấy" (rất mơ hồ)
+   • PHẢI khẳng định rõ: "Dạ em không có sản phẩm này với giá chính xác X ạ"
+   • GIẢI THÍCH: Tại sao hết hàng / model cũ / mới bán - 1 câu ngắn
+   • GỢI Ý: Sản phẩm cùng loại với giá gần nhất từ danh sách
+   • SO SÁNH: Tại sao sản phẩm gợi ý tốt hơn/kém hơn giá yêu cầu
 5️⃣ Luôn thân thiện, tràn đầy năng lượng, không khô khan
 6️⃣ Dùng emojis & icon tự nhiên để tăng sự hấp dẫn
+7️⃣ **🚫 TUYỆT ĐỐI KHÔNG ĐƯỢC BỊA (HALLUCINATE) SẢN PHẨM**:
+   • Khi khách nêu tên sản phẩm cụ thể ("iPhone 16", "Macbook Pro", etc) → PHẢI gọi **searchProducts tool NGAY**
+   • KHÔNG được viết ra giá, chip, camera, specs mà không lấy từ tool trước
+   • KHÔNG được mô tả sản phẩm bằng chữ nếu chưa gọi tool (vì data sẽ sai)
+   • Luôn phải hiển thị **PRODUCT CARDS** từ kết quả search để khách chọn (KHÔNG phải mô tả bằng chữ)
+   • Nếu tool không tìm thấy → Gợi ý sản phẩm tương tự hoặc khác loại, KHÔNG bịa
+   ✅ ĐÚNG: Gọi searchProducts("iPhone 16") → Frontend hiển thị cards → Khách nhìn và chọn
+   ❌ SAI: "iPhone 16 giá 18.5M, chip A16, camera 48MP..." (bịa dữ liệu không từ tool)
 
 💎 **QUY TẮC TRÌNH BÀY (CỰC KỲ QUAN TRỌNG)**:
 
@@ -239,6 +272,79 @@ Nhận diện: Khách nói "tôi muốn mua", "cho tôi cái này", "tìm giúp 
    - "Cách nào bạn thích?" (thay vì chỉ hỏi "Chọn cái nào?")
    - "Mình có thể tư vấn thêm..." (thay vì "Còn cần gì không?")
    - Tạo cảm giác như người bán hàng thực sự quan tâm
+
+---
+
+🛡️ GUARDRAILS & QUY TẮC AN TOÀN (TUYỆT ĐỐI TUÂN THỦ):
+
+1️⃣ **Bám sát chuyên môn - Từ chối lịch sự:**
+CHỈ trả lời các vấn đề liên quan đến đồ công nghệ, tư vấn sản phẩm, đơn hàng tại "Chợ Công Nghệ". 
+Nếu khách hỏi ngoài lề (chính trị, tôn giáo, code, toán học, v.v.), hãy từ chối lịch sự:
+   "Dạ em chỉ là chuyên gia tư vấn đồ công nghệ thôi ạ, em không rành vấn đề này. 😅"
+   "Mình đang tìm thiết bị gì để em hỗ trợ nhé?"
+✅ VÍ DỤ TROLL HANDLING:
+   👤 "Chỉ mình code website này đi"
+   🤖 "Dạ em chỉ là tư vấn bán hàng, không có chuyên môn lập trình đâu ạ. 😅 Chứ bạn có đang cần điện thoại/laptop không? Em giúp tìm cho ạ!"
+   
+   👤 "Bầu cử Mỹ ai thắng?"
+   🤖 "Haha, em là chatbot mua hàng thôi ạ, chính trị em không tư vấn được. Bạn có cần thiết bị công nghệ gì không?"
+
+2️⃣ **Xử lý so sánh đối thủ (FPT, TGDĐ, CellphoneS):**
+Nếu khách nhắc đến cửa hàng khác, KHÔNG nói xấu đối thủ. Thay vào đó:
+   ✅ Nhấn mạnh vào ưu đãi của "Chợ Công Nghệ": giá, bảo hành, dịch vụ
+   ✅ Giải thích khác biệt tích cực: "Mình có [tính năng X], [giá Y], [bảo hành Z]"
+   ❌ KHÔNG nói: "Bên họ chắc đắt hơn", "Họ kém hơn mình"
+   
+✅ VÍ DỤ:
+   👤 "Thế Giới Di Động bán rẻ hơn bên bạn, giảm giá đi?"
+   🤖 "Mình không so sánh được giá với các cửa hàng khác ạ. Nhưng Chợ Công Nghệ có chính sách:
+      - 📦 Bảo hành chính hãng
+      - 💰 Giá cạnh tranh (có promotions hàng tuần)
+      - ⚡ Tư vấn chuyên môn miễn phí
+      - 🚚 Giao nhanh, lắp ráp miễn phí
+      
+      Bạn tìm sản phẩm nào để mình giúp bạn tìm giá tốt nhất?"
+
+3️⃣ **KHÔNG bịa dặt dữ liệu (Hallucination Prevention):**
+Tuyệt đối KHÔNG tự ý hứa hẹn nếu không có xác nhận từ Tool:
+   ❌ KHÔNG: "Bên em đang tặng kèm tai nghe AirPods khi mua iPhone"
+   ❌ KHÔNG: "Em vừa kiểm tra, còn hàng 100 cái"
+   ❌ KHÔNG: "Hôm nay giảm 50% cho tất cả iPhone"
+   
+   ✅ CHỈ nói những gì Tool trả về:
+      - Giá từ searchProducts tool
+      - Thông tin khuyến mãi nếu có trong kết quả search
+      - Tồn kho từ tool
+   
+   ✅ NẾU TOOL KHÔNG TRẢ VỀ:
+      "Em chưa kiểm tra được thông tin đó trong hệ thống. Em gọi tool xem liên hệ với khách sạn (...)
+      hoặc "Thông tin quà tặng em phải xác nhận lại với quản lý, em sẽ cập nhật sau nhé ạ"
+
+4️⃣ **Thu thập thông tin khéo léo (Tránh Overload):**
+Khi xin thông tin giao hàng, HÃY HỎI TỪNG BƯỚC:
+   ❌ SAI: "Dạ cho em biết Tên, SĐT, Email, Địa chỉ chi tiết, Số lượng được không ạ?"
+   ✅ ĐÚNG: 
+      - Lần 1: "Dạ anh cho em xin Tên người nhận được không ạ?"
+      - Lần 2: "Cảm ơn anh. Giờ em cần SĐT liên hệ được không ạ?"
+      - Lần 3: "Email (nếu có) + Địa chỉ chi tiết giao hàng là sao ạ?"
+   
+   ✅ LINH HOẠT: Có thể hỏi 2 thông tin cùng lúc nếu BỰC tự nhiên (VD: "Tên + SĐT"), nhưng tối đa 2.
+
+5️⃣ **Không tự bịa quá lời (Keep it Real):**
+   ❌ KHÔNG: "Em là AI tốt nhất trong ngành"
+   ❌ KHÔNG: "Bạn sẽ tiết kiệm 10 triệu nếu mua hôm nay" (nếu không confirm được)
+   ✅ YÊU CẦU: Thành thật, khiêm tốn, chuyên nghiệp
+
+6️⃣ **Xác nhận danh tính khách (Chống lừa):**
+Sau khi lấy thông tin (tên, SĐT, địa chỉ), PHẢI xác nhận lại trước khi tạo đơn:
+   ✅ "Xác nhận lại nhé anh: Tên [X], SĐT [Y], Địa chỉ [Z], thanh toán [phương thức], đúng không ạ?"
+   Chỉ khi khách nói "Đúng", "OK", "Chốt", "Được" → mới gọi createOrderRequest tool
+
+⚠️ LƯU Ý KỸ THUẬT NGHIÊM TRỌNG - BACKEND:
+- KHÔNG dùng biến Global để lưu state người dùng (productVariantId, paymentMethodId, v.v.)
+- Biến global -> Dữ liệu của khách A sẽ ảnh hưởng khách B (Critical Bug!)
+- ✅ Thay vào đó: Lưu state trong conversation context + gửi kèm mỗi request từ frontend
+- ✅ Backend chỉ đọc giá trị từ req.body, không phụ thuộc global variables
 
 `;
 
@@ -555,7 +661,15 @@ Ví dụ: "Mình chưa bán dòng đó, nhưng nếu bạn cần một laptop hi
       }).slice(0, 5); // Giới hạn 5 variants gợi ý
 
       if (nearestVariants.length > 0) {
-        priceMatchMessage = `⚠️ Không tìm thấy sản phẩm chính xác với giá ${priceRangeMin.toLocaleString('vi-VN')}-${priceRangeMax.toLocaleString('vi-VN')}đ, nhưng mình có những alternatives gần nhất:`;
+        // 🔴 KHẲNG ĐỊNH RÕ RÀNG: Shop không có sản phẩm với giá chính xác
+        const priceRangeStr = priceRangeMin === priceRangeMax 
+          ? `${priceRangeMin.toLocaleString('vi-VN')}đ`
+          : `${priceRangeMin.toLocaleString('vi-VN')}-${priceRangeMax.toLocaleString('vi-VN')}đ`;
+        
+        const productType = products[0]?.name || keyword;
+        priceMatchMessage = `❌ Dạ em không có sản phẩm "${productType}" với giá chính xác ${priceRangeStr} ạ.
+
+✅ Nhưng em có những sản phẩm cùng loại với giá gần nhất dưới đây. Bạn xem có phù hợp không?`;
         
         nearestVariants.forEach((v: any) => {
           // Rebuild variant info
@@ -644,6 +758,12 @@ Ví dụ: "Mình chưa bán dòng đó, nhưng nếu bạn cần một laptop hi
       variants: variants,
       priceFilterUsed: !!priceRange,
       exactPriceMatch: exactPriceMatchFound,
+      // 🔴 Thêm context cho AI khi không tìm thấy giá chính xác
+      priceNotMatched: priceRange && !exactPriceMatchFound && variants.length > 0,
+      requestedPriceRange: priceRange ? `${(priceRange.min || 0).toLocaleString('vi-VN')}-${(priceRange.max || Infinity).toLocaleString('vi-VN')}đ` : null,
+      contextForAI: priceRange && !exactPriceMatchFound && variants.length > 0 
+        ? `Khách hàng yêu cầu giá ${(priceRange.min || 0).toLocaleString('vi-VN')}-${(priceRange.max || Infinity).toLocaleString('vi-VN')}đ nhưng shop không có chính xác. Các sản phẩm dưới là cùng loại (${products[0]?.name || keyword}) với giá gần nhất. Hãy giải thích mộtchút tại sao shop không có giá đó (có thể do hết hàng, mới bán, hay model khác) và thuyết phục khách lựa chọn một trong các sản phẩm gợi ý.`
+        : null,
     };
   } catch (error) {
     console.error("Lỗi khi query DB Chatbot:", error);
@@ -738,7 +858,24 @@ const executeCreateOrderRequest = async (args: any) => {
   try {
     console.log("🚀 Tạo yêu cầu đặt hàng từ chatbot:", args);
 
-    // 🔧 TÁCH EMAIL VÀ ĐỊA CHỈ NẾU BỊ DÍNH
+    // � VALIDATE productVariantId - MUST BE UUID FORMAT
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(args.productVariantId)) {
+      console.error(`❌ INVALID productVariantId: "${args.productVariantId}" is NOT a valid UUID format`);
+      return {
+        error: `❌ Lỗi nội bộ: productVariantId không hợp lệ (bịa dữ liệu?). Vui lòng chọn lại sản phẩm từ danh sách hiển thị.`,
+      };
+    }
+
+    // 🔐 VALIDATE paymentMethodId - MUST BE UUID FORMAT  
+    if (args.paymentMethodId && !uuidRegex.test(args.paymentMethodId) && args.paymentMethodId !== "COD" && args.paymentMethodId !== "BANK_TRANSFER" && args.paymentMethodId !== "MOMO" && args.paymentMethodId !== "VNPAY" && args.paymentMethodId !== "ZALOPAY") {
+      console.error(`❌ INVALID paymentMethodId: "${args.paymentMethodId}" is NOT a valid UUID or code`);
+      return {
+        error: `❌ Lỗi nội bộ: paymentMethodId không hợp lệ. Vui lòng chọn lại phương thức thanh toán.`,
+      };
+    }
+
+    // �🔧 TÁCH EMAIL VÀ ĐỊA CHỈ NẾU BỊ DÍNH
     let cleanAddress = args.address;
     const emailPattern = /([a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/;
     const emailMatch = args.address.match(emailPattern);
@@ -1130,24 +1267,37 @@ const extractCustomerInfoFromHistory = (msgHistory: any[]): { name?: string; pho
 // 5. MAIN EXPORT (CHAT BOT LOGIC) - OPENAI INTEGRATION
 // ============================================================================
 
-let lastSearchedProductVariantId: string | null = null;
-let lastSearchedProductsHtml: string | null = null;
-let lastSearchedProductsVariants: any[] = [];
-let lastPaymentMethodsHtml: string | null = null;
-let lastAvailablePaymentMethods: any[] = [];
-let lastSelectedPaymentMethodId: string | null = null;
+// 🔒 CONVERSATION CONTEXT TYPE - Replaces global variables!
+// This object should be stored on FRONTEND and passed with each request
+// DO NOT USE GLOBAL VARIABLES - they are shared across all users!
+interface ConversationContext {
+  searchedProductVariantId?: string | null;
+  searchedProductsHtml?: string | null;
+  searchedProductsVariants?: any[];
+  paymentMethodsHtml?: string | null;
+  availablePaymentMethods?: any[];
+  selectedPaymentMethodId?: string | null;
+}
 
-const getChatReply = async (userMessages: any[], selectedVariantId?: string, selectedPaymentMethodId?: string) => {
+const getChatReply = async (
+  userMessages: any[],
+  selectedVariantId?: string,
+  selectedPaymentMethodId?: string,
+  conversationContext?: ConversationContext // 🆕 Context object instead of global variables
+) => {
   try {
-    // 🔑 NẾU FRONTEND GỬI ID, LƯU LẠI VÀO BIẾN TOÀN CỤC NGAY LẬP TỨC
+    // � Initialize context if not provided (for backward compatibility)
+    const ctx: ConversationContext = conversationContext || {};
+    
+    // 🔑 NẾU FRONTEND GỬI ID, CẬP NHẬT CONTEXT NGAY (không lưu global)
     if (selectedVariantId) {
-      lastSearchedProductVariantId = selectedVariantId;
-      console.log(`✅ Saved variantId to state: ${lastSearchedProductVariantId}`);
+      ctx.searchedProductVariantId = selectedVariantId;
+      console.log(`✅ Updated variantId in context: ${ctx.searchedProductVariantId}`);
     }
 
     if (selectedPaymentMethodId) {
-      lastSelectedPaymentMethodId = selectedPaymentMethodId;
-      console.log(`✅ Saved paymentId to state: ${lastSelectedPaymentMethodId}`);
+      ctx.selectedPaymentMethodId = selectedPaymentMethodId;
+      console.log(`✅ Updated paymentId in context: ${ctx.selectedPaymentMethodId}`);
     }
 
     if (!userMessages || userMessages.length === 0) {
@@ -1155,6 +1305,7 @@ const getChatReply = async (userMessages: any[], selectedVariantId?: string, sel
         role: "assistant",
         content:
           "👋 Chào bạn! Mình là chuyên gia tư vấn công nghệ của Chợ Công Nghệ. Mình có thể giúp bạn tìm điện thoại, laptop, tablet hay bất cứ thiết bị công nghệ nào bạn cần. Nhu cầu của bạn là gì ạ?",
+        conversationContext: ctx, // 🔒 Return context back to frontend
       };
     }
 
@@ -1170,21 +1321,22 @@ const getChatReply = async (userMessages: any[], selectedVariantId?: string, sel
 
     if (confirming) {
       console.log("🎯 CONFIRMATION DETECTED!");
+      console.log(`📌 Context State: variantId=${ctx.searchedProductVariantId}, paymentId=${ctx.selectedPaymentMethodId}`);
 
       const customerInfo = extractCustomerInfoFromHistory(historyMessages);
 
-      if (!customerInfo.productVariantId && lastSearchedProductVariantId) {
-        customerInfo.productVariantId = lastSearchedProductVariantId;
-        console.log(`📌 Using saved productVariantId: ${lastSearchedProductVariantId}`);
+      // 🔑 STEP 1: INJECT productVariantId FROM CONTEXT (TRƯỚC KHI CHECK MISSING)
+      if (!customerInfo.productVariantId && ctx.searchedProductVariantId) {
+        customerInfo.productVariantId = ctx.searchedProductVariantId;
+        console.log(`✅ [CONFIRM] Injected variantId từ context: ${ctx.searchedProductVariantId}`);
       }
 
-      // ================== 🪄 AUTO-RECOVER PAYMENT METHOD ID ==================
-      // Nếu UI không gửi ID (khách gõ chữ hoặc server bị restart), tự động dò từ text
-      if (!lastSelectedPaymentMethodId && lastAvailablePaymentMethods.length > 0) {
+      // 🔑 STEP 2: AUTO-RECOVER PAYMENT METHOD ID FROM TEXT VÀ CONTEXT
+      if (!ctx.selectedPaymentMethodId && ctx.availablePaymentMethods && ctx.availablePaymentMethods.length > 0) {
         for (let i = historyMessages.length - 1; i >= 0; i--) {
           if (historyMessages[i].role === "user") {
             const msgText = historyMessages[i].content?.toLowerCase() || "";
-            const found = lastAvailablePaymentMethods.find(
+            const found = ctx.availablePaymentMethods.find(
               (pm) =>
                 msgText.includes(pm.code.toLowerCase()) ||
                 msgText.includes(pm.name.toLowerCase()) ||
@@ -1195,20 +1347,26 @@ const getChatReply = async (userMessages: any[], selectedVariantId?: string, sel
                 (msgText.includes("vnpay") && pm.code === "VNPAY"),
             );
             if (found) {
-              lastSelectedPaymentMethodId = found.id;
-              console.log(`🪄 Đã tự động khôi phục paymentId từ text: ${found.name} (${found.code})`);
-              break; // Tìm thấy thì dừng luôn
+              ctx.selectedPaymentMethodId = found.id;
+              console.log(`✅ [CONFIRM] Auto-recovered paymentId: ${found.name} (${found.code})`);
+              break;
             }
           }
         }
       }
-      // ========================================================================
 
-      console.log("📊 Final Extracted Info:", customerInfo);
+      console.log(`📊 [CONFIRM FINAL STATE]`, {
+        name: customerInfo.name,
+        phone: customerInfo.phone,
+        productVariantId: customerInfo.productVariantId,
+        email: customerInfo.email,
+        address: customerInfo.address,
+        paymentMethodId: ctx.selectedPaymentMethodId,
+      });
 
-      // Kiểm tra xem đã có đầy đủ thông tin cơ bản chưa (không bao gồm payment confirmation)
+      // Kiểm tra xem đã có đầy đủ thông tin cơ bản chưa
       if (!customerInfo.name || !customerInfo.phone || !customerInfo.address || !customerInfo.productVariantId) {
-        console.warn("⚠️ Missing required info:", customerInfo);
+        console.warn("⚠️ Still missing required info after context injection:", customerInfo);
 
         let missingFields: string[] = [];
         if (!customerInfo.name) missingFields.push("tên");
@@ -1219,28 +1377,44 @@ const getChatReply = async (userMessages: any[], selectedVariantId?: string, sel
         return {
           role: "assistant",
           content: `Xin lỗi, tôi chưa có đầy đủ thông tin. Vui lòng cung cấp lại: ${missingFields.join(", ")}`,
+          conversationContext: ctx, // 🔒 Return context back to frontend
         };
       }
 
-      // Nếu chưa hiển thị payment methods, hiển thị và không tạo order cùng lúc
-      if (!lastPaymentMethodsHtml && !lastSelectedPaymentMethodId) {
+      // Nếu chưa hiển thị payment methods, hiển thị ngay (gọi tool trực tiếp, không để OpenAI gọi lại)
+      if (!ctx.paymentMethodsHtml && !ctx.selectedPaymentMethodId) {
         console.log("📊 Gửi danh sách payment methods cho user chọn...");
+        
+        // ✅ GỌI TOOL TRỰC TIẾP thay vì để OpenAI gọi (tránh lặp lại)
+        const paymentMethodsResult = await executeGetPaymentMethods();
+        if (paymentMethodsResult.html && !paymentMethodsResult.error) {
+          ctx.paymentMethodsHtml = paymentMethodsResult.html;
+          ctx.availablePaymentMethods = paymentMethodsResult.paymentMethods || [];
+          console.log(`💾 Payment methods loaded directly: ${paymentMethodsResult.paymentMethods?.length || 0} methods`);
+        }
+        
         return {
           role: "assistant",
-          content: `Bạn có chắc là Họ Tên ${customerInfo.name}, SĐT ${customerInfo.phone}, Địa chỉ ${customerInfo.address} không? 
-                    
-Dưới đây là các phương thức thanh toán có sẵn, bạn chọn cách nào ạ:`,
-          // Payment methods sẽ được gửi bởi OpenAI tool call
-          // Chúng tôi sẽ gọi getPaymentMethods ở lần sau
+          content: `Cảm ơn anh đã xác nhận thông tin! 😊
+
+Bây giờ, anh chọn phương thức thanh toán nào ạ? Danh sách phương thức có sẵn dưới đây:`,
+          html: ctx.paymentMethodsHtml, // ✅ THÊM HTML để frontend render
+          format: "payment_methods", // ✅ THÊM FORMAT để frontend biết cách hiển thị
+          paymentMethods: ctx.availablePaymentMethods, // ✅ THÊM danh sách để frontend dùng
+          conversationContext: ctx, // 🔒 Return context
         };
       }
 
-      // Nếu payment methods đã hiển thị nhưng user chưa chọn, bỏ qua
-      if (!lastSelectedPaymentMethodId) {
-        console.log("⚠️ User chưa chọn payment method, chờ user chọn");
+      // Nếu payment methods đã hiển thị nhưng user chưa chọn, chỉ nhắc nhở (KHÔNG gọi OpenAI lại)
+      if (ctx.paymentMethodsHtml && !ctx.selectedPaymentMethodId) {
+        console.log("⚠️ User chưa chọn payment method từ danh sách, nhắc nhở lại");
         return {
           role: "assistant",
-          content: `Vui lòng chọn một phương thức thanh toán từ danh sách trên ạ!`,
+          content: `Anh vui lòng chọn một phương thức thanh toán từ danh sách trên ạ! 💰`,
+          html: ctx.paymentMethodsHtml, // ✅ GỬI LẠI HTML (tránh user phải scroll)
+          format: "payment_methods",
+          paymentMethods: ctx.availablePaymentMethods,
+          conversationContext: ctx, // 🔒 Return context back to frontend
         };
       }
 
@@ -1252,24 +1426,30 @@ Dưới đây là các phương thức thanh toán có sẵn, bạn chọn cách
         email: customerInfo.email,
         address: customerInfo.address,
         productVariantId: customerInfo.productVariantId,
-        paymentMethodId: lastSelectedPaymentMethodId,
+        paymentMethodId: ctx.selectedPaymentMethodId,
         quantity: 1,
       });
 
       if (orderResult.error) {
-        return { role: "assistant", content: orderResult.error };
+        return { 
+          role: "assistant", 
+          content: orderResult.error,
+          conversationContext: ctx, // 🔒 Return context back to frontend
+        };
       }
 
-      lastSearchedProductVariantId = null;
-      lastSearchedProductsHtml = null;
-      lastSearchedProductsVariants = [];
-      lastPaymentMethodsHtml = null;
-      lastAvailablePaymentMethods = [];
-      lastSelectedPaymentMethodId = null;
+      // 🔒 Clear context after successful order
+      ctx.searchedProductVariantId = null;
+      ctx.searchedProductsHtml = null;
+      ctx.searchedProductsVariants = [];
+      ctx.paymentMethodsHtml = null;
+      ctx.availablePaymentMethods = [];
+      ctx.selectedPaymentMethodId = null;
 
       return {
         role: "assistant",
         content: `${orderResult.message}\n\n📦 **Mã đơn:** ${orderResult.orderCode}\n💰 **Tổng tiền:** ${orderResult.totalAmount}\n\nVui lòng chờ staff liên hệ xác nhận. Cảm ơn bạn đã mua hàng tại Chợ Công Nghệ! 🎉`,
+        conversationContext: ctx, // 🔒 Return context back to frontend
       };
     }
 
@@ -1284,18 +1464,20 @@ Dưới đây là các phương thức thanh toán có sẵn, bạn chọn cách
     ];
 
     // 🔑 NẾU USER ĐÃ CHỌN SẢN PHẨM, THÊM CONTEXT NGĂN GỌI searchProducts LẠI
-    if (lastSearchedProductVariantId) {
+    if (ctx.searchedProductVariantId) {
       openAiMessages.splice(1, 0, {
         role: "system",
-        content: `⚠️ USER ĐÃ CHỌN SẢN PHẨM RỒI (ID: ${lastSearchedProductVariantId}). KHÔNG GỌI searchProducts LẠI. Chuyển sang Bước 3: Hỏi số lượng + xác nhận thông tin khách (tên, SĐT, địa chỉ).`,
+        content: `⚠️ USER ĐÃ CHỌN SẢN PHẨM RỒI (ID: ${ctx.searchedProductVariantId}). KHÔNG GỌI searchProducts LẠI. Chuyển sang Bước 3: Hỏi số lượng + xác nhận thông tin khách (tên, SĐT, địa chỉ).`,
       });
     }
 
     // 🔑 NẾU ĐÃ HIỂN THỊ PAYMENT METHODS, THÊM CONTEXT NGĂN GỌI getPaymentMethods LẠI
-    if (lastPaymentMethodsHtml && !lastSelectedPaymentMethodId) {
+    if (ctx.paymentMethodsHtml) {
       openAiMessages.splice(1, 0, {
         role: "system",
-        content: `⚠️ DANH SÁCH PHƯƠNG THỨC THANH TOÁN ĐÃ ĐƯỢC HIỂN THỊ. KHÔNG GỌI getPaymentMethods LẠI. Chỉ chờ user chọn phương thức thanh toán từ danh sách.`,
+        content: `⚠️ DANH SÁCH PHƯƠNG THỨC THANH TOÁN ĐÃ ĐƯỢC HIỂN THỊ TRÊN FRONTEND. TUYỆT ĐỐI KHÔNG GỌI getPaymentMethods LẠI.
+- Nếu user chưa chọn: Hỗ trợ user chọn từ danh sách đã hiển thị
+- Nếu user đã chọn (ví dụ: "COD", "Momo", etc): Chuyển sang bước xác nhận đơn hàng`,
       });
     }
 
@@ -1304,6 +1486,77 @@ Dưới đây là các phương thức thanh toán có sẵn, bạn chọn cách
       role: "system",
       content: `NHẮC NHỞ TRÌNH BÀY: Luôn xuống dòng, dùng bullet points cho các ý chính, bôi đậm từ khóa quan trọng, tránh đoạn văn dài quá 3 câu. Sử dụng icon (📱 📸 💰 ⚡) một cách tự nhiên.`,
     });
+
+    // 🚀 AUTO-DETECT PRODUCT NAME & AUTO-CALL searchProducts
+    // Kiểm tra nếu user nêu tên sản phẩm cụ thể → TỰ ĐỘNG GỌI searchProducts ngay (không để AI bịa)
+    const productKeywords = [
+      "iphone", "macbook", "ipad", "apple watch",
+      "samsung", "galaxy", "s24", "a50",
+      "oppo", "a15", "reno",
+      "xiaomi", "redmi", "poco",
+      "lenovo", "thinkpad",
+      "dell", "inspiron", "xps",
+      "hp", "pavilion",
+      "asus", "vivobook",
+      "acer", "aspire"
+    ];
+    const userMsgLower = latestMessage.toLowerCase();
+    const detectedProduct = productKeywords.find(kw => userMsgLower.includes(kw));
+
+    // 🎯 Nếu detect được tên sản phẩm & chưa search cho sản phẩm đó & KHÔNG ĐANG CONFIRM
+    // ⚠️ NHƯNG: Nếu user đã chọn variant từ list trước (có selectedVariantId từ frontend), KHÔNG search lại
+    if (detectedProduct && !ctx.searchedProductVariantId && !selectedVariantId && !confirming) {
+      console.log(`🔍 AUTO-DETECT: "${detectedProduct}" - Tự động gọi searchProducts`);
+      
+      const autoSearchResult = await executeSearchProducts({
+        keyword: detectedProduct,
+        color: undefined,
+        storage: undefined,
+        priceRange: undefined // Nếu user nêu giá, AI sẽ phân tách ra function args
+      });
+
+      if (autoSearchResult.found && autoSearchResult.html) {
+        // ✅ LƯU VÀO CONTEXT - BỎ QUA CHI TIẾT
+        ctx.searchedProductsHtml = autoSearchResult.html;
+        ctx.searchedProductsVariants = autoSearchResult.variants || [];
+        ctx.searchedProductVariantId = autoSearchResult.firstVariantId; // 🔑 LƯU VARIANT ID!
+        
+        console.log(`💾 [AUTO-DETECT] Updated context: variantId=${ctx.searchedProductVariantId}, variants=${autoSearchResult.variants?.length || 0}`);
+        
+        // 🔌 Inject kết quả search vào message array cho OpenAI
+        openAiMessages.push({
+          role: "assistant",
+          content: `[🔍 Kết quả tìm kiếm tự động: Tìm thấy ${autoSearchResult.variants?.length || 0} phiên bản sản phẩm]`,
+        });
+        
+        openAiMessages.push({
+          role: "user",
+          content: latestMessage,
+        });
+        
+        // 🎯 Thêm system instruction cho OpenAI
+        openAiMessages.splice(1, 0, {
+          role: "system",
+          content: `🔗 SEARCH PRODUCTS ĐÃ ĐƯỢC THỰC HIỆN. Dựa vào kết quả search ở trên:
+- Hiển thị product cards cho khách chọn (frontend sẽ tự động render HTML)
+- KHÔNG ĐƯỢC mô tả sản phẩm bằng chữ nếu chưa có user confirm
+- Nếu user chọn 1 variant → lưu vào context (frontend sẽ gửi selectedVariantId)
+- KHÔNG TUYỆT ĐỐI GỌI searchProducts LẠI`,
+        });
+      } else if (!autoSearchResult.found) {
+        // ❌ Search không tìm thấy - để OpenAI tư vấn sản phẩm tương tự
+        console.log(`⚠️ Search không tìm "${detectedProduct}" - để AI tư vấn tương tự`);
+        openAiMessages.splice(1, 0, {
+          role: "system",
+          content: `Không tìm thấy "${detectedProduct}" trong kho. Hãy dùng kiến thức của bạn để:
+1. Giải thích tại sao hết hàng / không có model đó
+2. Gợi ý sản phẩm THỰC TẾ tương tự từ cũng loại (nhưng không bịa ra dữ liệu)
+3. Nếu khách muốn xem các sản phẩm khác, hãy yêu cầu gọi searchProducts tool với keyword khác`,
+        });
+      }
+    } else {
+      console.log(`⏭️ AUTO-DETECT SKIPPED: confirming=${confirming}, searchedProductVariantId=${ctx.searchedProductVariantId}`);
+    }
 
     // 2. Gọi API OpenAI lần 1
     const response = await openai.chat.completions.create({
@@ -1352,20 +1605,20 @@ Dưới đây là các phương thức thanh toán có sẵn, bạn chọn cách
               note: "✅ Thay vì báo lỗi, hãy dùng kiến thức của bạn để tư vấn sản phẩm tương tự hoặc hỏi thêm chi tiết",
             };
           } else {
-            // ✅ Search thành công - cập nhật state
+            // ✅ Search thành công - cập nhật context (không phải global!)
             if (apiResponse.html) {
-              lastSearchedProductsHtml = apiResponse.html;
-              console.log(`💾 Saved product cards HTML`);
+              ctx.searchedProductsHtml = apiResponse.html;
+              console.log(`💾 Updated product cards HTML in context`);
             }
 
             if (apiResponse.variants && Array.isArray(apiResponse.variants)) {
-              lastSearchedProductsVariants = apiResponse.variants;
-              console.log(`💾 Saved ${apiResponse.variants.length} structured variants with imageUrl`);
+              ctx.searchedProductsVariants = apiResponse.variants;
+              console.log(`💾 Updated ${apiResponse.variants.length} structured variants in context`);
             }
 
             if (apiResponse.firstVariantId) {
-              lastSearchedProductVariantId = apiResponse.firstVariantId;
-              console.log(`💾 Saved first productVariantId: ${apiResponse.firstVariantId}`);
+              ctx.searchedProductVariantId = apiResponse.firstVariantId;
+              console.log(`💾 Updated first productVariantId in context: ${apiResponse.firstVariantId}`);
             }
 
             toolResponseForAI = {
@@ -1382,15 +1635,15 @@ Dưới đây là các phương thức thanh toán có sẵn, bạn chọn cách
             console.warn(`🔄 Get payment methods FAILED - ${apiResponse.error}`);
             toolResponseForAI = { error: apiResponse.error };
           } else {
-            // ✅ Lấy payment methods thành công - cập nhật state
+            // ✅ Lấy payment methods thành công - cập nhật context (không phải global!)
             if (apiResponse.html) {
-              lastPaymentMethodsHtml = apiResponse.html;
-              console.log(`💾 Saved payment methods HTML`);
+              ctx.paymentMethodsHtml = apiResponse.html;
+              console.log(`💾 Updated payment methods HTML in context`);
             }
 
             if (apiResponse.paymentMethods && Array.isArray(apiResponse.paymentMethods)) {
-              lastAvailablePaymentMethods = apiResponse.paymentMethods;
-              console.log(`💾 Saved ${apiResponse.paymentMethods.length} payment methods`);
+              ctx.availablePaymentMethods = apiResponse.paymentMethods;
+              console.log(`💾 Updated ${apiResponse.paymentMethods.length} payment methods in context`);
             }
 
             toolResponseForAI = {
@@ -1401,12 +1654,12 @@ Dưới đây là các phương thức thanh toán có sẵn, bạn chọn cách
             };
           }
         } else if (functionName === "createOrderRequest") {
-          // ÉP DÙNG ID THẬT: Ghi đè ID do AI tự chế bằng ID chuẩn từ giao diện
-          if (lastSelectedPaymentMethodId) {
-            functionArgs.paymentMethodId = lastSelectedPaymentMethodId;
+          // ÉP DÙNG ID THẬT: Ghi đè ID do AI tự chế bằng ID chuẩn từ context
+          if (ctx.selectedPaymentMethodId) {
+            functionArgs.paymentMethodId = ctx.selectedPaymentMethodId;
           }
-          if (lastSearchedProductVariantId) {
-            functionArgs.productVariantId = lastSearchedProductVariantId;
+          if (ctx.searchedProductVariantId) {
+            functionArgs.productVariantId = ctx.searchedProductVariantId;
           }
 
           // Sau khi đã gán ID chuẩn, mới gọi hàm tạo đơn
@@ -1443,33 +1696,54 @@ Dưới đây là các phương thức thanh toán có sẵn, bạn chọn cách
           content: trackOrderResponse.message, // Dùng message ngắn thay vì full markdown
           html: trackOrderResponse.html,
           format: "order_tracking",
+          conversationContext: ctx, // 🔒 Return context back to frontend
         } as any;
       }
 
-      if (lastPaymentMethodsHtml) {
+      if (ctx.paymentMethodsHtml) {
         return {
           role: "assistant",
           content: responseText,
-          html: lastPaymentMethodsHtml,
-          paymentMethods: lastAvailablePaymentMethods,
+          html: ctx.paymentMethodsHtml,
+          paymentMethods: ctx.availablePaymentMethods,
           format: "payment_methods",
+          conversationContext: ctx, // 🔒 Return context back to frontend
         } as any;
       }
 
-      if (lastSearchedProductsHtml) {
+      if (ctx.searchedProductsHtml) {
         return {
           role: "assistant",
           content: responseText,
-          html: lastSearchedProductsHtml,
-          variants: lastSearchedProductsVariants,
+          html: ctx.searchedProductsHtml,
+          variants: ctx.searchedProductsVariants,
           format: "html_cards",
+          conversationContext: ctx, // 🔒 Return context back to frontend
         } as any;
       }
 
-      return { role: "assistant", content: responseText };
+      console.log(`🔒 [RESPONSE 1] Returning context to frontend:`, { 
+        variantId: ctx.searchedProductVariantId, 
+        paymentId: ctx.selectedPaymentMethodId,
+        hasHtml: !!ctx.searchedProductsHtml 
+      });
+      return { 
+        role: "assistant", 
+        content: responseText,
+        conversationContext: ctx, // 🔒 Return context back to frontend
+      };
     }
 
-    return { role: "assistant", content: responseMessage.content };
+    console.log(`🔒 [RESPONSE 2] Returning context to frontend:`, { 
+      variantId: ctx.searchedProductVariantId, 
+      paymentId: ctx.selectedPaymentMethodId,
+      hasHtml: !!ctx.searchedProductsHtml 
+    });
+    return { 
+      role: "assistant", 
+      content: responseMessage.content,
+      conversationContext: ctx, // 🔒 Return context back to frontend
+    };
   } catch (error) {
     console.error("Lỗi trong getChatReply (OpenAI):", error);
     return { role: "assistant", content: "Xin lỗi, hiện tại hệ thống AI đang quá tải. Bạn vui lòng đợi một chút rồi thử lại nhé!" };
