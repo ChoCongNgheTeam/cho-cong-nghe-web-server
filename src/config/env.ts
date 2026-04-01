@@ -1,5 +1,4 @@
 import "dotenv/config";
-import { OpenAI } from "openai/client.js";
 
 export const env = {
   JWT_SECRET: process.env.JWT_SECRET!,
