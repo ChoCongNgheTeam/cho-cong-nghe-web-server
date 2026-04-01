@@ -14,6 +14,7 @@ export const selectPublicUser = {
   role: true,
   isActive: true,
   avatarImage: true,
+  avatarPath: true, // publicId Cloudinary — cần để xóa ảnh cũ khi update
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.usersSelect;

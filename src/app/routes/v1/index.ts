@@ -46,6 +46,8 @@ import notificationRoutes from "@/app/modules/notification/notification.route";
 
 import analyticsRouter from "@/app/modules/analytics/analytics.route";
 
+import categoryVariantAttributeRoute from "@/app/modules/category-variant/category-variant-attribute.route";
+
 const router = Router();
 
 // ===== Core & Auth =====
@@ -96,5 +98,8 @@ router.use("/notifications", notificationRoutes);
 
 // ===== Analytics =====
 router.use("/analytics", analyticsRouter);
+
+// ===== Category Variant =====
+router.use("/category-variant-attributes", categoryVariantAttributeRoute);
 
 export default router;

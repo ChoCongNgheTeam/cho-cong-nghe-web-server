@@ -157,6 +157,7 @@ model users {
   isActive     Boolean   @default(true)
   notifications notifications[]
   fcmTokens     fcm_tokens[]
+  avatarPath   String?
   avatarImage  String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

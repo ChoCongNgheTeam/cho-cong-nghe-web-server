@@ -32,6 +32,8 @@ export const createUserSchema = z.object({
   role: z.enum(["CUSTOMER", "ADMIN", "STAFF"]).optional().default("CUSTOMER"),
   isActive: z.boolean().optional().default(true),
   avatarImage: z.string().url().optional().or(z.literal("")),
+  // avatarPath: publicId Cloudinary — controller tự inject sau khi upload, không nhận từ client
+  avatarPath: z.string().optional(),
 });
 
 export const updateUserSchema = z
@@ -46,6 +48,8 @@ export const updateUserSchema = z
     role: z.enum(["CUSTOMER", "ADMIN", "STAFF"]).optional(),
     isActive: z.boolean().optional(),
     avatarImage: z.string().url().optional().or(z.literal("")),
+    avatarPath: z.string().optional(),
+    removeAvatar: z.boolean().optional(),
   })
   .strict();
 
@@ -57,6 +61,8 @@ export const updateProfileSchema = z
     dateOfBirth: z.string().datetime().optional(),
     gender: z.enum(["MALE", "FEMALE", "OTHER"]).optional(),
     avatarImage: z.string().url().optional().or(z.literal("")),
+    avatarPath: z.string().optional(),
+    removeAvatar: z.boolean().optional(),
   })
   .strict();
 

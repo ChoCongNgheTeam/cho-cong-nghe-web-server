@@ -3,6 +3,7 @@ import prisma from "@/config/db";
 import * as userRepository from "./user.repository";
 import { NotFoundError, ForbiddenError, BadRequestError } from "@/errors";
 import { handlePrismaError } from "@/utils/handle-prisma-error";
+import { deleteOldAvatarImage } from "./user.helpers";
 import { ChangePasswordInput, CreateUserInput, GetUsersQuery, UpdateProfileInput, UpdateUserInput } from "./user.validation";
 
 // Helper
@@ -20,8 +21,23 @@ export const getMe = async (userId: string) => {
 };
 
 export const updateMe = async (userId: string, input: UpdateProfileInput) => {
-  await assertUserExists(userId);
-  return userRepository.update(userId, input).catch(handlePrismaError);
+  const user = (await assertUserExists(userId)) as any;
+
+  // Xóa ảnh cũ khi upload ảnh mới
+  if (input.avatarPath && user.avatarPath) {
+    await deleteOldAvatarImage(user.avatarPath);
+  }
+
+  // Xóa ảnh khi removeAvatar=true
+  if (input.removeAvatar && user.avatarPath) {
+    await deleteOldAvatarImage(user.avatarPath);
+    (input as any).avatarPath = null;
+    (input as any).avatarImage = null;
+  }
+
+  const { removeAvatar, ...data } = input as any;
+
+  return userRepository.update(userId, data).catch(handlePrismaError);
 };
 
 export const changeMyPassword = async (userId: string, input: ChangePasswordInput) => {
@@ -61,13 +77,29 @@ export const createUser = async (input: CreateUserInput) => {
 };
 
 export const updateUser = async (id: string, input: UpdateUserInput) => {
-  await assertUserExists(id);
+  const user = (await assertUserExists(id)) as any;
 
   const data: Record<string, unknown> = { ...input };
+
+  // Hash password nếu có
   if (data.password) {
     data.passwordHash = await bcrypt.hash(data.password as string, 10);
     delete data.password;
   }
+
+  // Xóa ảnh cũ khi upload ảnh mới
+  if (data.avatarPath && user.avatarPath) {
+    await deleteOldAvatarImage(user.avatarPath);
+  }
+
+  // Xóa ảnh khi removeAvatar=true
+  if (data.removeAvatar && user.avatarPath) {
+    await deleteOldAvatarImage(user.avatarPath);
+    data.avatarPath = null;
+    data.avatarImage = null;
+  }
+
+  delete data.removeAvatar;
 
   return userRepository.update(id, data).catch(handlePrismaError);
 };
@@ -98,6 +130,11 @@ export const hardDeleteUser = async (id: string) => {
 
   if (!user.deletedAt) {
     throw new ForbiddenError("Phải soft delete trước khi xóa vĩnh viễn. Dùng DELETE /admin/users/:id");
+  }
+
+  // Xóa avatar Cloudinary trước khi hard delete
+  if (user.avatarPath) {
+    await deleteOldAvatarImage(user.avatarPath);
   }
 
   return userRepository.hardDelete(id).catch(handlePrismaError);
