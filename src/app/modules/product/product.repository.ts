@@ -2276,3 +2276,82 @@ export const findActiveVariantsMatchingSelection = async (productId: string, sel
     return selectedEntries.every(([code, value]) => attrMap.get(code) === value.toLowerCase().trim());
   });
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LOW STOCK ALERT
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * getLowStockProducts
+ *
+ * Trả về danh sách sản phẩm có ít nhất 1 active variant với quantity <= threshold.
+ * Mỗi item gồm: product info + danh sách variants đang cảnh báo.
+ * Dùng cho admin stock alert banner + ticker.
+ */
+export const getLowStockProducts = async (threshold = 5, limit = 20) => {
+  const products = await prisma.products.findMany({
+    where: {
+      deletedAt: null,
+      isActive: true,
+      variants: {
+        some: {
+          isActive: true,
+          deletedAt: null,
+          quantity: { lte: threshold },
+        },
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      isFeatured: true,
+      img: {
+        select: { imageUrl: true, color: true, position: true },
+        orderBy: { position: "asc" },
+        take: 1,
+      },
+      variants: {
+        where: {
+          isActive: true,
+          deletedAt: null,
+          quantity: { lte: threshold },
+        },
+        select: {
+          id: true,
+          code: true,
+          quantity: true,
+          price: true,
+          variantAttributes: {
+            select: {
+              attributeOption: {
+                select: { value: true, label: true, attribute: { select: { code: true, name: true } } },
+              },
+            },
+          },
+        },
+        orderBy: { quantity: "asc" },
+      },
+    },
+    orderBy: [{ isFeatured: "desc" }, { name: "asc" }],
+    take: limit,
+  });
+
+  return products.map((p) => ({
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    isFeatured: p.isFeatured,
+    thumbnail: p.img[0]?.imageUrl ?? null,
+    lowStockVariants: p.variants.map((v) => ({
+      id: v.id,
+      code: v.code,
+      quantity: v.quantity,
+      price: Number(v.price),
+      label: v.variantAttributes.map((a) => a.attributeOption.label).join(" · ") || "Default",
+      isOutOfStock: v.quantity === 0,
+    })),
+    // quantity thấp nhất trong product
+    minQuantity: Math.min(...p.variants.map((v) => v.quantity)),
+  }));
+};

@@ -1007,7 +1007,13 @@ export const compareProducts = async (ids: string[]) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const getProductStats = async () => {
-  return getAdminProductStats();
+  const [stats, lowStockProducts] = await Promise.all([getAdminProductStats(), repo.getLowStockProducts(5, 20)]);
+
+  return {
+    ...stats,
+    lowStock: lowStockProducts.length,
+    lowStockProducts,
+  };
 };
 
 /**
