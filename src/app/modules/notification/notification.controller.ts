@@ -63,7 +63,6 @@ export const sendCampaignHandler = async (req: Request, res: Response) => {
 
   let userIds: string[] = req.body.userIds ?? [];
 
-  // Nếu targetAll=true → lấy tất cả active users
   if (targetAll) {
     const { default: prisma } = await import("@/config/db");
     const users = await prisma.users.findMany({
@@ -83,4 +82,42 @@ export const sendCampaignHandler = async (req: Request, res: Response) => {
     message: `Đã gửi thông báo campaign đến ${userIds.length} người dùng`,
     data: { sentTo: userIds.length },
   });
+};
+
+/**
+ * GET /notifications/admin
+ * Lấy thông báo dành cho admin/staff: chỉ gồm ORDER_STATUS, COMMENT_NEW, REVIEW_NEW.
+ * Mỗi admin/staff chỉ thấy thông báo được gửi đến chính họ (theo userId).
+ */
+export const getAdminNotificationsHandler = async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  if (!userId) throw new UnauthorizedError();
+
+  const page = Number(req.query.page) || 1;
+  const limit = Math.min(Number(req.query.limit) || 20, 50);
+
+  const result = await notificationService.getAdminNotifications(userId, page, limit);
+  res.json({
+    data: result.data,
+    meta: {
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      totalPages: result.totalPages,
+      unreadCount: result.unreadCount,
+    },
+    message: "Lấy thông báo admin thành công",
+  });
+};
+
+/**
+ * PATCH /notifications/admin/read-all
+ * Đánh dấu tất cả thông báo admin/staff (ORDER_STATUS, COMMENT_NEW, REVIEW_NEW) đã đọc.
+ */
+export const markAllAdminAsReadHandler = async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  if (!userId) throw new UnauthorizedError();
+
+  await notificationService.markAllAdminAsRead(userId);
+  res.json({ message: "Đã đánh dấu tất cả thông báo admin đã đọc" });
 };

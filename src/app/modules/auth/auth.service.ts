@@ -227,13 +227,22 @@ export const refreshTokenRotation = async (refreshToken: string) => {
 
   const newRefreshToken = signRefreshToken({ userId: decoded.userId }, refreshTokenTTL);
 
-  await createRefreshToken({
-    userId: decoded.userId,
-    token: newRefreshToken,
-    expiresAt: new Date(Date.now() + refreshTokenTTL),
-    absoluteExpiresAt: tokenInDb.absoluteExpiresAt, // giữ nguyên deadline tuyệt đối
-    ttlType: tokenInDb.ttlType,
-  });
+  try {
+    await createRefreshToken({
+      userId: decoded.userId,
+      token: newRefreshToken,
+      expiresAt: new Date(Date.now() + refreshTokenTTL),
+      absoluteExpiresAt: tokenInDb.absoluteExpiresAt, // giữ nguyên deadline tuyệt đối
+      ttlType: tokenInDb.ttlType,
+    });
+  } catch (e: any) {
+    if (e.code === "P2002") {
+      // Race condition: request khác đã tạo rồi, không cần làm gì
+      // Trả về token đã sign vẫn valid
+    } else {
+      throw e;
+    }
+  }
 
   return { accessToken, accessTokenTTL, refreshToken: newRefreshToken, refreshTokenTTL };
 };

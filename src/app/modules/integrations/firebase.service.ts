@@ -5,6 +5,8 @@ let initialized = false;
 export const initFirebase = () => {
   if (initialized || !process.env.FIREBASE_PROJECT_ID) return;
 
+  // console.log("PRIVATE KEY:", process.env.FIREBASE_PRIVATE_KEY);
+
   admin.initializeApp({
     credential: admin.credential.cert({
       projectId: process.env.FIREBASE_PROJECT_ID,

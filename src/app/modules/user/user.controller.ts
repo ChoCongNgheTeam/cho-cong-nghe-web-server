@@ -1,18 +1,40 @@
 import { Request, Response } from "express";
 import * as userService from "./user.service";
-import { getUsersQuerySchema } from "./user.validation";
+import { getUsersQuerySchema, updateProfileSchema, updateUserSchema } from "./user.validation";
+import { parseMultipartData, uploadAvatarImage } from "./user.helpers";
+import { cleanupFile } from "@/services/file-cleanup.service";
 import { ForbiddenError } from "@/errors";
 
-// Self
+// ─── Self ─────────────────────────────────────────────────────────────────────
 
 export const getMeHandler = async (req: Request, res: Response) => {
   const user = await userService.getMe(req.user!.id);
   res.json({ data: user, message: "Lấy thông tin cá nhân thành công" });
 };
 
+/**
+ * PATCH /users/me
+ *
+ * Hỗ trợ multipart/form-data (khi gửi kèm ảnh) lẫn application/json (khi không có ảnh).
+ * Field `avatarImage` + `avatarPath` do controller inject sau khi upload xong.
+ * Field `removeAvatar=true` → xóa ảnh cũ, set null.
+ */
 export const updateMeHandler = async (req: Request, res: Response) => {
-  const user = await userService.updateMe(req.user!.id, req.body);
-  res.json({ data: user, message: "Cập nhật hồ sơ thành công" });
+  const file = req.file;
+  try {
+    const parsedBody = parseMultipartData(req.body);
+    const validatedBody = updateProfileSchema.parse(parsedBody);
+    const uploadedImage = file ? await uploadAvatarImage(file) : null;
+
+    const user = await userService.updateMe(req.user!.id, {
+      ...validatedBody,
+      ...(uploadedImage && { avatarImage: uploadedImage.url, avatarPath: uploadedImage.publicId }),
+    });
+
+    res.json({ data: user, message: "Cập nhật hồ sơ thành công" });
+  } finally {
+    cleanupFile(file);
+  }
 };
 
 export const changePasswordHandler = async (req: Request, res: Response) => {
@@ -20,7 +42,7 @@ export const changePasswordHandler = async (req: Request, res: Response) => {
   res.json({ message: "Đổi mật khẩu thành công" });
 };
 
-// Staff & Admin
+// ─── Staff & Admin ────────────────────────────────────────────────────────────
 
 export const getUsersHandler = async (req: Request, res: Response) => {
   const query = getUsersQuerySchema.parse(req.query);
@@ -51,7 +73,7 @@ export const deleteUserHandler = async (req: Request, res: Response) => {
   const requester = req.user!;
   const target = await userService.getUserById(req.params.id);
 
-  if (requester.role === "STAFF" && target.role !== "CUSTOMER") {
+  if (requester.role === "STAFF" && (target as any).role !== "CUSTOMER") {
     throw new ForbiddenError("Staff chỉ được phép xóa tài khoản khách hàng");
   }
 
@@ -59,16 +81,35 @@ export const deleteUserHandler = async (req: Request, res: Response) => {
   res.json({ message: "Xóa người dùng thành công" });
 };
 
-// Admin only
+// ─── Admin only ───────────────────────────────────────────────────────────────
 
 export const createUserHandler = async (req: Request, res: Response) => {
   const user = await userService.createUser(req.body);
   res.status(201).json({ data: user, message: "Tạo người dùng thành công" });
 };
 
+/**
+ * PATCH /admin/users/:id
+ *
+ * Hỗ trợ multipart/form-data (khi admin upload ảnh) lẫn application/json.
+ * Không validate body ở middleware — controller tự gọi parseMultipartData + schema.parse.
+ */
 export const updateUserHandler = async (req: Request, res: Response) => {
-  const user = await userService.updateUser(req.params.id, req.body);
-  res.json({ data: user, message: "Cập nhật người dùng thành công" });
+  const file = req.file;
+  try {
+    const parsedBody = parseMultipartData(req.body);
+    const validatedBody = updateUserSchema.parse(parsedBody);
+    const uploadedImage = file ? await uploadAvatarImage(file) : null;
+
+    const user = await userService.updateUser(req.params.id, {
+      ...validatedBody,
+      ...(uploadedImage && { avatarImage: uploadedImage.url, avatarPath: uploadedImage.publicId }),
+    });
+
+    res.json({ data: user, message: "Cập nhật người dùng thành công" });
+  } finally {
+    cleanupFile(file);
+  }
 };
 
 export const restoreUserHandler = async (req: Request, res: Response) => {

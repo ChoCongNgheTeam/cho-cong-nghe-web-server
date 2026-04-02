@@ -252,3 +252,37 @@ export interface RawVariant {
   isActive: boolean;
   variantAttributes: RawVariantAttribute[];
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN STATS / LOW STOCK
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface LowStockVariant {
+  id: string;
+  code: string | null;
+  quantity: number;
+  price: number;
+  label: string;
+  isOutOfStock: boolean;
+}
+
+export interface LowStockProduct {
+  id: string;
+  name: string;
+  slug: string;
+  isFeatured: boolean;
+  thumbnail: string | null;
+  lowStockVariants: LowStockVariant[];
+  minQuantity: number;
+}
+
+export interface AdminProductStats {
+  total: number;
+  active: number;
+  inactive: number;
+  outOfStock: number;
+  deleted: number;
+  featured: number;
+  lowStock: number;
+  lowStockProducts: LowStockProduct[];
+}

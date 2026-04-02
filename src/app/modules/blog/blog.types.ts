@@ -6,6 +6,27 @@ export enum BlogStatus {
   ARCHIVED = "ARCHIVED",
 }
 
+/**
+ * BlogType — phân loại nội dung bài viết.
+ * Đồng bộ với Prisma enum BlogType trong schema.
+ */
+export enum BlogType {
+  TIN_MOI = "TIN_MOI", // Tin tức mới
+  DANH_GIA = "DANH_GIA", // Đánh giá - Tư vấn
+  KHUYEN_MAI = "KHUYEN_MAI", // Khuyến mãi
+  DIEN_MAY = "DIEN_MAY", // Điện máy - Gia dụng
+  NOI_BAT = "NOI_BAT", // Nổi bật (editorial pick)
+}
+
+// Label hiển thị cho từng type — dùng ở FE + admin
+export const BLOG_TYPE_LABELS: Record<BlogType, string> = {
+  [BlogType.TIN_MOI]: "Tin mới",
+  [BlogType.DANH_GIA]: "Đánh giá - Tư vấn",
+  [BlogType.KHUYEN_MAI]: "Khuyến mãi",
+  [BlogType.DIEN_MAY]: "Điện máy - Gia dụng",
+  [BlogType.NOI_BAT]: "Nổi bật",
+};
+
 // ─── Shared ───────────────────────────────────────────────────────────────────
 
 export interface Author {
@@ -32,12 +53,12 @@ export interface BlogCard {
   excerpt: string;
   viewCount: number;
   status: BlogStatus;
+  type: BlogType;
   author: Author;
   createdAt: Date;
-  updatedAt?: Date; // có trong admin response
+  updatedAt?: Date;
   publishedAt?: Date;
   commentsCount?: number;
-  // Soft delete — chỉ xuất hiện trong response admin/trash
   deletedAt?: Date;
   deletedBy?: string;
 }
@@ -50,13 +71,13 @@ export interface BlogDetail {
   thumbnail?: string;
   viewCount: number;
   status: BlogStatus;
+  type: BlogType;
   author: Author;
   createdAt: Date;
   updatedAt: Date;
   publishedAt?: Date;
   comments?: any[];
   commentsCount?: number;
-  // Soft delete — chỉ xuất hiện trong response admin/trash
   deletedAt?: Date;
   deletedBy?: string;
 }
@@ -72,6 +93,7 @@ export interface RawBlogBase {
   imagePath: string | null;
   viewCount: number;
   status: BlogStatus;
+  type: BlogType;
   createdAt: Date;
   publishedAt: Date | null;
   author: {
@@ -86,7 +108,6 @@ export interface RawBlogDetail extends RawBlogBase {
   updatedAt: Date;
 }
 
-// Admin raw — thêm soft delete fields
 export interface RawBlogAdmin extends RawBlogDetail {
   deletedAt: Date | null;
   deletedBy: string | null;

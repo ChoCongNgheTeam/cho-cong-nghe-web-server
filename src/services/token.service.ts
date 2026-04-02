@@ -1,6 +1,7 @@
 import jwt, { Secret, SignOptions } from "jsonwebtoken";
 import { jwtConfig } from "@/config/jwt";
 import { AccessTokenPayload } from "@/types/jwt";
+import { randomUUID } from "crypto";
 
 export const signAccessToken = (payload: { userId: string; role: string }) => {
   return jwt.sign(payload, jwtConfig.accessToken.secret as Secret, {
@@ -9,8 +10,8 @@ export const signAccessToken = (payload: { userId: string; role: string }) => {
 };
 
 export const signRefreshToken = (payload: { userId: string }, refreshTokenTTL: number) => {
-  return jwt.sign(payload, jwtConfig.refreshToken.secret as Secret, {
-    expiresIn: Math.floor(refreshTokenTTL / 1000), // ms → seconds
+  return jwt.sign({ ...payload, jti: randomUUID() }, jwtConfig.refreshToken.secret as Secret, {
+    expiresIn: Math.floor(refreshTokenTTL / 1000),
   });
 };
 

@@ -1,11 +1,6 @@
 import { Request, Response } from "express";
 import { loginWithGoogle, loginWithFacebook, loginWithApple, exchangeFacebookCode } from "./oauth.service";
-
-const REFRESH_COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
-};
+import { REFRESH_COOKIE_OPTIONS } from "@/config/cookie";
 
 const setRefreshTokenCookie = (res: Response, token: string, maxAge: number) => {
   res.cookie("refreshToken", token, { ...REFRESH_COOKIE_OPTIONS, maxAge });

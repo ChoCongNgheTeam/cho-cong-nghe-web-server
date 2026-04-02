@@ -1,11 +1,6 @@
 import { CookieOptions, Request, Response } from "express";
 import { register, login, forgotPassword, resetPassword, changePassword, logout, refreshTokenRotation } from "./auth.service";
-
-const REFRESH_COOKIE_OPTIONS: CookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-};
+import { REFRESH_COOKIE_OPTIONS } from "@/config/cookie";
 
 const setRefreshTokenCookie = (res: Response, token: string, maxAge: number) => {
   res.cookie("refreshToken", token, {

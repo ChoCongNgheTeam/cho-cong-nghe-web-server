@@ -112,6 +112,7 @@ export const getHomePageData = async (userId?: string): Promise<HomeResponse> =>
   const sliders = allMedia[MediaPosition.HOME_TOP] || [];
   const bannersTop = allMedia[MediaPosition.BELOW_SLIDER] || [];
   const bannersSection1 = allMedia[MediaPosition.HOME_SECTION_1] || [];
+  console.log(bannersSection1);
 
   return {
     sliders,
