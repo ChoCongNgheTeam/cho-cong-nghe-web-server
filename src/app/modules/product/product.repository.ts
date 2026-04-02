@@ -407,22 +407,30 @@ export const findAllAdmin = async (query: Record<string, any>) => {
     prisma.products.count({ where: { ...baseWhere, isActive: true } }),
     prisma.products.count({ where: { ...baseWhere, isActive: false } }),
     prisma.products.count({ where: { ...baseWhere, isFeatured: true } }),
-    // outOfStock — đếm qua variants
+    // outOfStock — product có ít nhất 1 active variant VÀ TẤT CẢ active variants đều hết hàng
+    // Phải filter isActive + deletedAt trong every, nếu không inactive/deleted variants
+    // (quantity=0 mặc định) sẽ bị tính vào, khiến đếm sai
     prisma.products.count({
       where: {
         ...baseWhere,
         AND: [
           {
+            // Phải có ít nhất 1 active variant
             variants: {
-              some: {}, // phải có ít nhất 1 variant
+              some: { isActive: true, deletedAt: null },
             },
           },
           {
+            // TẤT CẢ active variants đều quantity <= 0
             variants: {
               every: {
-                quantity: {
-                  lte: 0,
-                },
+                OR: [
+                  // Variant không active / đã xóa → bỏ qua (không tính vào điều kiện)
+                  { isActive: false },
+                  { deletedAt: { not: null } },
+                  // Active variant thực sự → phải hết hàng
+                  { isActive: true, deletedAt: null, quantity: { lte: 0 } },
+                ],
               },
             },
           },
@@ -2216,32 +2224,63 @@ export const findProductsForComparison = async (ids: string[]) => {
  * Dashboard overview: tổng sản phẩm, active/inactive, hết hàng, đã xóa.
  * Dùng Promise.all để parallel queries.
  */
+// export const getAdminProductStats = async () => {
+//   const [total, active, inactive, outOfStock, deleted, featured] = await Promise.all([
+//     // Tổng (không tính đã xóa)
+//     prisma.products.count({ where: { deletedAt: null } }),
+
+//     // Đang hiển thị
+//     prisma.products.count({ where: { deletedAt: null, isActive: true } }),
+
+//     // Đang ẩn
+//     prisma.products.count({ where: { deletedAt: null, isActive: false } }),
+
+//     // Hết hàng (tất cả variants đều quantity <= 0)
+//     prisma.products.count({
+//       where: {
+//         deletedAt: null,
+//         isActive: true,
+//         variants: {
+//           every: { quantity: { lte: 0 }, deletedAt: null },
+//         },
+//       },
+//     }),
+
+//     // Đã xóa mềm
+//     prisma.products.count({ where: { deletedAt: { not: null } } }),
+
+//     // Nổi bật
+//     prisma.products.count({ where: { deletedAt: null, isActive: true, isFeatured: true } }),
+//   ]);
+
+//   return { total, active, inactive, outOfStock, deleted, featured };
+// };
+
 export const getAdminProductStats = async () => {
   const [total, active, inactive, outOfStock, deleted, featured] = await Promise.all([
-    // Tổng (không tính đã xóa)
     prisma.products.count({ where: { deletedAt: null } }),
-
-    // Đang hiển thị
     prisma.products.count({ where: { deletedAt: null, isActive: true } }),
-
-    // Đang ẩn
     prisma.products.count({ where: { deletedAt: null, isActive: false } }),
 
-    // Hết hàng (tất cả variants đều quantity <= 0)
+    // Hết hàng: có ít nhất 1 active variant VÀ tất cả active variants đều quantity <= 0
     prisma.products.count({
       where: {
         deletedAt: null,
         isActive: true,
-        variants: {
-          every: { quantity: { lte: 0 }, deletedAt: null },
-        },
+        AND: [
+          { variants: { some: { isActive: true, deletedAt: null } } },
+          {
+            variants: {
+              every: {
+                OR: [{ isActive: false }, { deletedAt: { not: null } }, { isActive: true, deletedAt: null, quantity: { lte: 0 } }],
+              },
+            },
+          },
+        ],
       },
     }),
 
-    // Đã xóa mềm
     prisma.products.count({ where: { deletedAt: { not: null } } }),
-
-    // Nổi bật
     prisma.products.count({ where: { deletedAt: null, isActive: true, isFeatured: true } }),
   ]);
 
@@ -2297,7 +2336,7 @@ export const getLowStockProducts = async (threshold = 5, limit = 20) => {
         some: {
           isActive: true,
           deletedAt: null,
-          quantity: { lte: threshold },
+          quantity: { gt: 0, lte: threshold }, // gt: 0 — loại out of stock
         },
       },
     },
@@ -2315,7 +2354,7 @@ export const getLowStockProducts = async (threshold = 5, limit = 20) => {
         where: {
           isActive: true,
           deletedAt: null,
-          quantity: { lte: threshold },
+          quantity: { gt: 0, lte: threshold }, // chỉ low stock, không phải out
         },
         select: {
           id: true,
@@ -2353,5 +2392,71 @@ export const getLowStockProducts = async (threshold = 5, limit = 20) => {
     })),
     // quantity thấp nhất trong product
     minQuantity: Math.min(...p.variants.map((v) => v.quantity)),
+  }));
+};
+
+export const getOutOfStockProducts = async (limit = 20) => {
+  const products = await prisma.products.findMany({
+    where: {
+      deletedAt: null,
+      isActive: true,
+      variants: {
+        some: {
+          isActive: true,
+          deletedAt: null,
+          quantity: { lte: 0 },
+        },
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      isFeatured: true,
+      img: {
+        select: { imageUrl: true, color: true, position: true },
+        orderBy: { position: "asc" },
+        take: 1,
+      },
+      variants: {
+        where: { isActive: true, deletedAt: null, quantity: { lte: 0 } },
+        select: {
+          id: true,
+          code: true,
+          quantity: true,
+          price: true,
+          variantAttributes: {
+            select: {
+              attributeOption: {
+                select: {
+                  value: true,
+                  label: true,
+                  attribute: { select: { code: true, name: true } },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { quantity: "asc" },
+      },
+    },
+    take: limit,
+  });
+
+  return products.map((p) => ({
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    isFeatured: p.isFeatured,
+    thumbnail: p.img[0]?.imageUrl ?? null,
+    lowStockVariants: p.variants.map((v) => ({
+      id: v.id,
+      code: v.code,
+      quantity: v.quantity,
+      price: Number(v.price),
+      label: v.variantAttributes.map((a) => a.attributeOption.label).join(" · ") || "Default",
+      isOutOfStock: true,
+    })),
+    minQuantity: 0,
   }));
 };

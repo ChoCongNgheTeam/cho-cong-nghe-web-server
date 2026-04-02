@@ -1007,12 +1007,21 @@ export const compareProducts = async (ids: string[]) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const getProductStats = async () => {
-  const [stats, lowStockProducts] = await Promise.all([getAdminProductStats(), repo.getLowStockProducts(5, 20)]);
+  const [stats, lowStockProducts, outOfStockProducts] = await Promise.all([
+    getAdminProductStats(),
+    repo.getLowStockProducts(5, 20), // quantity > 0 && <= 5
+    repo.getOutOfStockProducts(20), // quantity = 0
+  ]);
+
+  console.log("stats", stats);
+  console.log("lowStockProducts", lowStockProducts);
+  console.log("outOfStockProducts", outOfStockProducts);
 
   return {
     ...stats,
     lowStock: lowStockProducts.length,
     lowStockProducts,
+    outOfStockProducts, // FE dùng cho banner
   };
 };
 
