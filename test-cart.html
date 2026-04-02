@@ -62,6 +62,63 @@
         <button onclick="saveToken()">💾 Lưu Token</button>
     </div>
 
+    <div class="section" style="border-left: 5px solid #e83e8c;">
+        <h2>🔔 Thông báo (Notifications)</h2>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
+            <button class="btn-cyan" onclick="testGetNotifications()">📬 Xem Thông báo</button>
+            <button class="btn-green" onclick="testMarkAllAsRead()" style="background-color: #20c997;">✓ Đánh dấu tất cả đã đọc</button>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid #e83e8c;">
+            <h4 style="margin-top: 0;">💾 Quản lý FCM Token (Push Notification)</h4>
+            <input type="text" id="fcmTokenInput" placeholder="FCM Token (để nhận push notification)">
+            <select id="deviceType" style="margin: 5px 0;">
+                <option value="web">Web</option>
+                <option value="android">Android</option>
+                <option value="ios">iOS</option>
+            </select>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn-green" onclick="testSaveFcmToken()" style="flex: 1;">💾 Lưu FCM Token</button>
+                <button class="btn-red" onclick="testDeleteFcmToken()" style="flex: 1;">🗑️ Xóa FCM Token</button>
+            </div>
+        </div>
+
+        <div id="notifications-container" style="max-height: 400px; overflow-y: auto; padding-right: 5px;">
+            <i>Chưa tải dữ liệu...</i>
+        </div>
+
+        <h4>Log Result:</h4>
+        <pre id="log-notifications">No data yet...</pre>
+    </div>
+
+    <div class="section" style="border-left: 5px solid #fd7e14; background: #fef3cd; margin-bottom: 20px;">
+        <h2>📢 Admin - Gửi Campaign Notification</h2>
+        <p style="color: #856404; margin-bottom: 15px;">Gửi thông báo đến người dùng hoặc tất cả khách hàng</p>
+        
+        <h4>Chọn cách gửi:</h4>
+        <div style="margin-bottom: 15px; display: flex; gap: 15px;">
+            <label><input type="radio" name="campaignTarget" value="all" checked> 📣 Gửi đến TẤT CẢ khách hàng</label>
+            <label><input type="radio" name="campaignTarget" value="specific"> 👥 Gửi đến ID cụ thể</label>
+        </div>
+
+        <div id="specificUserIds-container" style="display: none; margin-bottom: 15px;">
+            <textarea id="specificUserIds" placeholder="Nhập User IDs (ngăn cách bằng dấu phẩy hoặc xuống dòng)" style="width: 100%; height: 100px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+        </div>
+
+        <input type="text" id="campaignTitle" placeholder="Tiêu đề thông báo (Title)">
+        <textarea id="campaignBody" placeholder="Nội dung thông báo (Body)" style="min-height: 80px;"></textarea>
+        
+        <div style="background: white; padding: 10px; border-radius: 4px; border: 1px solid #ddd; margin-bottom: 15px;">
+            <h4>📦 Dữ liệu bổ sung (JSON - tùy chọn)</h4>
+            <textarea id="campaignData" placeholder='{"key": "value"}' style="width: 100%; height: 80px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+        </div>
+
+        <button class="btn-orange" style="width: 100%; background-color: #fd7e14;" onclick="testSendCampaign()">🚀 Gửi Campaign</button>
+        
+        <h4 style="margin-top: 20px;">Log Result:</h4>
+        <pre id="log-campaign">No data yet...</pre>
+    </div>
+
     <div class="grid-2">
         <div>
             <div class="section cart-zone">
@@ -248,6 +305,18 @@
             document.getElementById(elementId).innerText = JSON.stringify(data, null, 2);
         }
 
+        // ===== CAMPAIGN TARGET RADIO BUTTON HANDLER =====
+        document.querySelectorAll('input[name="campaignTarget"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                const container = document.getElementById('specificUserIds-container');
+                if (radio.value === 'specific') {
+                    container.style.display = 'block';
+                } else {
+                    container.style.display = 'none';
+                }
+            });
+        });
+
         // ================= CART API =================
         function testGetCart() {
             fetch(`${BASE_URL}/cart`, { method: 'GET', headers: getHeaders() })
@@ -376,6 +445,182 @@
                 </div>
             `).join('');
             container.innerHTML += `<div style="text-align:right; font-weight:bold; margin-top:10px;">Tổng tiền: ${Number(cartData.subtotal).toLocaleString('vi-VN')} đ</div>`;
+        }
+
+        // ================= NOTIFICATION API =================
+        function testGetNotifications() {
+            const page = 1;
+            const limit = 10;
+            fetch(`${BASE_URL}/notifications?page=${page}&limit=${limit}`, { method: 'GET', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-notifications', res);
+                    renderNotificationsUI(res.data, res.meta);
+                })
+                .catch(err => log('log-notifications', { error: err.message }));
+        }
+
+        function testMarkAsRead(id) {
+            fetch(`${BASE_URL}/notifications/${id}/read`, { method: 'PATCH', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-notifications', res);
+                    testGetNotifications();
+                })
+                .catch(err => log('log-notifications', { error: err.message }));
+        }
+
+        function testMarkAllAsRead() {
+            if (!confirm('Đánh dấu tất cả thông báo đã đọc?')) return;
+            fetch(`${BASE_URL}/notifications/read-all`, { method: 'PATCH', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-notifications', res);
+                    alert(res.message || 'Đã đánh dấu tất cả');
+                    testGetNotifications();
+                })
+                .catch(err => log('log-notifications', { error: err.message }));
+        }
+
+        function testSaveFcmToken() {
+            const token = document.getElementById('fcmTokenInput').value;
+            const device = document.getElementById('deviceType').value;
+            
+            if (!token) {
+                alert('Vui lòng nhập FCM Token');
+                return;
+            }
+
+            const body = { token, device };
+            fetch(`${BASE_URL}/notifications/fcm-token`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-notifications', res);
+                    alert(res.message || '✅ Lưu FCM Token thành công!');
+                })
+                .catch(err => log('log-notifications', { error: err.message }));
+        }
+
+        function testDeleteFcmToken() {
+            const token = document.getElementById('fcmTokenInput').value;
+            
+            if (!token) {
+                alert('Vui lòng nhập FCM Token');
+                return;
+            }
+
+            if (!confirm('Xóa FCM Token này?')) return;
+
+            const body = { token };
+            fetch(`${BASE_URL}/notifications/fcm-token`, { method: 'DELETE', headers: getHeaders(), body: JSON.stringify(body) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-notifications', res);
+                    alert(res.message || '✅ Xóa FCM Token thành công!');
+                })
+                .catch(err => log('log-notifications', { error: err.message }));
+        }
+
+        function testSendCampaign() {
+            const title = document.getElementById('campaignTitle').value;
+            const body = document.getElementById('campaignBody').value;
+            const dataStr = document.getElementById('campaignData').value;
+            const target = document.querySelector('input[name="campaignTarget"]:checked').value;
+
+            if (!title || !body) {
+                alert('Vui lòng nhập tiêu đề và nội dung');
+                return;
+            }
+
+            let data = {};
+            if (dataStr.trim()) {
+                try {
+                    data = JSON.parse(dataStr);
+                } catch {
+                    alert('Dữ liệu JSON không hợp lệ');
+                    return;
+                }
+            }
+
+            let requestBody = { title, body, data };
+
+            if (target === 'specific') {
+                const idsText = document.getElementById('specificUserIds').value;
+                if (!idsText.trim()) {
+                    alert('Vui lòng nhập User IDs');
+                    return;
+                }
+                const userIds = idsText.split(/[,\n]/).map(id => id.trim()).filter(id => id);
+                requestBody.userIds = userIds;
+                requestBody.targetAll = false;
+            } else {
+                requestBody.targetAll = true;
+            }
+
+            fetch(`${BASE_URL}/notifications/admin/campaign`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(requestBody) })
+                .then(res => res.json())
+                .then(res => {
+                    log('log-campaign', res);
+                    alert(res.message || '✅ Gửi campaign thành công!');
+                })
+                .catch(err => log('log-campaign', { error: err.message }));
+        }
+
+        function renderNotificationsUI(notifications, meta) {
+            const container = document.getElementById('notifications-container');
+            
+            if (!notifications || notifications.length === 0) {
+                container.innerHTML = '<p style="color:#666; text-align: center; padding: 20px;">Không có thông báo nào</p>';
+                return;
+            }
+
+            const unreadBadge = meta?.unreadCount ? `<span class="badge" style="background: #dc3545; position: absolute; top: 10px; right: 10px;">+${meta.unreadCount} chưa đọc</span>` : '';
+
+            container.innerHTML = `
+                <div style="margin-bottom: 15px; padding: 10px; background: white; border-radius: 6px; border: 1px solid #ddd; position: relative;">
+                    <strong>Tổng cộng: ${meta?.total || 0} thông báo</strong>
+                    ${unreadBadge}
+                </div>
+            ` + notifications.map(notif => `
+                <div style="border: 1px solid ${notif.isRead ? '#e9ecef' : '#cfe2ff'}; padding: 12px; margin-bottom: 10px; border-radius: 6px; background: ${notif.isRead ? '#f8f9fa' : '#cfe2ff'};">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: bold; color: #222; margin-bottom: 5px;">
+                                ${notif.title}
+                                ${!notif.isRead ? '<span style="background: #0dcaf0; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 5px;">New</span>' : ''}
+                            </div>
+                            <div style="color: #555; margin-bottom: 8px; line-height: 1.4;">${notif.body}</div>
+                            <div style="font-size: 12px; color: #999;">
+                                ${new Date(notif.createdAt).toLocaleString('vi-VN')}
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end;">
+                            <span class="badge" style="background: ${getChannelColor(notif.channel)};">${notif.channel}</span>
+                            <span class="badge" style="background: ${getStatusColor(notif.status)};">${notif.status}</span>
+                        </div>
+                    </div>
+                    ${!notif.isRead ? `<button class="btn-cyan" style="padding: 4px 10px; font-size: 12px; margin-top: 10px;" onclick="testMarkAsRead('${notif.id}')">✓ Đánh dấu đã đọc</button>` : ''}
+                    ${notif.data ? `<details style="margin-top: 10px; font-size: 12px;"><summary>Dữ liệu bổ sung</summary><pre style="background: #2d2d2d; color: #4af626; padding: 8px; border-radius: 4px; font-size: 11px;">${JSON.stringify(notif.data, null, 2)}</pre></details>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function getChannelColor(channel) {
+            const colors = {
+                'IN_APP': '#0dcaf0',
+                'PUSH': '#198754',
+                'EMAIL': '#6f42c1',
+            };
+            return colors[channel] || '#6c757d';
+        }
+
+        function getStatusColor(status) {
+            const colors = {
+                'SENT': '#198754',
+                'PENDING': '#ffc107',
+                'FAILED': '#dc3545',
+            };
+            return colors[status] || '#6c757d';
         }
 
         // ================= ADDRESS API =================
