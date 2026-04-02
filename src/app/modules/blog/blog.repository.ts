@@ -24,6 +24,7 @@ const selectBlogCard = {
   imageUrl: true,
   viewCount: true,
   status: true,
+  type: true,
   createdAt: true,
   publishedAt: true,
   author: { select: selectAuthor },
@@ -68,6 +69,10 @@ const buildBlogWhere = (query: ListBlogsQuery, onlyPublished: boolean, isAdmin: 
 
   if (query.search) {
     where.OR = [{ title: { contains: query.search, mode: "insensitive" } }, { content: { contains: query.search, mode: "insensitive" } }];
+  }
+
+  if (query.type) {
+    where.type = query.type;
   }
 
   if (query.authorId) {

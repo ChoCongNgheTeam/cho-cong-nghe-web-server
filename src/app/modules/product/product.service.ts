@@ -1013,9 +1013,9 @@ export const getProductStats = async () => {
     repo.getOutOfStockProducts(20), // quantity = 0
   ]);
 
-  console.log("stats", stats);
-  console.log("lowStockProducts", lowStockProducts);
-  console.log("outOfStockProducts", outOfStockProducts);
+  // console.log("stats", stats);
+  // console.log("lowStockProducts", lowStockProducts);
+  // console.log("outOfStockProducts", outOfStockProducts);
 
   return {
     ...stats,

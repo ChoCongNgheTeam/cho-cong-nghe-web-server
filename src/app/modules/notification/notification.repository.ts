@@ -1,5 +1,5 @@
 import prisma from "@/config/db";
-import { CreateNotificationInput } from "./notification.types";
+import { CreateNotificationInput, ADMIN_NOTIFICATION_TYPES } from "./notification.types";
 
 export const create = async (input: CreateNotificationInput) => {
   return prisma.notifications.create({ data: input });
@@ -24,6 +24,33 @@ export const findByUserId = async (userId: string, page = 1, limit = 20) => {
   return { data, total, page, limit, totalPages: Math.ceil(total / limit), unreadCount };
 };
 
+/**
+ * Lấy thông báo dành cho admin/staff:
+ * Chỉ trả về các type liên quan đến đơn hàng mới, comment, review.
+ * Lọc theo userId của chính admin/staff đó (vì thông báo được tạo trên userId của họ).
+ */
+export const findAdminNotifications = async (userId: string, page = 1, limit = 20) => {
+  const skip = (page - 1) * limit;
+  const where = {
+    userId,
+    type: { in: ADMIN_NOTIFICATION_TYPES },
+    channel: "IN_APP" as const,
+  };
+
+  const [data, total, unreadCount] = await prisma.$transaction([
+    prisma.notifications.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    }),
+    prisma.notifications.count({ where }),
+    prisma.notifications.count({ where: { ...where, isRead: false } }),
+  ]);
+
+  return { data, total, page, limit, totalPages: Math.ceil(total / limit), unreadCount };
+};
+
 export const markAsRead = async (id: string, userId: string) => {
   return prisma.notifications.updateMany({
     where: { id, userId },
@@ -34,6 +61,22 @@ export const markAsRead = async (id: string, userId: string) => {
 export const markAllAsRead = async (userId: string) => {
   return prisma.notifications.updateMany({
     where: { userId, isRead: false },
+    data: { isRead: true, readAt: new Date() },
+  });
+};
+
+/**
+ * Đánh dấu tất cả thông báo admin/staff đã đọc
+ * (chỉ các type liên quan đến đơn hàng, comment, review)
+ */
+export const markAllAdminAsRead = async (userId: string) => {
+  return prisma.notifications.updateMany({
+    where: {
+      userId,
+      isRead: false,
+      type: { in: ADMIN_NOTIFICATION_TYPES },
+      channel: "IN_APP",
+    },
     data: { isRead: true, readAt: new Date() },
   });
 };

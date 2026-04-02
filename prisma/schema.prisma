@@ -141,6 +141,14 @@ enum VariantDisplayType {
   CARD
 }
 
+enum BlogType {
+  TIN_MOI
+  DANH_GIA
+  KHUYEN_MAI
+  DIEN_MAY
+  NOI_BAT
+}
+
 
 // SOFT DELETE: users là entity chính, staff/admin cần trash
 // deletedBy tham chiếu chính nó (self-ref) — dùng String thay vì Uuid relation để tránh circular
@@ -859,6 +867,7 @@ model blogs {
   imagePath   String?
   imageUrl    String?
   viewCount   Int        @default(0)
+  type        BlogType   @default(TIN_MOI)
   status      BlogStatus @default(DRAFT)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -994,6 +1003,8 @@ enum NotificationType {
   CAMPAIGN_PROMOTION
   ORDER_STATUS
   USER_INACTIVE
+  COMMENT_NEW
+  REVIEW_NEW
 }
 
 enum NotificationChannel {

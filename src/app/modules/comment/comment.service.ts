@@ -3,8 +3,10 @@ import * as repo from "./comment.repository";
 import { transformComment, transformCommentsList } from "./comment.transformers";
 import { CreateCommentInput, UpdateCommentInput, ListCommentsQuery, CommentTargetType } from "./comment.validation";
 import { NotFoundError, BadRequestError, ForbiddenError } from "@/errors";
+import { sendCommentNewAdminNotification } from "@/app/modules/notification/notification.service";
+import prisma from "@/config/db";
 
-//  Helper
+// ── Helper ────────────────────────────────────────────────────────────────────
 
 const assertCommentExists = async (id: string, options: { includeDeleted?: boolean; isAdmin?: boolean } = {}) => {
   const comment = await repo.findById(id, options);
@@ -12,7 +14,27 @@ const assertCommentExists = async (id: string, options: { includeDeleted?: boole
   return comment;
 };
 
-//  Public
+/**
+ * Lấy tên target để hiển thị trong notification.
+ * Hiện tại hỗ trợ PRODUCT — thêm case khác nếu targetType mở rộng sau này.
+ */
+const resolveTargetName = async (targetType: CommentTargetType, targetId: string): Promise<string> => {
+  try {
+    if (targetType === "PRODUCT") {
+      const product = await prisma.products.findUnique({
+        where: { id: targetId },
+        select: { name: true },
+      });
+      return product?.name ?? targetId;
+    }
+    // Thêm case mới ở đây nếu cần: POST, NEWS, ...
+    return targetId;
+  } catch {
+    return targetId;
+  }
+};
+
+// ── Public ────────────────────────────────────────────────────────────────────
 
 export const getCommentsPublic = async (query: ListCommentsQuery) => {
   const result = await repo.findAllPublic(query);
@@ -32,17 +54,19 @@ export const getCommentsCountByTargets = async (targetType: CommentTargetType, t
 };
 
 export const getCommentReplies = async (parentId: string) => {
-  // Kiểm tra parent tồn tại và chưa bị xóa
   await assertCommentExists(parentId);
   const replies = await repo.findReplies(parentId, true);
   return transformCommentsList(replies);
 };
 
-//  Authenticated user: tạo, tự xóa comment của mình
+// ── Authenticated user ────────────────────────────────────────────────────────
+
 export const createComment = async (userId: string, input: CreateCommentInput) => {
+  // 1. Validate target tồn tại
   const targetExists = await repo.validateTarget(input.targetType, input.targetId);
   if (!targetExists) throw new NotFoundError("Target");
 
+  // 2. Validate parent comment nếu có
   if (input.parentId) {
     const parentValid = await repo.validateParentComment(input.parentId, input.targetType, input.targetId);
     if (!parentValid) {
@@ -50,30 +74,40 @@ export const createComment = async (userId: string, input: CreateCommentInput) =
     }
   }
 
-  // Lưu DB trước với isApproved = false
+  // 3. Lưu DB với isApproved = false
   const comment = await repo.create(userId, input);
 
-  // Chạy AI moderation
+  // 4. AI moderation
+  let result: { comment: ReturnType<typeof transformComment>; autoApproved: boolean; reason?: string };
   try {
     const moderation = await moderateContent("comment", comment.content || "");
     if (moderation.approved) {
-      // Pass → auto approve
       const approved = await repo.update(comment.id, { isApproved: true });
-      return { comment: transformComment(approved), autoApproved: true };
+      result = { comment: transformComment(approved), autoApproved: true };
     } else {
-      // Reject → giữ isApproved = false, admin review sau
-      return { comment: transformComment(comment), autoApproved: false, reason: moderation.reason };
+      result = { comment: transformComment(comment), autoApproved: false, reason: moderation.reason };
     }
   } catch (error) {
-    // AI fail → giữ isApproved = false, admin review sau (silent fail)
     console.error("Moderation error:", error);
-    return { comment: transformComment(comment), autoApproved: false };
+    result = { comment: transformComment(comment), autoApproved: false };
   }
+
+  // 5. Notify admin/staff — fire-and-forget, không block response
+  setImmediate(async () => {
+    try {
+      const [user, targetName] = await Promise.all([prisma.users.findUnique({ where: { id: userId }, select: { fullName: true } }), resolveTargetName(input.targetType, input.targetId)]);
+
+      await sendCommentNewAdminNotification(user?.fullName ?? "Khách hàng", targetName, comment.id, input.targetId);
+    } catch (err) {
+      console.error("[Notification] Lỗi gửi notify comment mới:", err);
+    }
+  });
+
+  return result;
 };
 
 /**
  * User tự xóa comment của mình — soft delete, KHÔNG xóa replies.
- * Replies của người khác vẫn hiển thị dù parent bị ẩn.
  */
 export const deleteOwnComment = async (id: string, userId: string) => {
   const comment = await assertCommentExists(id);
@@ -85,7 +119,7 @@ export const deleteOwnComment = async (id: string, userId: string) => {
   return repo.softDeleteOwn(id, userId);
 };
 
-//  Staff & Admin: list, detail, approve
+// ── Staff & Admin ─────────────────────────────────────────────────────────────
 
 export const getCommentsAdmin = async (query: ListCommentsQuery) => {
   const result = await repo.findAllAdmin(query);
@@ -113,11 +147,8 @@ export const bulkApproveComments = async (commentIds: string[], isApproved: bool
   return repo.bulkApprove(commentIds, isApproved);
 };
 
-//  Soft delete — Staff & Admin
+// ── Soft delete — Staff & Admin ───────────────────────────────────────────────
 
-/**
- * Soft delete — replies cũng bị soft delete theo.
- */
 export const softDeleteComment = async (id: string, deletedById: string) => {
   await assertCommentExists(id);
   return repo.softDelete(id, deletedById);
@@ -127,7 +158,7 @@ export const bulkSoftDeleteComments = async (ids: string[], deletedById: string)
   return repo.bulkSoftDelete(ids, deletedById);
 };
 
-//  Admin only: restore, hard delete, trash
+// ── Admin only ────────────────────────────────────────────────────────────────
 
 export const restoreComment = async (id: string) => {
   const comment = (await repo.findById(id, { includeDeleted: true, isAdmin: true })) as any;
@@ -144,7 +175,6 @@ export const bulkRestoreComments = async (ids: string[]) => {
 
 /**
  * Hard delete — Admin only, CHỈ sau khi đã soft delete.
- * Hard delete replies trước, rồi mới hard delete comment.
  */
 export const hardDeleteComment = async (id: string) => {
   const comment = (await repo.findById(id, { includeDeleted: true, isAdmin: true })) as any;

@@ -40,6 +40,7 @@ export const transformBlogCard = (blog: any): BlogCard => ({
   excerpt: extractExcerpt(blog.content),
   viewCount: blog.viewCount,
   status: blog.status,
+  type: blog.type,
   author: transformAuthor(blog.author),
   createdAt: blog.createdAt,
   // updatedAt — có trong selectBlogAdmin, không có trong selectBlogCard (public)
@@ -61,6 +62,7 @@ export const transformBlogDetail = (blog: any): BlogDetail => ({
   thumbnail: blog.imageUrl ?? undefined,
   viewCount: blog.viewCount,
   status: blog.status,
+  type: blog.type,
   author: transformAuthor(blog.author),
   createdAt: blog.createdAt,
   updatedAt: blog.updatedAt,

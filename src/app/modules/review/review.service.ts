@@ -4,6 +4,7 @@ import { NotFoundError, BadRequestError, ForbiddenError } from "@/errors";
 import { ReviewStatus } from "@prisma/client";
 import prisma from "@/config/db";
 import { moderateContent } from "@/services/moderation";
+import { sendReviewNewAdminNotification } from "@/app/modules/notification/notification.service";
 
 // ── Helper ─────────────────────────────────────────────────────────────────
 
@@ -16,8 +17,6 @@ const assertReviewExists = async (id: string, options: { includeDeleted?: boolea
 /**
  * Tính lại ratingAverage và ratingCount cho sản phẩm.
  * Gọi sau mỗi lần approve/reject/delete review để giữ số liệu đồng bộ.
- *
- * Chỉ tính các review APPROVED và chưa bị soft delete.
  */
 const recalculateProductRating = async (productId: string) => {
   const approvedReviews = await prisma.reviews.findMany({
@@ -41,18 +40,12 @@ const recalculateProductRating = async (productId: string) => {
   });
 };
 
-/**
- * Lấy productId từ reviewId để recalculate.
- * Dùng sau khi thao tác approve/delete.
- */
 const getProductIdFromReview = async (reviewId: string): Promise<string | null> => {
   const review = await prisma.reviews.findFirst({
     where: { id: reviewId },
     select: {
       orderItem: {
-        select: {
-          productVariant: { select: { productId: true } },
-        },
+        select: { productVariant: { select: { productId: true } } },
       },
     },
   });
@@ -64,10 +57,14 @@ const getProductIdFromReview = async (reviewId: string): Promise<string | null> 
 export const createUserReview = async (userId: string, input: CreateReviewInput) => {
   const { orderItemId, rating, comment } = input;
 
+  // 1. Validate order item
   const orderItem = await prisma.order_items.findUnique({
     where: { id: orderItemId },
     include: {
       order: { select: { userId: true, orderStatus: true } },
+      productVariant: {
+        include: { product: { select: { id: true, name: true } } },
+      },
     },
   });
 
@@ -78,31 +75,73 @@ export const createUserReview = async (userId: string, input: CreateReviewInput)
   const existingReview = await repo.findReviewByOrderItemId(orderItemId);
   if (existingReview) throw new BadRequestError("Bạn đã đánh giá sản phẩm này rồi");
 
-  // Lưu DB trước với PENDING
+  // Lấy thông tin product ngay tại đây để dùng cho notification
+  const productId = orderItem.productVariant.product.id;
+  const productName = orderItem.productVariant.product.name;
+
+  // 2. Lưu DB với PENDING
   const review = await repo.createReview({ userId, orderItemId, rating, comment });
 
-  // AI moderation nếu có comment
+  // 3. Helper nội bộ: approve + recalculate + notify admin
+  const approveAndNotify = async (reviewId: string) => {
+    await repo.updateReview(reviewId, { isApproved: ReviewStatus.APPROVED });
+    await recalculateProductRating(productId);
+
+    // Notify admin/staff — fire-and-forget
+    setImmediate(async () => {
+      try {
+        const user = await prisma.users.findUnique({
+          where: { id: userId },
+          select: { fullName: true },
+        });
+        await sendReviewNewAdminNotification(user?.fullName ?? "Khách hàng", productName, rating, reviewId, productId);
+      } catch (err) {
+        console.error("[Notification] Lỗi gửi notify review mới:", err);
+      }
+    });
+  };
+
+  // 4. AI moderation nếu có comment
   if (comment) {
     try {
-      const moderation = await moderateContent("review", comment || "");
+      const moderation = await moderateContent("review", comment);
       if (moderation.approved) {
-        await repo.updateReview(review.id, { isApproved: ReviewStatus.APPROVED });
-        // Recalculate rating sau khi auto-approve
-        const productId = await getProductIdFromReview(review.id);
-        if (productId) await recalculateProductRating(productId);
+        await approveAndNotify(review.id);
         return { review: await repo.findReviewById(review.id), autoApproved: true };
       } else {
+        // Giữ PENDING, admin review sau — vẫn notify để admin biết có review mới cần duyệt
+        setImmediate(async () => {
+          try {
+            const user = await prisma.users.findUnique({
+              where: { id: userId },
+              select: { fullName: true },
+            });
+            await sendReviewNewAdminNotification(user?.fullName ?? "Khách hàng", productName, rating, review.id, productId);
+          } catch (err) {
+            console.error("[Notification] Lỗi gửi notify review mới:", err);
+          }
+        });
         return { review, autoApproved: false, reason: moderation.reason };
       }
     } catch {
+      // AI fail → giữ PENDING, vẫn notify admin
+      setImmediate(async () => {
+        try {
+          const user = await prisma.users.findUnique({
+            where: { id: userId },
+            select: { fullName: true },
+          });
+          await sendReviewNewAdminNotification(user?.fullName ?? "Khách hàng", productName, rating, review.id, productId);
+        } catch (err) {
+          console.error("[Notification] Lỗi gửi notify review mới:", err);
+        }
+      });
       return { review, autoApproved: false };
     }
   }
 
-  // Không có comment → auto approve (chỉ có rating)
-  await repo.updateReview(review.id, { isApproved: ReviewStatus.APPROVED });
-  const productId = await getProductIdFromReview(review.id);
-  if (productId) await recalculateProductRating(productId);
+  // 5. Không có comment → auto approve ngay
+  await approveAndNotify(review.id);
   return { review: await repo.findReviewById(review.id), autoApproved: true };
 };
 
@@ -111,7 +150,6 @@ export const createUserReview = async (userId: string, input: CreateReviewInput)
 export const getReviewsByProduct = async (productId: string) => {
   const reviews = await repo.findReviewsByProductId(productId, true);
 
-  // Tính stats từ reviews đã approved (đồng bộ với ratingAverage trong DB)
   const total = reviews.length;
   const average = total > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / total : 0;
   const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
@@ -142,7 +180,6 @@ export const getReviewById = async (id: string) => {
 export const updateReviewAdmin = async (reviewId: string, input: UpdateReviewAdminInput) => {
   await assertReviewExists(reviewId);
   const updated = await repo.updateReview(reviewId, input);
-  // Nếu có thay đổi isApproved → recalculate
   if (input.isApproved !== undefined) {
     const productId = await getProductIdFromReview(reviewId);
     if (productId) await recalculateProductRating(productId);
@@ -153,7 +190,6 @@ export const updateReviewAdmin = async (reviewId: string, input: UpdateReviewAdm
 export const approveReview = async (reviewId: string, isApproved: ReviewStatus) => {
   await assertReviewExists(reviewId);
   const updated = await repo.updateReview(reviewId, { isApproved });
-  // Recalculate rating sau khi thay đổi approve status
   const productId = await getProductIdFromReview(reviewId);
   if (productId) await recalculateProductRating(productId);
   return updated;
@@ -162,7 +198,6 @@ export const approveReview = async (reviewId: string, isApproved: ReviewStatus) 
 export const bulkApproveReviews = async (reviewIds: string[], isApproved: ReviewStatus) => {
   const result = await repo.bulkApprove(reviewIds, isApproved);
 
-  // Recalculate cho tất cả products liên quan
   const productIds = await prisma.reviews.findMany({
     where: { id: { in: reviewIds } },
     select: { orderItem: { select: { productVariant: { select: { productId: true } } } } },
@@ -176,7 +211,6 @@ export const bulkApproveReviews = async (reviewIds: string[], isApproved: Review
 export const softDeleteReview = async (id: string, deletedById: string) => {
   await assertReviewExists(id);
   const result = await repo.softDelete(id, deletedById);
-  // Recalculate sau khi ẩn review
   const productId = await getProductIdFromReview(id);
   if (productId) await recalculateProductRating(productId);
   return result;
@@ -199,7 +233,6 @@ export const restoreReview = async (id: string) => {
   if (!review) throw new NotFoundError("Đánh giá");
   if (!(review as any).deletedAt) throw new BadRequestError("Đánh giá này chưa bị xóa");
   const restored = await repo.restore(id);
-  // Recalculate sau khi restore (review có thể là APPROVED)
   const productId = await getProductIdFromReview(id);
   if (productId) await recalculateProductRating(productId);
   return restored;
@@ -223,7 +256,6 @@ export const hardDeleteReview = async (id: string) => {
   if (!(review as any).deletedAt) throw new ForbiddenError("Phải soft delete trước khi xóa vĩnh viễn");
   const productId = await getProductIdFromReview(id);
   await repo.hardDelete(id);
-  // Recalculate sau hard delete
   if (productId) await recalculateProductRating(productId);
 };
 
