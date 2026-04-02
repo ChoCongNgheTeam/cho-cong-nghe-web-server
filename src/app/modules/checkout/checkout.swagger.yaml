@@ -77,9 +77,6 @@ components:
         voucherDiscount:
           type: number
           description: Số tiền giảm giá
-        taxAmount:
-          type: number
-          description: Thuế VAT (10%)
         totalAmount:
           type: number
           description: Tổng thanh toán cuối cùng

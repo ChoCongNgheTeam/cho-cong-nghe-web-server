@@ -115,15 +115,6 @@ export const validateAndApplyVoucher = async (voucherId: string | undefined, sub
 };
 
 // =======================================================
-// 4. Tính Thuế
-// =======================================================
-const VAT_RATE = 0.1;
-export const calculateTax = (subtotal: number, shippingFee: number, voucherDiscount: number): number => {
-  const taxableAmount = subtotal + shippingFee - voucherDiscount;
-  return Math.round(Math.max(taxableAmount, 0) * VAT_RATE);
-};
-
-// =======================================================
 // 5. Chuẩn bị dữ liệu Checkout (Gom tất cả lại)
 // =======================================================
 export const prepareCheckoutData = async (userId: string, input: CheckoutInput): Promise<CheckoutSummary> => {
@@ -153,8 +144,7 @@ export const prepareCheckoutData = async (userId: string, input: CheckoutInput):
   // Parallel: shipping fee + voucher
   const [shippingFee, { discount: voucherDiscount }] = await Promise.all([calculateShippingFee(subtotalAmount, shippingAddressId), validateAndApplyVoucher(voucherId, subtotalAmount, userId)]);
 
-  const taxAmount = calculateTax(subtotalAmount, shippingFee, voucherDiscount);
-  const totalAmount = subtotalAmount + shippingFee - voucherDiscount + taxAmount;
+  const totalAmount = subtotalAmount + shippingFee - voucherDiscount ;
 
   const isBankTransfer = paymentMethod.code === "BANK_TRANSFER";
   const bankTransferCode = isBankTransfer ? `TT${nanoid(8).toUpperCase()}` : undefined;
@@ -164,7 +154,6 @@ export const prepareCheckoutData = async (userId: string, input: CheckoutInput):
     subtotalAmount,
     shippingFee,
     voucherDiscount,
-    taxAmount,
     totalAmount,
     paymentMethodId,
     paymentMethodCode: paymentMethod.code,
