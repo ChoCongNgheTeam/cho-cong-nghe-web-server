@@ -401,7 +401,7 @@ export const sendOrderConfirmationEmail = async (
                     }
 
                     <div style="text-align: center; margin-top: 32px;">
-                      <a href="${process.env.FRONTEND_URL}/order-status/${orderCode}"
+                      <a href="${process.env.FRONTEND_URL}/profile/orders/${orderCode}"
                          style="display: inline-block; padding: 12px 32px; background-color: #F3F4F6; color: #111827; text-decoration: none; border: 1px solid #D1D5DB; border-radius: 6px; font-weight: 600; font-size: 14px; transition: all 0.2s;">
                         Tra cứu đơn hàng
                       </a>
