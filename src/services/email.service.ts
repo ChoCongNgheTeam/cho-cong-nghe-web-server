@@ -265,13 +265,13 @@ export const sendOrderConfirmationEmail = async (
   paymentInfo?: {
     paymentMethodCode: string;
     paymentLink?: string;
-  }
+  },
 ) => {
   const brandColor = "#3B82F6"; // Màu xanh chủ đạo
 
   const emailPattern = /([a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}),?\s*/;
-  const cleanShippingAddress = orderDetails.shippingAddress.replace(emailPattern, '').trim();
-  
+  const cleanShippingAddress = orderDetails.shippingAddress.replace(emailPattern, "").trim();
+
   const mailOptions = {
     from: `"Chợ Công Nghệ" <${process.env.SMTP_FROM}>`,
     to: email,
@@ -329,14 +329,14 @@ export const sendOrderConfirmationEmail = async (
                         </td>
                         <td style="padding: 12px 0; border-bottom: 1px solid #F3F4F6; text-align: right; vertical-align: top;">
                           <p style="margin: 0; color: #111827; font-size: 15px; font-weight: 500;">
-                            ${(orderDetails.unitPrice * orderDetails.quantity).toLocaleString('vi-VN')}đ
+                            ${(orderDetails.unitPrice * orderDetails.quantity).toLocaleString("vi-VN")}đ
                           </p>
                         </td>
                       </tr>
                       <tr>
                         <td style="padding: 16px 0 0; color: #111827; font-size: 16px; font-weight: 600;">Tổng thanh toán:</td>
                         <td style="padding: 16px 0 0; color: ${brandColor}; font-size: 18px; font-weight: 700; text-align: right;">
-                          ${orderDetails.totalAmount.toLocaleString('vi-VN')}đ
+                          ${orderDetails.totalAmount.toLocaleString("vi-VN")}đ
                         </td>
                       </tr>
                     </table>
@@ -373,7 +373,7 @@ export const sendOrderConfirmationEmail = async (
                     </div>
 
                     ${
-                      paymentInfo?.paymentLink && ['MOMO', 'VNPAY', 'ZALOPAY', 'BANK_TRANSFER'].includes(paymentInfo.paymentMethodCode)
+                      paymentInfo?.paymentLink && ["MOMO", "VNPAY", "ZALOPAY", "BANK_TRANSFER"].includes(paymentInfo.paymentMethodCode)
                         ? `
                           <div style="border: 1px dashed ${brandColor}; border-radius: 8px; padding: 24px; text-align: center; margin-bottom: 24px;">
                             <h3 style="margin: 0 0 12px; color: #111827; font-size: 15px; font-weight: 600;">
@@ -383,21 +383,25 @@ export const sendOrderConfirmationEmail = async (
                               Quét mã QR dưới đây để hoàn tất thanh toán
                             </p>
                             
-                            <img src="${paymentInfo.paymentMethodCode === 'BANK_TRANSFER' ? paymentInfo.paymentLink : `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(paymentInfo.paymentLink)}`}" 
+                            <img src="${paymentInfo.paymentMethodCode === "BANK_TRANSFER" ? paymentInfo.paymentLink : `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(paymentInfo.paymentLink)}`}" 
                                  alt="Mã QR" 
                                  style="width: 200px; height: 200px; margin: 0 auto; display: block; border: 1px solid #E5E7EB; border-radius: 8px; padding: 8px;">
                             
-                            ${['MOMO', 'VNPAY', 'ZALOPAY'].includes(paymentInfo.paymentMethodCode) ? `
+                            ${
+                              ["MOMO", "VNPAY", "ZALOPAY"].includes(paymentInfo.paymentMethodCode)
+                                ? `
                               <div style="margin-top: 20px;">
                                 <a href="${paymentInfo.paymentLink}" 
                                    style="display: inline-block; padding: 12px 24px; background-color: ${brandColor}; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
                                   Mở ứng dụng thanh toán
                                 </a>
                               </div>
-                            ` : ''}
+                            `
+                                : ""
+                            }
                           </div>
                         `
-                        : ''
+                        : ""
                     }
 
                     <div style="text-align: center; margin-top: 32px;">

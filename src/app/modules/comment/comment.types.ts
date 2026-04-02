@@ -21,6 +21,8 @@ export interface Comment {
   content: string;
   targetType: CommentTargetType;
   targetId: string;
+  /** Tên blog / sản phẩm được comment — backend populate khi query admin */
+  targetName?: string;
   parentId?: string;
   isApproved: boolean;
   createdAt: Date;
@@ -43,6 +45,8 @@ export interface RawComment {
   content: string;
   targetType: CommentTargetType;
   targetId: string;
+  /** Inject sau khi batch-lookup blogs/products */
+  targetName?: string | null;
   parentId: string | null;
   isApproved: boolean;
   createdAt: Date;

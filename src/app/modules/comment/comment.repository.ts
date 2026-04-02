@@ -3,6 +3,29 @@ import { Prisma } from "@prisma/client";
 import { ListCommentsQuery } from "./comment.validation";
 import { CommentTargetType } from "./comment.types";
 
+export interface FindCommentsParams {
+  page?: number;
+  limit?: number;
+  targetType?: CommentTargetType;
+  targetId?: string;
+  isApproved?: boolean;
+  /** null = chỉ lấy top-level, undefined = lấy tất cả */
+  parentId?: string | null;
+  sortBy?: "createdAt";
+  sortOrder?: "asc" | "desc";
+  includeDeleted?: boolean;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+const userSelect = {
+  id: true,
+  fullName: true,
+  email: true,
+  avatarImage: true,
+} satisfies Prisma.usersSelect;
+
 //  Select Fields
 
 const selectUser = {
@@ -35,6 +58,45 @@ const selectCommentAdmin = {
   deletedAt: true,
   deletedBy: true,
 } satisfies Prisma.commentsSelect;
+
+// ── Target name resolver ──────────────────────────────────────────────────────
+
+/**
+ * Batch-lookup tên blog / product từ danh sách comment.
+ * Chỉ tốn 2 SQL phụ (song song) dù có bao nhiêu comment trên trang.
+ *
+ * @returns Map<targetId, targetName>
+ */
+const resolveTargetNames = async (rows: Array<{ targetType: string; targetId: string }>): Promise<Map<string, string>> => {
+  const blogIds: string[] = [];
+  const productIds: string[] = [];
+
+  for (const row of rows) {
+    if (row.targetType === CommentTargetType.BLOG) blogIds.push(row.targetId);
+    else if (row.targetType === CommentTargetType.PRODUCT) productIds.push(row.targetId);
+    // PAGE không có bảng tương ứng — bỏ qua
+  }
+
+  const [blogs, products] = await Promise.all([
+    blogIds.length
+      ? prisma.blogs.findMany({
+          where: { id: { in: blogIds } },
+          select: { id: true, title: true },
+        })
+      : [],
+    productIds.length
+      ? prisma.products.findMany({
+          where: { id: { in: productIds } },
+          select: { id: true, name: true },
+        })
+      : [],
+  ]);
+
+  const map = new Map<string, string>();
+  for (const b of blogs) map.set(b.id, b.title);
+  for (const p of products) map.set(p.id, p.name);
+  return map;
+};
 
 //  Query Builder
 
@@ -74,8 +136,20 @@ export const findAllPublic = async (query: ListCommentsQuery) => {
   return _findAll(query, { onlyApproved: true, isAdmin: false });
 };
 
+/**
+ * Admin list — inject targetName vào mỗi comment để hiển thị tên blog/sản phẩm
+ */
 export const findAllAdmin = async (query: ListCommentsQuery) => {
-  return _findAll(query, { onlyApproved: false, isAdmin: true });
+  const result = await _findAll(query, { onlyApproved: false, isAdmin: true });
+
+  // Batch resolve tên — không N+1
+  const nameMap = await resolveTargetNames(result.data);
+  const data = result.data.map((c) => ({
+    ...c,
+    targetName: nameMap.get(c.targetId) ?? null,
+  }));
+
+  return { ...result, data };
 };
 
 const _findAll = async (query: ListCommentsQuery, options: { onlyApproved: boolean; isAdmin: boolean }) => {
@@ -96,17 +170,24 @@ const _findAll = async (query: ListCommentsQuery, options: { onlyApproved: boole
  * Tìm theo id.
  * - Mặc định: bỏ qua comment đã soft delete.
  * - Admin + includeDeleted=true: tìm cả trong trash.
+ * - isAdmin=true: inject targetName vào kết quả.
  */
 export const findById = async (id: string, options: { includeDeleted?: boolean; isAdmin?: boolean } = {}) => {
   const { includeDeleted = false, isAdmin = false } = options;
 
-  return prisma.comments.findFirst({
+  const comment = await prisma.comments.findFirst({
     where: {
       id,
       ...(!isAdmin || !includeDeleted ? { deletedAt: null } : {}),
     },
     select: isAdmin ? selectCommentAdmin : selectComment,
   });
+
+  if (!comment || !isAdmin) return comment;
+
+  // Inject targetName cho admin detail view
+  const nameMap = await resolveTargetNames([comment]);
+  return { ...comment, targetName: nameMap.get(comment.targetId) ?? null };
 };
 
 /**

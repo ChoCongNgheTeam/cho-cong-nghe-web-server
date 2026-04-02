@@ -27,6 +27,8 @@ export const transformComment = (comment: any): Comment => ({
   content: comment.content,
   targetType: comment.targetType,
   targetId: comment.targetId,
+  // targetName được inject bởi repository (chỉ có ở admin queries)
+  ...(comment.targetName != null && { targetName: comment.targetName }),
   parentId: comment.parentId ?? undefined,
   isApproved: comment.isApproved,
   createdAt: comment.createdAt,
