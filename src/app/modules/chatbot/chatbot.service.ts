@@ -98,6 +98,14 @@ export const getChatReply = async (userMessages: ChatMessage[]): Promise<ChatRes
     // Thực thi tất cả tool calls song song
     const toolResults = await Promise.all(
       message.tool_calls.map(async (toolCall) => {
+        if (!("function" in toolCall)) {
+          return {
+            role: "tool" as const,
+            tool_call_id: toolCall.id,
+            content: JSON.stringify({ error: "Tool call không hợp lệ" }),
+          };
+        }
+
         const args = JSON.parse(toolCall.function.arguments || "{}");
         const result = await dispatchTool(toolCall.function.name, args);
 
