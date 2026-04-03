@@ -460,10 +460,22 @@
         // Chú ý sửa lại cổng (PORT) cho đúng với server Node.js đang chạy
         const API_URL = 'http://localhost:5000/api/v1/chatbot'; 
         
-        // Mảng lưu trữ lịch sử tin nhắn để gửi lên server
+        // Mảy lưu trữ lịch sử tin nhắn để gửi lên server
         let chatHistory = [];
-        let selectedVariantId = null; // Lưu variant ID khi user click card
-        let selectedPaymentMethodId = null; // Lưu payment method ID khi user chọn
+        
+        // 🔒 ConversationContext: Quản lý state per conversation (từ backend)
+        // Frontend phải lưu và gửi lại context này mỗi message
+        // ⚙️ Flow:
+        // 1. User gọi action → Backend auto-detect/search → lưu variantId vào ctx → return ctx
+        // 2. Frontend nhận ctx → lưu vào conversationContext
+        // 3. User confirm → Frontend gửi ctx + other params → Backend sử dụng ctx.variantId
+        let conversationContext = null;
+        
+        // 🎯 Selected IDs: Những gì user đã chọn trực tiếp (từ UI click)
+        // LƯỚI: Khi user click product card hoặc payment method, frontend cập nhật direct
+        // Khi backend auto-detect tìm được, nó sẽ set vào conversationContext.searchedProductVariantId
+        let selectedVariantId = null;
+        let selectedPaymentMethodId = null;
 
         const chatMessages = document.getElementById('chatMessages');
         const userInput = document.getElementById('userInput');
@@ -492,7 +504,12 @@
             showTyping(true);
 
             try {
-                // 3. Gọi API (Gửi mảng chatHistory + selectedVariantId + selectedPaymentMethodId)
+                // 3. Gọi API với thông tin đầy đủ
+                console.log(`\n📤 [SEND REQUEST]`);
+                console.log(`  conversationContext:`, conversationContext);
+                console.log(`  selectedVariantId:`, selectedVariantId);
+                console.log(`  selectedPaymentMethodId:`, selectedPaymentMethodId);
+                
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: {
@@ -501,7 +518,8 @@
                     body: JSON.stringify({ 
                         messages: chatHistory,
                         selectedVariantId: selectedVariantId,
-                        selectedPaymentMethodId: selectedPaymentMethodId
+                        selectedPaymentMethodId: selectedPaymentMethodId,
+                        conversationContext: conversationContext
                     })
                 });
 
@@ -510,25 +528,62 @@
                 if (response.ok && result.success) {
                     const botReply = result.data.content;
                     
+                    // 🔒 Cập nhật conversationContext từ response (CỰC KỲ QUAN TRỌNG)
+                    console.log(`📥 [RECEIVE RESPONSE]`);
+                    if (result.data.conversationContext) {
+                        conversationContext = result.data.conversationContext;
+                        console.log(`  ✅ Updated conversationContext:`, {
+                          variantId: conversationContext?.searchedProductVariantId,
+                          paymentId: conversationContext?.selectedPaymentMethodId,
+                          hasHtml: !!conversationContext?.searchedProductsHtml
+                        });
+                    } else {
+                        console.log(`  ⚠️ Response không có conversationContext, giữ context cũ:`, conversationContext);
+                    }
+                    
+                    // 🎯 Cập nhật selected IDs từ context
+                    if (conversationContext?.searchedProductVariantId && !selectedVariantId) {
+                        selectedVariantId = conversationContext.searchedProductVariantId;
+                        console.log(`  ✅ Set selectedVariantId từ context: ${selectedVariantId}`);
+                    }
+                    if (conversationContext?.selectedPaymentMethodId && !selectedPaymentMethodId) {
+                        selectedPaymentMethodId = conversationContext.selectedPaymentMethodId;
+                        console.log(`  ✅ Set selectedPaymentMethodId từ context: ${selectedPaymentMethodId}`);
+                    }
+                    
                     // Thêm phản hồi của bot vào lịch sử
                     chatHistory.push({ role: 'assistant', content: botReply });
                     
+                    // 🔍 Kiểm tra nếu không có giá chính xác (priceNotMatched = true)
+                    if (result.data.priceNotMatched) {
+                        console.warn(`⚠️ Không tìm thấy giá chính xác. Giá yêu cầu: ${result.data.requestedPriceRange}`);
+                    }
+                    
                     // Kiểm tra nếu response có HTML cards (Products)
                     if (result.data.html && result.data.format === 'html_cards') {
-                        // Hiển thị message + HTML cards
-                        appendMessage('bot', botReply || 'Các phiên bản sản phẩm:');
+                        // Hiển thị message (nếu có) + HTML cards
+                        if (botReply) {
+                            const parsedHtml = marked.parse(botReply);
+                            appendMessage('bot', parsedHtml, true);
+                        }
                         appendProductCards(result.data.html, result.data.variants);
                     } 
                     // Kiểm tra nếu response có HTML payment methods
                     else if (result.data.html && result.data.format === 'payment_methods') {
-                        // Hiển thị message + payment methods
-                        appendMessage('bot', botReply || 'Danh sách phương thức thanh toán:');
+                        // Hiển thị message (nếu có) + payment methods
+                        if (botReply) {
+                            const parsedHtml = marked.parse(botReply);
+                            appendMessage('bot', parsedHtml, true);
+                        }
                         appendPaymentMethods(result.data.html, result.data.paymentMethods);
                     }
                     // Kiểm tra nếu response có HTML order tracking
                     else if (result.data.html && result.data.format === 'order_tracking') {
-                        // Hiển thị message + order tracking
-                        appendMessage('bot', botReply || 'Thông tin đơn hàng của bạn:');
+                        // Hiển thị message (nếu có) + order tracking
+                        if (botReply) {
+                            const parsedHtml = marked.parse(botReply);
+                            appendMessage('bot', parsedHtml, true);
+                        }
                         appendOrderTracking(result.data.html);
                     }
                     else {
@@ -537,7 +592,8 @@
                         appendMessage('bot', parsedHtml, true);
                     }
                 } else {
-                    appendMessage('bot', 'Xin lỗi, hệ thống đang bận. Bạn thử lại sau nhé!');
+                    const errorMsg = result.message || 'Xin lỗi, hệ thống đang bận. Bạn thử lại sau nhé!';
+                    appendMessage('bot', errorMsg);
                     console.error('API Error:', result);
                 }
 
@@ -573,11 +629,13 @@
             const cards = containerDiv.querySelectorAll('.product-card');
             cards.forEach((card, idx) => {
                 card.addEventListener('click', function() {
-                    // Lưu variant ID
-                    selectedVariantId = this.getAttribute('data-variant-id');
+                    // 🎯 Cập nhật selectedVariantId
+                    const variantId = this.getAttribute('data-variant-id');
+                    selectedVariantId = variantId;
+                    
                     const variantName = this.getAttribute('data-variant-name');
                     
-                    console.log(`✅ Đã chọn: ${variantName}, variantId: ${selectedVariantId}`);
+                    console.log(`✅ Đã chọn: ${variantName}, variantId: ${variantId}`);
                     
                     // 🔥 TỰ ĐỘNG NHẬP TEXT VÀO Ô INPUT VÀ GỬI
                     userInput.value = `Tôi chọn phiên bản: ${variantName}`;
@@ -605,11 +663,13 @@
                     el.addEventListener('click', function(e) {
                         e.preventDefault();
                         
-                        // Lưu payment method ID và gửi message
-                        selectedPaymentMethodId = item.getAttribute('data-payment-id');
+                        // 🎯 Cập nhật selectedPaymentMethodId
+                        const paymentMethodId = item.getAttribute('data-payment-id');
+                        selectedPaymentMethodId = paymentMethodId;
+                        
                         const paymentName = item.getAttribute('data-payment-name');
                         
-                        console.log(`✅ Đã chọn phương thức thanh toán: ${paymentName} (ID: ${selectedPaymentMethodId})`);
+                        console.log(`✅ Đã chọn phương thức thanh toán: ${paymentName} (ID: ${paymentMethodId})`);
                         
                         // Sử dụng standard sendMessage flow
                         userInput.value = `Tôi chọn phương thức: ${paymentName}`;

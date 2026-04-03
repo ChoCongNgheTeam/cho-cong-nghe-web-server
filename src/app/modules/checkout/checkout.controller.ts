@@ -107,7 +107,6 @@ export const checkoutHandler = async (req: Request, res: Response) => {
         subtotalAmount: checkoutSummary.subtotalAmount,
         shippingFee: checkoutSummary.shippingFee,
         voucherDiscount: checkoutSummary.voucherDiscount,
-        taxAmount: checkoutSummary.taxAmount,
         totalAmount: checkoutSummary.totalAmount,
         itemCount: checkoutSummary.items.length,
       },

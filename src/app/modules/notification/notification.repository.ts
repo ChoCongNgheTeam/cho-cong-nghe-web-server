@@ -13,13 +13,13 @@ export const findByUserId = async (userId: string, page = 1, limit = 20) => {
   const skip = (page - 1) * limit;
   const [data, total, unreadCount] = await prisma.$transaction([
     prisma.notifications.findMany({
-      where: { userId },
+      where: { userId, channel: "IN_APP" },
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
     }),
-    prisma.notifications.count({ where: { userId } }),
-    prisma.notifications.count({ where: { userId, isRead: false } }),
+    prisma.notifications.count({ where: { userId, channel: "IN_APP" } }),
+    prisma.notifications.count({ where: { userId, channel: "IN_APP", isRead: false } }),
   ]);
   return { data, total, page, limit, totalPages: Math.ceil(total / limit), unreadCount };
 };

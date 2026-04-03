@@ -99,7 +99,7 @@ export const handleVnpayIpn = async (rawQuery: unknown) => {
 
 export const vnpayReturnHandler = (req: Request, res: Response): void => {
   const verified = vnpay.verifyReturnUrl(req.query as any);
-  console.log("[VNPay Return] verified:", verified.isVerified, verified.isSuccess);
+  // console.log("[VNPay Return] verified:", verified.isVerified, verified.isSuccess);
   const txnRef = req.query.vnp_TxnRef as string;
   redirectToFrontend(res, txnRef);
 };

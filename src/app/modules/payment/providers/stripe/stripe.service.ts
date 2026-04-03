@@ -85,7 +85,7 @@ export const handleStripeWebhook = async (req: Request) => {
       where: { id: order.id },
       data: { paymentStatus: "PAID" },
     });
-    console.log(`[Stripe Webhook] Order ${order.id} → PAID`);
+    // console.log(`[Stripe Webhook] Order ${order.id} → PAID`);
   }
 
   return { received: true, orderId: order.id, transactionStatus: isSuccess ? "COMPLETED" : "FAILED" };

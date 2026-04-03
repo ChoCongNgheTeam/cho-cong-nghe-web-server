@@ -48,6 +48,8 @@ import analyticsRouter from "@/app/modules/analytics/analytics.route";
 
 import categoryVariantAttributeRoute from "@/app/modules/category-variant/category-variant-attribute.route";
 
+import { aiContentRoute } from "@/app/modules/ai-content/ai-content.route";
+
 const router = Router();
 
 // ===== Core & Auth =====
@@ -89,6 +91,9 @@ router.use("/specifications", specificationRouter);
 
 // ===== Chatbot =====
 router.use("/chatbot", chatbotRoute);
+
+// ===== AI Content =====
+router.use("/ai-content", aiContentRoute);
 
 // ===== Search =====
 router.use("/search", searchRoutes);

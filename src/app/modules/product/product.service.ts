@@ -162,7 +162,7 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
   if (!product || !product.isActive) throw new NotFoundError("Sản phẩm");
 
   let variant;
-  console.log(options?.bundle);
+  // console.log(options?.bundle);
 
   // NEW: nếu có bundle param → tìm theo variantId trực tiếp
   if (options?.bundle) {
