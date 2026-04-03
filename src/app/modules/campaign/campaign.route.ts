@@ -33,6 +33,7 @@ import {
   addCampaignCategorySchema,
   updateCampaignCategorySchema,
   campaignCategoryParamsSchema,
+  campaignOnlyParamsSchema, // ✅ import thêm
   bulkDeleteCampaignsSchema,
 } from "./campaign.validation";
 
@@ -78,12 +79,17 @@ router.post(
   ...adminAuth,
   campaignUpload.array("images", 20),
   parseMultipart({ fields: { categories: "json" } }),
-  validate(campaignCategoryParamsSchema, "params"),
+  validate(campaignOnlyParamsSchema, "params"),
   validate(addCampaignCategorySchema, "body"),
   asyncHandler(addCategoriesToCampaignHandler),
 );
 
-router.get("/admin/:campaignId/categories/:categoryId", ...adminAuth, validate(campaignCategoryParamsSchema, "params"), asyncHandler(getCampaignCategoryHandler));
+router.get(
+  "/admin/:campaignId/categories/:categoryId",
+  ...adminAuth,
+  validate(campaignCategoryParamsSchema, "params"),
+  asyncHandler(getCampaignCategoryHandler),
+);
 
 router.patch(
   "/admin/:campaignId/categories/:categoryId",
@@ -95,6 +101,11 @@ router.patch(
   asyncHandler(updateCampaignCategoryHandler),
 );
 
-router.delete("/admin/:campaignId/categories/:categoryId", ...adminAuth, validate(campaignCategoryParamsSchema, "params"), asyncHandler(removeCategoryFromCampaignHandler));
+router.delete(
+  "/admin/:campaignId/categories/:categoryId",
+  ...adminAuth,
+  validate(campaignCategoryParamsSchema, "params"),
+  asyncHandler(removeCategoryFromCampaignHandler),
+);
 
 export default router;

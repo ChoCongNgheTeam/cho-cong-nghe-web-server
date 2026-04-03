@@ -9,13 +9,17 @@ export const campaignSlugParamsSchema = z.object({
   slug: z.string().min(1, { message: "Slug không được để trống" }),
 });
 
+// ✅ FIX: schema riêng cho route chỉ có campaignId (không có categoryId)
+export const campaignOnlyParamsSchema = z.object({
+  campaignId: z.string().uuid({ message: "ID chiến dịch không hợp lệ" }),
+});
+
 export const listCampaignsQuerySchema = z.object({
   page: z.coerce.number().positive().default(1),
   limit: z.coerce.number().positive().max(100).default(20),
   search: z.string().optional(),
   type: z.nativeEnum(CampaignType).optional(),
   isActive: z.coerce.boolean().optional(),
-  // status filter — cùng pattern với promotions
   status: z.enum(["active", "inactive", "upcoming", "expired"]).optional(),
   sortBy: z.enum(["name", "createdAt", "startDate", "endDate"]).default("createdAt"),
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
