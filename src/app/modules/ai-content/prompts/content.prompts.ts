@@ -140,3 +140,34 @@ export const buildSlugFromTitle = (title: string): string => {
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
 };
+
+// ─── Product Description từ tên (không có DB data) ──────────
+// Dùng khi tạo sản phẩm mới, chưa save vào DB
+export const buildProductDescriptionPromptFromName = (input: {
+  productName: string;
+  focusKeyword: string;
+  tone?: "professional" | "friendly" | "enthusiastic";
+  targetLength?: "short" | "medium" | "long";
+  additionalNotes?: string;
+}): string => {
+  const targetLength = WORD_COUNT_MAP[input.targetLength || "medium"].product;
+  const tone = TONE_MAP[input.tone || "friendly"];
+
+  return `Bạn là chuyên gia viết nội dung thương mại điện tử tại Việt Nam. Viết mô tả sản phẩm chuẩn SEO cho shop công nghệ.
+
+## THÔNG TIN SẢN PHẨM
+- Tên: ${input.productName}
+
+## YÊU CẦU VIẾT
+- Từ khóa SEO chính: **"${input.focusKeyword}"** — phải xuất hiện tự nhiên 3-5 lần
+- Phong cách: ${tone}
+- Độ dài mục tiêu: khoảng ${targetLength} từ
+- Định dạng: HTML cơ bản (dùng <p>, <ul>, <li>, <strong>, <h3>)
+${input.additionalNotes ? `- Lưu ý: ${input.additionalNotes}` : ""}
+
+## QUAN TRỌNG
+- Suy luận tính năng nổi bật dựa vào tên sản phẩm và từ khóa
+- Viết tổng quát nhưng thuyết phục, tránh bịa số liệu cụ thể không có căn cứ
+- Dùng cấu trúc: Mở đầu → Điểm nổi bật (bullet) → Đoạn kết CTA
+- Trả về HTML thuần, KHÔNG có markdown hay backtick`;
+};

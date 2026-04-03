@@ -8,16 +8,25 @@ import { aiContentService } from "./ai-content.service";
 // ============================================================
 
 // POST /api/admin/ai-content/product-description
+// Dùng khi sản phẩm đã tồn tại trong DB (có productId)
 const generateProductDescription = asyncHandler(async (req: Request, res: Response) => {
   const input = req.body;
-  const createdBy = (req as any).user.id; // từ authMiddleware
+  const createdBy = (req as any).user.id;
 
   const result = await aiContentService.generateProductDescription(input, createdBy);
 
-  res.status(200).json({
-    success: true,
-    data: result,
-  });
+  res.status(200).json({ success: true, data: result });
+});
+
+// POST /api/admin/ai-content/product-description-from-name
+// Dùng khi tạo sản phẩm MỚI, chỉ có tên + keyword, chưa có DB record
+const generateProductDescriptionFromName = asyncHandler(async (req: Request, res: Response) => {
+  const input = req.body;
+  const createdBy = (req as any).user.id;
+
+  const result = await aiContentService.generateProductDescriptionFromName(input, createdBy);
+
+  res.status(200).json({ success: true, data: result });
 });
 
 // POST /api/admin/ai-content/blog
@@ -27,14 +36,11 @@ const generateBlogPost = asyncHandler(async (req: Request, res: Response) => {
 
   const result = await aiContentService.generateBlogPost(input, createdBy);
 
-  res.status(200).json({
-    success: true,
-    data: result,
-  });
+  res.status(200).json({ success: true, data: result });
 });
 
 // POST /api/admin/ai-content/analyze-seo
-// Phân tích SEO nội dung đã có (không gọi AI, chỉ analyze)
+// Không gọi AI, chỉ analyze JS — nhanh, không timeout
 const analyzeSEO = asyncHandler(async (req: Request, res: Response) => {
   const { content, title, focusKeyword, contentType } = req.body;
 
@@ -45,10 +51,7 @@ const analyzeSEO = asyncHandler(async (req: Request, res: Response) => {
     contentType: contentType || "product",
   });
 
-  res.status(200).json({
-    success: true,
-    data: seoScore,
-  });
+  res.status(200).json({ success: true, data: seoScore });
 });
 
 // GET /api/admin/ai-content/history
@@ -62,14 +65,12 @@ const getHistory = asyncHandler(async (req: Request, res: Response) => {
     limit: Number(limit) || 20,
   });
 
-  res.status(200).json({
-    success: true,
-    data: result,
-  });
+  res.status(200).json({ success: true, data: result });
 });
 
 export const aiContentController = {
   generateProductDescription,
+  generateProductDescriptionFromName,
   generateBlogPost,
   analyzeSEO,
   getHistory,

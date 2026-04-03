@@ -2,22 +2,20 @@ import OpenAI from "openai";
 import { env } from "@/config/env";
 import prisma from "@/config/db";
 import { GenerateProductDescriptionInput, GenerateBlogPostInput, GeneratedContent, SEOScore } from "./ai-content.types";
-import { buildProductDescriptionPrompt, buildBlogPostPrompt, buildMetaDescriptionPrompt, buildSlugFromTitle } from "./prompts/content.prompts";
+import { buildProductDescriptionPrompt, buildProductDescriptionPromptFromName, buildBlogPostPrompt, buildMetaDescriptionPrompt, buildSlugFromTitle } from "./prompts/content.prompts";
 import { analyzeSEO } from "./seo.analyzer";
 
 // ============================================================
 // AI CONTENT SERVICE
-// 2 tính năng chính:
-// 1. generateProductDescription — viết mô tả sản phẩm từ thông số DB
-// 2. generateBlogPost — viết bài blog từ tiêu đề + keyword
-// + analyzeSEOOnly — check SEO nội dung đã có
 // ============================================================
 
 const openai = new OpenAI({
   apiKey: env.OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+  timeout: 180_000, // 3 phút — đủ cho cả blog dài
+  maxRetries: 2,
 });
 
-// Helper: call OpenAI với retry đơn giản
+// ─── callOpenAI ─────────────────────────────────────────────
 const callOpenAI = async (prompt: string, maxTokens: number): Promise<string> => {
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
@@ -25,15 +23,13 @@ const callOpenAI = async (prompt: string, maxTokens: number): Promise<string> =>
     temperature: 0.7,
     max_tokens: maxTokens,
   });
-
   return response.choices[0].message.content || "";
 };
 
-// ─── 1. Generate Product Description ────────────────────────
-export const generateProductDescription = async (input: GenerateProductDescriptionInput, createdBy: string): Promise<GeneratedContent> => {
-  // Fetch product data từ DB
+// ─── Fetch product data từ DB ────────────────────────────────
+const fetchProductData = async (productId: string) => {
   const product = await prisma.products.findFirst({
-    where: { id: input.productId, deletedAt: null },
+    where: { id: productId, deletedAt: null },
     select: {
       name: true,
       description: true,
@@ -66,7 +62,6 @@ export const generateProductDescription = async (input: GenerateProductDescripti
 
   if (!product) throw new Error("Sản phẩm không tồn tại");
 
-  // Format specs by group
   const specGroups: Record<string, { name: string; value: string }[]> = {};
   for (const ps of product.productSpecifications) {
     const group = ps.specification.group || "Thông số khác";
@@ -74,97 +69,140 @@ export const generateProductDescription = async (input: GenerateProductDescripti
     specGroups[group].push({ name: ps.specification.name, value: ps.value });
   }
 
-  // Format variants
   const variants = product.variants.map((v) => {
     const label = v.variantAttributes.map((va) => va.attributeOption.label).join(" / ") || "Mặc định";
     return { label, price: Number(v.price) };
   });
 
-  // Build prompt & generate
-  const prompt = buildProductDescriptionPrompt(input, {
+  return {
     name: product.name,
     brand: product.brand.name,
     category: product.category.name,
-    specifications: Object.entries(specGroups).map(([group, items]) => ({ group, items })),
+    specifications: Object.entries(specGroups).map(([group, items]) => ({
+      group,
+      items,
+    })),
     variants,
     existingDescription: product.description || undefined,
-  });
+  };
+};
 
-  const generatedContent = await callOpenAI(prompt, 1200);
+// ─── 1. Generate Product Description (có productId — từ DB) ──
+export const generateProductDescription = async (input: GenerateProductDescriptionInput, createdBy: string): Promise<GeneratedContent> => {
+  const productData = await fetchProductData(input.productId!);
 
-  // Analyze SEO
-  const title = product.name;
-  const seoScore = analyzeSEO(generatedContent, title, input.focusKeyword, "product");
+  const prompt = buildProductDescriptionPrompt(input, productData);
+  const generatedContent = await callOpenAI(prompt, 1500);
 
-  // Generate meta description
-  const metaPrompt = buildMetaDescriptionPrompt(title, generatedContent, input.focusKeyword);
-  const suggestedMetaDescription = await callOpenAI(metaPrompt, 200);
+  const seoScore = analyzeSEO(generatedContent, productData.name, input.focusKeyword, "product");
 
-  // Save to DB
-  await prisma.ai_contents.create({
-    data: {
-      type: "PRODUCT_DESCRIPTION",
-      referenceId: input.productId,
-      focusKeyword: input.focusKeyword,
-      inputData: input as any,
-      outputContent: generatedContent,
-      seoScore: seoScore.overall,
-      seoDetails: seoScore as any,
-      createdBy,
-    },
-  });
+  const suggestedMetaDescription = (await callOpenAI(buildMetaDescriptionPrompt(productData.name, generatedContent, input.focusKeyword), 200)).trim();
+
+  // Best-effort save
+  prisma.ai_contents
+    .create({
+      data: {
+        type: "PRODUCT_DESCRIPTION",
+        referenceId: input.productId,
+        focusKeyword: input.focusKeyword,
+        inputData: input as any,
+        outputContent: generatedContent,
+        seoScore: seoScore.overall,
+        seoDetails: seoScore as any,
+        createdBy,
+      },
+    })
+    .catch((err) => console.error("[ai-content] DB save failed:", err));
 
   return {
     content: generatedContent,
     seoScore,
-    suggestedTitle: title,
-    suggestedMetaDescription: suggestedMetaDescription.trim(),
+    suggestedTitle: productData.name,
+    suggestedMetaDescription,
   };
 };
 
-// ─── 2. Generate Blog Post ───────────────────────────────────
+// ─── 2. Generate Product Description (KHÔNG có productId) ────
+// Dùng khi đang tạo sản phẩm mới, chỉ có tên + keyword
+export const generateProductDescriptionFromName = async (
+  input: {
+    productName: string;
+    focusKeyword: string;
+    tone?: "professional" | "friendly" | "enthusiastic";
+    targetLength?: "short" | "medium" | "long";
+    additionalNotes?: string;
+  },
+  createdBy: string,
+): Promise<GeneratedContent> => {
+  const prompt = buildProductDescriptionPromptFromName(input);
+  const generatedContent = await callOpenAI(prompt, 1500);
+
+  const seoScore = analyzeSEO(generatedContent, input.productName, input.focusKeyword, "product");
+
+  const suggestedMetaDescription = (await callOpenAI(buildMetaDescriptionPrompt(input.productName, generatedContent, input.focusKeyword), 200)).trim();
+
+  prisma.ai_contents
+    .create({
+      data: {
+        type: "PRODUCT_DESCRIPTION",
+        focusKeyword: input.focusKeyword,
+        inputData: input as any,
+        outputContent: generatedContent,
+        seoScore: seoScore.overall,
+        seoDetails: seoScore as any,
+        createdBy,
+      },
+    })
+    .catch((err) => console.error("[ai-content] DB save failed:", err));
+
+  return {
+    content: generatedContent,
+    seoScore,
+    suggestedTitle: input.productName,
+    suggestedMetaDescription,
+  };
+};
+
+// ─── 3. Generate Blog Post ────────────────────────────────────
 export const generateBlogPost = async (input: GenerateBlogPostInput, createdBy: string): Promise<GeneratedContent> => {
   const prompt = buildBlogPostPrompt(input);
-  const generatedContent = await callOpenAI(prompt, 3000);
+  const generatedContent = await callOpenAI(prompt, 3500);
 
-  // Analyze SEO
   const seoScore = analyzeSEO(generatedContent, input.title, input.focusKeyword, "blog");
 
-  // Suggest slug
   const suggestedSlug = buildSlugFromTitle(input.title);
 
-  // Generate meta description
-  const metaPrompt = buildMetaDescriptionPrompt(input.title, generatedContent, input.focusKeyword);
-  const suggestedMetaDescription = await callOpenAI(metaPrompt, 200);
+  const suggestedMetaDescription = (await callOpenAI(buildMetaDescriptionPrompt(input.title, generatedContent, input.focusKeyword), 200)).trim();
 
-  // Save to DB
-  await prisma.ai_contents.create({
-    data: {
-      type: "BLOG_POST",
-      focusKeyword: input.focusKeyword,
-      inputData: input as any,
-      outputContent: generatedContent,
-      seoScore: seoScore.overall,
-      seoDetails: seoScore as any,
-      createdBy,
-    },
-  });
+  prisma.ai_contents
+    .create({
+      data: {
+        type: "BLOG_POST",
+        focusKeyword: input.focusKeyword,
+        inputData: input as any,
+        outputContent: generatedContent,
+        seoScore: seoScore.overall,
+        seoDetails: seoScore as any,
+        createdBy,
+      },
+    })
+    .catch((err) => console.error("[ai-content] DB save failed:", err));
 
   return {
     content: generatedContent,
     seoScore,
     suggestedTitle: input.title,
     suggestedSlug,
-    suggestedMetaDescription: suggestedMetaDescription.trim(),
+    suggestedMetaDescription,
   };
 };
 
-// ─── 3. Analyze SEO Only (không generate, chỉ check) ────────
+// ─── 4. Analyze SEO Only ─────────────────────────────────────
 export const analyzeSEOOnly = (params: { content: string; title: string; focusKeyword: string; contentType: "product" | "blog" }): SEOScore => {
   return analyzeSEO(params.content, params.title, params.focusKeyword, params.contentType);
 };
 
-// ─── 4. Get History ─────────────────────────────────────────
+// ─── 5. Get History ──────────────────────────────────────────
 export const getContentHistory = async (params: { type?: "PRODUCT_DESCRIPTION" | "BLOG_POST"; referenceId?: string; page?: number; limit?: number }) => {
   const { type, referenceId, page = 1, limit = 20 } = params;
   const skip = (page - 1) * limit;
@@ -197,6 +235,7 @@ export const getContentHistory = async (params: { type?: "PRODUCT_DESCRIPTION" |
 
 export const aiContentService = {
   generateProductDescription,
+  generateProductDescriptionFromName,
   generateBlogPost,
   analyzeSEOOnly,
   getContentHistory,
