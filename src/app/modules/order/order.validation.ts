@@ -16,6 +16,7 @@ export type OrderQuery = z.infer<typeof orderQuerySchema>;
 export const updateOrderAdminSchema = z.object({
   orderStatus: z.enum(["PENDING", "PROCESSING", "SHIPPED", "DELIVERED"]).optional(),
   paymentStatus: z.enum(["UNPAID", "PAID", "REFUNDED"]).optional(),
+  paymentMethodId: z.string().uuid("ID phương thức thanh toán không hợp lệ").optional(), // ← thêm
   shippingFee: z.number().min(0).optional(),
   voucherDiscount: z.number().min(0).optional(),
 });

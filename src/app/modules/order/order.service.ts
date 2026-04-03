@@ -110,11 +110,11 @@ export const updateOrderAdmin = async (orderId: string, input: UpdateOrderAdminI
     data: {
       orderStatus: input.orderStatus,
       paymentStatus: input.paymentStatus,
+      paymentMethodId: input.paymentMethodId,  // ← thêm
       shippingFee: input.shippingFee,
       voucherDiscount: input.voucherDiscount,
     },
   });
-
   // [THÊM MỚI] Gửi thông báo nếu trạng thái đơn hàng thay đổi
   if (input.orderStatus && input.orderStatus !== order.orderStatus) {
     sendOrderStatusNotification(updatedOrder.userId, updatedOrder.orderCode, input.orderStatus).catch((err) => {
