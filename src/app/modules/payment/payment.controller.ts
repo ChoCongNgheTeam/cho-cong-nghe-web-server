@@ -72,7 +72,7 @@ export const createMomoPaymentHandler = async (req: Request, res: Response) => {
 
 export const momoWebhookHandler = async (req: Request, res: Response) => {
   try {
-    console.log("[MoMo IPN] Received:", JSON.stringify(req.body));
+    // console.log("[MoMo IPN] Received:", JSON.stringify(req.body));
     const result = await handleMomoIpn(req.body);
     res.json(result);
   } catch (error: any) {
@@ -119,7 +119,7 @@ export const createZaloPayPaymentHandler = async (req: Request, res: Response) =
 
 export const zaloPayCallbackHandler = async (req: Request, res: Response) => {
   try {
-    console.log("[ZaloPay CB] Received:", req.body);
+    // console.log("[ZaloPay CB] Received:", req.body);
     const result = await handleZaloPayCallback(req.body);
     res.json(result);
   } catch (error: any) {

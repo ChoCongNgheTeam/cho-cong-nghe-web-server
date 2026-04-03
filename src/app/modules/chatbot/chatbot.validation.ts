@@ -1,16 +1,15 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-const chatSchema = z.object({
-  messages: z.array(
-    z.object({
-      role: z.enum(['user', 'assistant', 'system']),
-      content: z.string(),
-    })
-  ),
-  selectedVariantId: z.string().uuid().nullish(), // Allow null, undefined, or valid UUID
-  selectedPaymentMethodId: z.string().uuid().nullish(), // Allow null, undefined, or valid UUID
+export const chatSchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().min(1).max(2000),
+      }),
+    )
+    .min(1, "Cần ít nhất 1 tin nhắn")
+    .max(50, "Tối đa 50 tin nhắn"),
 });
 
-export const chatbotValidation = {
-  chatSchema
-};
+export type ChatInput = z.infer<typeof chatSchema>;

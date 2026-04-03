@@ -1018,3 +1018,38 @@ enum NotificationStatus {
   SENT
   FAILED
 }
+
+enum AiContentType {
+  PRODUCT_DESCRIPTION
+  BLOG_POST
+}
+
+model ai_contents {
+  id          String        @id @default(uuid()) @db.Uuid
+  type        AiContentType
+  referenceId String?       @db.Uuid  // productId nếu type = PRODUCT_DESCRIPTION
+  focusKeyword String
+  inputData   Json          // Raw input để regenerate nếu cần
+  outputContent String      @db.Text
+  seoScore    Int           // 0-100
+  seoDetails  Json          // Chi tiết SEO score
+  createdBy   String        @db.Uuid  // userId của admin/staff
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+ 
+  @@index([type, referenceId])
+  @@index([createdBy])
+  @@index([createdAt])
+}
+
+model chat_sessions {
+  id        String   @id @default(uuid()) @db.Uuid
+  sessionKey String  @unique  // UUID từ FE localStorage
+  messages  Json    // Array of {role, content}
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  expiresAt DateTime // Tự động xóa sau 24h
+ 
+  @@index([sessionKey])
+  @@index([expiresAt])
+}

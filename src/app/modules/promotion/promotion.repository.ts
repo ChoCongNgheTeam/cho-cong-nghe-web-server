@@ -365,9 +365,9 @@ export const create = async (data: CreatePromotionInput) => {
 };
 
 export const update = async (id: string, data: UpdatePromotionInput) => {
-  console.log(data);
+  // console.log(data);
 
-  console.log(data);
+  // console.log(data);
 
   const { rules, targets, ...updateData } = data;
 
@@ -507,5 +507,5 @@ export const getActivePromotions = async () => {
 export const clearPromotionsCache = () => {
   promotionsCache = null;
   promotionsCacheTime = 0;
-  console.log("[Cache] Cleared promotions cache");
+  // console.log("[Cache] Cleared promotions cache");
 };

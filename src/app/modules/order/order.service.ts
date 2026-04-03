@@ -273,7 +273,7 @@ export const createOrderAdmin = async (input: CreateOrderAdminInput) => {
   // 🔔 GỬI THÔNG BÁO CHO ADMIN/STAFF KHI TẠO ĐƠN HÀNG
   try {
     await sendOrderCreatedAdminNotification(order.orderCode);
-    console.log(`🔔 Thông báo đơn hàng mới ${order.orderCode} đã gửi cho ADMIN/STAFF`);
+    // console.log(`🔔 Thông báo đơn hàng mới ${order.orderCode} đã gửi cho ADMIN/STAFF`);
   } catch (adminNotifError) {
     console.warn(`⚠️ Lỗi gửi thông báo admin (nhưng order đã tạo):`, adminNotifError);
     // Không throw error - order đã tạo rồi, không nên lỗi vì notification

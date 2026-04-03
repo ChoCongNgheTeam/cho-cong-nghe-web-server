@@ -144,7 +144,7 @@ export const prepareCheckoutData = async (userId: string, input: CheckoutInput):
   // Parallel: shipping fee + voucher
   const [shippingFee, { discount: voucherDiscount }] = await Promise.all([calculateShippingFee(subtotalAmount, shippingAddressId), validateAndApplyVoucher(voucherId, subtotalAmount, userId)]);
 
-  const totalAmount = subtotalAmount + shippingFee - voucherDiscount ;
+  const totalAmount = subtotalAmount + shippingFee - voucherDiscount;
 
   const isBankTransfer = paymentMethod.code === "BANK_TRANSFER";
   const bankTransferCode = isBankTransfer ? `TT${nanoid(8).toUpperCase()}` : undefined;
@@ -213,7 +213,7 @@ export const createOrderFromCheckout = async (userId: string, checkoutSummary: C
             },
           );
 
-          console.log(`📧 Email xác nhận đơn hàng ${order.orderCode} đã gửi tới ${user.email}`);
+          // console.log(`📧 Email xác nhận đơn hàng ${order.orderCode} đã gửi tới ${user.email}`);
         }
       } catch (emailError) {
         console.warn(`⚠️ Lỗi gửi email xác nhận:`, emailError);
@@ -224,7 +224,7 @@ export const createOrderFromCheckout = async (userId: string, checkoutSummary: C
     (async () => {
       try {
         await sendOrderCreatedAdminNotification(order.orderCode);
-        console.log(`🔔 Thông báo đơn hàng mới ${order.orderCode} đã gửi cho ADMIN/STAFF`);
+        // console.log(`🔔 Thông báo đơn hàng mới ${order.orderCode} đã gửi cho ADMIN/STAFF`);
       } catch (adminNotifError) {
         console.warn(`⚠️ Lỗi gửi thông báo admin:`, adminNotifError);
       }

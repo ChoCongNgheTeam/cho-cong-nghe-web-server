@@ -2,7 +2,7 @@ import prisma from "@/config/db";
 import { sendInactiveUserNotification } from "@/app/modules/notification/notification.service";
 
 export const runUserInactiveJob = async () => {
-  console.log("[Job] Running user inactive check...");
+  // console.log("[Job] Running user inactive check...");
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 

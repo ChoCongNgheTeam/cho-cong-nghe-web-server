@@ -2,7 +2,7 @@ import prisma from "@/config/db";
 import { sendVoucherExpiringNotification } from "@/app/modules/notification/notification.service";
 
 export const runVoucherExpiryJob = async () => {
-  console.log("[Job] Running voucher expiry check...");
+  // console.log("[Job] Running voucher expiry check...");
 
   const now = new Date();
   const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -34,5 +34,5 @@ export const runVoucherExpiryJob = async () => {
     }
   }
 
-  console.log(`[Job] Voucher expiry: notified ${count} users`);
+  // console.log(`[Job] Voucher expiry: notified ${count} users`);
 };

@@ -157,7 +157,7 @@ export const handleMomoIpn = async (rawPayload: unknown) => {
   }
 
   const newPaymentStatus = isSuccess ? "PAID" : "UNPAID";
-  console.log(`[MoMo IPN] Order ${order.id} → ${newPaymentStatus}`);
+  // console.log(`[MoMo IPN] Order ${order.id} → ${newPaymentStatus}`);
 
   return { success: true, orderId: order.id, transactionStatus, newPaymentStatus };
 };

@@ -111,7 +111,7 @@ export const handleZaloPayCallback = async (rawPayload: unknown) => {
     });
   }
 
-  console.log(`[ZaloPay CB] Order ${order.id} → PAID`);
+  // console.log(`[ZaloPay CB] Order ${order.id} → PAID`);
   return { return_code: 1, return_message: "Thành công" };
 };
 

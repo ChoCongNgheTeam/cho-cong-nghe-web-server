@@ -68,7 +68,7 @@ export const createPromotion = async (input: CreatePromotionInput) => {
 export const updatePromotion = async (id: string, input: UpdatePromotionInput) => {
   const existing = await assertPromotionExists(id, { isAdmin: true });
 
-  console.log(existing);
+  // console.log(existing);
 
   if (input.name && input.name !== (existing as any).name) {
     const nameExists = await repo.checkPromotionName(input.name, id);
