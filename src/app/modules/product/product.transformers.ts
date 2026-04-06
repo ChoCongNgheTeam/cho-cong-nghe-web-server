@@ -108,10 +108,16 @@ const buildAvailableOptionsWithStatus = (variants: RawVariant[], colorImages: an
     }
   }
 
-  return Array.from(typesMap.entries()).map(([type, values]) => ({
-    type,
-    values: Array.from(values.values()),
-  }));
+  return Array.from(typesMap.entries())
+    .map(([type, values]) => ({
+      type,
+      values: Array.from(values.values()),
+    }))
+    .sort((a, b) => {
+      if (a.type === "color") return 1; // color đi sau
+      if (b.type === "color") return -1;
+      return 0; // giữ nguyên thứ tự các loại khác
+    });
 };
 
 /**
@@ -356,6 +362,14 @@ export const transformProductVariantResponse = (product: any, variant: RawVarian
 };
 
 export const transformProductSpecifications = (product: {
+  name: string;
+  img: {
+    id: string;
+    imageUrl: string | null;
+    position: number;
+    color: string;
+    altText: string | null;
+  }[];
   productSpecifications: {
     specificationId: string;
     value: string | null;
@@ -370,19 +384,19 @@ export const transformProductSpecifications = (product: {
       unit?: string | null;
     };
   }[];
-}): { specifications: ProductSpecificationGroup[] } => {
+}): {
+  name: string;
+  image: string | null;
+  specifications: ProductSpecificationGroup[];
+} => {
   const valueMap = new Map<string, string | null>(product.productSpecifications.map((ps) => [ps.specificationId, ps.value]));
 
   const groups: ProductSpecificationGroup[] = [];
 
   for (const cs of product.categorySpecifications) {
     let group = groups.find((g) => g.groupName === cs.groupName);
-
     if (!group) {
-      group = {
-        groupName: cs.groupName,
-        items: [],
-      };
+      group = { groupName: cs.groupName, items: [] };
       groups.push(group);
     }
 
@@ -398,7 +412,11 @@ export const transformProductSpecifications = (product: {
     });
   }
 
-  return { specifications: groups };
+  return {
+    name: product.name,
+    image: product.img?.[0]?.imageUrl ?? null, // safely handle null
+    specifications: groups,
+  };
 };
 
 export const transformProductHighlights = (product: any): Highlight[] => {

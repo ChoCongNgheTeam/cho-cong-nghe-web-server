@@ -34,6 +34,7 @@ const selectCategoryTree = {
     select: {
       id: true,
       slug: true,
+      name: true,
       parent: {
         select: {
           id: true,
@@ -550,7 +551,15 @@ export const findSpecificationsBySlug = async (slug: string) => {
     where: { slug, deletedAt: null },
     select: {
       isActive: true,
+      name: true,
       categoryId: true,
+
+      img: {
+        select: selectColorImage,
+        orderBy: [{ color: "asc" }, { position: "asc" }],
+        take: 1,
+      },
+
       productSpecifications: {
         select: { specificationId: true, value: true },
       },

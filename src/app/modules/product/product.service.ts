@@ -246,8 +246,7 @@ export const getProductSpecificationsBySlug = async (slug: string) => {
   const product = await repo.findSpecificationsBySlug(slug);
   if (!product || !product.isActive) throw new NotFoundError("Thông số sản phẩm");
 
-  const { specifications } = transformProductSpecifications(product);
-  return { specifications };
+  return transformProductSpecifications(product);
 };
 
 export const getProductGallery = async (slug: string) => {
