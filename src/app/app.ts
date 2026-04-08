@@ -26,25 +26,45 @@ app.use(
 
 // if (process.env.NODE_ENV === "production") {
 //   import("node-cron").then(({ default: cron }) => {
-//     cron.schedule("0 3 * * *", async () => {
-//       await cleanupRefreshTokens();
-//     });
+//     cron.schedule(
+//       "0 3 * * *",
+//       async () => {
+//         console.log("🧹 Running cleanupRefreshTokens...");
+//         await cleanupRefreshTokens();
+//       },
+//       {
+//         timezone: "Asia/Ho_Chi_Minh",
+//       },
+//     );
 //   });
 // }
-if (process.env.NODE_ENV === "production") {
-  import("node-cron").then(({ default: cron }) => {
-    cron.schedule(
-      "* * * * *",
-      async () => {
-        console.log("🔥 CRON RUNNING");
-        await cleanupRefreshTokens();
-      },
-      {
-        timezone: "Asia/Ho_Chi_Minh",
-      },
-    );
-  });
-}
+
+// if (process.env.NODE_ENV === "production") {
+//   import("node-cron").then(({ default: cron }) => {
+//     cron.schedule(
+//       "* * * * *", // mỗi phút
+//       async () => {
+//         console.log("🔥 CRON RUNNING");
+//         await cleanupRefreshTokens();
+//       },
+//       {
+//         timezone: "Asia/Ho_Chi_Minh",
+//       },
+//     );
+//   });
+// }
+
+app.post("/cron/cleanup-refresh-tokens", async (req, res) => {
+  const auth = req.headers.authorization;
+
+  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  const result = await cleanupRefreshTokens();
+
+  res.json({ deleted: result });
+});
 
 initFirebase();
 startJobs();
@@ -56,6 +76,11 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+app.get("/test-cleanup", async (req, res) => {
+  await cleanupRefreshTokens();
+  res.send("Cleanup done");
+});
 
 app.get("/", (req, res) => {
   res.json({

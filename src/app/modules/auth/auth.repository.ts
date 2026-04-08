@@ -144,16 +144,28 @@ export const findValidRefreshTokenWithUser = (token: string) => {
 };
 
 export const cleanupRevokedExpiredRefreshTokens = async () => {
-  return prisma.refresh_tokens.deleteMany({
+  const now = new Date();
+  console.log(now);
+
+  const toDelete = await prisma.refresh_tokens.findMany({
     where: {
-      expiresAt: {
-        lt: new Date(),
-      },
-      revokedAt: {
-        not: null,
-      },
+      expiresAt: { lt: now },
+      revokedAt: { not: null },
     },
   });
+
+  console.log("🧪 Tokens to delete:", toDelete.length);
+
+  const result = await prisma.refresh_tokens.deleteMany({
+    where: {
+      expiresAt: { lt: now },
+      revokedAt: { not: null },
+    },
+  });
+
+  console.log("🧹 Deleted:", result.count);
+
+  return result;
 };
 
 // OAuth
