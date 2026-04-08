@@ -3,6 +3,7 @@ import * as mediaService from "./media.service";
 import { MediaType, MediaPosition } from "./media.types";
 import { parseMultipartData, uploadMediaImage } from "./media.helpers";
 import { cleanupFile } from "@/services/file-cleanup.service";
+import { mediaByCategoryQuerySchema } from "./media.validation";
 
 export const getMediaByTypeHandler = async (req: Request, res: Response) => {
   const media = await mediaService.getMediaByType(req.params.type as MediaType);
@@ -79,4 +80,10 @@ export const deleteMediaHandler = async (req: Request, res: Response) => {
 export const reorderMediaHandler = async (req: Request, res: Response) => {
   const result = await mediaService.reorderMedia(req.body);
   res.json({ message: result.message });
+};
+
+export const getMediaByCategoryHandler = async (req: Request, res: Response) => {
+  const query = mediaByCategoryQuerySchema.parse(req.query);
+  const media = await mediaService.getMediaByCategorySlug(query);
+  res.json({ data: media, total: media.length, message: "Lấy media theo danh mục thành công" });
 };

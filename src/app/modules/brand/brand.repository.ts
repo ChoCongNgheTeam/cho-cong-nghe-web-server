@@ -1,6 +1,7 @@
 import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
 import { CreateBrandInput, UpdateBrandInput, ListBrandsQuery } from "./brand.validation";
+import { collectCategoryIds } from "@/utils/category";
 
 // Select dùng cho public — không expose soft delete metadata
 const selectPublic = {
@@ -30,6 +31,30 @@ const selectAdmin = {
   deletedBy: true,
   _count: { select: { products: true } },
 } satisfies Prisma.brandsSelect;
+
+export const getCategoryTreeBySlug = async (slug: string) => {
+  return prisma.categories.findFirst({
+    where: {
+      slug,
+      deletedAt: null,
+    },
+    include: {
+      children: {
+        where: { deletedAt: null },
+        include: {
+          children: {
+            where: { deletedAt: null },
+            include: {
+              children: {
+                where: { deletedAt: null },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+};
 
 const buildBrandWhere = (query: ListBrandsQuery, onlyActive: boolean, isAdmin: boolean): Prisma.brandsWhereInput => {
   const where: Prisma.brandsWhereInput = {};
@@ -267,4 +292,63 @@ export const findAllDeleted = async (options: { page?: number; limit?: number } 
   ]);
 
   return { data, total, page, limit };
+};
+
+export const findByCategorySlug = async (slug: string) => {
+  // 1. Lấy category tree
+  const rootCategory = await prisma.categories.findFirst({
+    where: {
+      slug,
+      deletedAt: null,
+    },
+    include: {
+      children: {
+        where: { deletedAt: null },
+        include: {
+          children: {
+            where: { deletedAt: null },
+            include: {
+              children: {
+                where: { deletedAt: null },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!rootCategory) return [];
+
+  // 2. Lấy tất cả categoryId (root + children + grandchildren)
+  const categoryIds = collectCategoryIds(rootCategory);
+
+  // DEBUG (nên giữ lúc dev)
+  // console.log("CATEGORY IDS:", categoryIds);
+
+  // 3. Query brands qua product.categoryId
+  return prisma.brands.findMany({
+    where: {
+      isActive: true,
+      deletedAt: null,
+      products: {
+        some: {
+          deletedAt: null,
+          isActive: true,
+          categoryId: {
+            in: categoryIds,
+          },
+        },
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      imagePath: true,
+      imageUrl: true,
+      isFeatured: true,
+    },
+    orderBy: [{ isFeatured: "desc" }, { name: "asc" }],
+  });
 };
