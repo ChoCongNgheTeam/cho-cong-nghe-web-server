@@ -24,11 +24,25 @@ app.use(
   }),
 );
 
+// if (process.env.NODE_ENV === "production") {
+//   import("node-cron").then(({ default: cron }) => {
+//     cron.schedule("0 3 * * *", async () => {
+//       await cleanupRefreshTokens();
+//     });
+//   });
+// }
 if (process.env.NODE_ENV === "production") {
   import("node-cron").then(({ default: cron }) => {
-    cron.schedule("0 3 * * *", async () => {
-      await cleanupRefreshTokens();
-    });
+    cron.schedule(
+      "* * * * *",
+      async () => {
+        console.log("🔥 CRON RUNNING");
+        await cleanupRefreshTokens();
+      },
+      {
+        timezone: "Asia/Ho_Chi_Minh",
+      },
+    );
   });
 }
 
