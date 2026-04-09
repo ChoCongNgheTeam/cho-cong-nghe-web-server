@@ -9,13 +9,13 @@ export interface ChatMessage {
 
 export interface ChatRequest {
   messages: ChatMessage[];
-  sessionId?: string; // optional: nếu FE có lưu session
+  sessionId?: string;
 }
 
 export interface ChatResponse {
   reply: string;
   sessionId?: string;
-  toolsUsed?: string[]; // debug: biết AI gọi tool nào
+  toolsUsed?: string[];
 }
 
 // ---- Tool input types ----
@@ -28,6 +28,10 @@ export interface SearchProductsArgs {
   maxPrice?: number;
   storage?: string;
   color?: string;
+  // Lọc theo thông số kỹ thuật — key là spec key trong DB (VD: "spec_ram", "spec_nfc")
+  specsFilter?: Record<string, string>;
+  // Lọc theo variant attribute — key là attribute code (VD: "storage", "ram")
+  attrsFilter?: Record<string, string | string[]>;
   limit?: number;
 }
 
@@ -36,7 +40,7 @@ export interface GetProductDetailArgs {
 }
 
 export interface GetPolicyArgs {
-  policyType: string; // "WARRANTY" | "RETURN" | "DELIVERY" | etc.
+  policyType: string;
 }
 
 export interface GetPromotionsArgs {
@@ -56,8 +60,8 @@ export interface ProductSearchResult {
   category: string;
   inStock: boolean;
   rating: number;
-  highlights: { name: string; value: string }[];
-  promotionLabel?: string; // "Giảm 10%", "Tặng quà"
+  highlights: { name: string; key: string; value: string }[];
+  promotionLabel?: string;
 }
 
 export interface ProductDetailResult {
@@ -77,12 +81,12 @@ export interface ProductDetailResult {
 
 export interface PolicyResult {
   title: string;
-  content: string; // raw HTML/text từ DB
+  content: string;
 }
 
 export interface PromotionResult {
   name: string;
   description?: string;
-  discountSummary: string; // "Giảm 10% tất cả iPhone"
+  discountSummary: string;
   endDate?: string;
 }
