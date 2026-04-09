@@ -3,7 +3,12 @@ import { env } from "@/config/env";
 import { ChatMessage, ChatResponse } from "./chatbot.types";
 import { CHATBOT_SYSTEM_PROMPT } from "./prompts/system.prompt";
 import { CHATBOT_TOOLS } from "./tools/tool.definitions";
-import { executeSearchProducts, executeGetProductDetail, executeGetActivePromotions, executeGetPolicy } from "./tools/tool.executor";
+import {
+  executeSearchProducts,
+  executeGetProductDetail,
+  executeGetActivePromotions,
+  executeGetPolicy,
+} from "./tools/tool.executor";
 
 // ============================================================
 // CHATBOT SERVICE
@@ -19,10 +24,13 @@ const openai = new OpenAI({
   apiKey: env.OPENAI_API_KEY || process.env.OPENAI_API_KEY,
 });
 
-const MAX_TOOL_ROUNDS = 3; // Tránh vòng lặp vô hạn
+const MAX_TOOL_ROUNDS = 3;
 
 // ─── Dispatcher: routes tool name → executor ────────────────
-const dispatchTool = async (name: string, args: Record<string, any>): Promise<string> => {
+const dispatchTool = async (
+  name: string,
+  args: Record<string, any>,
+): Promise<string> => {
   try {
     let result: any;
 
@@ -55,25 +63,26 @@ const dispatchTool = async (name: string, args: Record<string, any>): Promise<st
 };
 
 // ─── Main: getChatReply ──────────────────────────────────────
-export const getChatReply = async (userMessages: ChatMessage[]): Promise<ChatResponse> => {
-  // Build message list: system + last 10 turns (tránh tốn token)
-  const contextMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-    { role: "system", content: CHATBOT_SYSTEM_PROMPT },
-    ...userMessages.slice(-10).map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    })),
-  ];
+export const getChatReply = async (
+  userMessages: ChatMessage[],
+): Promise<ChatResponse> => {
+  const contextMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
+    [
+      { role: "system", content: CHATBOT_SYSTEM_PROMPT },
+      ...userMessages.slice(-10).map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+    ];
 
   const toolsUsed: string[] = [];
   let rounds = 0;
 
-  // Tool-calling loop
   while (rounds < MAX_TOOL_ROUNDS) {
     rounds++;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // nhanh + rẻ, đủ dùng cho chatbot
+      model: "gpt-4o-mini",
       messages: contextMessages,
       tools: CHATBOT_TOOLS,
       tool_choice: "auto",
@@ -83,19 +92,17 @@ export const getChatReply = async (userMessages: ChatMessage[]): Promise<ChatRes
 
     const message = response.choices[0].message;
 
-    // Không có tool call → AI đã trả lời xong
     if (!message.tool_calls || message.tool_calls.length === 0) {
       return {
-        reply: message.content || "Xin lỗi, mình không hiểu câu hỏi. Bạn có thể nói rõ hơn không?",
+        reply:
+          message.content ||
+          "Xin lỗi, mình không hiểu câu hỏi. Bạn có thể nói rõ hơn không?",
         toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined,
       };
     }
 
-    // AI muốn gọi tool(s)
-    // Thêm assistant message vào context
     contextMessages.push(message);
 
-    // Thực thi tất cả tool calls song song
     const toolResults = await Promise.all(
       message.tool_calls.map(async (toolCall) => {
         if (!("function" in toolCall)) {
@@ -119,10 +126,7 @@ export const getChatReply = async (userMessages: ChatMessage[]): Promise<ChatRes
       }),
     );
 
-    // Thêm kết quả tool vào context
     contextMessages.push(...toolResults);
-
-    // Loop lại → AI đọc kết quả và quyết định có cần gọi thêm tool không
   }
 
   // Vượt quá MAX_TOOL_ROUNDS → force reply
@@ -140,7 +144,9 @@ export const getChatReply = async (userMessages: ChatMessage[]): Promise<ChatRes
   });
 
   return {
-    reply: finalResponse.choices[0].message.content || "Xin lỗi, có lỗi xảy ra. Vui lòng thử lại.",
+    reply:
+      finalResponse.choices[0].message.content ||
+      "Xin lỗi, có lỗi xảy ra. Vui lòng thử lại.",
     toolsUsed,
   };
 };

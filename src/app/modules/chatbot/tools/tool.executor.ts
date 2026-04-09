@@ -1,5 +1,15 @@
 import prisma from "@/config/db";
-import { SearchProductsArgs, GetProductDetailArgs, GetPolicyArgs, GetPromotionsArgs, ProductSearchResult, ProductDetailResult, PolicyResult, PromotionResult } from "../chatbot.types";
+import { buildProductWhere } from "@/app/modules/product/product_filter.where-builder";
+import {
+  SearchProductsArgs,
+  GetProductDetailArgs,
+  GetPolicyArgs,
+  GetPromotionsArgs,
+  ProductSearchResult,
+  ProductDetailResult,
+  PolicyResult,
+  PromotionResult,
+} from "../chatbot.types";
 
 // ============================================================
 // TOOL EXECUTORS
@@ -9,83 +19,68 @@ import { SearchProductsArgs, GetProductDetailArgs, GetPolicyArgs, GetPromotionsA
 
 // ─── 1. SEARCH PRODUCTS ─────────────────────────────────────
 export const executeSearchProducts = async (args: SearchProductsArgs): Promise<ProductSearchResult[]> => {
-  const { keyword, categorySlug, brandSlug, minPrice, maxPrice, storage, color, limit = 5 } = args;
+  const {
+    keyword,
+    categorySlug,
+    brandSlug,
+    minPrice,
+    maxPrice,
+    storage,
+    color,
+    specsFilter,
+    attrsFilter,
+    limit = 5,
+  } = args;
 
   const now = new Date();
 
-  // Build where clause
-  const where: any = {
-    isActive: true,
-    deletedAt: null,
-    AND: [] as any[],
+  // ── Build dynamic query object cho buildProductWhere ──────
+  // Tái sử dụng toàn bộ filter logic đã có trong product module
+  // thay vì duplicate code
+  const dynamicQuery: Record<string, any> = {
+    search: keyword,
   };
 
-  // Keyword search: tên hoặc brand match
-  where.OR = [
-    { name: { contains: keyword, mode: "insensitive" } },
-    { brand: { name: { contains: keyword, mode: "insensitive" } } },
-    { category: { name: { contains: keyword, mode: "insensitive" } } },
-  ];
+  if (categorySlug) dynamicQuery.category = categorySlug;
+  if (minPrice) dynamicQuery.minPrice = minPrice;
+  if (maxPrice) dynamicQuery.maxPrice = maxPrice;
+  if (storage) dynamicQuery[`attr_storage`] = storage;
+  if (color) dynamicQuery[`attr_color`] = color;
 
-  // Category filter
-  if (categorySlug) {
-    where.category = { slug: categorySlug };
-  }
-
-  // Brand filter
+  // Brand: resolve slug → id
   if (brandSlug) {
-    where.brand = { slug: brandSlug };
-  }
-
-  // Price filter (qua variants)
-  if (minPrice || maxPrice) {
-    const variantWhere: any = { isActive: true, deletedAt: null };
-    if (minPrice) variantWhere.price = { gte: minPrice };
-    if (maxPrice) variantWhere.price = { ...(variantWhere.price || {}), lte: maxPrice };
-    where.AND.push({ variants: { some: variantWhere } });
-  }
-
-  // Storage filter
-  if (storage) {
-    where.AND.push({
-      variants: {
-        some: {
-          isActive: true,
-          variantAttributes: {
-            some: {
-              attributeOption: {
-                attribute: { code: "storage" },
-                value: { contains: storage, mode: "insensitive" },
-              },
-            },
-          },
-        },
-      },
+    const brand = await prisma.brands.findUnique({
+      where: { slug: brandSlug, isActive: true, deletedAt: null },
+      select: { id: true },
     });
+    if (brand) dynamicQuery.brandId = brand.id;
   }
 
-  // Color filter
-  if (color) {
-    where.AND.push({
-      variants: {
-        some: {
-          isActive: true,
-          variantAttributes: {
-            some: {
-              attributeOption: {
-                attribute: { code: "color" },
-                value: { contains: color, mode: "insensitive" },
-              },
-            },
-          },
-        },
-      },
-    });
+  // specsFilter: { "spec_ram": "16 GB", "ram": "16 GB", "spec_nfc": "true" }
+  // Key đã có prefix "spec_" → spread thẳng
+  // Key không có prefix → thêm prefix "spec_"
+  if (specsFilter) {
+    for (const [key, value] of Object.entries(specsFilter)) {
+      if (key.startsWith("spec_")) {
+        dynamicQuery[key] = value;
+      } else {
+        dynamicQuery[`spec_${key}`] = value;
+      }
+    }
   }
 
-  if (where.AND.length === 0) delete where.AND;
+  // attrsFilter: { "storage": "256GB", "ram": ["8GB", "16GB"] }
+  // → thêm prefix "attr_"
+  if (attrsFilter) {
+    for (const [key, value] of Object.entries(attrsFilter)) {
+      dynamicQuery[`attr_${key}`] = value;
+    }
+  }
 
-  // Lấy sản phẩm
+  // ── Dùng buildProductWhere để build Prisma where clause ───
+  const where = await buildProductWhere(dynamicQuery, true);
+
+  // ── Query sản phẩm ────────────────────────────────────────
   const products = await prisma.products.findMany({
     where,
     take: Math.min(limit, 10),
@@ -108,26 +103,36 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
         orderBy: { price: "asc" },
       },
       productSpecifications: {
+        // Bỏ take: 3 → lấy tất cả highlight specs
+        // AI cần đọc đủ specs để đánh giá (GPU, RAM, camera, pin...)
         where: { isHighlight: true },
         select: {
           value: true,
-          specification: { select: { name: true } },
+          specification: {
+            select: {
+              name: true,
+              key: true, // AI dùng key để hiểu loại spec
+            },
+          },
         },
-        take: 3,
+        orderBy: { sortOrder: "asc" },
       },
     },
   });
 
-  // Lấy promotions đang active (1 lần, dùng cho tất cả sản phẩm)
+  // ── Lấy promotions active để gắn label ───────────────────
   const activePromotions = await prisma.promotions.findMany({
     where: {
       isActive: true,
       deletedAt: null,
-      AND: [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }],
+      AND: [
+        { OR: [{ startDate: null }, { startDate: { lte: now } }] },
+        { OR: [{ endDate: null }, { endDate: { gte: now } }] },
+      ],
     },
     include: { rules: true, targets: true },
     orderBy: { priority: "desc" },
-    take: 20, // đủ để check, không quá nặng
+    take: 20,
   });
 
   return products.map((p) => {
@@ -137,7 +142,13 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
     const inStock = p.variants.some((v) => v.quantity > 0);
 
     // Tìm promotion áp dụng cho sản phẩm này
-    const applicablePromo = activePromotions.find((promo) => promo.targets.some((t) => t.targetType === "ALL" || (t.targetType === "PRODUCT" && t.targetId === p.id)));
+    const applicablePromo = activePromotions.find((promo) =>
+      promo.targets.some(
+        (t) =>
+          t.targetType === "ALL" ||
+          (t.targetType === "PRODUCT" && t.targetId === p.id),
+      ),
+    );
 
     let promotionLabel: string | undefined;
     if (applicablePromo?.rules?.[0]) {
@@ -165,6 +176,7 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
       inStock,
       rating: Number(p.ratingAverage),
       highlights: p.productSpecifications.map((ps) => ({
+        key: ps.specification.key,
         name: ps.specification.name,
         value: ps.value,
       })),
@@ -174,7 +186,9 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
 };
 
 // ─── 2. GET PRODUCT DETAIL ──────────────────────────────────
-export const executeGetProductDetail = async (args: GetProductDetailArgs): Promise<ProductDetailResult | null> => {
+export const executeGetProductDetail = async (
+  args: GetProductDetailArgs,
+): Promise<ProductDetailResult | null> => {
   const product = await prisma.products.findFirst({
     where: { slug: args.slug, isActive: true, deletedAt: null },
     select: {
@@ -212,6 +226,7 @@ export const executeGetProductDetail = async (args: GetProductDetailArgs): Promi
           specification: {
             select: {
               name: true,
+              key: true,
               group: true,
             },
           },
@@ -237,7 +252,9 @@ export const executeGetProductDetail = async (args: GetProductDetailArgs): Promi
 
   // Format variants thành label đọc được
   const variants = product.variants.map((v) => {
-    const attrLabels = v.variantAttributes.map((va) => va.attributeOption.label).join(" / ");
+    const attrLabels = v.variantAttributes
+      .map((va) => va.attributeOption.label)
+      .join(" / ");
     return {
       label: attrLabels || "Mặc định",
       price: Number(v.price),
@@ -265,7 +282,9 @@ export const executeGetProductDetail = async (args: GetProductDetailArgs): Promi
 };
 
 // ─── 3. GET ACTIVE PROMOTIONS ───────────────────────────────
-export const executeGetActivePromotions = async (args: GetPromotionsArgs): Promise<PromotionResult[]> => {
+export const executeGetActivePromotions = async (
+  args: GetPromotionsArgs,
+): Promise<PromotionResult[]> => {
   const now = new Date();
   const limit = Math.min(args.limit || 5, 10);
 
@@ -273,7 +292,10 @@ export const executeGetActivePromotions = async (args: GetPromotionsArgs): Promi
     where: {
       isActive: true,
       deletedAt: null,
-      AND: [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }],
+      AND: [
+        { OR: [{ startDate: null }, { startDate: { lte: now } }] },
+        { OR: [{ endDate: null }, { endDate: { gte: now } }] },
+      ],
     },
     include: {
       rules: { take: 1 },
@@ -311,7 +333,9 @@ export const executeGetActivePromotions = async (args: GetPromotionsArgs): Promi
 };
 
 // ─── 4. GET POLICY ──────────────────────────────────────────
-export const executeGetPolicy = async (args: GetPolicyArgs): Promise<PolicyResult | null> => {
+export const executeGetPolicy = async (
+  args: GetPolicyArgs,
+): Promise<PolicyResult | null> => {
   const page = await prisma.pages.findFirst({
     where: {
       type: "POLICY",
@@ -332,7 +356,7 @@ export const executeGetPolicy = async (args: GetPolicyArgs): Promise<PolicyResul
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 2000); // Giới hạn 2000 chars để không chiếm quá nhiều token
+    .slice(0, 2000);
 
   return {
     title: page.title,
