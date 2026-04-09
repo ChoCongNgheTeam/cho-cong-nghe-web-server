@@ -150,12 +150,25 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
       ),
     );
 
+    // Tính giá thực tế (sau discount) nếu có promotion
+    let finalPriceMin = priceMin;
+    let finalPriceMax = priceMax;
     let promotionLabel: string | undefined;
+
     if (applicablePromo?.rules?.[0]) {
       const rule = applicablePromo.rules[0];
+      
       if (rule.actionType === "DISCOUNT_PERCENT" && rule.discountValue) {
+        // Giảm theo phần trăm
+        const discountPercent = Number(rule.discountValue);
+        finalPriceMin = Math.round(priceMin * (1 - discountPercent / 100));
+        finalPriceMax = Math.round(priceMax * (1 - discountPercent / 100));
         promotionLabel = `Giảm ${rule.discountValue}%`;
       } else if (rule.actionType === "DISCOUNT_FIXED" && rule.discountValue) {
+        // Giảm số tiền cố định
+        const discountFixed = Number(rule.discountValue);
+        finalPriceMin = Math.max(0, priceMin - discountFixed);
+        finalPriceMax = Math.max(0, priceMax - discountFixed);
         promotionLabel = `Giảm ${Number(rule.discountValue).toLocaleString("vi-VN")}đ`;
       } else if (rule.actionType === "GIFT_PRODUCT") {
         promotionLabel = "Tặng quà";
@@ -169,8 +182,8 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
       name: p.name,
       slug: p.slug,
       thumbnail: p.img[0]?.imageUrl || "",
-      priceMin,
-      priceMax,
+      priceMin: finalPriceMin,
+      priceMax: finalPriceMax,
       brand: p.brand.name,
       category: p.category.name,
       inStock,
@@ -238,9 +251,54 @@ export const executeGetProductDetail = async (
 
   if (!product) return null;
 
+  const now = new Date();
+
+  // Lấy promotions active
+  const activePromotions = await prisma.promotions.findMany({
+    where: {
+      isActive: true,
+      deletedAt: null,
+      AND: [
+        { OR: [{ startDate: null }, { startDate: { lte: now } }] },
+        { OR: [{ endDate: null }, { endDate: { gte: now } }] },
+      ],
+    },
+    include: { rules: true, targets: true },
+    orderBy: { priority: "desc" },
+    take: 20,
+  });
+
+  // Tìm promotion áp dụng cho sản phẩm này
+  const applicablePromo = activePromotions.find((promo) =>
+    promo.targets.some(
+      (t) =>
+        t.targetType === "ALL" ||
+        (t.targetType === "PRODUCT" && t.targetId === product.id),
+    ),
+  );
+
+  // Hàm tính giá thực tế dựa trên promotion
+  const calculateFinalPrice = (originalPrice: number): number => {
+    if (applicablePromo?.rules?.[0]) {
+      const rule = applicablePromo.rules[0];
+      if (rule.actionType === "DISCOUNT_PERCENT" && rule.discountValue) {
+        const discountPercent = Number(rule.discountValue);
+        return Math.round(originalPrice * (1 - discountPercent / 100));
+      } else if (rule.actionType === "DISCOUNT_FIXED" && rule.discountValue) {
+        const discountFixed = Number(rule.discountValue);
+        return Math.max(0, originalPrice - discountFixed);
+      }
+    }
+    return originalPrice;
+  };
+
   const prices = product.variants.map((v) => Number(v.price));
   const priceMin = prices.length ? Math.min(...prices) : 0;
   const priceMax = prices.length ? Math.max(...prices) : 0;
+
+  // Tính giá thực tế (sau discount)
+  const finalPriceMin = calculateFinalPrice(priceMin);
+  const finalPriceMax = calculateFinalPrice(priceMax);
 
   // Group specs by group name
   const specGroups: Record<string, { name: string; value: string }[]> = {};
@@ -250,14 +308,16 @@ export const executeGetProductDetail = async (
     specGroups[group].push({ name: ps.specification.name, value: ps.value });
   }
 
-  // Format variants thành label đọc được
+  // Format variants thành label đọc được (với giá thực tế)
   const variants = product.variants.map((v) => {
     const attrLabels = v.variantAttributes
       .map((va) => va.attributeOption.label)
       .join(" / ");
+    const originalPrice = Number(v.price);
+    const finalPrice = calculateFinalPrice(originalPrice);
     return {
       label: attrLabels || "Mặc định",
-      price: Number(v.price),
+      price: finalPrice,
       inStock: v.quantity > 0,
     };
   });
@@ -269,8 +329,8 @@ export const executeGetProductDetail = async (
     description: product.description || undefined,
     brand: product.brand.name,
     category: product.category.name,
-    priceMin,
-    priceMax,
+    priceMin: finalPriceMin,
+    priceMax: finalPriceMax,
     inStock: product.variants.some((v) => v.quantity > 0),
     rating: Number(product.ratingAverage),
     specifications: Object.entries(specGroups).map(([group, items]) => ({
