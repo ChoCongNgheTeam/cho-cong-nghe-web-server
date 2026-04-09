@@ -1,7 +1,7 @@
 import * as repo from "./media.repository";
 import { transformMedia, transformMediaList } from "./media.transformers";
 import { CreateMediaInput, UpdateMediaInput, ReorderMediaInput } from "./media.validation";
-import { MediaType, MediaPosition } from "./media.types";
+import { MediaType, MediaPosition, MediaByCategoryQuery } from "./media.types";
 import { deleteOldMediaImage } from "./media.helpers";
 import { NotFoundError, BadRequestError } from "@/errors";
 import prisma from "@/config/db";
@@ -98,4 +98,9 @@ export const reorderMedia = async (input: ReorderMediaInput) => {
 
   await prisma.$transaction(updates);
   return { message: "Sắp xếp thành công" };
+};
+
+export const getMediaByCategorySlug = async ({ categorySlug, type }: MediaByCategoryQuery) => {
+  const media = await repo.findByCategorySlug(categorySlug, type);
+  return transformMediaList(media);
 };

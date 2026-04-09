@@ -122,3 +122,7 @@ export const hardDeleteBrand = async (id: string) => {
 export const getDeletedBrands = async (options: { page?: number; limit?: number } = {}) => {
   return brandRepository.findAllDeleted(options);
 };
+
+export const getBrandsByCategorySlug = async (slug: string) => {
+  return brandRepository.findByCategorySlug(slug);
+};

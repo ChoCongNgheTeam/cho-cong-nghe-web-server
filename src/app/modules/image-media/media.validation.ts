@@ -5,71 +5,58 @@ export const mediaTypeSchema = z.nativeEnum(MediaType);
 export const mediaPositionSchema = z.nativeEnum(MediaPosition);
 
 export const createMediaSchema = z.object({
-   type: mediaTypeSchema,
-   position: mediaPositionSchema,
-   title: z
-      .string()
-      .trim()
-      .max(200, "Tiêu đề tối đa 200 ký tự")
-      .optional()
-      .or(z.literal("")),
-   // ✅ Thêm dòng này
-   subTitle: z
-      .string()
-      .trim()
-      .max(500, "Mô tả tối đa 500 ký tự")
-      .optional()
-      .or(z.literal("")),
-   imagePath: z.string().optional().or(z.literal("")),
-   imageUrl: z.string().url("URL không hợp lệ").optional().or(z.literal("")),
-   linkUrl: z.string().optional().or(z.literal("")),
-   order: z.coerce.number().int().min(0, "Order phải >= 0").optional(),
-   isActive: z.coerce.boolean().optional().default(true),
+  type: mediaTypeSchema,
+  position: mediaPositionSchema,
+  title: z.string().trim().max(200, "Tiêu đề tối đa 200 ký tự").optional().or(z.literal("")),
+  // ✅ Thêm dòng này
+  subTitle: z.string().trim().max(500, "Mô tả tối đa 500 ký tự").optional().or(z.literal("")),
+  imagePath: z.string().optional().or(z.literal("")),
+  imageUrl: z.string().url("URL không hợp lệ").optional().or(z.literal("")),
+  linkUrl: z.string().optional().or(z.literal("")),
+  order: z.coerce.number().int().min(0, "Order phải >= 0").optional(),
+  isActive: z.coerce.boolean().optional().default(true),
 });
 
 export const updateMediaSchema = z.object({
-   type: mediaTypeSchema.optional(),
-   position: mediaPositionSchema.optional(),
-   title: z
-      .string()
-      .trim()
-      .max(200, "Tiêu đề tối đa 200 ký tự")
-      .optional()
-      .or(z.literal("")),
-   subTitle: z
-      .string()
-      .trim()
-      .max(500, "Mô tả tối đa 500 ký tự")
-      .optional()
-      .or(z.literal("")),
-   imagePath: z.string().optional().or(z.literal("")),
-   imageUrl: z.string().url("URL không hợp lệ").optional().or(z.literal("")),
-   linkUrl: z.string().optional().or(z.literal("")),
-   order: z.coerce.number().int().min(0, "Order phải >= 0").optional(),
-   isActive: z.coerce.boolean().optional(),
+  type: mediaTypeSchema.optional(),
+  position: mediaPositionSchema.optional(),
+  title: z.string().trim().max(200, "Tiêu đề tối đa 200 ký tự").optional().or(z.literal("")),
+  subTitle: z.string().trim().max(500, "Mô tả tối đa 500 ký tự").optional().or(z.literal("")),
+  imagePath: z.string().optional().or(z.literal("")),
+  imageUrl: z.string().url("URL không hợp lệ").optional().or(z.literal("")),
+  linkUrl: z.string().optional().or(z.literal("")),
+  order: z.coerce.number().int().min(0, "Order phải >= 0").optional(),
+  isActive: z.coerce.boolean().optional(),
 });
 
 export const reorderMediaSchema = z.object({
-   mediaId: z.string().uuid("Media ID không hợp lệ"),
-   newOrder: z.coerce.number().int().min(0, "Order phải >= 0"),
+  mediaId: z.string().uuid("Media ID không hợp lệ"),
+  newOrder: z.coerce.number().int().min(0, "Order phải >= 0"),
 });
 
 export const mediaParamsSchema = z.object({
-   id: z.string().uuid({ message: "ID media không hợp lệ" }),
+  id: z.string().uuid({ message: "ID media không hợp lệ" }),
 });
 
 export const mediaTypeParamsSchema = z.object({
-   type: mediaTypeSchema,
+  type: mediaTypeSchema,
 });
 
 export const mediaPositionParamsSchema = z.object({
-   position: mediaPositionSchema,
+  position: mediaPositionSchema,
 });
 
 export const mediaFilterSchema = z.object({
-   type: mediaTypeSchema,
-   position: mediaPositionSchema,
+  type: mediaTypeSchema,
+  position: mediaPositionSchema,
 });
+
+export const mediaByCategoryQuerySchema = z.object({
+  categorySlug: z.string().min(1, "Slug category không được để trống"),
+  type: mediaTypeSchema.optional(),
+});
+
+export type MediaByCategoryQuery = z.infer<typeof mediaByCategoryQuerySchema>;
 
 export type CreateMediaInput = z.infer<typeof createMediaSchema>;
 export type UpdateMediaInput = z.infer<typeof updateMediaSchema>;

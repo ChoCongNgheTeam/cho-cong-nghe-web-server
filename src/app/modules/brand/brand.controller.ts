@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import * as brandService from "./brand.service";
 import { parseMultipartData, uploadBrandImage } from "./brand.helpers";
 import { cleanupFile } from "@/services/file-cleanup.service";
-import { listBrandsQuerySchema, featuredBrandsQuerySchema } from "./brand.validation";
+import { listBrandsQuerySchema, featuredBrandsQuerySchema, brandByCategoryQuerySchema } from "./brand.validation";
 
 // Public
 
@@ -123,4 +123,12 @@ export const getDeletedBrandsHandler = async (req: Request, res: Response) => {
     },
     message: "Lấy danh sách thương hiệu đã xóa thành công",
   });
+};
+
+export const getBrandsByCategoryHandler = async (req: Request, res: Response) => {
+  const { slug } = brandByCategoryQuerySchema.parse(req.query);
+  // console.log(slug);
+
+  const brands = await brandService.getBrandsByCategorySlug(slug);
+  res.json({ data: brands, message: "Lấy danh sách thương hiệu theo danh mục thành công" });
 };

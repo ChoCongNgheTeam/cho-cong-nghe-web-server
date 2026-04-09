@@ -13,5 +13,5 @@ export const startJobs = () => {
     await runUserInactiveJob();
   });
 
-  console.log("[Jobs] Cron jobs started");
+  // console.log("[Jobs] Cron jobs started");
 };

@@ -17,8 +17,9 @@ import {
   restoreBrandHandler,
   hardDeleteBrandHandler,
   getDeletedBrandsHandler,
+  getBrandsByCategoryHandler,
 } from "./brand.controller";
-import { listBrandsQuerySchema, featuredBrandsQuerySchema, brandParamsSchema, brandSlugParamsSchema, createBrandSchema, updateBrandSchema } from "./brand.validation";
+import { listBrandsQuerySchema, featuredBrandsQuerySchema, brandParamsSchema, brandSlugParamsSchema, createBrandSchema, updateBrandSchema, brandByCategoryQuerySchema } from "./brand.validation";
 
 const router = Router();
 
@@ -28,6 +29,8 @@ const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
 router.get("/", validate(listBrandsQuerySchema, "query"), asyncHandler(getBrandsPublicHandler));
 router.get("/active", asyncHandler(getActiveBrandsHandler));
 router.get("/featured", validate(featuredBrandsQuerySchema, "query"), asyncHandler(getFeaturedBrandsHandler));
+
+router.get("/by-category", validate(brandByCategoryQuerySchema, "query"), asyncHandler(getBrandsByCategoryHandler));
 
 // Public
 router.get("/slug/:slug", validate(brandSlugParamsSchema, "params"), asyncHandler(getBrandBySlugHandler));

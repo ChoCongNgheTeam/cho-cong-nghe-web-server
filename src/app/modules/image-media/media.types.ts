@@ -74,3 +74,8 @@ export interface ReorderMediaInput {
   mediaId: string;
   newOrder: number;
 }
+
+export interface MediaByCategoryQuery {
+  categorySlug: string;
+  type?: MediaType;
+}

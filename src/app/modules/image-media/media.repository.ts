@@ -126,3 +126,65 @@ export const countByTypeAndPosition = async (type: MediaType, position: MediaPos
     where: { type, position },
   });
 };
+
+// Banner/Slider được gán cho category qua linkUrl chứa categorySlug
+// Convention: linkUrl = "/category/dien-thoai" hoặc chứa slug
+export const findByCategorySlug = async (categorySlug: string, type?: MediaType) => {
+  // 1. Lấy category tree
+  const rootCategory = await prisma.categories.findFirst({
+    where: {
+      slug: categorySlug,
+      deletedAt: null,
+    },
+    include: {
+      children: {
+        where: { deletedAt: null },
+        include: {
+          children: {
+            where: { deletedAt: null },
+            include: {
+              children: {
+                where: { deletedAt: null },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!rootCategory) return [];
+
+  // 2. Lấy toàn bộ slug (không phải ID)
+  const collectSlugs = (node: any): string[] => {
+    let slugs: string[] = [node.slug];
+
+    if (node.children && node.children.length > 0) {
+      for (const child of node.children) {
+        slugs = slugs.concat(collectSlugs(child));
+      }
+    }
+
+    return slugs;
+  };
+
+  const categorySlugs = collectSlugs(rootCategory);
+
+  // console.log("CATEGORY SLUGS:", categorySlugs);
+
+  // 3. Query banner
+  return prisma.image_media.findMany({
+    where: {
+      isActive: true,
+      deletedAt: null,
+      ...(type && { type }),
+      OR: categorySlugs.map((slug) => ({
+        linkUrl: {
+          contains: slug,
+        },
+      })),
+    },
+    select: selectMedia,
+    orderBy: { order: "asc" },
+  });
+};

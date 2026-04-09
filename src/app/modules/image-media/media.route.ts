@@ -14,8 +14,18 @@ import {
   updateMediaHandler,
   deleteMediaHandler,
   reorderMediaHandler,
+  getMediaByCategoryHandler,
 } from "./media.controller";
-import { createMediaSchema, updateMediaSchema, reorderMediaSchema, mediaParamsSchema, mediaTypeParamsSchema, mediaPositionParamsSchema, mediaFilterSchema } from "./media.validation";
+import {
+  createMediaSchema,
+  updateMediaSchema,
+  reorderMediaSchema,
+  mediaParamsSchema,
+  mediaTypeParamsSchema,
+  mediaPositionParamsSchema,
+  mediaFilterSchema,
+  mediaByCategoryQuerySchema,
+} from "./media.validation";
 import { asyncHandler } from "@/utils/async-handler";
 
 const router = Router();
@@ -25,6 +35,7 @@ const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
 // Public — tĩnh trước
 router.get("/all", asyncHandler(getAllActiveMediaHandler));
 router.get("/filter", validate(mediaFilterSchema, "query"), asyncHandler(getMediaByTypeAndPositionHandler));
+router.get("/by-category", validate(mediaByCategoryQuerySchema, "query"), asyncHandler(getMediaByCategoryHandler));
 router.get("/type/:type", validate(mediaTypeParamsSchema, "params"), asyncHandler(getMediaByTypeHandler));
 router.get("/position/:position", validate(mediaPositionParamsSchema, "params"), asyncHandler(getMediaByPositionHandler));
 

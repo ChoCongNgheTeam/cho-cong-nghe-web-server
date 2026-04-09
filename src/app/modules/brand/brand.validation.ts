@@ -57,6 +57,10 @@ export const updateBrandSchema = z.object({
   removeImage: z.boolean().optional(),
 });
 
+export const brandByCategoryQuerySchema = z.object({
+  slug: z.string().min(1, "Slug category không được để trống"),
+});
+
 export type CreateBrandInput = z.infer<typeof createBrandSchema>;
 export type UpdateBrandInput = z.infer<typeof updateBrandSchema>;
 export type ListBrandsQuery = z.infer<typeof listBrandsQuerySchema>;

@@ -57,5 +57,5 @@ export const runUserInactiveJob = async () => {
     }
   }
 
-  console.log(`[Job] Inactive users: sent ${count} retention vouchers`);
+  // console.log(`[Job] Inactive users: sent ${count} retention vouchers`);
 };
