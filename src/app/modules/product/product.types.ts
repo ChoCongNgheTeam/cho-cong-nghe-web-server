@@ -151,6 +151,7 @@ export interface ProductCard {
   highlights: ProductCardHighlight[];
   inStock: boolean;
   isActive: boolean;
+  category: Category | null;
 }
 
 // =====================
