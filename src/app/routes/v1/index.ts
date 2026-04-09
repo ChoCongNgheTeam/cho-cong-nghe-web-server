@@ -49,6 +49,7 @@ import analyticsRouter from "@/app/modules/analytics/analytics.route";
 import categoryVariantAttributeRoute from "@/app/modules/category-variant/category-variant-attribute.route";
 
 import { aiContentRoute } from "@/app/modules/ai-content/ai-content.route";
+import aiCompareRouter from "@/app/modules/ai-compare/ai-compare.router";
 
 const router = Router();
 
@@ -94,6 +95,9 @@ router.use("/chatbot", chatbotRoute);
 
 // ===== AI Content =====
 router.use("/ai-content", aiContentRoute);
+
+// ===== AI Compare =====
+router.use("/ai-compare", aiCompareRouter);
 
 // ===== Search =====
 router.use("/search", searchRoutes);
