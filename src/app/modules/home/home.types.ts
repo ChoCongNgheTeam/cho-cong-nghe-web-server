@@ -104,14 +104,6 @@ export interface HomeResponse {
   sliders: HomeSlider[];
   featuredCategories: FeaturedCategory[];
   bannersTop: HomeBanner[];
-  // flashSaleProducts: {
-  //   products: any[];
-  //   total: number;
-  //   date: Date;
-  //   startDate: Date | null;
-  //   endDate: Date | null;
-  // };
-  /** Lịch sale 7 ngày kèm products hôm nay — dùng cho section Flash Sale */
   saleSchedule: HomeSaleScheduleResponse;
   bannersSection1: HomeBanner[];
   activeCampaigns: HomeCampaign[];
