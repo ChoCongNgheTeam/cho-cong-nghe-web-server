@@ -39,22 +39,24 @@ export interface FindAllOptions extends GetUsersQuery {
  *   - Admin + includeDeleted=true: thấy cả user đã soft delete
  */
 export const findAll = async (options: FindAllOptions) => {
-  const { page = 1, limit = 20, search, role, isActive, gender, includeDeleted = false, isAdmin = false, sortBy = "createdAt", sortOrder = "desc" } = options;
+  const {
+    page = 1, limit = 20, search, role, isActive, gender,
+    includeDeleted = false, isAdmin = false,
+    sortBy = "createdAt", sortOrder = "desc"
+  } = options;
 
   const skip = (page - 1) * limit;
+  const deletedFilter: Prisma.usersWhereInput = isAdmin && includeDeleted
+    ? {} : { deletedAt: null };
 
-  const deletedFilter: Prisma.usersWhereInput = isAdmin && includeDeleted ? {} : { deletedAt: null };
-
-  const searchFilter: Prisma.usersWhereInput = search
-    ? {
-        OR: [
-          { email: { contains: search, mode: "insensitive" } },
-          { fullName: { contains: search, mode: "insensitive" } },
-          { userName: { contains: search, mode: "insensitive" } },
-          { phone: { contains: search, mode: "insensitive" } },
-        ],
-      }
-    : {};
+  const searchFilter: Prisma.usersWhereInput = search ? {
+    OR: [
+      { email: { contains: search, mode: "insensitive" } },
+      { fullName: { contains: search, mode: "insensitive" } },
+      { userName: { contains: search, mode: "insensitive" } },
+      { phone: { contains: search, mode: "insensitive" } },
+    ],
+  } : {};
 
   const where: Prisma.usersWhereInput = {
     ...deletedFilter,
@@ -64,6 +66,30 @@ export const findAll = async (options: FindAllOptions) => {
     ...(gender !== undefined && { gender }),
   };
 
+  // ── Special sorts: orderCount / totalSpent require aggregation
+  const isAggregateSort = sortBy === "orderCount" || sortBy === "totalSpent";
+
+  if (isAggregateSort) {
+    // Use Prisma aggregation — join with orders table
+    const orderBy = sortBy === "orderCount"
+      ? { orders: { _count: sortOrder } }
+      : { orders: { _sum: { totalAmount: sortOrder } } };
+
+    const [users, total] = await prisma.$transaction([
+      prisma.users.findMany({
+        where,
+        select: isAdmin ? selectAdminUser : selectPublicUser,
+        orderBy,
+        skip,
+        take: limit,
+      }),
+      prisma.users.count({ where }),
+    ]);
+
+    return { users, total, page, limit };
+  }
+
+  // ── Standard sorts
   const [users, total] = await prisma.$transaction([
     prisma.users.findMany({
       where,
@@ -77,7 +103,6 @@ export const findAll = async (options: FindAllOptions) => {
 
   return { users, total, page, limit };
 };
-
 /**
  * Tìm user theo id.
  *   - Mặc định: bỏ qua user đã soft delete.
