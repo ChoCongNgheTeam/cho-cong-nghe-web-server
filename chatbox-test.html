@@ -107,6 +107,13 @@
         .message.bot p:last-child { margin: 0; }
         .message.bot strong { color: #111; }
         .message.bot ul { padding-left: 20px; margin: 5px 0; }
+        .message.bot img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            display: block;
+            margin: 8px 0;
+        }
 
         /* Bong bóng User */
         .message.user {
@@ -218,7 +225,13 @@
 
         <div class="chat-messages" id="chatMessages">
             <div class="message bot">
-                Xin chào! Mình là trợ lý AI của Chợ Công Nghệ. Mình có thể giúp bạn tìm kiếm, báo giá laptop, điện thoại hay phụ kiện nào hôm nay?
+                Xin chào! Mình là trợ lý AI của Chợ Công Nghệ 👋<br/>
+                Mình có thể giúp bạn:<br/>
+                📱 Tìm kiếm điện thoại, laptop, máy tính bảng<br/>
+                🏠 Tìm kiếm điện máy (tivi, máy giặt, tủ lạnh, máy lạnh...)<br/>
+                🎧 Gợi ý tai nghe, loa, phụ kiện công nghệ<br/>
+                💰 Tư vấn giá, khuyến mãi, chính sách<br/>
+                <br/>Hỏi mình gì đi nào? 😊
             </div>
             
             <div class="typing-indicator" id="typingIndicator">
@@ -227,17 +240,22 @@
         </div>
 
         <div class="chat-input-area">
-            <input type="text" id="userInput" placeholder="Nhập câu hỏi của bạn (VD: Có iPhone 15 không?)..." autocomplete="off">
+            <input type="text" id="userInput" placeholder="VD: Có iPhone 15 không? Tìm laptop gaming dưới 20 triệu, Giá máy lạnh..." autocomplete="off">
             <button id="sendBtn" onclick="sendMessage()"><i class="fa-solid fa-paper-plane"></i></button>
         </div>
     </div>
 
     <script>
-        // CẤU HÌNH API CỦA BẠN Ở ĐÂY
-        // Chú ý sửa lại cổng (PORT) cho đúng với server Node.js đang chạy
+        // ╔════════════════════════════════════════════════════════════════╗
+        // ║ CHO CÔNG NGHỆ CHATBOT TEST CLIENT                             ║
+        // ║ Đã cập nhật: Hỗ trợ tìm kiếm điện máy + sorting by price    ║
+        // ╚════════════════════════════════════════════════════════════════╝
+        
+        // CẤU HÌNH API - Chú ý sửa cổng (PORT) nếu server chạy khác
         const API_URL = 'http://localhost:5000/api/v1/chatbot'; 
         
         // Mảy lưu trữ lịch sử tin nhắn để gửi lên server
+        // Backend sẽ lấy 10 turn gần nhất (20 messages) + xử lý sorting/filtering
         let chatHistory = [];
 
         const chatMessages = document.getElementById('chatMessages');
@@ -267,10 +285,10 @@
             showTyping(true);
 
             try {
-                // 3. Gọi API - Chỉ gửi messages (Backend sẽ lấy 10 turn gần nhất)
+                // 3. Gọi API với messages (Backend sẽ lấy 10 turn gần nhất)
                 const payload = { messages: chatHistory };
-                console.log('📤 Sending request to:', API_URL);
-                console.log('📤 Payload:', JSON.stringify(payload));
+                console.log('📤 Gửi request đến:', API_URL);
+                console.log('📤 Payload:', JSON.stringify(payload, null, 2));
                 
                 const response = await fetch(API_URL, {
                     method: 'POST',
@@ -281,10 +299,7 @@
                 });
 
                 console.log('📥 Response status:', response.status);
-                console.log('📥 Response headers:', Object.fromEntries(response.headers.entries()));
-                
                 const responseText = await response.text();
-                console.log('📥 Response text:', responseText);
                 
                 let result;
                 try {
@@ -305,18 +320,18 @@
                     const parsedHtml = marked.parse(botReply);
                     appendMessage('bot', parsedHtml, true);
                     
-                    // Log debug info nếu có tools được sử dụng
+                    // Debug: Log tools được sử dụng
                     if (result.data.toolsUsed && result.data.toolsUsed.length > 0) {
-                        console.log('🔨 Tools được sử dụng:', result.data.toolsUsed);
+                        console.log('🔨 Tools đã sử dụng:', result.data.toolsUsed.join(', '));
                     }
                 } else {
-                    const errorMsg = result.message || `Lỗi ${response.status}: ${response.statusText}`;
-                    appendMessage('bot', errorMsg);
+                    const errorMsg = result.message || `Server error ${response.status}`;
+                    appendMessage('bot', '❌ ' + errorMsg);
                     console.error('API Error:', result);
                 }
 
             } catch (error) {
-                appendMessage('bot', `❌ Lỗi kết nối: ${error.message}`);
+                appendMessage('bot', `❌ Lỗi mạng: ${error.message}`);
                 console.error('Network Error:', error);
             } finally {
                 // 4. Tắt trạng thái đang gõ

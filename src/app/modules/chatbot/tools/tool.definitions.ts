@@ -2,7 +2,6 @@ import OpenAI from "openai";
 
 // ============================================================
 // TOOL DEFINITIONS — OpenAI Function Calling Schema
-// AI sẽ tự quyết định khi nào gọi tool nào, không hardcode
 // ============================================================
 
 export const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
@@ -16,71 +15,54 @@ export const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         properties: {
           keyword: {
             type: "string",
-            description: "Từ khóa tìm kiếm tên sản phẩm. VD: 'iphone 15', 'laptop gaming', 'tai nghe chống ồn'",
+            description: "Từ khóa tìm kiếm tên sản phẩm. NẾU KHÁCH HỎI CHUNG CHUNG DANH MỤC (VD: 'có máy lạnh không', 'tìm điện thoại') -> HÃY ĐỂ TRỐNG TRƯỜNG NÀY và chỉ truyền categorySlug.",
           },
           categorySlug: {
             type: "string",
-            description: `Slug danh mục sản phẩm. Các giá trị phổ biến:
-              - 'dien-thoai': điện thoại smartphone
-              - 'laptop': máy tính xách tay
-              - 'tai-nghe': tai nghe
-              - 'may-tinh-bang': máy tính bảng
-              - 'phu-kien': phụ kiện (sạc, cáp, ốp lưng...)
-              Chỉ điền nếu biết chắc danh mục, không đoán mò.`,
+            description: `Slug danh mục. Chọn slug PHÙ HỢP NHẤT với yêu cầu khách:
+
+ĐIỆN THOẠI: 'dien-thoai', 'apple-iphone', 'samsung', 'xiaomi', 'oppo'
+LAPTOP: 'laptop', 'apple-macbook', 'asus-tuf-gaming', 'asus-rog', 'asus-zenbook', 'asus-vivobook', 'lenovo-legion-gaming', 'lenovo-gaming-loq', 'lenovo-thinkbook', 'lenovo-ideapad', 'acer-nitro', 'acer-predator', 'dell-gaming-g-series', 'hp-victus', 'hp-omen', 'hp-envy'
+ĐIỆN MÁY: 'tivi', 'may-giat', 'may-lanh-dieu-hoa', 'tu-lanh', 'may-say', 'tu-dong'
+TAI NGHE & LOA: 'tai-nghe-nhet-tai', 'tai-nghe-chup-tai', 'tai-nghe-khong-day', 'tai-nghe', 'loa-bluetooth', 'loa-karaoke', 'loa-vi-tinh'
+CHUỘT: 'chuot' (gaming), 'chuot-2' (văn phòng)
+BÀN PHÍM: 'ban-phim' (gaming/cơ), 'ban-phim-2' (văn phòng)
+PHỤ KIỆN DI ĐỘNG: 'sac-cap', 'sac-du-phong', 'bao-da-op-lung', 'mieng-dan-man-hinh', 'but-cam-ung'
+PHỤ KIỆN LAPTOP: 'webcam', 'hub-chuyen-doi', 'gia-do', 'balo-tui-xach', 'mieng-lot-chuot'`,
           },
           brandSlug: {
             type: "string",
-            description: "Slug thương hiệu nếu khách chỉ định. VD: 'apple', 'samsung', 'sony', 'xiaomi', 'dell', 'asus'",
+            description: "Slug thương hiệu nếu khách chỉ định.",
           },
           minPrice: {
             type: "number",
-            description: "Giá tối thiểu (VND). VD: 5000000 cho 5 triệu",
+            description: "Giá tối thiểu (VND).",
           },
           maxPrice: {
             type: "number",
-            description: "Giá tối đa (VND). VD: 10000000 cho 10 triệu. Khi khách nói 'tầm X triệu' thì dùng maxPrice = X*1.1 triệu để có margin.",
+            description: "Giá tối đa (VND).",
+          },
+          sortBy: {
+            type: "string",
+            enum: ["PRICE_ASC", "PRICE_DESC", "BEST_SELLING"],
+            description: "Nếu khách hỏi 'giá tốt', 'giá rẻ', 'rẻ nhất' -> dùng 'PRICE_ASC'. Nếu hỏi 'cao cấp', 'đắt nhất' -> dùng 'PRICE_DESC'.",
           },
           storage: {
             type: "string",
-            description: "Dung lượng bộ nhớ trong (variant attribute). VD: '128GB', '256GB', '512GB', '1TB'",
+            description: "Dung lượng bộ nhớ trong (variant attribute). VD: '128GB', '256GB'",
           },
           color: {
             type: "string",
-            description: "Màu sắc (variant attribute). VD: 'black', 'white', 'blue', 'titanium'",
+            description: "Màu sắc (variant attribute). VD: 'black', 'white'",
           },
           specsFilter: {
             type: "object",
-            description: `Lọc theo thông số kỹ thuật trong DB (product_specifications).
-              Key là specification key, value là giá trị cần lọc.
-              
-              Dùng prefix spec_ cho các thông số đặc biệt:
-              - BOOLEAN (có/không): { "spec_nfc": "true", "spec_5g": "true" }
-              - RANGE min: { "spec_battery_capacity_min": "4000" }
-              - RANGE max: { "spec_screen_size_max": "6.5" }
-              - ENUM: { "spec_os": "Android" }
-              
-              Không dùng prefix cho thông số thông thường:
-              - RAM: { "ram": "16 GB" } — chú ý có space giữa số và đơn vị
-              - Màn hình: { "screen_refresh_rate": "120Hz" }
-              - Camera: { "camera_main": "50.0 MP" }
-              
-              CHÚ Ý FORMAT VALUE (phải khớp chính xác với DB):
-              - RAM: "8 GB", "16 GB", "32 GB" (có space)
-              - Pin: "4000 mAh", "5000 mAh" (có space)
-              - Camera: "50.0 MP", "108.0 MP" (có .0)
-              - Màn hình Hz: "120Hz", "144Hz" (không space)
-              - Nếu không chắc format → KHÔNG dùng specsFilter, để AI lọc từ kết quả`,
-            additionalProperties: {
-              type: "string",
-            },
+            description: `Lọc theo thông số kỹ thuật (product_specifications).`,
+            additionalProperties: { type: "string" },
           },
           attrsFilter: {
             type: "object",
-            description: `Lọc theo thuộc tính variant (variants_attributes).
-              Key là attribute code, value là string hoặc mảng string (OR logic).
-              Các key phổ biến: "storage" (bộ nhớ), "ram" (RAM laptop/tablet), "color" (màu)
-              VD: { "storage": "256GB" } hoặc { "storage": ["128GB", "256GB"] }
-              VD: { "ram": "16GB" }`,
+            description: `Lọc theo thuộc tính variant. VD: { "storage": "256GB" }`,
             additionalProperties: {
               oneOf: [
                 { type: "string" },
@@ -90,10 +72,10 @@ export const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           },
           limit: {
             type: "number",
-            description: "Số lượng kết quả trả về. Mặc định 5, tối đa 10. Dùng 8-10 khi khách muốn 'vài mẫu'.",
+            description: "Số lượng kết quả. Mặc định 5, tối đa 10.",
           },
         },
-        required: ["keyword"],
+        required: [], // Đã xóa "keyword" khỏi mảng này để fix lỗi máy lạnh
       },
     },
   },
@@ -101,14 +83,11 @@ export const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "get_product_detail",
-      description: "Lấy thông tin chi tiết một sản phẩm cụ thể: toàn bộ thông số kỹ thuật, variants và giá từng phiên bản. Gọi khi khách hỏi chi tiết về 1 sản phẩm cụ thể.",
+      description: "Lấy thông tin chi tiết một sản phẩm cụ thể.",
       parameters: {
         type: "object",
         properties: {
-          slug: {
-            type: "string",
-            description: "Slug của sản phẩm lấy từ kết quả search_products. VD: 'iphone-15-pro-max-256gb'",
-          },
+          slug: { type: "string" },
         },
         required: ["slug"],
       },
@@ -118,14 +97,11 @@ export const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "get_active_promotions",
-      description: "Lấy danh sách khuyến mãi đang chạy. Gọi khi khách hỏi về sale, giảm giá, ưu đãi, khuyến mãi hiện tại.",
+      description: "Lấy danh sách khuyến mãi đang chạy.",
       parameters: {
         type: "object",
         properties: {
-          limit: {
-            type: "number",
-            description: "Số lượng khuyến mãi trả về, mặc định 5",
-          },
+          limit: { type: "number" },
         },
         required: [],
       },
@@ -135,14 +111,13 @@ export const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "get_policy",
-      description: "Lấy nội dung chính sách của shop. Gọi khi khách hỏi về bảo hành, đổi trả, giao hàng, thanh toán, trả góp...",
+      description: "Lấy nội dung chính sách của shop.",
       parameters: {
         type: "object",
         properties: {
           policyType: {
             type: "string",
             enum: ["WARRANTY", "RETURN", "DELIVERY", "DELIVERY_INSTALLATION", "INSTALLMENT", "LOYALTY", "PRIVACY", "TECHNICAL_SUPPORT", "UNBOXING"],
-            description: "Loại chính sách: WARRANTY=bảo hành, RETURN=đổi trả, DELIVERY=giao hàng, INSTALLMENT=trả góp, LOYALTY=tích điểm",
           },
         },
         required: ["policyType"],

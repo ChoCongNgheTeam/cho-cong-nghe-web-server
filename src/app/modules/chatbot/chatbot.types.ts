@@ -21,18 +21,20 @@ export interface ChatResponse {
 // ---- Tool input types ----
 
 export interface SearchProductsArgs {
-  keyword: string;
+  keyword?: string; // Đã đổi thành optional
   categorySlug?: string;
   brandSlug?: string;
   minPrice?: number;
   maxPrice?: number;
   storage?: string;
   color?: string;
-  // Lọc theo thông số kỹ thuật — key là spec key trong DB (VD: "spec_ram", "spec_nfc")
+  // Lọc theo thông số kỹ thuật
   specsFilter?: Record<string, string>;
-  // Lọc theo variant attribute — key là attribute code (VD: "storage", "ram")
+  // Lọc theo variant attribute
   attrsFilter?: Record<string, string | string[]>;
   limit?: number;
+  // Cách sắp xếp kết quả
+  sortBy?: "PRICE_ASC" | "PRICE_DESC" | "BEST_SELLING";
 }
 
 export interface GetProductDetailArgs {
