@@ -14,7 +14,6 @@ import {
 // ============================================================
 // TOOL EXECUTORS
 // Mỗi function là 1 tool — AI gọi, backend thực thi, trả data
-// AI KHÔNG query DB trực tiếp
 // ============================================================
 
 // ─── 1. SEARCH PRODUCTS ─────────────────────────────────────
@@ -30,16 +29,18 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
     specsFilter,
     attrsFilter,
     limit = 5,
+    sortBy = "BEST_SELLING"
   } = args;
 
   const now = new Date();
 
   // ── Build dynamic query object cho buildProductWhere ──────
-  // Tái sử dụng toàn bộ filter logic đã có trong product module
-  // thay vì duplicate code
-  const dynamicQuery: Record<string, any> = {
-    search: keyword,
-  };
+  const dynamicQuery: Record<string, any> = {};
+
+  // Vá lỗi: Chỉ gán keyword nếu nó tồn tại và khác rỗng
+  if (keyword && keyword.trim() !== "") {
+    dynamicQuery.search = keyword.trim();
+  }
 
   if (categorySlug) dynamicQuery.category = categorySlug;
   if (minPrice) dynamicQuery.minPrice = minPrice;
@@ -47,7 +48,6 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
   if (storage) dynamicQuery[`attr_storage`] = storage;
   if (color) dynamicQuery[`attr_color`] = color;
 
-  // Brand: resolve slug → id
   if (brandSlug) {
     const brand = await prisma.brands.findUnique({
       where: { slug: brandSlug, isActive: true, deletedAt: null },
@@ -56,9 +56,6 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
     if (brand) dynamicQuery.brandId = brand.id;
   }
 
-  // specsFilter: { "spec_ram": "16 GB", "ram": "16 GB", "spec_nfc": "true" }
-  // Key đã có prefix "spec_" → spread thẳng
-  // Key không có prefix → thêm prefix "spec_"
   if (specsFilter) {
     for (const [key, value] of Object.entries(specsFilter)) {
       if (key.startsWith("spec_")) {
@@ -69,21 +66,21 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
     }
   }
 
-  // attrsFilter: { "storage": "256GB", "ram": ["8GB", "16GB"] }
-  // → thêm prefix "attr_"
   if (attrsFilter) {
     for (const [key, value] of Object.entries(attrsFilter)) {
       dynamicQuery[`attr_${key}`] = value;
     }
   }
 
-  // ── Dùng buildProductWhere để build Prisma where clause ───
   const where = await buildProductWhere(dynamicQuery, true);
+
+  // Lấy tối đa 50 kết quả để sort bằng JS nếu AI yêu cầu xếp theo giá
+  const takeCount = sortBy !== "BEST_SELLING" ? 50 : Math.min(limit, 10);
 
   // ── Query sản phẩm ────────────────────────────────────────
   const products = await prisma.products.findMany({
     where,
-    take: Math.min(limit, 10),
+    take: takeCount,
     orderBy: [{ totalSoldCount: "desc" }, { ratingAverage: "desc" }],
     select: {
       id: true,
@@ -103,15 +100,13 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
         orderBy: { price: "asc" },
       },
       productSpecifications: {
-        // Bỏ take: 3 → lấy tất cả highlight specs
-        // AI cần đọc đủ specs để đánh giá (GPU, RAM, camera, pin...)
         where: { isHighlight: true },
         select: {
           value: true,
           specification: {
             select: {
               name: true,
-              key: true, // AI dùng key để hiểu loại spec
+              key: true,
             },
           },
         },
@@ -120,7 +115,7 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
     },
   });
 
-  // ── Lấy promotions active để gắn label ───────────────────
+  // ── Lấy promotions active để gắn label & tính giá ────────
   const activePromotions = await prisma.promotions.findMany({
     where: {
       isActive: true,
@@ -135,13 +130,12 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
     take: 20,
   });
 
-  return products.map((p) => {
+  let mappedProducts = products.map((p) => {
     const prices = p.variants.map((v) => Number(v.price));
     const priceMin = prices.length ? Math.min(...prices) : 0;
     const priceMax = prices.length ? Math.max(...prices) : 0;
     const inStock = p.variants.some((v) => v.quantity > 0);
 
-    // Tìm promotion áp dụng cho sản phẩm này
     const applicablePromo = activePromotions.find((promo) =>
       promo.targets.some(
         (t) =>
@@ -150,12 +144,22 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
       ),
     );
 
+    let finalPriceMin = priceMin;
+    let finalPriceMax = priceMax;
     let promotionLabel: string | undefined;
+
     if (applicablePromo?.rules?.[0]) {
       const rule = applicablePromo.rules[0];
+      
       if (rule.actionType === "DISCOUNT_PERCENT" && rule.discountValue) {
+        const discountPercent = Number(rule.discountValue);
+        finalPriceMin = Math.round(priceMin * (1 - discountPercent / 100));
+        finalPriceMax = Math.round(priceMax * (1 - discountPercent / 100));
         promotionLabel = `Giảm ${rule.discountValue}%`;
       } else if (rule.actionType === "DISCOUNT_FIXED" && rule.discountValue) {
+        const discountFixed = Number(rule.discountValue);
+        finalPriceMin = Math.max(0, priceMin - discountFixed);
+        finalPriceMax = Math.max(0, priceMax - discountFixed);
         promotionLabel = `Giảm ${Number(rule.discountValue).toLocaleString("vi-VN")}đ`;
       } else if (rule.actionType === "GIFT_PRODUCT") {
         promotionLabel = "Tặng quà";
@@ -169,8 +173,8 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
       name: p.name,
       slug: p.slug,
       thumbnail: p.img[0]?.imageUrl || "",
-      priceMin,
-      priceMax,
+      priceMin: finalPriceMin,
+      priceMax: finalPriceMax,
       brand: p.brand.name,
       category: p.category.name,
       inStock,
@@ -183,6 +187,16 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
       promotionLabel,
     };
   });
+
+  // Xử lý Sort bằng Javascript sau khi đã có giá chính thức (đã trừ khuyến mãi)
+  if (sortBy === "PRICE_ASC") {
+    mappedProducts.sort((a, b) => a.priceMin - b.priceMin);
+  } else if (sortBy === "PRICE_DESC") {
+    mappedProducts.sort((a, b) => b.priceMin - a.priceMin);
+  }
+
+  // Slice lại đúng số limit yêu cầu trước khi trả về cho AI
+  return mappedProducts.slice(0, Math.min(limit, 10));
 };
 
 // ─── 2. GET PRODUCT DETAIL ──────────────────────────────────
@@ -238,9 +252,54 @@ export const executeGetProductDetail = async (
 
   if (!product) return null;
 
+  const now = new Date();
+
+  // Lấy promotions active
+  const activePromotions = await prisma.promotions.findMany({
+    where: {
+      isActive: true,
+      deletedAt: null,
+      AND: [
+        { OR: [{ startDate: null }, { startDate: { lte: now } }] },
+        { OR: [{ endDate: null }, { endDate: { gte: now } }] },
+      ],
+    },
+    include: { rules: true, targets: true },
+    orderBy: { priority: "desc" },
+    take: 20,
+  });
+
+  // Tìm promotion áp dụng cho sản phẩm này
+  const applicablePromo = activePromotions.find((promo) =>
+    promo.targets.some(
+      (t) =>
+        t.targetType === "ALL" ||
+        (t.targetType === "PRODUCT" && t.targetId === product.id),
+    ),
+  );
+
+  // Hàm tính giá thực tế dựa trên promotion
+  const calculateFinalPrice = (originalPrice: number): number => {
+    if (applicablePromo?.rules?.[0]) {
+      const rule = applicablePromo.rules[0];
+      if (rule.actionType === "DISCOUNT_PERCENT" && rule.discountValue) {
+        const discountPercent = Number(rule.discountValue);
+        return Math.round(originalPrice * (1 - discountPercent / 100));
+      } else if (rule.actionType === "DISCOUNT_FIXED" && rule.discountValue) {
+        const discountFixed = Number(rule.discountValue);
+        return Math.max(0, originalPrice - discountFixed);
+      }
+    }
+    return originalPrice;
+  };
+
   const prices = product.variants.map((v) => Number(v.price));
   const priceMin = prices.length ? Math.min(...prices) : 0;
   const priceMax = prices.length ? Math.max(...prices) : 0;
+
+  // Tính giá thực tế (sau discount)
+  const finalPriceMin = calculateFinalPrice(priceMin);
+  const finalPriceMax = calculateFinalPrice(priceMax);
 
   // Group specs by group name
   const specGroups: Record<string, { name: string; value: string }[]> = {};
@@ -250,14 +309,16 @@ export const executeGetProductDetail = async (
     specGroups[group].push({ name: ps.specification.name, value: ps.value });
   }
 
-  // Format variants thành label đọc được
+  // Format variants thành label đọc được (với giá thực tế)
   const variants = product.variants.map((v) => {
     const attrLabels = v.variantAttributes
       .map((va) => va.attributeOption.label)
       .join(" / ");
+    const originalPrice = Number(v.price);
+    const finalPrice = calculateFinalPrice(originalPrice);
     return {
       label: attrLabels || "Mặc định",
-      price: Number(v.price),
+      price: finalPrice,
       inStock: v.quantity > 0,
     };
   });
@@ -269,8 +330,8 @@ export const executeGetProductDetail = async (
     description: product.description || undefined,
     brand: product.brand.name,
     category: product.category.name,
-    priceMin,
-    priceMax,
+    priceMin: finalPriceMin,
+    priceMax: finalPriceMax,
     inStock: product.variants.some((v) => v.quantity > 0),
     rating: Number(product.ratingAverage),
     specifications: Object.entries(specGroups).map(([group, items]) => ({
