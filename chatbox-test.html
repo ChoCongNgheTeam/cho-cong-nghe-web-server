@@ -248,14 +248,19 @@
     <script>
         // ╔════════════════════════════════════════════════════════════════╗
         // ║ CHO CÔNG NGHỆ CHATBOT TEST CLIENT                             ║
-        // ║ Đã cập nhật: Hỗ trợ tìm kiếm điện máy + sorting by price    ║
+        // ║ BE Refactored: Rút gọn prompt + cập nhật business rules      ║
+        // ║ API contract giữ nguyên: POST /api/v1/chatbot                ║
         // ╚════════════════════════════════════════════════════════════════╝
         
         // CẤU HÌNH API - Chú ý sửa cổng (PORT) nếu server chạy khác
         const API_URL = 'http://localhost:5000/api/v1/chatbot'; 
         
         // Mảy lưu trữ lịch sử tin nhắn để gửi lên server
-        // Backend sẽ lấy 10 turn gần nhất (20 messages) + xử lý sorting/filtering
+        // Backend sẽ:
+        // 1. Lấy 10 turn gần nhất (20 messages)
+        // 2. Gọi OpenAI tool-calling với Business Rules
+        // 3. Execute tools (search_products, get_product_detail, v.v.)
+        // 4. Trả lời tự nhiên dựa trên dữ liệu thực tế
         let chatHistory = [];
 
         const chatMessages = document.getElementById('chatMessages');

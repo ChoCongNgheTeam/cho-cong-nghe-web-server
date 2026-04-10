@@ -1,7 +1,8 @@
 import OpenAI from "openai";
 
 // ============================================================
-// TOOL DEFINITIONS — OpenAI Function Calling Schema
+// TOOL DEFINITIONS — Service Layer
+// Chứa toàn bộ luật nghiệp vụ và BẢNG MAPPING CHI TIẾT
 // ============================================================
 
 export const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
@@ -9,73 +10,61 @@ export const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "search_products",
-      description: "Tìm kiếm sản phẩm theo nhu cầu của khách hàng. Gọi khi khách hỏi về sản phẩm, so sánh, gợi ý mua hàng.",
+      description: `Tìm kiếm sản phẩm. 
+      LƯU Ý NGÂN SÁCH: 
+      - Khách nói "tầm/khoảng X triệu" -> maxPrice = X * 1.1 triệu
+      - "dưới X triệu" -> maxPrice = X triệu
+      - "giá tốt/rẻ nhất" -> KHÔNG dùng maxPrice, bắt buộc dùng sortBy = "PRICE_ASC"
+      - "cao cấp/đắt nhất" -> KHÔNG dùng maxPrice, bắt buộc dùng sortBy = "PRICE_DESC"`,
       parameters: {
         type: "object",
         properties: {
           keyword: {
             type: "string",
-            description: "Từ khóa tìm kiếm tên sản phẩm. NẾU KHÁCH HỎI CHUNG CHUNG DANH MỤC (VD: 'có máy lạnh không', 'tìm điện thoại') -> HÃY ĐỂ TRỐNG TRƯỜNG NÀY và chỉ truyền categorySlug.",
+            description: `Từ khóa tìm kiếm (Chỉ lấy TÊN GỐC). KHÔNG đưa dung lượng (128GB) hay từ khóa giá ('giá tốt'). 
+BẮT BUỘC DÙNG KEYWORD CHUẨN NẾU KHÁCH HỎI CÁC MẶT HÀNG SAU:
+- Tai nghe bluetooth / TWS -> keyword: "tai nghe bluetooth"
+- Tai nghe ANC / chống ồn -> keyword: "tai nghe chống ồn"
+- Chuột gaming / chơi game -> keyword: "chuột gaming"
+- Chuột không/có dây văn phòng -> keyword: "chuột không dây" hoặc "chuột"
+- Bàn phím cơ / gaming -> keyword: "bàn phím cơ" hoặc "bàn phím gaming"
+- Bàn phím không/có dây văn phòng -> keyword: "bàn phím không dây" hoặc "bàn phím"
+Nếu khách chỉ hỏi danh mục chung chung ('có máy lạnh không', 'tìm điện thoại') -> ĐỂ TRỐNG TRƯỜNG NÀY.`,
           },
           categorySlug: {
             type: "string",
-            description: `Slug danh mục. Chọn slug PHÙ HỢP NHẤT với yêu cầu khách:
-
-ĐIỆN THOẠI: 'dien-thoai', 'apple-iphone', 'samsung', 'xiaomi', 'oppo'
-LAPTOP: 'laptop', 'apple-macbook', 'asus-tuf-gaming', 'asus-rog', 'asus-zenbook', 'asus-vivobook', 'lenovo-legion-gaming', 'lenovo-gaming-loq', 'lenovo-thinkbook', 'lenovo-ideapad', 'acer-nitro', 'acer-predator', 'dell-gaming-g-series', 'hp-victus', 'hp-omen', 'hp-envy'
-ĐIỆN MÁY: 'tivi', 'may-giat', 'may-lanh-dieu-hoa', 'tu-lanh', 'may-say', 'tu-dong'
-TAI NGHE & LOA: 'tai-nghe-nhet-tai', 'tai-nghe-chup-tai', 'tai-nghe-khong-day', 'tai-nghe', 'loa-bluetooth', 'loa-karaoke', 'loa-vi-tinh'
-CHUỘT: 'chuot' (gaming), 'chuot-2' (văn phòng)
-BÀN PHÍM: 'ban-phim' (gaming/cơ), 'ban-phim-2' (văn phòng)
-PHỤ KIỆN DI ĐỘNG: 'sac-cap', 'sac-du-phong', 'bao-da-op-lung', 'mieng-dan-man-hinh', 'but-cam-ung'
-PHỤ KIỆN LAPTOP: 'webcam', 'hub-chuyen-doi', 'gia-do', 'balo-tui-xach', 'mieng-lot-chuot'`,
+            description: `BẮT BUỘC ánh xạ theo bảng chi tiết sau:
+[ĐIỆN THOẠI]: smartphone chung(dien-thoai), iPhone(apple-iphone), Samsung(samsung), Xiaomi/Redmi/Poco(xiaomi), OPPO(oppo).
+[LAPTOP]: laptop chung(laptop), MacBook(apple-macbook), Gaming Asus(asus-tuf-gaming hoặc asus-rog), Văn phòng Asus(asus-zenbook hoặc asus-vivobook), Gaming Lenovo(lenovo-legion-gaming hoặc lenovo-gaming-loq), Lenovo thường(lenovo-ideapad hoặc lenovo-thinkbook), Gaming Acer(acer-nitro hoặc acer-predator), Gaming Dell(dell-gaming-g-series), Gaming HP(hp-victus hoặc hp-omen), HP mỏng nhẹ(hp-envy).
+[ĐIỆN MÁY]: Tivi(tivi), Máy giặt(may-giat), Máy lạnh/điều hòa(may-lanh-dieu-hoa), Tủ lạnh(tu-lanh), Máy sấy quần áo(may-say), Tủ đông(tu-dong).
+[TAI NGHE/LOA]: Bluetooth/Không dây/TWS/ANC(tai-nghe-khong-day), Nhét tai/earbud/in-ear(tai-nghe-nhet-tai), Chụp tai/over-ear(tai-nghe-chup-tai), Headset gaming(tai-nghe), Loa bluetooth/di động(loa-bluetooth), Loa karaoke(loa-karaoke), Loa vi/máy tính(loa-vi-tinh).
+[CHUỘT/PHÍM]: Chuột gaming(chuot), Chuột văn phòng(chuot-2), Bàn phím gaming/cơ(ban-phim), Bàn phím văn phòng(ban-phim-2).
+[PHỤ KIỆN KHÁC]: Sạc/Pin dự phòng(sac-du-phong), Củ/Cáp sạc(sac-cap), Ốp lưng/bao da(bao-da-op-lung), Dán màn hình(mieng-dan-man-hinh), Bút cảm ứng(but-cam-ung), Webcam(webcam), Hub/USB hub(hub-chuyen-doi), Giá đỡ laptop(gia-do), Balo/túi xách(balo-tui-xach), Miếng lót chuột(mieng-lot-chuot).`,
           },
-          brandSlug: {
-            type: "string",
-            description: "Slug thương hiệu nếu khách chỉ định.",
-          },
-          minPrice: {
-            type: "number",
-            description: "Giá tối thiểu (VND).",
-          },
-          maxPrice: {
-            type: "number",
-            description: "Giá tối đa (VND).",
-          },
+          brandSlug: { type: "string" },
+          minPrice: { type: "number" },
+          maxPrice: { type: "number" },
           sortBy: {
             type: "string",
             enum: ["PRICE_ASC", "PRICE_DESC", "BEST_SELLING"],
-            description: "Nếu khách hỏi 'giá tốt', 'giá rẻ', 'rẻ nhất' -> dùng 'PRICE_ASC'. Nếu hỏi 'cao cấp', 'đắt nhất' -> dùng 'PRICE_DESC'.",
           },
-          storage: {
-            type: "string",
-            description: "Dung lượng bộ nhớ trong (variant attribute). VD: '128GB', '256GB'",
-          },
-          color: {
-            type: "string",
-            description: "Màu sắc (variant attribute). VD: 'black', 'white'",
-          },
+          storage: { type: "string" },
+          color: { type: "string" },
           specsFilter: {
             type: "object",
-            description: `Lọc theo thông số kỹ thuật (product_specifications).`,
+            description: "Lọc thông số. FORMAT DB: RAM: '8 GB', Pin: '5000 mAh', Camera: '50.0 MP', Hz: '120Hz'. KHÔNG chắc chắn format thì KHÔNG dùng.",
             additionalProperties: { type: "string" },
           },
           attrsFilter: {
             type: "object",
-            description: `Lọc theo thuộc tính variant. VD: { "storage": "256GB" }`,
+            description: "Lọc variant. VD Tách bộ nhớ khỏi tên máy: Khách hỏi 'iPhone 15 128GB' -> truyền keyword='iPhone 15', attrsFilter={ 'storage': '128GB' }",
             additionalProperties: {
-              oneOf: [
-                { type: "string" },
-                { type: "array", items: { type: "string" } },
-              ],
+              oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
             },
           },
-          limit: {
-            type: "number",
-            description: "Số lượng kết quả. Mặc định 5, tối đa 10.",
-          },
+          limit: { type: "number", description: "Số lượng kết quả, mặc định 5, tối đa 10." },
         },
-        required: [], // Đã xóa "keyword" khỏi mảng này để fix lỗi máy lạnh
+        required: [], 
       },
     },
   },
@@ -83,12 +72,10 @@ PHỤ KIỆN LAPTOP: 'webcam', 'hub-chuyen-doi', 'gia-do', 'balo-tui-xach', 'mie
     type: "function",
     function: {
       name: "get_product_detail",
-      description: "Lấy thông tin chi tiết một sản phẩm cụ thể.",
+      description: "Lấy thông tin chi tiết một sản phẩm cụ thể bằng slug.",
       parameters: {
         type: "object",
-        properties: {
-          slug: { type: "string" },
-        },
+        properties: { slug: { type: "string" } },
         required: ["slug"],
       },
     },
@@ -100,9 +87,7 @@ PHỤ KIỆN LAPTOP: 'webcam', 'hub-chuyen-doi', 'gia-do', 'balo-tui-xach', 'mie
       description: "Lấy danh sách khuyến mãi đang chạy.",
       parameters: {
         type: "object",
-        properties: {
-          limit: { type: "number" },
-        },
+        properties: { limit: { type: "number" } },
         required: [],
       },
     },
@@ -111,7 +96,7 @@ PHỤ KIỆN LAPTOP: 'webcam', 'hub-chuyen-doi', 'gia-do', 'balo-tui-xach', 'mie
     type: "function",
     function: {
       name: "get_policy",
-      description: "Lấy nội dung chính sách của shop.",
+      description: "Lấy nội dung chính sách của shop (bảo hành, đổi trả, giao hàng...).",
       parameters: {
         type: "object",
         properties: {

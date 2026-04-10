@@ -74,7 +74,7 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
 
   const where = await buildProductWhere(dynamicQuery, true);
 
-  // Vá lỗi: Lấy tối đa 50 kết quả để sort bằng JS nếu AI yêu cầu xếp theo giá
+  // Lấy tối đa 50 kết quả để sort bằng JS nếu AI yêu cầu xếp theo giá
   const takeCount = sortBy !== "BEST_SELLING" ? 50 : Math.min(limit, 10);
 
   // ── Query sản phẩm ────────────────────────────────────────
@@ -115,7 +115,7 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
     },
   });
 
-  // ── Lấy promotions active để gắn label ───────────────────
+  // ── Lấy promotions active để gắn label & tính giá ────────
   const activePromotions = await prisma.promotions.findMany({
     where: {
       isActive: true,
@@ -188,14 +188,14 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
     };
   });
 
-  // Xử lý Sort bằng Javascript sau khi đã có giá chính thức
+  // Xử lý Sort bằng Javascript sau khi đã có giá chính thức (đã trừ khuyến mãi)
   if (sortBy === "PRICE_ASC") {
     mappedProducts.sort((a, b) => a.priceMin - b.priceMin);
   } else if (sortBy === "PRICE_DESC") {
     mappedProducts.sort((a, b) => b.priceMin - a.priceMin);
   }
 
-  // Slice lại đúng số limit yêu cầu
+  // Slice lại đúng số limit yêu cầu trước khi trả về cho AI
   return mappedProducts.slice(0, Math.min(limit, 10));
 };
 

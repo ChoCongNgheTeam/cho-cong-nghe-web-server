@@ -21,7 +21,7 @@ export interface ChatResponse {
 // ---- Tool input types ----
 
 export interface SearchProductsArgs {
-  keyword?: string; // Đã đổi thành optional
+  keyword?: string; // Đã đổi thành optional để fix lỗi tìm danh mục
   categorySlug?: string;
   brandSlug?: string;
   minPrice?: number;
