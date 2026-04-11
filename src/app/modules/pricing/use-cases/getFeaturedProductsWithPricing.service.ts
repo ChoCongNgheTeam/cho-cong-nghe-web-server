@@ -19,7 +19,11 @@ export const getFeaturedProductsWithPricing = async (limit: number = 12, userId?
         pricingContext.variantAttributes,
       );
 
-      return { ...card, price: mapPricingToSummary(pricing) };
+      return {
+        ...card,
+        variantId: pricingContext.variantId,
+        price: mapPricingToSummary(pricing),
+      };
     }),
   );
 };

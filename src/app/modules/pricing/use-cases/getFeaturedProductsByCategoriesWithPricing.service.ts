@@ -22,7 +22,11 @@ export const getFeaturedProductsByCategoriesWithPricing = async (options: { limi
             pricingContext.variantAttributes,
           );
 
-          return { ...safeProduct, price: mapPricingToSummary(pricing) };
+          return {
+            ...safeProduct,
+            variantId: pricingContext.variantId,
+            price: mapPricingToSummary(pricing),
+          };
         }),
       );
 

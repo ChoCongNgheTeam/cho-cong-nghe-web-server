@@ -19,7 +19,11 @@ export const getRecentlyViewedProductsWithPricing = async (productIds: string[],
         pricingContext.variantAttributes,
       );
 
-      return { ...card, price: mapPricingToSummary(pricing) };
+      return {
+        ...card,
+        variantId: pricingContext.variantId,
+        price: mapPricingToSummary(pricing),
+      };
     }),
   );
 };

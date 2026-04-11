@@ -138,6 +138,7 @@ export interface ProductCard {
   name: string;
   priceOrigin: number;
   slug: string;
+  variantId: string;
   originalPrice?: number;
   discount?: number;
   thumbnail: string;
@@ -153,7 +154,6 @@ export interface ProductCard {
   isActive: boolean;
   category: Category | null;
 }
-
 // =====================
 // === PRODUCT DETAIL ===
 // =====================

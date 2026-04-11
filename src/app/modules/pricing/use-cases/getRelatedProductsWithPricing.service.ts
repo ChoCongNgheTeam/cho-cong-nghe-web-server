@@ -19,7 +19,11 @@ export const getRelatedProductsWithPricing = async (slug: string, limit: number 
         pricingContext.variantAttributes,
       );
 
-      return { ...card, price: mapPricingToSummary(pricing) };
+      return {
+        ...card,
+        variantId: pricingContext.variantId,
+        price: mapPricingToSummary(pricing),
+      };
     }),
   );
 };

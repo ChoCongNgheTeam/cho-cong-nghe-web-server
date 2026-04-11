@@ -234,20 +234,17 @@ const shouldUseBundleMode = (product: any, validVariants: RawVariant[]): boolean
 export const transformProductCard = (product: any): ProductCard | null => {
   const allVariants: any[] = product.variants ?? [];
 
-  // Nếu không có variant nào active → skip
   if (allVariants.length === 0) {
     console.warn(`[transformProductCard] Product ${product.id} (${product.slug}) has no active variant — skipped`);
     return null;
   }
 
-  // Chọn variant đại diện: ưu tiên isDefault, fallback về first
   const defaultVariant = allVariants.find((v: any) => v.isDefault) ?? allVariants[0];
 
   const firstColorImage = product.img?.[0];
   const thumbnail = firstColorImage?.imageUrl || "";
   const inStock = defaultVariant.quantity > 0;
 
-  // Build display name từ variant attributes (fallback về product.name nếu thiếu data)
   const displayName = defaultVariant.variantAttributes?.length ? buildVariantDisplayName(product.name, defaultVariant.variantAttributes) : product.name;
 
   return {
@@ -255,6 +252,7 @@ export const transformProductCard = (product: any): ProductCard | null => {
     name: displayName,
     priceOrigin: Number(defaultVariant.price),
     slug: product.slug,
+    variantId: defaultVariant.id,
     thumbnail,
     createdAt: product.createdAt ? new Date(product.createdAt) : null,
     rating: {
