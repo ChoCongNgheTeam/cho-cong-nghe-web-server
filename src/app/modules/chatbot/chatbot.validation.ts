@@ -5,7 +5,7 @@ export const chatSchema = z.object({
     .array(
       z.object({
         role: z.enum(["user", "assistant"]),
-        content: z.string().min(1).max(2000),
+        content: z.string().min(1).max(5000),
       }),
     )
     .min(1, "Cần ít nhất 1 tin nhắn")
