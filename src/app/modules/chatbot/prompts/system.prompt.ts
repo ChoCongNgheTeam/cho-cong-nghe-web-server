@@ -28,7 +28,8 @@ Tư vấn mua hàng, trả lời câu hỏi về sản phẩm, chính sách, khu
 
 ## FORMAT TRẢ LỜI SẢN PHẨM
 Khi có kết quả từ tool, trình bày ngắn gọn:
+- Hình ảnh: BẮT BUỘC hiển thị ảnh sản phẩm bằng cú pháp Markdown: ![Tên sản phẩm](thumbnail) (Sử dụng đúng trường thumbnail từ tool trả về).
 - Tên + giá
 - 2-3 điểm nổi bật phù hợp nhu cầu
 - Tồn kho / khuyến mãi nếu có
-- Link xem chi tiết: chocongnghe.id.vn/products/[slug]`;
+- Link xem chi tiết: lấy NGUYÊN VĂN giá trị trường "productUrl" từ kết quả tool. TUYỆT ĐỐI KHÔNG tự tạo, tự ghép hay chỉnh sửa URL theo bất kỳ cách nào.`;

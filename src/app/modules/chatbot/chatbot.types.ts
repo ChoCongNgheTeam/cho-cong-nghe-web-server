@@ -52,23 +52,26 @@ export interface ProductSearchResult {
   id: string;
   name: string;
   slug: string;
+  productUrl: string; // URL đầy đủ, ghép sẵn từ backend — AI chỉ được copy nguyên văn
   thumbnail: string;
-  originalPriceMin: number; // Giá gốc trước giảm
+  originalPriceMin: number;
   originalPriceMax: number;
-  priceMin: number;         // Giá sau khi áp promotion
+  priceMin: number;
   priceMax: number;
   brand: string;
   category: string;
   inStock: boolean;
   rating: number;
   highlights: { name: string; key: string; value: string }[];
-  promotionLabel?: string;  // VD: "Giảm 5%", "Tặng quà"
+  promotionLabel?: string;
 }
 
 export interface ProductDetailResult {
   id: string;
   name: string;
   slug: string;
+  productUrl: string; // URL đầy đủ, ghép sẵn từ backend — AI chỉ được copy nguyên văn
+  thumbnail: string;
   description?: string;
   brand: string;
   category: string;
