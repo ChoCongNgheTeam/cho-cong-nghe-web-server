@@ -274,6 +274,11 @@ export const executeGetProductDetail = async (
         brand: { select: { name: true } },
         category: { select: { name: true } },
         ratingAverage: true,
+        img: {
+          select: { imageUrl: true },
+          orderBy: { position: "asc" },
+          take: 1,
+        },
         variants: {
           where: { isActive: true, deletedAt: null },
           select: {
@@ -358,7 +363,7 @@ export const executeGetProductDetail = async (
     id: product.id,
     name: product.name,
     slug: product.slug,
-    // ✅ FIX: ghép sẵn URL đầy đủ từ slug DB — AI chỉ copy nguyên văn, không tự tạo
+    thumbnail: product.img[0]?.imageUrl || "",
     productUrl: `${PRODUCT_BASE_URL}/${product.slug}`,
     description: product.description?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300) || undefined,
     brand: product.brand.name,

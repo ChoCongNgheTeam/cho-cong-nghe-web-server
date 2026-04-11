@@ -71,6 +71,7 @@ export interface ProductDetailResult {
   name: string;
   slug: string;
   productUrl: string; // URL đầy đủ, ghép sẵn từ backend — AI chỉ được copy nguyên văn
+  thumbnail: string;
   description?: string;
   brand: string;
   category: string;
