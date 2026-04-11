@@ -375,7 +375,7 @@ export const getRevenueByPaymentMethod = async (from: Date, to: Date) => {
   }));
 };
 
-export const getRevenueByCategory = async (from: Date, to: Date) => {
+export const getRevenueByCategory = async (from: Date, to: Date, limit = 10) => {
   const rows = await prisma.$queryRaw<Array<{ category_id: string; category_name: string; revenue: number; units_sold: bigint }>>`
     SELECT
       c.id                                              AS category_id,
@@ -393,6 +393,7 @@ export const getRevenueByCategory = async (from: Date, to: Date) => {
       AND o."paymentStatus" = 'PAID'
     GROUP BY c.id, c.name
     ORDER BY revenue DESC
+    LIMIT ${Number(limit)}
   `;
 
   const totalRevenue = rows.reduce((acc, r) => acc + Number(r.revenue), 0);

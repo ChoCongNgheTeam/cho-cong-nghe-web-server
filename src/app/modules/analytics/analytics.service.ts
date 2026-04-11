@@ -187,7 +187,7 @@ export const getAnalytics = async (query: AnalyticsQuery): Promise<AnalyticsResp
     repo.getRevenueOverTime(from, to, granularity),
     repo.getRevenueOverTime(prevFrom, prevTo, granularity),
     repo.getRevenueByPaymentMethod(from, to),
-    repo.getRevenueByCategory(from, to),
+    repo.getRevenueByCategory(from, to, 10),
     repo.getTopCustomers(from, to, 10),
     repo.getConversionFunnel(from, to),
     repo.getAnalyticsSummary(from, to),
