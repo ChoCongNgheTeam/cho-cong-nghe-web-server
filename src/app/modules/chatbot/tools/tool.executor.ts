@@ -16,8 +16,9 @@ import {
 // Mỗi function là 1 tool — AI gọi, backend thực thi, trả data
 // ============================================================
 
+const PRODUCT_BASE_URL = "https://chocongnghe.id.vn/products";
+
 // ─── PROMOTION CACHE (TTL: 60s) ─────────────────────────────
-// Tránh query lại DB mỗi lần tool được gọi trong cùng 1 phiên
 interface CachedPromotion {
   id: string;
   priority: number;
@@ -32,7 +33,7 @@ interface CachedPromotion {
 
 let _promoCache: CachedPromotion[] | null = null;
 let _promoCacheAt = 0;
-const PROMO_TTL_MS = 60_000; // 60 giây
+const PROMO_TTL_MS = 60_000;
 
 const getActivePromotionsCache = async (): Promise<CachedPromotion[]> => {
   const now = Date.now();
@@ -143,7 +144,6 @@ export const executeSearchProducts = async (
     sortBy = "BEST_SELLING",
   } = args;
 
-  // ── Build dynamic query ───────────────────────────────────
   const dynamicQuery: Record<string, any> = {};
 
   if (keyword && keyword.trim() !== "") dynamicQuery.search = keyword.trim();
@@ -174,11 +174,8 @@ export const executeSearchProducts = async (
   }
 
   const where = await buildProductWhere(dynamicQuery, true);
-
-  // Giảm takeCount: sort giá chỉ cần 20 thay vì 50
   const takeCount = sortBy !== "BEST_SELLING" ? 20 : Math.min(limit, 10);
 
-  // ── Query sản phẩm + promotion song song ─────────────────
   const [products, promotions] = await Promise.all([
     prisma.products.findMany({
       where,
@@ -200,7 +197,7 @@ export const executeSearchProducts = async (
           where: { isActive: true, deletedAt: null },
           select: { price: true, quantity: true },
           orderBy: { price: "asc" },
-          take: 5, // Chỉ cần min/max, không cần lấy tất cả variants
+          take: 5,
         },
         productSpecifications: {
           where: { isHighlight: true },
@@ -209,11 +206,11 @@ export const executeSearchProducts = async (
             specification: { select: { name: true, key: true } },
           },
           orderBy: { sortOrder: "asc" },
-          take: 4, // Chỉ cần 3-4 highlights
+          take: 4,
         },
       },
     }),
-    getActivePromotionsCache(), // Dùng cache thay vì query riêng
+    getActivePromotionsCache(),
   ]);
 
   let mappedProducts = products.map((p) => {
@@ -233,6 +230,8 @@ export const executeSearchProducts = async (
       id: p.id,
       name: p.name,
       slug: p.slug,
+      // ✅ FIX: ghép sẵn URL đầy đủ từ slug DB — AI chỉ copy nguyên văn, không tự tạo
+      productUrl: `${PRODUCT_BASE_URL}/${p.slug}`,
       thumbnail: p.img[0]?.imageUrl || "",
       originalPriceMin: priceMin,
       originalPriceMax: priceMax,
@@ -303,7 +302,7 @@ export const executeGetProductDetail = async (
         },
       },
     }),
-    getActivePromotionsCache(), // Dùng cache, không query riêng
+    getActivePromotionsCache(),
   ]);
 
   if (!product) return null;
@@ -319,7 +318,6 @@ export const executeGetProductDetail = async (
     promotions,
   );
 
-  // Tính giá từng variant
   const applyPromoPrice = (originalPrice: number): number => {
     const promo = promotions.find((p) =>
       p.targets.some(
@@ -337,7 +335,6 @@ export const executeGetProductDetail = async (
     return originalPrice;
   };
 
-  // Group specs
   const specGroups: Record<string, { name: string; value: string }[]> = {};
   for (const ps of product.productSpecifications) {
     const group = ps.specification.group || "Thông số khác";
@@ -361,7 +358,8 @@ export const executeGetProductDetail = async (
     id: product.id,
     name: product.name,
     slug: product.slug,
-    // Trim description — AI chỉ cần tóm tắt ngắn
+    // ✅ FIX: ghép sẵn URL đầy đủ từ slug DB — AI chỉ copy nguyên văn, không tự tạo
+    productUrl: `${PRODUCT_BASE_URL}/${product.slug}`,
     description: product.description?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300) || undefined,
     brand: product.brand.name,
     category: product.category.name,

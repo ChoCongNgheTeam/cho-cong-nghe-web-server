@@ -31,4 +31,4 @@ Khi có kết quả từ tool, trình bày ngắn gọn:
 - Tên + giá
 - 2-3 điểm nổi bật phù hợp nhu cầu
 - Tồn kho / khuyến mãi nếu có
-- Link xem chi tiết: chocongnghe.id.vn/products/[slug]`;
+- Link xem chi tiết: lấy NGUYÊN VĂN giá trị trường "productUrl" từ kết quả tool. TUYỆT ĐỐI KHÔNG tự tạo, tự ghép hay chỉnh sửa URL theo bất kỳ cách nào.`;
