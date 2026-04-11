@@ -16,8 +16,119 @@ import {
 // Mỗi function là 1 tool — AI gọi, backend thực thi, trả data
 // ============================================================
 
+// ─── PROMOTION CACHE (TTL: 60s) ─────────────────────────────
+// Tránh query lại DB mỗi lần tool được gọi trong cùng 1 phiên
+interface CachedPromotion {
+  id: string;
+  priority: number;
+  rules: {
+    actionType: string;
+    discountValue: any;
+    buyQuantity: any;
+    getQuantity: any;
+  }[];
+  targets: { targetType: string; targetId: string | null }[];
+}
+
+let _promoCache: CachedPromotion[] | null = null;
+let _promoCacheAt = 0;
+const PROMO_TTL_MS = 60_000; // 60 giây
+
+const getActivePromotionsCache = async (): Promise<CachedPromotion[]> => {
+  const now = Date.now();
+  if (_promoCache && now - _promoCacheAt < PROMO_TTL_MS) {
+    return _promoCache;
+  }
+
+  const dbNow = new Date();
+  const promos = await prisma.promotions.findMany({
+    where: {
+      isActive: true,
+      deletedAt: null,
+      AND: [
+        { OR: [{ startDate: null }, { startDate: { lte: dbNow } }] },
+        { OR: [{ endDate: null }, { endDate: { gte: dbNow } }] },
+      ],
+    },
+    select: {
+      id: true,
+      priority: true,
+      rules: {
+        select: {
+          actionType: true,
+          discountValue: true,
+          buyQuantity: true,
+          getQuantity: true,
+        },
+        take: 1,
+        orderBy: { id: "asc" },
+      },
+      targets: {
+        select: { targetType: true, targetId: true },
+      },
+    },
+    orderBy: { priority: "desc" },
+    take: 20,
+  });
+
+  _promoCache = promos as CachedPromotion[];
+  _promoCacheAt = now;
+  return _promoCache;
+};
+
+// ─── HELPER: tính giá & label từ promo ──────────────────────
+const applyPromotion = (
+  priceMin: number,
+  priceMax: number,
+  productId: string,
+  promotions: CachedPromotion[],
+): { finalPriceMin: number; finalPriceMax: number; promotionLabel?: string } => {
+  const promo = promotions.find((p) =>
+    p.targets.some(
+      (t) => t.targetType === "ALL" || (t.targetType === "PRODUCT" && t.targetId === productId),
+    ),
+  );
+
+  if (!promo?.rules?.[0]) {
+    return { finalPriceMin: priceMin, finalPriceMax: priceMax };
+  }
+
+  const rule = promo.rules[0];
+
+  if (rule.actionType === "DISCOUNT_PERCENT" && rule.discountValue) {
+    const pct = Number(rule.discountValue);
+    return {
+      finalPriceMin: Math.round(priceMin * (1 - pct / 100)),
+      finalPriceMax: Math.round(priceMax * (1 - pct / 100)),
+      promotionLabel: `Giảm ${rule.discountValue}%`,
+    };
+  }
+  if (rule.actionType === "DISCOUNT_FIXED" && rule.discountValue) {
+    const fixed = Number(rule.discountValue);
+    return {
+      finalPriceMin: Math.max(0, priceMin - fixed),
+      finalPriceMax: Math.max(0, priceMax - fixed),
+      promotionLabel: `Giảm ${fixed.toLocaleString("vi-VN")}đ`,
+    };
+  }
+  if (rule.actionType === "GIFT_PRODUCT") {
+    return { finalPriceMin: priceMin, finalPriceMax: priceMax, promotionLabel: "Tặng quà" };
+  }
+  if (rule.actionType === "BUY_X_GET_Y") {
+    return {
+      finalPriceMin: priceMin,
+      finalPriceMax: priceMax,
+      promotionLabel: `Mua ${rule.buyQuantity} tặng ${rule.getQuantity}`,
+    };
+  }
+
+  return { finalPriceMin: priceMin, finalPriceMax: priceMax };
+};
+
 // ─── 1. SEARCH PRODUCTS ─────────────────────────────────────
-export const executeSearchProducts = async (args: SearchProductsArgs): Promise<ProductSearchResult[]> => {
+export const executeSearchProducts = async (
+  args: SearchProductsArgs,
+): Promise<ProductSearchResult[]> => {
   const {
     keyword,
     categorySlug,
@@ -29,24 +140,18 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
     specsFilter,
     attrsFilter,
     limit = 5,
-    sortBy = "BEST_SELLING"
+    sortBy = "BEST_SELLING",
   } = args;
 
-  const now = new Date();
-
-  // ── Build dynamic query object cho buildProductWhere ──────
+  // ── Build dynamic query ───────────────────────────────────
   const dynamicQuery: Record<string, any> = {};
 
-  // Vá lỗi: Chỉ gán keyword nếu nó tồn tại và khác rỗng
-  if (keyword && keyword.trim() !== "") {
-    dynamicQuery.search = keyword.trim();
-  }
-
+  if (keyword && keyword.trim() !== "") dynamicQuery.search = keyword.trim();
   if (categorySlug) dynamicQuery.category = categorySlug;
   if (minPrice) dynamicQuery.minPrice = minPrice;
   if (maxPrice) dynamicQuery.maxPrice = maxPrice;
-  if (storage) dynamicQuery[`attr_storage`] = storage;
-  if (color) dynamicQuery[`attr_color`] = color;
+  if (storage) dynamicQuery["attr_storage"] = storage;
+  if (color) dynamicQuery["attr_color"] = color;
 
   if (brandSlug) {
     const brand = await prisma.brands.findUnique({
@@ -58,11 +163,7 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
 
   if (specsFilter) {
     for (const [key, value] of Object.entries(specsFilter)) {
-      if (key.startsWith("spec_")) {
-        dynamicQuery[key] = value;
-      } else {
-        dynamicQuery[`spec_${key}`] = value;
-      }
+      dynamicQuery[key.startsWith("spec_") ? key : `spec_${key}`] = value;
     }
   }
 
@@ -74,61 +175,46 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
 
   const where = await buildProductWhere(dynamicQuery, true);
 
-  // Lấy tối đa 50 kết quả để sort bằng JS nếu AI yêu cầu xếp theo giá
-  const takeCount = sortBy !== "BEST_SELLING" ? 50 : Math.min(limit, 10);
+  // Giảm takeCount: sort giá chỉ cần 20 thay vì 50
+  const takeCount = sortBy !== "BEST_SELLING" ? 20 : Math.min(limit, 10);
 
-  // ── Query sản phẩm ────────────────────────────────────────
-  const products = await prisma.products.findMany({
-    where,
-    take: takeCount,
-    orderBy: [{ totalSoldCount: "desc" }, { ratingAverage: "desc" }],
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      brand: { select: { name: true } },
-      category: { select: { name: true } },
-      ratingAverage: true,
-      img: {
-        select: { imageUrl: true },
-        orderBy: { position: "asc" },
-        take: 1,
-      },
-      variants: {
-        where: { isActive: true, deletedAt: null },
-        select: { price: true, quantity: true },
-        orderBy: { price: "asc" },
-      },
-      productSpecifications: {
-        where: { isHighlight: true },
-        select: {
-          value: true,
-          specification: {
-            select: {
-              name: true,
-              key: true,
-            },
-          },
+  // ── Query sản phẩm + promotion song song ─────────────────
+  const [products, promotions] = await Promise.all([
+    prisma.products.findMany({
+      where,
+      take: takeCount,
+      orderBy: [{ totalSoldCount: "desc" }, { ratingAverage: "desc" }],
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        brand: { select: { name: true } },
+        category: { select: { name: true } },
+        ratingAverage: true,
+        img: {
+          select: { imageUrl: true },
+          orderBy: { position: "asc" },
+          take: 1,
         },
-        orderBy: { sortOrder: "asc" },
+        variants: {
+          where: { isActive: true, deletedAt: null },
+          select: { price: true, quantity: true },
+          orderBy: { price: "asc" },
+          take: 5, // Chỉ cần min/max, không cần lấy tất cả variants
+        },
+        productSpecifications: {
+          where: { isHighlight: true },
+          select: {
+            value: true,
+            specification: { select: { name: true, key: true } },
+          },
+          orderBy: { sortOrder: "asc" },
+          take: 4, // Chỉ cần 3-4 highlights
+        },
       },
-    },
-  });
-
-  // ── Lấy promotions active để gắn label & tính giá ────────
-  const activePromotions = await prisma.promotions.findMany({
-    where: {
-      isActive: true,
-      deletedAt: null,
-      AND: [
-        { OR: [{ startDate: null }, { startDate: { lte: now } }] },
-        { OR: [{ endDate: null }, { endDate: { gte: now } }] },
-      ],
-    },
-    include: { rules: true, targets: true },
-    orderBy: { priority: "desc" },
-    take: 20,
-  });
+    }),
+    getActivePromotionsCache(), // Dùng cache thay vì query riêng
+  ]);
 
   let mappedProducts = products.map((p) => {
     const prices = p.variants.map((v) => Number(v.price));
@@ -136,43 +222,20 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
     const priceMax = prices.length ? Math.max(...prices) : 0;
     const inStock = p.variants.some((v) => v.quantity > 0);
 
-    const applicablePromo = activePromotions.find((promo) =>
-      promo.targets.some(
-        (t) =>
-          t.targetType === "ALL" ||
-          (t.targetType === "PRODUCT" && t.targetId === p.id),
-      ),
+    const { finalPriceMin, finalPriceMax, promotionLabel } = applyPromotion(
+      priceMin,
+      priceMax,
+      p.id,
+      promotions,
     );
-
-    let finalPriceMin = priceMin;
-    let finalPriceMax = priceMax;
-    let promotionLabel: string | undefined;
-
-    if (applicablePromo?.rules?.[0]) {
-      const rule = applicablePromo.rules[0];
-      
-      if (rule.actionType === "DISCOUNT_PERCENT" && rule.discountValue) {
-        const discountPercent = Number(rule.discountValue);
-        finalPriceMin = Math.round(priceMin * (1 - discountPercent / 100));
-        finalPriceMax = Math.round(priceMax * (1 - discountPercent / 100));
-        promotionLabel = `Giảm ${rule.discountValue}%`;
-      } else if (rule.actionType === "DISCOUNT_FIXED" && rule.discountValue) {
-        const discountFixed = Number(rule.discountValue);
-        finalPriceMin = Math.max(0, priceMin - discountFixed);
-        finalPriceMax = Math.max(0, priceMax - discountFixed);
-        promotionLabel = `Giảm ${Number(rule.discountValue).toLocaleString("vi-VN")}đ`;
-      } else if (rule.actionType === "GIFT_PRODUCT") {
-        promotionLabel = "Tặng quà";
-      } else if (rule.actionType === "BUY_X_GET_Y") {
-        promotionLabel = `Mua ${rule.buyQuantity} tặng ${rule.getQuantity}`;
-      }
-    }
 
     return {
       id: p.id,
       name: p.name,
       slug: p.slug,
       thumbnail: p.img[0]?.imageUrl || "",
+      originalPriceMin: priceMin,
+      originalPriceMax: priceMax,
       priceMin: finalPriceMin,
       priceMax: finalPriceMax,
       brand: p.brand.name,
@@ -188,14 +251,12 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
     };
   });
 
-  // Xử lý Sort bằng Javascript sau khi đã có giá chính thức (đã trừ khuyến mãi)
   if (sortBy === "PRICE_ASC") {
     mappedProducts.sort((a, b) => a.priceMin - b.priceMin);
   } else if (sortBy === "PRICE_DESC") {
     mappedProducts.sort((a, b) => b.priceMin - a.priceMin);
   }
 
-  // Slice lại đúng số limit yêu cầu trước khi trả về cho AI
   return mappedProducts.slice(0, Math.min(limit, 10));
 };
 
@@ -203,105 +264,80 @@ export const executeSearchProducts = async (args: SearchProductsArgs): Promise<P
 export const executeGetProductDetail = async (
   args: GetProductDetailArgs,
 ): Promise<ProductDetailResult | null> => {
-  const product = await prisma.products.findFirst({
-    where: { slug: args.slug, isActive: true, deletedAt: null },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      description: true,
-      brand: { select: { name: true } },
-      category: { select: { name: true } },
-      ratingAverage: true,
-      img: { select: { imageUrl: true }, take: 1 },
-      variants: {
-        where: { isActive: true, deletedAt: null },
-        select: {
-          id: true,
-          price: true,
-          quantity: true,
-          variantAttributes: {
-            select: {
-              attributeOption: {
-                select: {
-                  value: true,
-                  label: true,
-                  attribute: { select: { code: true, name: true } },
+  const [product, promotions] = await Promise.all([
+    prisma.products.findFirst({
+      where: { slug: args.slug, isActive: true, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        brand: { select: { name: true } },
+        category: { select: { name: true } },
+        ratingAverage: true,
+        variants: {
+          where: { isActive: true, deletedAt: null },
+          select: {
+            id: true,
+            price: true,
+            quantity: true,
+            variantAttributes: {
+              select: {
+                attributeOption: {
+                  select: {
+                    label: true,
+                    attribute: { select: { code: true, name: true } },
+                  },
                 },
               },
             },
           },
+          orderBy: { price: "asc" },
         },
-        orderBy: { price: "asc" },
-      },
-      productSpecifications: {
-        select: {
-          value: true,
-          specification: {
-            select: {
-              name: true,
-              key: true,
-              group: true,
-            },
+        productSpecifications: {
+          select: {
+            value: true,
+            specification: { select: { name: true, key: true, group: true } },
           },
+          orderBy: { sortOrder: "asc" },
         },
-        orderBy: { sortOrder: "asc" },
       },
-    },
-  });
+    }),
+    getActivePromotionsCache(), // Dùng cache, không query riêng
+  ]);
 
   if (!product) return null;
-
-  const now = new Date();
-
-  // Lấy promotions active
-  const activePromotions = await prisma.promotions.findMany({
-    where: {
-      isActive: true,
-      deletedAt: null,
-      AND: [
-        { OR: [{ startDate: null }, { startDate: { lte: now } }] },
-        { OR: [{ endDate: null }, { endDate: { gte: now } }] },
-      ],
-    },
-    include: { rules: true, targets: true },
-    orderBy: { priority: "desc" },
-    take: 20,
-  });
-
-  // Tìm promotion áp dụng cho sản phẩm này
-  const applicablePromo = activePromotions.find((promo) =>
-    promo.targets.some(
-      (t) =>
-        t.targetType === "ALL" ||
-        (t.targetType === "PRODUCT" && t.targetId === product.id),
-    ),
-  );
-
-  // Hàm tính giá thực tế dựa trên promotion
-  const calculateFinalPrice = (originalPrice: number): number => {
-    if (applicablePromo?.rules?.[0]) {
-      const rule = applicablePromo.rules[0];
-      if (rule.actionType === "DISCOUNT_PERCENT" && rule.discountValue) {
-        const discountPercent = Number(rule.discountValue);
-        return Math.round(originalPrice * (1 - discountPercent / 100));
-      } else if (rule.actionType === "DISCOUNT_FIXED" && rule.discountValue) {
-        const discountFixed = Number(rule.discountValue);
-        return Math.max(0, originalPrice - discountFixed);
-      }
-    }
-    return originalPrice;
-  };
 
   const prices = product.variants.map((v) => Number(v.price));
   const priceMin = prices.length ? Math.min(...prices) : 0;
   const priceMax = prices.length ? Math.max(...prices) : 0;
 
-  // Tính giá thực tế (sau discount)
-  const finalPriceMin = calculateFinalPrice(priceMin);
-  const finalPriceMax = calculateFinalPrice(priceMax);
+  const { finalPriceMin, finalPriceMax, promotionLabel } = applyPromotion(
+    priceMin,
+    priceMax,
+    product.id,
+    promotions,
+  );
 
-  // Group specs by group name
+  // Tính giá từng variant
+  const applyPromoPrice = (originalPrice: number): number => {
+    const promo = promotions.find((p) =>
+      p.targets.some(
+        (t) => t.targetType === "ALL" || (t.targetType === "PRODUCT" && t.targetId === product.id),
+      ),
+    );
+    if (!promo?.rules?.[0]) return originalPrice;
+    const rule = promo.rules[0];
+    if (rule.actionType === "DISCOUNT_PERCENT" && rule.discountValue) {
+      return Math.round(originalPrice * (1 - Number(rule.discountValue) / 100));
+    }
+    if (rule.actionType === "DISCOUNT_FIXED" && rule.discountValue) {
+      return Math.max(0, originalPrice - Number(rule.discountValue));
+    }
+    return originalPrice;
+  };
+
+  // Group specs
   const specGroups: Record<string, { name: string; value: string }[]> = {};
   for (const ps of product.productSpecifications) {
     const group = ps.specification.group || "Thông số khác";
@@ -309,16 +345,14 @@ export const executeGetProductDetail = async (
     specGroups[group].push({ name: ps.specification.name, value: ps.value });
   }
 
-  // Format variants thành label đọc được (với giá thực tế)
   const variants = product.variants.map((v) => {
     const attrLabels = v.variantAttributes
       .map((va) => va.attributeOption.label)
       .join(" / ");
-    const originalPrice = Number(v.price);
-    const finalPrice = calculateFinalPrice(originalPrice);
     return {
       label: attrLabels || "Mặc định",
-      price: finalPrice,
+      originalPrice: Number(v.price),
+      price: applyPromoPrice(Number(v.price)),
       inStock: v.quantity > 0,
     };
   });
@@ -327,17 +361,18 @@ export const executeGetProductDetail = async (
     id: product.id,
     name: product.name,
     slug: product.slug,
-    description: product.description || undefined,
+    // Trim description — AI chỉ cần tóm tắt ngắn
+    description: product.description?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300) || undefined,
     brand: product.brand.name,
     category: product.category.name,
+    originalPriceMin: priceMin,
+    originalPriceMax: priceMax,
     priceMin: finalPriceMin,
     priceMax: finalPriceMax,
     inStock: product.variants.some((v) => v.quantity > 0),
     rating: Number(product.ratingAverage),
-    specifications: Object.entries(specGroups).map(([group, items]) => ({
-      group,
-      items,
-    })),
+    promotionLabel,
+    specifications: Object.entries(specGroups).map(([group, items]) => ({ group, items })),
     variants,
   };
 };
@@ -358,9 +393,14 @@ export const executeGetActivePromotions = async (
         { OR: [{ endDate: null }, { endDate: { gte: now } }] },
       ],
     },
-    include: {
-      rules: { take: 1 },
-      targets: { take: 3 },
+    select: {
+      name: true,
+      description: true,
+      endDate: true,
+      rules: {
+        select: { actionType: true, discountValue: true, buyQuantity: true, getQuantity: true },
+        take: 1,
+      },
     },
     orderBy: { priority: "desc" },
     take: limit,
@@ -371,17 +411,16 @@ export const executeGetActivePromotions = async (
     let discountSummary = "Xem chi tiết";
 
     if (rule) {
-      if (rule.actionType === "DISCOUNT_PERCENT" && rule.discountValue) {
+      if (rule.actionType === "DISCOUNT_PERCENT" && rule.discountValue)
         discountSummary = `Giảm ${rule.discountValue}%`;
-      } else if (rule.actionType === "DISCOUNT_FIXED" && rule.discountValue) {
+      else if (rule.actionType === "DISCOUNT_FIXED" && rule.discountValue)
         discountSummary = `Giảm ${Number(rule.discountValue).toLocaleString("vi-VN")}đ`;
-      } else if (rule.actionType === "FREE_SHIPPING") {
+      else if (rule.actionType === "FREE_SHIPPING")
         discountSummary = "Miễn phí vận chuyển";
-      } else if (rule.actionType === "GIFT_PRODUCT") {
+      else if (rule.actionType === "GIFT_PRODUCT")
         discountSummary = "Tặng quà kèm";
-      } else if (rule.actionType === "BUY_X_GET_Y" && rule.buyQuantity && rule.getQuantity) {
+      else if (rule.actionType === "BUY_X_GET_Y" && rule.buyQuantity && rule.getQuantity)
         discountSummary = `Mua ${rule.buyQuantity} tặng ${rule.getQuantity}`;
-      }
     }
 
     return {
@@ -404,23 +443,16 @@ export const executeGetPolicy = async (
       isPublished: true,
       deletedAt: null,
     },
-    select: {
-      title: true,
-      content: true,
-    },
+    select: { title: true, content: true },
   });
 
   if (!page) return null;
 
-  // Strip HTML tags để AI đọc được, giữ lại text
   const plainContent = page.content
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 2000);
 
-  return {
-    title: page.title,
-    content: plainContent,
-  };
+  return { title: page.title, content: plainContent };
 };

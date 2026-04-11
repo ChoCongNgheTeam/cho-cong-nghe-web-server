@@ -21,19 +21,16 @@ export interface ChatResponse {
 // ---- Tool input types ----
 
 export interface SearchProductsArgs {
-  keyword?: string; // Đã đổi thành optional để fix lỗi tìm danh mục
+  keyword?: string;
   categorySlug?: string;
   brandSlug?: string;
   minPrice?: number;
   maxPrice?: number;
   storage?: string;
   color?: string;
-  // Lọc theo thông số kỹ thuật
   specsFilter?: Record<string, string>;
-  // Lọc theo variant attribute
   attrsFilter?: Record<string, string | string[]>;
   limit?: number;
-  // Cách sắp xếp kết quả
   sortBy?: "PRICE_ASC" | "PRICE_DESC" | "BEST_SELLING";
 }
 
@@ -56,14 +53,16 @@ export interface ProductSearchResult {
   name: string;
   slug: string;
   thumbnail: string;
-  priceMin: number;
+  originalPriceMin: number; // Giá gốc trước giảm
+  originalPriceMax: number;
+  priceMin: number;         // Giá sau khi áp promotion
   priceMax: number;
   brand: string;
   category: string;
   inStock: boolean;
   rating: number;
   highlights: { name: string; key: string; value: string }[];
-  promotionLabel?: string;
+  promotionLabel?: string;  // VD: "Giảm 5%", "Tặng quà"
 }
 
 export interface ProductDetailResult {
@@ -73,12 +72,15 @@ export interface ProductDetailResult {
   description?: string;
   brand: string;
   category: string;
+  originalPriceMin: number;
+  originalPriceMax: number;
   priceMin: number;
   priceMax: number;
   inStock: boolean;
   rating: number;
+  promotionLabel?: string;
   specifications: { group: string; items: { name: string; value: string }[] }[];
-  variants: { label: string; price: number; inStock: boolean }[];
+  variants: { label: string; originalPrice: number; price: number; inStock: boolean }[];
 }
 
 export interface PolicyResult {

@@ -11,11 +11,14 @@ export const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "search_products",
       description: `Tìm kiếm sản phẩm. 
-      LƯU Ý NGÂN SÁCH: 
+      LƯU Ý NGÂN SÁCH VÀ TỪ KHÓA: 
       - Khách nói "tầm/khoảng X triệu" -> maxPrice = X * 1.1 triệu
       - "dưới X triệu" -> maxPrice = X triệu
       - "giá tốt/rẻ nhất" -> KHÔNG dùng maxPrice, bắt buộc dùng sortBy = "PRICE_ASC"
-      - "cao cấp/đắt nhất" -> KHÔNG dùng maxPrice, bắt buộc dùng sortBy = "PRICE_DESC"`,
+      - "cao cấp/đắt nhất" -> KHÔNG dùng maxPrice, bắt buộc dùng sortBy = "PRICE_DESC"
+      - "hot nhất/bán chạy nhất/nhiều người mua" -> BẮT BUỘC dùng sortBy = "BEST_SELLING"
+      - KHÁCH HỎI TÌM "SẢN PHẨM SALE/GIẢM GIÁ" -> BẮT BUỘC GỌI TOOL NÀY. Nếu khách không nói rõ loại máy, hãy để trống các tham số để lấy top.
+      - QUAN TRỌNG: NẾU KHÁCH HỎI ĐÍCH DANH 1 DÒNG MÁY CỤ THỂ (VD: "có Z Fold 7 không?", "giá iPhone 15") -> Gọi tool này để tìm máy. Nếu tìm thấy, BẮT BUỘC lấy 'slug' đó gọi tiếp tool 'get_product_detail' để lấy danh sách các phiên bản (variants) báo giá chi tiết cho khách.`,
       parameters: {
         type: "object",
         properties: {
@@ -84,7 +87,11 @@ Nếu khách chỉ hỏi danh mục chung chung ('có máy lạnh không', 'tìm
     type: "function",
     function: {
       name: "get_active_promotions",
-      description: "Lấy danh sách khuyến mãi đang chạy.",
+      description: `Lấy danh sách chương trình khuyến mãi đang chạy.
+      LƯU Ý QUAN TRỌNG:
+      1. NẾU khách yêu cầu TÌM MÁY/SẢN PHẨM (VD: "sản phẩm đang sale", "điện thoại nào giảm giá", "máy nào hot"), TUYỆT ĐỐI KHÔNG dùng tool này (hãy dùng search_products).
+      2. CHỈ dùng tool này khi khách hỏi thông tin chung về chương trình (VD: "shop có đang chạy sale gì không?", "có chương trình ưu đãi nào không?").
+      3. Khi có kết quả, phải chuyển tên chương trình thành tiếng Việt tự nhiên, KHÔNG đọc y nguyên mã code cho khách.`,
       parameters: {
         type: "object",
         properties: { limit: { type: "number" } },
