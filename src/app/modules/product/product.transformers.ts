@@ -271,6 +271,7 @@ export const transformProductCard = (product: any): ProductCard | null => {
     })),
     inStock,
     isActive: product.isActive,
+    category: product.category ?? null,
   };
 };
 
