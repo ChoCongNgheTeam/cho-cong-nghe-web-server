@@ -4,7 +4,15 @@ import { authMiddleware } from "@/app/middlewares/auth.middleware";
 import { requireRole } from "@/app/middlewares/role.middleware";
 import { asyncHandler } from "@/utils/async-handler";
 import { aiContentController } from "./ai-content.controller";
-import { generateProductDescriptionSchema, generateProductDescriptionFromNameSchema, generateBlogPostSchema, analyzeSEOSchema, contentHistorySchema } from "./ai-content.validation";
+import {
+  generateProductDescriptionSchema,
+  generateProductDescriptionFromNameSchema,
+  generateBlogPostSchema,
+  analyzeSEOSchema,
+  contentHistorySchema,
+  suggestSpecificationsSchema,
+} from "./ai-content.validation";
+import { uploadSpec } from "./ai-content.service";
 
 // ============================================================
 // AI CONTENT ROUTES — Admin only
@@ -15,36 +23,49 @@ const router = Router();
 
 const adminAuth = [authMiddleware(), requireRole("ADMIN", "STAFF")] as const;
 
-// ─── Timeout middleware riêng cho AI routes ──────────────────
-// Express/Node mặc định không có timeout — nếu server chạy sau
-// nginx/proxy thì proxy sẽ cut connection trước khi AI xong.
-// Middleware này set socket timeout dài hơn cho đúng route.
+// ─── Timeout middleware cho AI routes ────────────────────────
 const extendTimeout = (timeoutMs = 180_000) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    // Tăng socket timeout để tránh proxy/nginx ngắt sớm
     req.socket.setTimeout(timeoutMs);
-
-    // Gửi header sớm để proxy biết connection vẫn sống
-    // (một số proxy như nginx dùng proxy_read_timeout để đo từ lúc nhận header cuối)
-    res.setHeader("X-Accel-Buffering", "no"); // tắt nginx buffering
-
+    res.setHeader("X-Accel-Buffering", "no");
     next();
   };
 };
 
-// Viết mô tả sản phẩm (sản phẩm đã tồn tại trong DB)
+// ─── Standard routes ─────────────────────────────────────────
+
+router.get("/spec-template", ...adminAuth, asyncHandler(aiContentController.downloadSpecTemplate));
+
 router.post("/product-description", ...adminAuth, extendTimeout(), validate(generateProductDescriptionSchema), asyncHandler(aiContentController.generateProductDescription));
 
-// Viết mô tả sản phẩm (sản phẩm MỚI, chỉ có tên + keyword)
 router.post("/product-description-from-name", ...adminAuth, extendTimeout(), validate(generateProductDescriptionFromNameSchema), asyncHandler(aiContentController.generateProductDescriptionFromName));
 
-// Viết bài blog
 router.post("/blog", ...adminAuth, extendTimeout(), validate(generateBlogPostSchema), asyncHandler(aiContentController.generateBlogPost));
 
-// Check SEO — không gọi AI, không cần timeout dài
 router.post("/analyze-seo", ...adminAuth, validate(analyzeSEOSchema), asyncHandler(aiContentController.analyzeSEO));
 
-// Lịch sử nội dung đã tạo
 router.get("/history", ...adminAuth, validate(contentHistorySchema, "query"), asyncHandler(aiContentController.getHistory));
+
+router.post("/suggest-specifications", ...adminAuth, extendTimeout(60_000), validate(suggestSpecificationsSchema), asyncHandler(aiContentController.suggestSpecifications));
+
+// ─── Import Specifications — multipart/form-data ─────────────
+//
+// FIX LỖI "Multipart: Boundary not found":
+// Nguyên nhân: express.json() (global middleware) consume request
+// stream TRƯỚC khi multer chạy. Một stream chỉ đọc được 1 lần —
+// multer không còn gì để đọc → không tìm thấy multipart boundary.
+//
+// Giải pháp: đặt uploadSpec.single("file") LÀ MIDDLEWARE ĐẦU TIÊN
+// của route này, TRƯỚC cả authMiddleware. Auth vẫn chạy sau đó,
+// nhưng lúc này body đã được multer parse xong và không bị conflict.
+//
+// Lưu ý: req.body (categoryId) sau multer vẫn đọc được vì multer
+// tự parse các text fields trong multipart form.
+router.post(
+  "/import-specifications",
+  uploadSpec.single("file"), // ← phải đứng đầu tiên
+  ...adminAuth,
+  asyncHandler(aiContentController.importSpecificationsHandler),
+);
 
 export const aiContentRoute = router;

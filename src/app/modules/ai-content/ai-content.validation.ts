@@ -48,4 +48,40 @@ export const generateProductDescriptionFromNameSchema = z.object({
   additionalNotes: z.string().max(500).optional(),
 });
 
+// ─── Suggest Specifications ──────────────────────────────────
+export const suggestSpecificationsSchema = z.object({
+  // Tên sản phẩm để AI suy luận thông số
+  productName: z.string().min(3, "Tên sản phẩm tối thiểu 3 ký tự").max(300),
+
+  // categoryId để fetch đúng danh sách spec fields
+  categoryId: z.string().uuid("categoryId phải là UUID hợp lệ"),
+
+  // Danh sách spec cần AI điền — gửi lên để AI biết field nào cần fill
+  // Array of { specificationId, name, group, unit? }
+  specifications: z
+    .array(
+      z.object({
+        specificationId: z.string(),
+        name: z.string(),
+        group: z.string().optional(),
+        unit: z.string().nullable().optional(),
+      }),
+    )
+    .min(1, "Phải có ít nhất 1 thông số"),
+
+  // Chỉ fill field trống (không ghi đè field đã có giá trị)
+  onlyEmpty: z.boolean().default(true),
+});
+
+export const importSpecificationsSchema = z.object({
+  // categoryId để validate spec_id hợp lệ với danh mục
+  categoryId: z.string().uuid(),
+  // onlyEmpty: chỉ apply cho field đang trống (FE xử lý, BE chỉ parse)
+  onlyEmpty: z.boolean().default(true),
+  // confirmOverwrite: nếu false → trả về list field sẽ bị ghi đè để FE confirm
+  confirmOverwrite: z.boolean().default(false),
+});
+
+export type SuggestSpecificationsInput = z.infer<typeof suggestSpecificationsSchema>;
+
 export type GenerateProductDescriptionFromNameInput = z.infer<typeof generateProductDescriptionFromNameSchema>;
