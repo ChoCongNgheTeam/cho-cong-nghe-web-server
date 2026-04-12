@@ -74,6 +74,7 @@ const importSpecificationsHandler = asyncHandler(async (req: Request, res: Respo
 // Logic build XLSX đã chuyển sang service
 const downloadSpecTemplate = asyncHandler(async (req: Request, res: Response) => {
   const { categoryId } = req.query as { categoryId: string };
+  console.log(categoryId);
 
   if (!categoryId) {
     return res.status(400).json({ success: false, message: "categoryId là bắt buộc" });

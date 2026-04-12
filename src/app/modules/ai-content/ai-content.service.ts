@@ -213,33 +213,30 @@ export const getContentHistory = async (params: { type?: "PRODUCT_DESCRIPTION" |
 };
 
 // ─── buildSuggestSpecsPrompt (internal) ─────────────────────
-const buildSuggestSpecsPrompt = (productName: string, specifications: { specificationId: string; name: string; group?: string; unit?: string | null }[]): string => {
-  const specList = specifications.map((s) => `- specificationId: ${s.specificationId}\n  name: ${s.name}${s.group ? `\n  group: ${s.group}` : ""}${s.unit ? `\n  unit: ${s.unit}` : ""}`).join("\n");
+// ─── Prompt builder (cho từng chunk) ────────────────────────
+const buildSuggestSpecsPrompt = (productName: string, specs: Array<{ specificationId: string; name: string; group?: string; unit?: string | null }>): string => {
+  const specList = specs
+    .map((s) => {
+      const unitHint = s.unit ? ` (đơn vị: ${s.unit})` : "";
+      const groupHint = s.group ? ` [nhóm: ${s.group}]` : "";
+      return `- id="${s.specificationId}" | tên="${s.name}"${groupHint}${unitHint}`;
+    })
+    .join("\n");
 
-  return `Bạn là chuyên gia phần cứng công nghệ. Dựa vào tên sản phẩm, hãy suy luận giá trị cho các thông số kỹ thuật sau.
-
+  return `Bạn là chuyên gia về sản phẩm công nghệ. Dựa vào tên sản phẩm sau, hãy điền giá trị hợp lý cho từng thông số kỹ thuật.
+ 
 ## SẢN PHẨM
 ${productName}
-
+ 
 ## DANH SÁCH THÔNG SỐ CẦN ĐIỀN
 ${specList}
-
+ 
 ## YÊU CẦU
 - Với mỗi thông số, hãy suy luận giá trị dựa trên tên sản phẩm
-- Nếu không thể suy luận được (thông tin không có trong tên), trả về value là null
+- Nếu không thể suy luận được, trả về value là null
 - Giá trị phải thực tế, không bịa số liệu không có căn cứ
 - Giá trị KHÔNG bao gồm đơn vị (đơn vị đã có trong field "unit")
 - Trả về JSON object với key là specificationId, value là string hoặc null
- 
-## VÍ DỤ
-Sản phẩm: "Keychron K6 Pro Wireless Mechanical Keyboard"
-→ {
-  "id-loai-ket-noi": "USB-C, Bluetooth 5.1",
-  "id-layout": "65%",
-  "id-switch": null,
-  "id-pin": "4000",
-  "id-rgb": "RGB"
-}
  
 ## QUAN TRỌNG
 - Chỉ trả về JSON thuần, không markdown, không giải thích
@@ -247,30 +244,173 @@ Sản phẩm: "Keychron K6 Pro Wireless Mechanical Keyboard"
 - Với thông số không suy luận được: value = null (KHÔNG bỏ key)`;
 };
 
-// ─── 6. Suggest Specifications ───────────────────────────────
-export const suggestSpecifications = async (input: SuggestSpecificationsInput): Promise<{ suggestions: Record<string, string | null>; filledCount: number; productName: string }> => {
-  const prompt = buildSuggestSpecsPrompt(input.productName, input.specifications);
-  const raw = await callOpenAI(prompt, 800);
+// ─── Parse JSON an toàn — xử lý cả truncated JSON ───────────
+// Khi max_tokens bị cắt ngang, JSON có dạng:
+//   { "id1": "val1", "id2": "val ← bị cắt ở đây
+// Ta cố gắng thu hồi các cặp key-value đã hoàn chỉnh.
+const safeParseSpecJson = (raw: string): Record<string, string | null> => {
+  // Bước 1: clean markdown fences
+  const cleaned = raw
+    .replace(/```json\n?/g, "")
+    .replace(/```\n?/g, "")
+    .trim();
 
-  let suggestions: Record<string, string | null> = {};
+  // Bước 2: thử parse bình thường trước
   try {
-    const cleaned = raw
-      .replace(/```json\n?/g, "")
-      .replace(/```\n?/g, "")
-      .trim();
     const parsed = JSON.parse(cleaned);
-    const validIds = new Set(input.specifications.map((s) => s.specificationId));
-    for (const [k, v] of Object.entries(parsed)) {
-      if (validIds.has(k)) {
-        suggestions[k] = typeof v === "string" && v.trim() ? v.trim() : null;
-      }
+    if (typeof parsed === "object" && parsed !== null) return parsed;
+  } catch {
+    // tiếp tục sang recovery
+  }
+
+  // Bước 3: partial recovery — extract các cặp đã hoàn chỉnh bằng regex
+  // Match: "uuid": "value" hoặc "uuid": null
+  const recovered: Record<string, string | null> = {};
+  const pairRegex = /"([0-9a-f-]{36})"\s*:\s*(?:"((?:[^"\\]|\\.)*)"|null)/gi;
+  let match: RegExpExecArray | null;
+  while ((match = pairRegex.exec(cleaned)) !== null) {
+    recovered[match[1]] = match[2] !== undefined ? match[2] : null;
+  }
+
+  if (Object.keys(recovered).length > 0) {
+    console.warn(`[ai-content] JSON truncated, recovered ${Object.keys(recovered).length} entries via regex`);
+    return recovered;
+  }
+
+  // Bước 4: thử auto-close JSON bị cắt
+  // Tìm vị trí dấu phẩy hoặc : cuối cùng và cắt tại đó rồi đóng ngoặc
+  try {
+    const lastClean = cleaned.replace(/,\s*$/, "").replace(/,\s*"[^"]*"\s*:\s*[^,}]*$/, "");
+    const closed = lastClean.endsWith("}") ? lastClean : lastClean + "}";
+    const parsed = JSON.parse(closed);
+    if (typeof parsed === "object" && parsed !== null) {
+      console.warn(`[ai-content] JSON auto-closed, recovered ${Object.keys(parsed).length} entries`);
+      return parsed;
     }
   } catch {
-    console.error("[ai-content] suggestSpecifications JSON parse failed:", raw.slice(0, 200));
+    // bỏ qua
+  }
+
+  console.error("[ai-content] JSON parse failed completely:", cleaned.slice(0, 300));
+  return {};
+};
+
+// ─── Token budget per spec ───────────────────────────────────
+// UUID (36) + value (~40 chars) + JSON syntax ≈ ~30 tokens/spec
+// Thêm 200 tokens buffer cho prompt overhead
+const TOKENS_PER_SPEC = 35;
+const PROMPT_OVERHEAD = 300;
+const MAX_TOKENS_CAP = 4000; // gpt-4o-mini max output safe limit
+
+const calcMaxTokens = (specCount: number): number => Math.min(PROMPT_OVERHEAD + specCount * TOKENS_PER_SPEC, MAX_TOKENS_CAP);
+
+// ─── Chunk size: ~20 specs/batch là điểm ngọt nhất ──────────
+// - Đủ nhỏ để không bị cắt token
+// - Đủ lớn để không spam quá nhiều requests
+const CHUNK_SIZE = 20;
+
+// ─── 6. Suggest Specifications (chunked) ─────────────────────
+export const suggestSpecifications = async (
+  input: SuggestSpecificationsInput,
+): Promise<{
+  suggestions: Record<string, string | null>;
+  filledCount: number;
+  productName: string;
+  chunksUsed: number;
+}> => {
+  const { productName, specifications } = input;
+  const validIds = new Set(specifications.map((s) => s.specificationId));
+
+  // Chia specs thành chunks
+  const chunks: (typeof specifications)[] = [];
+  for (let i = 0; i < specifications.length; i += CHUNK_SIZE) {
+    chunks.push(specifications.slice(i, i + CHUNK_SIZE));
+  }
+
+  console.log(`[ai-content] suggestSpecifications: ${specifications.length} specs → ${chunks.length} chunks`);
+
+  // Gọi song song tất cả chunks
+  const chunkResults = await Promise.allSettled(
+    chunks.map(async (chunk, idx) => {
+      const prompt = buildSuggestSpecsPrompt(productName, chunk);
+      const maxTokens = calcMaxTokens(chunk.length);
+
+      console.log(`[ai-content] chunk ${idx + 1}/${chunks.length}: ${chunk.length} specs, maxTokens=${maxTokens}`);
+
+      const raw = await callOpenAI(prompt, maxTokens);
+      return safeParseSpecJson(raw);
+    }),
+  );
+
+  // Merge kết quả từ tất cả chunks
+  const suggestions: Record<string, string | null> = {};
+
+  for (let i = 0; i < chunkResults.length; i++) {
+    const result = chunkResults[i];
+    if (result.status === "fulfilled") {
+      const parsed = result.value;
+      for (const [k, v] of Object.entries(parsed)) {
+        if (validIds.has(k)) {
+          suggestions[k] = typeof v === "string" && v.trim() ? v.trim() : null;
+        }
+      }
+    } else {
+      console.error(`[ai-content] chunk ${i + 1} failed:`, result.reason?.message);
+    }
   }
 
   const filledCount = Object.values(suggestions).filter((v) => v !== null).length;
-  return { suggestions, filledCount, productName: input.productName };
+
+  console.log(`[ai-content] suggestSpecifications done: ${filledCount}/${specifications.length} filled`);
+
+  return {
+    suggestions,
+    filledCount,
+    productName,
+    chunksUsed: chunks.length,
+  };
+};
+
+// ─── Walk up category tree để tìm specs ─────────────────────
+// Specs có thể được define ở node cha (shared template).
+// VD: MacBook Pro 16 inch (ec11a...) → cha là Apple (Macbook) (864fa...)
+//     → cha là Laptop (93443...) — specs định nghĩa ở đây
+//
+// Thuật toán: query từ categoryId hiện tại, nếu không có specs
+// thì lấy parentId rồi thử lại, cho đến khi tìm thấy hoặc hết tree.
+const findSpecsWalkingUp = async (categoryId: string) => {
+  let currentId: string | null = categoryId;
+  const visited: string[] = [];
+
+  while (currentId) {
+    visited.push(currentId);
+
+    const specs = await prisma.category_specifications.findMany({
+      where: { categoryId: currentId },
+      include: {
+        specification: {
+          select: { name: true, group: true, unit: true, isRequired: true },
+        },
+      },
+      orderBy: [{ specification: { group: "asc" } }, { sortOrder: "asc" }],
+    });
+
+    if (specs.length > 0) {
+      console.log(`[getSpecTemplate] found ${specs.length} specs at categoryId=${currentId}` + (currentId !== categoryId ? ` (walked up from ${categoryId})` : ""));
+      return { specs, resolvedCategoryId: currentId };
+    }
+
+    // Chưa có → lấy parentId
+    const cat: { parentId: string | null } | null = await prisma.categories.findUnique({
+      where: { id: currentId },
+      select: { parentId: true },
+    });
+
+    currentId = cat?.parentId ?? null;
+  }
+
+  console.warn(`[getSpecTemplate] no specs found, visited: ${visited.join(" → ")}`);
+  return { specs: [], resolvedCategoryId: null };
 };
 
 // ─── 7. Get Spec Template (XLSX buffer) ──────────────────────
@@ -280,23 +420,15 @@ export interface SpecTemplateResult {
 }
 
 export const getSpecTemplate = async (categoryId: string): Promise<SpecTemplateResult> => {
-  const specs = await prisma.category_specifications.findMany({
-    where: { categoryId },
-    include: {
-      specification: {
-        select: { name: true, group: true, unit: true, isRequired: true },
-      },
-    },
-    orderBy: [{ specification: { group: "asc" } }, { sortOrder: "asc" }],
-  });
+  const { specs, resolvedCategoryId } = await findSpecsWalkingUp(categoryId);
 
   if (specs.length === 0) {
-    throw Object.assign(new Error("Danh mục không có thông số kỹ thuật"), { statusCode: 404 });
+    throw Object.assign(new Error("Không tìm thấy thông số kỹ thuật cho danh mục này hoặc danh mục cha"), { statusCode: 404 });
   }
 
   const wb = XLSX.utils.book_new();
 
-  // Sheet 1: Spec IDs (thông tin tham chiếu)
+  // Sheet 1: Spec IDs (tham chiếu)
   const specRows = specs.map((s) => ({
     "spec_id (UUID)": s.specificationId,
     "name (tên thông số)": s.specification.name,
@@ -323,9 +455,11 @@ export const getSpecTemplate = async (categoryId: string): Promise<SpecTemplateR
 
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
 
+  // Dùng resolvedCategoryId (node có specs thật) trong filename
+  const filenameId = (resolvedCategoryId ?? categoryId).slice(0, 8);
   return {
     buffer,
-    filename: `spec-template-${categoryId.slice(0, 8)}.xlsx`,
+    filename: `spec-template-${filenameId}.xlsx`,
   };
 };
 
@@ -423,10 +557,7 @@ export const parseSpecFile = (buffer: Buffer, filename: string): ImportParseResu
 
 // ─── Validate spec_ids với category ──────────────────────────
 export const validateSpecIds = async (specIds: string[], categoryId: string): Promise<{ valid: string[]; invalid: string[] }> => {
-  const specs = await prisma.category_specifications.findMany({
-    where: { categoryId },
-    select: { specificationId: true },
-  });
+  const { specs } = await findSpecsWalkingUp(categoryId);
   const validSet = new Set(specs.map((s) => s.specificationId));
   return {
     valid: specIds.filter((id) => validSet.has(id)),

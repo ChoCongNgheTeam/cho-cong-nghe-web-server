@@ -61,11 +61,16 @@ router.post("/suggest-specifications", ...adminAuth, extendTimeout(60_000), vali
 //
 // Lưu ý: req.body (categoryId) sau multer vẫn đọc được vì multer
 // tự parse các text fields trong multipart form.
+// extendTimeout(60_000) → extendTimeout(120_000)
+// Lý do: 55 specs / 20 per chunk = 3 chunks chạy song song
+// Mỗi chunk ~15-20s → worst case ~25s, nhưng thêm buffer an toàn
+
 router.post(
-  "/import-specifications",
-  uploadSpec.single("file"), // ← phải đứng đầu tiên
+  "/suggest-specifications",
   ...adminAuth,
-  asyncHandler(aiContentController.importSpecificationsHandler),
+  extendTimeout(120_000), // tăng từ 60s lên 120s
+  validate(suggestSpecificationsSchema),
+  asyncHandler(aiContentController.suggestSpecifications),
 );
 
 export const aiContentRoute = router;
