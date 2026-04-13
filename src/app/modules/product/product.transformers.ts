@@ -234,6 +234,8 @@ const shouldUseBundleMode = (product: any, validVariants: RawVariant[]): boolean
 export const transformProductCard = (product: any): ProductCard | null => {
   const allVariants: any[] = product.variants ?? [];
 
+  // console.log(allVariants);
+
   if (allVariants.length === 0) {
     console.warn(`[transformProductCard] Product ${product.id} (${product.slug}) has no active variant — skipped`);
     return null;
