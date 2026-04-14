@@ -2,8 +2,10 @@ import { getVariantPricing } from "../pricing.service";
 import { mapPricingToSummary } from "../pricing.helpers";
 import { getCart } from "../../cart/cart.service";
 
-export const getCartWithPricing = async (userId: string, voucherCode?: string) => {
-  const cartItems = await getCart(userId);
+// 👇 THÊM: cartItemIds?: string[] vào vị trí tham số thứ 2
+export const getCartWithPricing = async (userId: string, cartItemIds?: string[], voucherCode?: string) => {
+  // 👇 Đẩy mảng ID xuống hàm getCart để filter ngay tại Database
+  const cartItems = await getCart(userId, cartItemIds);
 
   if (cartItems.length === 0) {
     return {
@@ -66,10 +68,12 @@ export const getCartWithPricing = async (userId: string, voucherCode?: string) =
     errors,
   };
 };
-// export const validateCartForCheckout = async (userId: string, voucherCode?: string) => {
+
+// Các đoạn code bị comment bên dưới cũng được cập nhật lại vị trí tham số cho đồng bộ
+// export const validateCartForCheckout = async (userId: string, cartItemIds?: string[], voucherCode?: string) => {
 //   const errors: string[] = [];
 //   const warnings: string[] = [];
-//   const cart = await getCartWithPricing(userId, voucherCode);
+//   const cart = await getCartWithPricing(userId, cartItemIds, voucherCode);
 
 //   if (cart.items.length === 0) {
 //     errors.push("Giỏ hàng trống");
@@ -86,9 +90,9 @@ export const getCartWithPricing = async (userId: string, voucherCode?: string) =
 //   return { isValid: errors.length === 0, errors, warnings };
 // };
 
-// export const applyVoucherToCart = async (userId: string, voucherCode: string) => {
+// export const applyVoucherToCart = async (userId: string, cartItemIds?: string[], voucherCode: string) => {
 //   try {
-//     const cart = await getCartWithPricing(userId, voucherCode);
+//     const cart = await getCartWithPricing(userId, cartItemIds, voucherCode);
 //     if (!cart.isValid && cart.errors.length > 0) return { success: false, message: cart.errors[0] };
 //     if (!cart.appliedVoucher) return { success: false, message: "Voucher không áp dụng được cho giỏ hàng này" };
 //     return {
@@ -101,4 +105,4 @@ export const getCartWithPricing = async (userId: string, voucherCode?: string) =
 //   }
 // };
 
-// export const removeVoucherFromCart = async (userId: string) => getCartWithPricing(userId);
+// export const removeVoucherFromCart = async (userId: string, cartItemIds?: string[]) => getCartWithPricing(userId, cartItemIds);

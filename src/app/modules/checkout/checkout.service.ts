@@ -12,9 +12,9 @@ import { sendOrderCreatedAdminNotification } from "../notification/notification.
 // 1. Cart validation (ĐÃ SỬA ĐỂ GHI NHẬN GIÁ PROMOTION)
 // =======================================================
 
-export const validateCartItems = async (userId: string): Promise<CartValidationResult> => {
+export const validateCartItems = async (userId: string, cartItemIds?: string[]): Promise<CartValidationResult> => {
   // Gọi hàm tính giá chung từ module Pricing thay vì gọi trực tiếp DB
-  const cartPricing = await getCartWithPricing(userId);
+  const cartPricing = await getCartWithPricing(userId, cartItemIds);
 
   if (cartPricing.items.length === 0) {
     return {
@@ -22,7 +22,7 @@ export const validateCartItems = async (userId: string): Promise<CartValidationR
       totalItems: 0,
       totalQuantity: 0,
       items: [],
-      errors: ["Giỏ hàng trống, vui lòng thêm sản phẩm"],
+      errors: ["Giỏ hàng trống hoặc chưa có sản phẩm nào được chọn, vui lòng chọn sản phẩm"],
     };
   }
 
@@ -118,9 +118,9 @@ export const validateAndApplyVoucher = async (voucherId: string | undefined, sub
 // 5. Chuẩn bị dữ liệu Checkout (Gom tất cả lại)
 // =======================================================
 export const prepareCheckoutData = async (userId: string, input: CheckoutInput): Promise<CheckoutSummary> => {
-  const { paymentMethodId, shippingAddressId, voucherId } = input;
+  const { paymentMethodId, shippingAddressId, voucherId, cartItemIds } = input;
 
-  const [validation, paymentMethod] = await Promise.all([validateCartItems(userId), repo.findPaymentMethodById(paymentMethodId).catch(handlePrismaError)]);
+  const [validation, paymentMethod] = await Promise.all([validateCartItems(userId, cartItemIds), repo.findPaymentMethodById(paymentMethodId).catch(handlePrismaError)]);
 
   if (!validation.isValid) {
     throw new BadRequestError(`Giỏ hàng không hợp lệ: ${validation.errors.join(", ")}`);
@@ -160,6 +160,7 @@ export const prepareCheckoutData = async (userId: string, input: CheckoutInput):
     shippingAddressId,
     voucherId,
     bankTransferCode,
+    cartItemIds, // Lưu mảng ID vào summary để mang sang repo xóa
   };
 };
 
@@ -212,8 +213,6 @@ export const createOrderFromCheckout = async (userId: string, checkoutSummary: C
               paymentLink: paymentRedirectUrl || bankTransferQrUrl || undefined,
             },
           );
-
-          // console.log(`📧 Email xác nhận đơn hàng ${order.orderCode} đã gửi tới ${user.email}`);
         }
       } catch (emailError) {
         console.warn(`⚠️ Lỗi gửi email xác nhận:`, emailError);
@@ -224,7 +223,6 @@ export const createOrderFromCheckout = async (userId: string, checkoutSummary: C
     (async () => {
       try {
         await sendOrderCreatedAdminNotification(order.orderCode);
-        // console.log(`🔔 Thông báo đơn hàng mới ${order.orderCode} đã gửi cho ADMIN/STAFF`);
       } catch (adminNotifError) {
         console.warn(`⚠️ Lỗi gửi thông báo admin:`, adminNotifError);
       }

@@ -126,6 +126,13 @@
                 <button class="btn-green" onclick="testGetCart()">🔄 Lấy Giỏ Hàng</button>
                 <button class="btn-red" onclick="testClearCart()">🗑️ Xóa sạch Giỏ Hàng</button>
                 <button class="btn-cyan" onclick="testSyncCart()">🔀 Sync Cart (sau khi login)</button>
+                
+                <div style="background: #f0f8ff; padding: 10px; border-radius: 6px; margin: 10px 0; border: 1px solid #b3d9ff;">
+                    <small style="color: #0056b3;"><b>📌 Chọn sản phẩm:</b></small>
+                    <button class="btn-cyan" style="padding: 4px 10px; font-size: 12px; margin-left: 10px;" onclick="selectAllCartItems()">✓ Chọn tất cả</button>
+                    <button class="btn-orange" style="padding: 4px 10px; font-size: 12px;" onclick="deselectAllCartItems()">✗ Bỏ chọn tất cả</button>
+                    <button class="btn-red" style="padding: 4px 10px; font-size: 12px;" onclick="deleteSelectedCartItems()">🗑️ Xóa các item được chọn</button>
+                </div>
                 <hr style="border: 0; border-top: 1px dashed #ddd; margin: 15px 0;">
                 
                 <h3>Thêm vào giỏ</h3>
@@ -201,7 +208,7 @@
                 
                 <button class="btn-cyan" onclick="testValidateCheckout()">✓ Validate Checkout</button>
                 <button class="btn-purple" onclick="testCheckoutPreview()">👁️ Xem trước Đơn (Preview)</button>
-                <button class="btn-orange" onclick="testCheckout()">💰 Đặt Hàng Ngay</button>
+                <button class="btn-orange" onclick="testCheckoutSmart()" style="width: 100%; font-size: 16px; padding: 10px;">💰 Đặt Hàng Ngay</button>
                 
                 <h4>Log Result:</h4>
                 <pre id="log-checkout">No data yet...</pre>
@@ -213,6 +220,11 @@
                 <h2>5. Đơn hàng của tôi (My Orders)</h2>
                 <button onclick="testGetMyOrders()">🔄 Tải danh sách Đơn hàng</button>
                 
+                <div style="background: #f0f8ff; padding: 10px; border-radius: 6px; margin: 10px 0; border: 1px solid #b3d9ff;">
+                    <small style="color: #0056b3;"><b>📌 Chọn đơn hàng:</b></small>
+                    <button class="btn-cyan" style="padding: 4px 10px; font-size: 12px; margin-left: 10px;" onclick="selectAllUserOrders()">✓ Chọn tất cả</button>
+                    <button class="btn-orange" style="padding: 4px 10px; font-size: 12px;" onclick="deselectAllUserOrders()">✗ Bỏ chọn tất cả</button>
+                </div>
                 <hr style="margin: 20px 0;">
                 <h3>Tìm đơn hàng theo mã</h3>
                 <input type="text" id="searchOrderCode" placeholder="Mã đơn hàng (ORDER-xxx)">
@@ -243,6 +255,12 @@
                     <div class="tab" onclick="filterAdminOrders('CANCELLED', this)">Đã hủy</div>
                 </div>
                 <button class="btn-red" onclick="testGetAdminOrders()">Lấy Đơn Hàng Admin</button>
+                
+                <div style="background: #f0f8ff; padding: 10px; border-radius: 6px; margin: 10px 0; border: 1px solid #b3d9ff;">
+                    <small style="color: #0056b3;"><b>📌 Chọn đơn hàng:</b></small>
+                    <button class="btn-cyan" style="padding: 4px 10px; font-size: 12px; margin-left: 10px;" onclick="selectAllAdminOrders()">✓ Chọn tất cả</button>
+                    <button class="btn-orange" style="padding: 4px 10px; font-size: 12px;" onclick="deselectAllAdminOrders()">✗ Bỏ chọn tất cả</button>
+                </div>
                 
                 <div style="background: #fff3cd; padding: 10px; border-radius: 6px; margin: 10px 0; border: 1px solid #ffeaa7;">
                     <small><b>💡 Để cập nhật đơn:</b> Bấm "Chi tiết" ở admin orders, rồi điền Order ID + Status (PENDING/PROCESSING/SHIPPED/DELIVERED/CANCELLED)</small>
@@ -368,7 +386,12 @@
 
         function testSyncCart() {
             if (!confirm('Sync giỏ hàng từ localStorage lên DB?')) return;
-            fetch(`${BASE_URL}/cart/sync`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({}) })
+            // Ví dụ items từ localStorage (thực tế: JSON.parse(localStorage.getItem('cart')))
+            const items = [
+                { productVariantId: '...uuid...', quantity: 2 }
+            ];
+            const body = { items: items };
+            fetch(`${BASE_URL}/cart/sync`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) })
                 .then(res => res.json())
                 .then(res => {
                     log('log-cart', res);
@@ -398,11 +421,12 @@
         function testChangeCartItemVariant() {
             const cartItemId = document.getElementById('editCartItemId').value;
             const newVariantId = document.getElementById('editVariantId').value;
+            const newQty = parseInt(document.getElementById('editQty').value);
             if (!cartItemId || !newVariantId) {
                 alert('Vui lòng nhập Cart Item ID và Variant ID mới');
                 return;
             }
-            const body = { productVariantId: newVariantId };
+            const body = { newVariantId: newVariantId, quantity: newQty };
             fetch(`${BASE_URL}/cart/${cartItemId}/change-variant`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(body) })
                 .then(res => res.json())
                 .then(res => {
@@ -436,15 +460,73 @@
             }
             container.innerHTML = cartData.items.map(item => `
                 <div style="display:flex; gap:15px; margin-bottom:10px; background: white; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    <input type="checkbox" class="cart-item-checkbox" data-item-id="${item.id}" style="width: 20px; height: 20px; cursor: pointer; margin-top: 5px;" onchange="updateSelectedItems()">
                     <img src="${item.image || 'https://via.placeholder.com/60'}" width="60" height="60" style="object-fit: cover; border-radius: 4px; border: 1px solid #eee;">
                     <div style="flex: 1;">
                         <div style="font-weight: 600;">${item.productName}</div>
                         <div style="font-size: 12px; color: #777;">Phân loại: ${item.color || ''} ${item.storage ? '- ' + item.storage : ''}</div>
                         <div style="color: #d32f2f; font-weight: bold;">${Number(item.unitPrice).toLocaleString('vi-VN')} đ <span style="color:#555; font-size:12px; font-weight:normal;">x ${item.quantity}</span></div>
+                        <div style="font-size: 11px; color: #999; margin-top: 5px;">ID: ${item.id}</div>
                     </div>
                 </div>
             `).join('');
             container.innerHTML += `<div style="text-align:right; font-weight:bold; margin-top:10px;">Tổng tiền: ${Number(cartData.subtotal).toLocaleString('vi-VN')} đ</div>`;
+        }
+
+        let selectedCartItems = [];
+
+        function updateSelectedItems() {
+            const checkboxes = document.querySelectorAll('.cart-item-checkbox:checked');
+            selectedCartItems = Array.from(checkboxes).map(cb => cb.dataset.itemId);
+            console.log('Selected items:', selectedCartItems);
+        }
+
+        function selectAllCartItems() {
+            document.querySelectorAll('.cart-item-checkbox').forEach(cb => {
+                cb.checked = true;
+            });
+            updateSelectedItems();
+        }
+
+        function deselectAllCartItems() {
+            document.querySelectorAll('.cart-item-checkbox').forEach(cb => {
+                cb.checked = false;
+            });
+            updateSelectedItems();
+        }
+
+        function deleteSelectedCartItems() {
+            if (selectedCartItems.length === 0) {
+                alert('Vui lòng chọn ít nhất 1 item để xóa');
+                return;
+            }
+            if (!confirm(`Bạn có chắc chắn muốn xóa ${selectedCartItems.length} item này?`)) return;
+
+            let deleteCount = 0;
+            let errorCount = 0;
+            console.log('Deleting items:', selectedCartItems);
+
+            // Xóa từng item một
+            Promise.all(selectedCartItems.map(itemId =>
+                fetch(`${BASE_URL}/cart/${itemId}`, { method: 'DELETE', headers: getHeaders() })
+                    .then(res => res.json())
+                    .then(res => {
+                        if (res.message || !res.error) {
+                            deleteCount++;
+                            console.log(`✓ Deleted item: ${itemId}`);
+                        } else {
+                            errorCount++;
+                        }
+                    })
+                    .catch(err => {
+                        errorCount++;
+                        console.error(`✗ Error deleting: ${itemId}`, err);
+                    })
+            )).then(() => {
+                alert(`Xóa thành công: ${deleteCount} item, Lỗi: ${errorCount} item`);
+                selectedCartItems = [];
+                testGetCart();
+            });
         }
 
         // ================= NOTIFICATION API =================
@@ -757,7 +839,16 @@
         }
 
         function testValidateCheckout() {
-            fetch(`${BASE_URL}/checkout/validate`, { method: 'GET', headers: getHeaders() })
+            let query = '';
+            if (selectedCartItems.length > 0) {
+                const params = new URLSearchParams();
+                selectedCartItems.forEach(itemId => params.append('cartItemIds', itemId));
+                query = '?' + params.toString();
+                console.log(`Validate ${selectedCartItems.length} selected items`);
+            } else {
+                console.log('Validate all items in cart');
+            }
+            fetch(`${BASE_URL}/checkout/validate${query}`, { method: 'GET', headers: getHeaders() })
                 .then(res => res.json())
                 .then(res => {
                     log('log-checkout', res);
@@ -767,30 +858,67 @@
         }
 
         function testCheckoutPreview() {
-            const query = buildCheckoutQueryOrBody(true);
+            const params = new URLSearchParams();
+            const baseData = buildCheckoutQueryOrBody(false);
+            
+            if (baseData.shippingAddressId) params.append('shippingAddressId', baseData.shippingAddressId);
+            if (baseData.paymentMethodId) params.append('paymentMethodId', baseData.paymentMethodId);
+            if (baseData.voucherId) params.append('voucherId', baseData.voucherId);
+            
+            if (selectedCartItems.length > 0) {
+                selectedCartItems.forEach(itemId => params.append('cartItemIds', itemId));
+                console.log(`Preview ${selectedCartItems.length} selected items`);
+            } else {
+                console.log('Preview all items in cart');
+            }
+            
+            const query = params.toString() ? '?' + params.toString() : '';
             fetch(`${BASE_URL}/checkout/preview${query}`, { method: 'GET', headers: getHeaders() })
                 .then(res => res.json())
                 .then(res => log('log-checkout', res))
                 .catch(err => log('log-checkout', err.message));
         }
 
-        function testCheckout() {
+        function testCheckoutSmart() {
             const body = buildCheckoutQueryOrBody(false);
             if (!body.shippingAddressId || !body.paymentMethodId) {
                 alert("Vui lòng nhập Address ID và Payment ID!");
                 return;
             }
-            fetch(`${BASE_URL}/checkout`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) })
-                .then(res => res.json())
-                .then(res => {
-                    log('log-checkout', res);
-                    if (res.success) {
-                        alert('🎉 Đặt hàng thành công!');
-                        testGetCart(); 
-                        testGetMyOrders(); 
-                    }
-                })
-                .catch(err => log('log-checkout', err.message));
+            
+            // Nếu có items được chọn → checkout chỉ selected items
+            if (selectedCartItems.length > 0) {
+                body.cartItemIds = selectedCartItems;
+                console.log(`Checkout ${selectedCartItems.length} selected items:`, body);
+                
+                fetch(`${BASE_URL}/checkout`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) })
+                    .then(res => res.json())
+                    .then(res => {
+                        log('log-checkout', res);
+                        if (res.success) {
+                            alert(`🎉 Đặt hàng ${selectedCartItems.length} item thành công!\nGiỏ hàng còn lại những item chưa mua.`);
+                            selectedCartItems = [];
+                            document.querySelectorAll('.cart-item-checkbox').forEach(cb => cb.checked = false);
+                            testGetCart(); 
+                            testGetMyOrders(); 
+                        }
+                    })
+                    .catch(err => log('log-checkout', err.message));
+            } else {
+                // Nếu không có items được chọn → checkout tất cả items
+                console.log('Checkout all items:', body);
+                fetch(`${BASE_URL}/checkout`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) })
+                    .then(res => res.json())
+                    .then(res => {
+                        log('log-checkout', res);
+                        if (res.success) {
+                            alert('🎉 Đặt hàng tất cả sản phẩm thành công!');
+                            testGetCart(); 
+                            testGetMyOrders(); 
+                        }
+                    })
+                    .catch(err => log('log-checkout', err.message));
+            }
         }
 
         // ================= ORDER API (CẬP NHẬT FLATTEN DATA) =================
@@ -826,18 +954,23 @@
 
                         return `
                         <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 6px; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                            <div style="display:flex; justify-content:space-between; border-bottom: 1px dashed #eee; padding-bottom: 10px;">
-                                <div><b>Mã đơn:</b> <span style="color:#007bff; font-weight:bold;">${o.orderCode}</span></div>
-                                <span class="badge status-${o.orderStatus}">${o.orderStatus}</span>
-                            </div>
-                            ${itemsHtml}
-                            <div style="margin-top: 15px; text-align: right;">
-                                <b>Tổng tiền:</b> <span style="color:#d32f2f; font-size:16px; font-weight:bold;">${Number(o.totalAmount).toLocaleString('vi-VN')} đ</span>
-                            </div>
-                            <div style="margin-top: 10px; text-align: right; display:flex; justify-content: flex-end; gap: 5px;">
-                                <button class="btn-cyan" style="padding: 5px 10px; font-size: 12px;" onclick="showOrderDetail('${o.id}', false)">👁️ Chi tiết</button>
-                                ${(o.orderStatus === 'DELIVERED' || o.orderStatus === 'CANCELLED') ? `<button class="btn-orange" style="padding: 5px 10px; font-size: 12px;" onclick="testReorderOrder('${o.id}')">🔄 Tạo lại</button>` : ''}
-                                ${(o.orderStatus === 'PENDING' || o.orderStatus === 'PROCESSING') ? `<button class="btn-red" style="padding: 5px 10px; font-size: 12px;" onclick="testCancelOrder('${o.id}')">❌ Hủy Đơn</button>` : ''}
+                            <div style="display:flex; gap:10px; align-items:flex-start;">
+                                <input type="checkbox" class="order-item-checkbox" data-order-id="${o.id}" style="width: 20px; height: 20px; cursor: pointer; margin-top: 5px;" onchange="updateSelectedOrders()">
+                                <div style="flex: 1;">
+                                    <div style="display:flex; justify-content:space-between; border-bottom: 1px dashed #eee; padding-bottom: 10px;">
+                                        <div><b>Mã đơn:</b> <span style="color:#007bff; font-weight:bold;">${o.orderCode}</span></div>
+                                        <span class="badge status-${o.orderStatus}">${o.orderStatus}</span>
+                                    </div>
+                                    ${itemsHtml}
+                                    <div style="margin-top: 15px; text-align: right;">
+                                        <b>Tổng tiền:</b> <span style="color:#d32f2f; font-size:16px; font-weight:bold;">${Number(o.totalAmount).toLocaleString('vi-VN')} đ</span>
+                                    </div>
+                                    <div style="margin-top: 10px; text-align: right; display:flex; justify-content: flex-end; gap: 5px;">
+                                        <button class="btn-cyan" style="padding: 5px 10px; font-size: 12px;" onclick="showOrderDetail('${o.id}', false)">👁️ Chi tiết</button>
+                                        ${(o.orderStatus === 'DELIVERED' || o.orderStatus === 'CANCELLED') ? `<button class="btn-orange" style="padding: 5px 10px; font-size: 12px;" onclick="testReorderOrder('${o.id}')">🔄 Tạo lại</button>` : ''}
+                                        ${(o.orderStatus === 'PENDING' || o.orderStatus === 'PROCESSING') ? `<button class="btn-red" style="padding: 5px 10px; font-size: 12px;" onclick="testCancelOrder('${o.id}')">❌ Hủy Đơn</button>` : ''}
+                                    </div>
+                                </div>
                             </div>
                         </div>`;
                     }).join('');
@@ -852,6 +985,28 @@
                     alert(res.message);
                     testGetMyOrders();
                 });
+        }
+
+        let selectedUserOrders = [];
+
+        function updateSelectedOrders() {
+            const checkboxes = document.querySelectorAll('.order-item-checkbox:checked');
+            selectedUserOrders = Array.from(checkboxes).map(cb => cb.dataset.orderId);
+            console.log('Selected user orders:', selectedUserOrders);
+        }
+
+        function selectAllUserOrders() {
+            document.querySelectorAll('.order-item-checkbox').forEach(cb => {
+                cb.checked = true;
+            });
+            updateSelectedOrders();
+        }
+
+        function deselectAllUserOrders() {
+            document.querySelectorAll('.order-item-checkbox').forEach(cb => {
+                cb.checked = false;
+            });
+            updateSelectedOrders();
         }
 
         // ===== ORDER API MỚI - USER =====
@@ -940,6 +1095,8 @@
         }
 
         let currentAdminOrders = [];
+        let selectedAdminOrders = [];
+
         function testGetAdminOrders() {
             fetch(`${BASE_URL}/orders/admin/all`, { method: 'GET', headers: getHeaders() })
                 .then(res => res.json())
@@ -968,18 +1125,43 @@
 
             container.innerHTML = orders.map(o => `
                 <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 6px; background: white;">
-                    <div style="display:flex; justify-content:space-between; align-items: center;">
-                        <div><b>${o.orderCode}</b> - <span style="font-size:12px;color:#666;">Khách: ${o.user?.fullName || o.shippingContactName}</span></div>
-                        <span class="badge status-${o.orderStatus}">${o.orderStatus}</span>
-                    </div>
-                    <div style="margin-top: 5px; font-size: 13px;">Tổng tiền: <b style="color:#d32f2f;">${Number(o.totalAmount).toLocaleString('vi-VN')} đ</b></div>
-                    <div style="margin-top: 10px; display: flex; gap: 5px; flex-wrap: wrap;">
-                        <button class="btn-cyan" style="padding: 4px 10px; font-size: 12px;" onclick="showOrderDetail('${o.id}', true)">👁️ Chi tiết</button>
-                        <button class="btn-orange" style="padding: 4px 10px; font-size: 12px;" onclick="usOrderId('${o.id}')">📋 Chọn Cập nhật</button>
-                        <button class="btn-red" style="padding: 4px 10px; font-size: 12px;" onclick="usOrderIdAndCancel('${o.id}')">❌ Hủy Ngay</button>
+                    <div style="display:flex; gap: 10px; align-items:flex-start;">
+                        <input type="checkbox" class="admin-order-checkbox" data-order-id="${o.id}" style="width: 20px; height: 20px; cursor: pointer; margin-top: 3px;" onchange="updateSelectedAdminOrders()">
+                        <div style="flex: 1;">
+                            <div style="display:flex; justify-content:space-between; align-items: center;">
+                                <div><b>${o.orderCode}</b> - <span style="font-size:12px;color:#666;">Khách: ${o.user?.fullName || o.shippingContactName}</span></div>
+                                <span class="badge status-${o.orderStatus}">${o.orderStatus}</span>
+                            </div>
+                            <div style="margin-top: 5px; font-size: 13px;">Tổng tiền: <b style="color:#d32f2f;">${Number(o.totalAmount).toLocaleString('vi-VN')} đ</b></div>
+                            <div style="margin-top: 10px; display: flex; gap: 5px; flex-wrap: wrap;">
+                                <button class="btn-cyan" style="padding: 4px 10px; font-size: 12px;" onclick="showOrderDetail('${o.id}', true)">👁️ Chi tiết</button>
+                                <button class="btn-orange" style="padding: 4px 10px; font-size: 12px;" onclick="usOrderId('${o.id}')">📋 Chọn Cập nhật</button>
+                                <button class="btn-red" style="padding: 4px 10px; font-size: 12px;" onclick="usOrderIdAndCancel('${o.id}')">❌ Hủy Ngay</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `).join('');
+        }
+
+        function updateSelectedAdminOrders() {
+            const checkboxes = document.querySelectorAll('.admin-order-checkbox:checked');
+            selectedAdminOrders = Array.from(checkboxes).map(cb => cb.dataset.orderId);
+            console.log('Selected admin orders:', selectedAdminOrders);
+        }
+
+        function selectAllAdminOrders() {
+            document.querySelectorAll('.admin-order-checkbox').forEach(cb => {
+                cb.checked = true;
+            });
+            updateSelectedAdminOrders();
+        }
+
+        function deselectAllAdminOrders() {
+            document.querySelectorAll('.admin-order-checkbox').forEach(cb => {
+                cb.checked = false;
+            });
+            updateSelectedAdminOrders();
         }
 
         function usOrderId(id) {

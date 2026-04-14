@@ -8,6 +8,7 @@ export interface CheckoutInput {
   paymentMethodId: string;
   shippingAddressId: string;
   voucherId?: string;
+  cartItemIds?: string[];
 }
 
 /**
@@ -61,6 +62,7 @@ export interface CheckoutSummary {
   orderCode?: string;
   // Payment fields — populated by buildPaymentInfo() TRƯỚC transaction
   paymentFields?: PaymentFields;
+  cartItemIds?: string[];
 }
 
 /**
