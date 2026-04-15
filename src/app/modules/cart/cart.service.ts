@@ -28,9 +28,9 @@ export const validateCartItemStatus = async (variantId: string, quantity: number
   };
 };
 
-export const getCart = async (userId: string) => {
-  // 1. Chỉ đảm nhiệm việc lấy dữ liệu giỏ hàng thô từ DB
-  const items = await repo.findByUserId(userId);
+export const getCart = async (userId: string, cartItemIds?: string[]) => {
+  // Truyền mảng ID xuống repo để DB lọc trực tiếp
+  const items = await repo.findByUserId(userId, cartItemIds);
   return items.map(repo.transformToCartResponse);
 };
 

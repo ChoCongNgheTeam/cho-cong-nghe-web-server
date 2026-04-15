@@ -61,9 +61,13 @@ export const findVariantWithProductById = async (variantId: string) => {
   });
 };
 
-export const findByUserId = async (userId: string) => {
+export const findByUserId = async (userId: string, cartItemIds?: string[]) => {
   return prisma.cart_items.findMany({
-    where: { userId },
+    where: { 
+      userId,
+      // Nếu có mảng ID thì thêm điều kiện IN, nếu không thì lấy tất cả (Fallback)
+      ...(cartItemIds && cartItemIds.length > 0 ? { id: { in: cartItemIds } } : {})
+    },
     select: cartItemSelect,
     orderBy: { createdAt: "desc" },
   });

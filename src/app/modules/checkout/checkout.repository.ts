@@ -5,11 +5,7 @@ import { CheckoutSummary } from "./checkout.types";
 export const findCartItemsWithProduct = async (userId: string) => {
   return prisma.cart_items.findMany({
     where: { userId },
-    include: {
-      productVariant: {
-        include: { product: true },
-      },
-    },
+    include: { productVariant: { include: { product: true } } },
   });
 };
 
@@ -35,35 +31,22 @@ export const findPaymentMethodById = async (id: string) => {
 export const findVoucherWithUser = async (voucherId: string, userId: string) => {
   return prisma.vouchers.findUnique({
     where: { id: voucherId },
-    include: {
-      voucherUsers: {
-        where: { userId },
-      },
-    },
+    include: { voucherUsers: { where: { userId } } },
   });
 };
 
 export const findVoucherUsersCount = async (voucherId: string) => {
-  return prisma.voucher_user.count({
-    where: { voucherId },
-  });
+  return prisma.voucher_user.count({ where: { voucherId } });
 };
 
 /**
  * Transaction: Khởi tạo đơn hàng, trừ tồn kho, xóa giỏ hàng, cập nhật voucher.
- *
- * Nhận checkoutSummary đã được merge paymentFields từ buildPaymentInfo()
- * → ghi tất cả vào DB trong 1 transaction duy nhất (atomic).
- * Không cần gọi updateOrderPaymentFields sau.
  */
 export const executeOrderTransaction = async (userId: string, checkoutSummary: CheckoutSummary, isFromCart: boolean = true) => {
-  // Dùng orderCode đã generate từ controller (để khớp với ref gửi lên payment provider)
-  // Fallback: generate mới nếu không có (e.g. COD, Bank Transfer)
   const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, "");
   const randomPart = Math.random().toString(36).substring(2, 7).toUpperCase();
   const orderCode = checkoutSummary.orderCode ?? `CCN-${datePart}-${randomPart}`;
 
-  // Destructure payment fields một lần để dùng trong transaction
   const {
     bankTransferQrUrl = null,
     bankTransferContent = null,
@@ -77,17 +60,15 @@ export const executeOrderTransaction = async (userId: string, checkoutSummary: C
   } = checkoutSummary.paymentFields ?? {};
 
   return prisma.$transaction(async (tx) => {
-    // 0. LẤY THÔNG TIN ĐỊA CHỈ ĐỂ LÀM SNAPSHOT
+    // 0. Snapshot Address
     const address = await tx.user_addresses.findUnique({
       where: { id: checkoutSummary.shippingAddressId },
       include: { province: true, ward: true },
     });
 
-    if (!address) {
-      throw new Error("Không tìm thấy thông tin địa chỉ giao hàng");
-    }
+    if (!address) throw new Error("Không tìm thấy thông tin địa chỉ giao hàng");
 
-    // 1. Tạo order mới — payment fields đã có sẵn, không cần update thêm sau
+    // 1. Tạo order mới
     const newOrder = await tx.orders.create({
       data: {
         orderCode,
@@ -95,13 +76,11 @@ export const executeOrderTransaction = async (userId: string, checkoutSummary: C
         paymentMethodId: checkoutSummary.paymentMethodId,
         voucherId: checkoutSummary.voucherId,
         shippingAddressId: checkoutSummary.shippingAddressId,
-
         shippingContactName: address.contactName,
         shippingPhone: address.phone,
         shippingProvince: address.province.fullName,
         shippingWard: address.ward.fullName,
         shippingDetail: address.detailAddress,
-
         subtotalAmount: new Prisma.Decimal(checkoutSummary.subtotalAmount),
         shippingFee: new Prisma.Decimal(checkoutSummary.shippingFee),
         voucherDiscount: new Prisma.Decimal(checkoutSummary.voucherDiscount),
@@ -109,19 +88,15 @@ export const executeOrderTransaction = async (userId: string, checkoutSummary: C
         orderStatus: OrderStatus.PENDING,
         paymentStatus: PaymentStatus.UNPAID,
         bankTransferCode: checkoutSummary.bankTransferCode,
-
-        // Payment fields — đã được build bởi payment-info.builder.ts trước khi vào đây
         bankTransferQrUrl,
         bankTransferContent,
         bankTransferExpiredAt,
         paymentExpiredAt,
         paymentRedirectUrl,
-        // Provider IDs cho IPN webhook
         momoOrderId,
         vnpayTxnRef,
         zaloPayTransId,
         stripePaymentIntentId,
-
         orderItems: {
           create: checkoutSummary.items.map((item) => ({
             productVariantId: item.productVariantId,
@@ -131,73 +106,59 @@ export const executeOrderTransaction = async (userId: string, checkoutSummary: C
         },
       },
       include: {
-        orderItems: {
-          include: {
-            productVariant: {
-              include: { product: true },
-            },
-          },
-        },
+        orderItems: { include: { productVariant: { include: { product: true } } } },
       },
     });
-    // update variant
+
+    // 2. Trừ tồn kho Variant và cập nhật lượt bán Product
     await Promise.all(
       checkoutSummary.items.map((item) =>
         tx.products_variants.update({
           where: { id: item.productVariantId },
-          data: {
-            quantity: { decrement: item.quantity },
-            soldCount: { increment: item.quantity },
-          },
+          data: { quantity: { decrement: item.quantity }, soldCount: { increment: item.quantity } },
         }),
       ),
     );
 
-    // build map
     const productSoldMap = new Map<string, number>();
-
     for (const item of newOrder.orderItems) {
       const productId = item.productVariant.productId;
-
-      const current = productSoldMap.get(productId) || 0;
-      productSoldMap.set(productId, current + item.quantity);
+      productSoldMap.set(productId, (productSoldMap.get(productId) || 0) + item.quantity);
     }
 
-    // update product
     await Promise.all(
       Array.from(productSoldMap.entries()).map(([productId, quantity]) =>
         tx.products.update({
           where: { id: productId },
-          data: {
-            totalSoldCount: { increment: quantity },
-          },
+          data: { totalSoldCount: { increment: quantity } },
         }),
       ),
     );
 
-    // 3. Xóa giỏ hàng (chỉ khi checkout từ giỏ hàng)
+    // 3. Xóa các sản phẩm được chọn khỏi giỏ hàng
     if (isFromCart) {
-      await tx.cart_items.deleteMany({
-        where: { userId },
-      });
+      if (checkoutSummary.cartItemIds && checkoutSummary.cartItemIds.length > 0) {
+        await tx.cart_items.deleteMany({
+          where: { userId, id: { in: checkoutSummary.cartItemIds } },
+        });
+      } else {
+        await tx.cart_items.deleteMany({ where: { userId } });
+      }
     }
 
-    // 4. Cập nhật voucher (nếu có)
+    // 4. Cập nhật lượt dùng voucher
     if (checkoutSummary.voucherId) {
-      const voucherId = checkoutSummary.voucherId;
+      const vId = checkoutSummary.voucherId;
       await tx.vouchers.update({
-        where: { id: voucherId },
+        where: { id: vId },
         data: { usesCount: { increment: 1 } },
       });
-
       await tx.voucher_usages.create({
-        data: { voucherId, userId, orderId: newOrder.id },
+        data: { voucherId: vId, userId, orderId: newOrder.id },
       });
-
       const userVoucher = await tx.voucher_user.findUnique({
-        where: { voucherId_userId: { voucherId, userId } },
+        where: { voucherId_userId: { voucherId: vId, userId } },
       });
-
       if (userVoucher) {
         await tx.voucher_user.update({
           where: { id: userVoucher.id },
@@ -210,43 +171,25 @@ export const executeOrderTransaction = async (userId: string, checkoutSummary: C
   });
 };
 
-/**
- * Transaction: Hủy đơn hàng và hoàn trả lại tồn kho
- */
+// Hủy đơn hàng và hoàn trả tồn kho (dùng khi hủy sau khi đã tạo đơn)
 export const cancelOrderAndRestoreInventory = async (orderId: string) => {
   return prisma.$transaction(async (tx) => {
     const orderItems = await tx.order_items.findMany({ where: { orderId } });
-
     for (const item of orderItems) {
       await tx.products_variants.update({
         where: { id: item.productVariantId },
-        data: {
-          quantity: { increment: item.quantity },
-          soldCount: { decrement: item.quantity },
-        },
+        data: { quantity: { increment: item.quantity }, soldCount: { decrement: item.quantity } },
       });
     }
-
-    await tx.orders.update({
-      where: { id: orderId },
-      data: { orderStatus: "CANCELLED" },
-    });
+    await tx.orders.update({ where: { id: orderId }, data: { orderStatus: "CANCELLED" } });
   });
 };
 
-/**
- * Transaction: Xác nhận đơn hàng (Chuyển sang PROCESSING)
- */
+// Cập nhật trạng thái đơn hàng (dùng cho cả hủy và các trạng thái khác)
 export const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
-  return prisma.orders.update({
-    where: { id: orderId },
-    data: { orderStatus: status },
-  });
+  return prisma.orders.update({ where: { id: orderId }, data: { orderStatus: status } });
 };
 
 export const updateOrderPaymentFields = async (orderId: string, data: Record<string, any>) => {
-  return prisma.orders.update({
-    where: { id: orderId },
-    data,
-  });
+  return prisma.orders.update({ where: { id: orderId }, data });
 };
