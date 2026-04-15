@@ -11,9 +11,10 @@ export const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "search_products",
       description: `Tìm kiếm sản phẩm. 
-      LƯU Ý NGÂN SÁCH VÀ TỪ KHÓA: 
-      - Khách nói "tầm/khoảng X triệu" -> maxPrice = X * 1.1 triệu
-      - "dưới X triệu" -> maxPrice = X triệu
+      LƯU Ý NGÂN SÁCH VÀ TỪ KHÓA (BẮT BUỘC QUY ĐỔI RA VNĐ, 1 triệu = 1000000): 
+      - Khách nói "tầm/khoảng X triệu" -> BẮT BUỘC truyền CẢ 2 tham số: minPrice = X * 0.8 * 1000000 và maxPrice = X * 1.2 * 1000000. (VD: "tầm 300 triệu" -> minPrice = 240000000, maxPrice = 360000000).
+      - "dưới X triệu" -> minPrice = 0, maxPrice = X * 1000000.
+      - "từ X đến Y triệu" -> minPrice = X * 1000000, maxPrice = Y * 1000000.
       - "giá tốt/rẻ nhất" -> KHÔNG dùng maxPrice, bắt buộc dùng sortBy = "PRICE_ASC"
       - "cao cấp/đắt nhất" -> KHÔNG dùng maxPrice, bắt buộc dùng sortBy = "PRICE_DESC"
       - "hot nhất/bán chạy nhất/nhiều người mua" -> BẮT BUỘC dùng sortBy = "BEST_SELLING"
