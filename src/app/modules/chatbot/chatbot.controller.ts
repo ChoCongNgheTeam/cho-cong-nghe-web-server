@@ -10,10 +10,9 @@ import { chatbotService } from "./chatbot.service";
 const chat = asyncHandler(async (req: Request, res: Response) => {
   const { messages } = req.body;
 
-  // Chỉ lấy 10 turn gần nhất (20 messages), FE không cần quản lý
-  const recentMessages = messages.slice(-20);
-
-  const result = await chatbotService.getChatReply(recentMessages);
+  // FIX: Bỏ slice ở đây — việc giới hạn context đã được xử lý trong service
+  // Tránh double-slice gây mất context không nhất quán
+  const result = await chatbotService.getChatReply(messages);
 
   res.status(200).json({
     success: true,

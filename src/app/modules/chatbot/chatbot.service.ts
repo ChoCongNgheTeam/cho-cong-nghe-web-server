@@ -52,13 +52,13 @@ const dispatchTool = async (
     }
 
     if (!result || (Array.isArray(result) && result.length === 0)) {
-      return JSON.stringify({ message: "Không tìm thấy kết quả phù hợp" });
+      return JSON.stringify({ found: false, message: "Không tìm thấy kết quả phù hợp" });
     }
 
-    return JSON.stringify(result);
+    return JSON.stringify({ found: true, data: result });
   } catch (err) {
     console.error(`[chatbot] Tool "${name}" error:`, err);
-    return JSON.stringify({ error: "Lỗi khi tra cứu dữ liệu, vui lòng thử lại" });
+    return JSON.stringify({ found: false, error: "Lỗi khi tra cứu dữ liệu, vui lòng thử lại" });
   }
 };
 
@@ -66,14 +66,19 @@ const dispatchTool = async (
 export const getChatReply = async (
   userMessages: ChatMessage[],
 ): Promise<ChatResponse> => {
-  const contextMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
-    [
-      { role: "system", content: CHATBOT_SYSTEM_PROMPT },
-      ...userMessages.slice(-10).map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      })),
-    ];
+  // FIX: Bỏ slice ở controller, chỉ slice 1 lần ở đây — lấy 20 messages gần nhất
+  // (10 turn = 10 user + 10 assistant)
+  const recentMessages = userMessages.slice(-20);
+
+  // FIX: contextMessages là array LOCAL cho mỗi request — không share state giữa các request
+  // Tool results (kể cả lỗi) chỉ sống trong scope này, không nhiễm sang request khác
+  const contextMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    { role: "system", content: CHATBOT_SYSTEM_PROMPT },
+    ...recentMessages.map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    })),
+  ];
 
   const toolsUsed: string[] = [];
   let rounds = 0;
@@ -92,6 +97,7 @@ export const getChatReply = async (
 
     const message = response.choices[0].message;
 
+    // Không có tool call → AI đã có đủ thông tin để trả lời
     if (!message.tool_calls || message.tool_calls.length === 0) {
       return {
         reply:
@@ -101,6 +107,7 @@ export const getChatReply = async (
       };
     }
 
+    // Push assistant message (có tool_calls) vào context của round này
     contextMessages.push(message);
 
     const toolResults = await Promise.all(
@@ -109,13 +116,22 @@ export const getChatReply = async (
           return {
             role: "tool" as const,
             tool_call_id: toolCall.id,
-            content: JSON.stringify({ error: "Tool call không hợp lệ" }),
+            content: JSON.stringify({ found: false, error: "Tool call không hợp lệ" }),
           };
         }
 
-        const args = JSON.parse(toolCall.function.arguments || "{}");
-        const result = await dispatchTool(toolCall.function.name, args);
+        let args: Record<string, any> = {};
+        try {
+          args = JSON.parse(toolCall.function.arguments || "{}");
+        } catch {
+          return {
+            role: "tool" as const,
+            tool_call_id: toolCall.id,
+            content: JSON.stringify({ found: false, error: "Arguments không hợp lệ" }),
+          };
+        }
 
+        const result = await dispatchTool(toolCall.function.name, args);
         toolsUsed.push(toolCall.function.name);
 
         return {
@@ -129,7 +145,7 @@ export const getChatReply = async (
     contextMessages.push(...toolResults);
   }
 
-  // Vượt quá MAX_TOOL_ROUNDS → force reply
+  // Vượt quá MAX_TOOL_ROUNDS → force reply với data đã có
   const finalResponse = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
@@ -146,7 +162,7 @@ export const getChatReply = async (
   return {
     reply:
       finalResponse.choices[0].message.content ||
-      "Xin lỗi, có lỗi xảy ra. Vui lòng thử lại.",
+      "Xin lỗi bạn, hiện tại mình chưa tìm thấy thông tin phù hợp cho yêu cầu này. Bạn có thể liên hệ Hotline 1800.6060 (Nhánh 1) để được hỗ trợ nhanh nhất nhé!",
     toolsUsed,
   };
 };
