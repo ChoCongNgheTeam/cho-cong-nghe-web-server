@@ -202,13 +202,64 @@
             
             <div class="section checkout-zone">
                 <h2>4. Đặt hàng (Checkout)</h2>
-                <input type="text" id="chkAddressId" placeholder="Address ID (Bấm 'Chọn' ở trên để điền)">
-                <input type="text" id="chkPaymentId" placeholder="Payment Method ID (Bắt buộc)">
-                <input type="text" id="chkVoucherId" placeholder="Voucher ID (Tùy chọn)">
                 
-                <button class="btn-cyan" onclick="testValidateCheckout()">✓ Validate Checkout</button>
-                <button class="btn-purple" onclick="testCheckoutPreview()">👁️ Xem trước Đơn (Preview)</button>
-                <button class="btn-orange" onclick="testCheckoutSmart()" style="width: 100%; font-size: 16px; padding: 10px;">💰 Đặt Hàng Ngay</button>
+                <h3>Chọn thông tin giao hàng & thanh toán</h3>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+                    <h4>📍 Địa chỉ giao hàng</h4>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="text" id="chkAddressId" placeholder="Address ID (Bấm 'Chọn' ở trên để điền)" readonly style="flex: 1;">
+                        <span id="selectedAddressInfo" style="font-size: 13px; color: #666; flex: 1;"></span>
+                    </div>
+                </div>
+
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+                    <h4>💳 Phương thức thanh toán</h4>
+                    <button class="btn-cyan" onclick="testGetPaymentMethods()" style="margin-bottom: 10px; width: 100%;">🔄 Tải Phương thức thanh toán</button>
+                    <select id="chkPaymentId" style="margin-bottom: 10px;">
+                        <option value="">-- Chọn phương thức thanh toán --</option>
+                    </select>
+                    <div id="paymentInfo" style="font-size: 13px; color: #666; margin-top: 8px;"></div>
+                </div>
+
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+                    <h4>🎟️ Mã khuyến mãi (Tùy chọn)</h4>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="chkVoucherId" placeholder="Voucher ID hoặc mã">
+                        <button class="btn-green" onclick="testApplyVoucher()" style="flex: 0 0 auto;">✓ Áp dụng</button>
+                    </div>
+                    <div id="voucherInfo" style="font-size: 13px; color: #666; margin-top: 8px;"></div>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button class="btn-cyan" onclick="testValidateCheckout()" style="flex: 1;">✓ Kiểm tra</button>
+                    <button class="btn-purple" onclick="testCheckoutPreview()" style="flex: 1;">👁️ Xem trước</button>
+                </div>
+
+                <div id="checkout-summary" style="background: #f0f8ff; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 2px solid #b3d9ff; display: none;">
+                    <h4 style="margin-top: 0;">📦 Chi tiết đơn hàng</h4>
+                    <div id="summary-items" style="max-height: 300px; overflow-y: auto; margin-bottom: 15px;"></div>
+                    <hr style="margin: 10px 0; border: 0; border-top: 1px solid #ddd;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px;">
+                        <div><strong>Cộng tiền hàng:</strong></div>
+                        <div style="text-align: right;"><span id="summary-subtotal">0</span> đ</div>
+                        
+                        <div><strong>🚚 Phí vận chuyển:</strong></div>
+                        <div style="text-align: right; font-weight: bold; color: #fd7e14;">
+                            <span id="summary-shipping">0</span> đ
+                            <span id="shipping-badge" style="margin-left: 8px; font-size: 12px; background: #28a745; color: white; padding: 2px 6px; border-radius: 3px;"></span>
+                        </div>
+                        
+                        <div style="color: #d32f2f;"><strong>Ưu đãi:</strong></div>
+                        <div style="text-align: right; color: #d32f2f; font-weight: bold;">
+                            -<span id="summary-discount">0</span> đ
+                        </div>
+                        
+                        <div style="border-top: 2px solid #ddd; padding-top: 10px; font-weight: bold; font-size: 16px;">💰 Tổng cộng:</div>
+                        <div style="border-top: 2px solid #ddd; padding-top: 10px; text-align: right; font-weight: bold; font-size: 16px; color: #d32f2f;"><span id="summary-total">0</span> đ</div>
+                    </div>
+                </div>
+
+                <button class="btn-orange" onclick="testCheckoutSmart()" style="width: 100%; font-size: 16px; padding: 12px; font-weight: bold;">💰 Đặt Hàng Ngay</button>
                 
                 <h4>Log Result:</h4>
                 <pre id="log-checkout">No data yet...</pre>
@@ -796,13 +847,13 @@
             }
 
             container.innerHTML = addresses.map(addr => `
-                <div style="border: 1px solid ${addr.isDefault ? '#17a2b8' : '#ddd'}; padding: 12px; margin-bottom: 10px; border-radius: 6px; background: ${addr.isDefault ? '#f0f9fa' : 'white'}; position: relative;">
+                <div data-address-id="${addr.id}" style="border: 1px solid ${addr.isDefault ? '#17a2b8' : '#ddd'}; padding: 12px; margin-bottom: 10px; border-radius: 6px; background: ${addr.isDefault ? '#f0f9fa' : 'white'}; position: relative;">
                     ${addr.isDefault ? '<span class="badge status-DEFAULT" style="position: absolute; top: 10px; right: 10px;">Mặc định</span>' : ''}
                     <div style="font-weight: bold; color: #222;">
-                        ${addr.contactName} - ${addr.phone} 
+                        <span data-field="name">${addr.contactName}</span> - <span data-field="phone">${addr.phone}</span>
                         <span style="font-size:10px; background:#eee; padding:2px 5px; border-radius:3px;">${addr.type || 'N/A'}</span>
                     </div>
-                    <div style="font-size: 13px; color: #555; margin: 5px 0;">${addr.fullAddress || addr.detailAddress}</div>
+                    <div style="font-size: 13px; color: #555; margin: 5px 0;" data-field="address">${addr.fullAddress || addr.detailAddress}</div>
                     
                     <div style="margin-top: 10px;">
                         <code style="background: #e9ecef; padding: 3px 6px; font-size: 11px; border-radius: 4px; color: #d63384; display:block; margin-bottom:10px;">ID: ${addr.id}</code>
@@ -818,16 +869,159 @@
 
         function useAddress(id) {
             document.getElementById('chkAddressId').value = id;
-            alert('✅ Đã điền Address ID xuống form Đặt hàng (Checkout)!');
+            
+            // Lấy thông tin address từ HTML để hiển thị
+            const addressRow = document.querySelector(`[data-address-id="${id}"]`);
+            if (addressRow) {
+                const name = addressRow.querySelector('[data-field="name"]')?.textContent || '';
+                const phone = addressRow.querySelector('[data-field="phone"]')?.textContent || '';
+                const address = addressRow.querySelector('[data-field="address"]')?.textContent || '';
+                document.getElementById('selectedAddressInfo').textContent = `${name} | ${phone} | ${address}`;
+            }
+            alert('✅ Đã chọn địa chỉ!');
         }
 
-        // ================= CHECKOUT API =================
+        // ================= PAYMENT METHODS =================
+        function testGetPaymentMethods() {
+            fetch(`${BASE_URL}/payments/active`, { method: 'GET', headers: getHeaders() })
+                .then(res => res.json())
+                .then(res => {
+                    if (!res.data || res.data.length === 0) {
+                        alert('Không có phương thức thanh toán nào');
+                        return;
+                    }
+                    const select = document.getElementById('chkPaymentId');
+                    select.innerHTML = '<option value="">-- Chọn phương thức thanh toán --</option>';
+                    res.data.forEach(pm => {
+                        const option = document.createElement('option');
+                        option.value = pm.id;
+                        option.textContent = `${pm.name} (${pm.code})`;
+                        option.dataset.code = pm.code;
+                        option.dataset.description = pm.description;
+                        select.appendChild(option);
+                    });
+                    log('log-checkout', { message: 'Loaded payment methods', data: res.data });
+                })
+                .catch(err => {
+                    log('log-checkout', err.message);
+                    alert('Lỗi tải phương thức thanh toán: ' + err.message);
+                });
+        }
+
+        // Update payment info when selected
+        document.addEventListener('DOMContentLoaded', () => {
+            const paymentSelect = document.getElementById('chkPaymentId');
+            if (paymentSelect) {
+                paymentSelect.addEventListener('change', (e) => {
+                    const selectedOption = e.target.options[e.target.selectedIndex];
+                    const infoDiv = document.getElementById('paymentInfo');
+                    if (selectedOption.value) {
+                        infoDiv.textContent = `${selectedOption.textContent}`;
+                        if (selectedOption.dataset.code === 'BANK_TRANSFER') {
+                            infoDiv.innerHTML += '<br><small style="color: #e83e8c;">Bạn sẽ nhận mã chuyển khoản sau khi đặt hàng</small>';
+                        }
+                    } else {
+                        infoDiv.textContent = '';
+                    }
+                });
+            }
+        });
+
+        // ================= VOUCHER =================
+        function testApplyVoucher() {
+            const voucherCode = document.getElementById('chkVoucherId').value;
+            if (!voucherCode) {
+                alert('Vui lòng nhập mã voucher');
+                return;
+            }
+            
+            // Fetch chi tiết voucher từ code
+            fetch(`${BASE_URL}/vouchers/code/${voucherCode}`, {
+                method: 'GET',
+                headers: getHeaders()
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (res.data) {
+                    const voucher = res.data;
+                    let discountText = '';
+                    if (voucher.discountType === 'DISCOUNT_PERCENT') {
+                        discountText = `${voucher.discountValue}%`;
+                        if (voucher.maxDiscountValue) {
+                            discountText += ` (tối đa: ${Number(voucher.maxDiscountValue).toLocaleString('vi-VN')} đ)`;
+                        }
+                    } else {
+                        discountText = `${Number(voucher.discountValue).toLocaleString('vi-VN')} đ`;
+                    }
+                    
+                    document.getElementById('voucherInfo').innerHTML = `
+                        <strong style="color: #28a745;">✓ ${voucher.name}</strong><br>
+                        Chiết khấu: ${discountText}
+                        ${voucher.minOrderValue ? `<br><small>Đơn hàng tối thiểu: ${Number(voucher.minOrderValue).toLocaleString('vi-VN')} đ</small>` : ''}
+                    `;
+                    alert(`✓ Voucher "${voucher.name}" hợp lệ!`);
+                } else {
+                    document.getElementById('voucherInfo').innerHTML = `<strong style="color: #dc3545;">✗ ${res.message || 'Voucher không tồn tại'}</strong>`;
+                    alert('❌ ' + (res.message || 'Voucher không tồn tại'));
+                }
+            })
+            .catch(err => {
+                log('log-checkout', err.message);
+                document.getElementById('voucherInfo').innerHTML = `<strong style="color: #dc3545;">✗ Lỗi: ${err.message}</strong>`;
+                alert('❌ Lỗi: ' + err.message);
+            });
+        }
+
+        // ================= CHECKOUT SUMMARY RENDER =================
+        function renderCheckoutSummary(data) {
+            if (!data) return;
+            
+            const container = document.getElementById('checkout-summary');
+            const itemsContainer = document.getElementById('summary-items');
+            
+            // Render items
+            itemsContainer.innerHTML = data.items.map(item => `
+                <div style="display: flex; gap: 10px; padding: 10px; background: white; border-radius: 4px; margin-bottom: 8px; border-left: 3px solid #17a2b8;">
+                    <div style="flex: 1;">
+                        <div><strong>${item.productName}</strong></div>
+                        <div style="font-size: 12px; color: #666;">${item.variantCode ? `Mã: ${item.variantCode}` : 'Không rõ'}</div>
+                        <div style="font-size: 12px; color: #666;">Số lượng: ${item.quantity}</div>
+                    </div>
+                    <div style="text-align: right; min-width: 100px;">
+                        <div style="font-size: 12px; color: #666;">${Number(item.unitPrice).toLocaleString('vi-VN')} đ/cái</div>
+                        <div style="font-weight: bold;">${Number(item.subtotal).toLocaleString('vi-VN')} đ</div>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Render totals
+            document.getElementById('summary-subtotal').textContent = Number(data.subtotalAmount).toLocaleString('vi-VN');
+            document.getElementById('summary-shipping').textContent = Number(data.shippingFee).toLocaleString('vi-VN');
+            document.getElementById('summary-discount').textContent = Number(data.voucherDiscount).toLocaleString('vi-VN');
+            document.getElementById('summary-total').textContent = Number(data.totalAmount).toLocaleString('vi-VN');
+            
+            // Badge freeship nếu phí ship = 0
+            const shippingBadge = document.getElementById('shipping-badge');
+            if (Number(data.shippingFee) === 0) {
+                shippingBadge.textContent = '🎉 FREESHIP';
+                shippingBadge.style.display = 'inline-block';
+            } else {
+                shippingBadge.style.display = 'none';
+            }
+            
+            // Show container
+            container.style.display = 'block';
+        }
+
         function buildCheckoutQueryOrBody(isQuery = false) {
             const data = {
                 shippingAddressId: document.getElementById('chkAddressId').value,
                 paymentMethodId: document.getElementById('chkPaymentId').value,
                 voucherId: document.getElementById('chkVoucherId').value || undefined
             };
+            // Loại bỏ field voucherId nếu rỗng để tránh gửi undefined lên API
+            if (!data.voucherId) delete data.voucherId;
+            
             if (isQuery) {
                 const params = new URLSearchParams();
                 if (data.shippingAddressId) params.append('shippingAddressId', data.shippingAddressId);
@@ -852,14 +1046,27 @@
                 .then(res => res.json())
                 .then(res => {
                     log('log-checkout', res);
-                    alert(res.message || (res.data?.valid ? '✅ Giỏ hàng hợp lệ' : '❌ Giỏ hàng không hợp lệ'));
+                    if (res.data?.isValid) {
+                        alert(`✅ Giỏ hàng hợp lệ!\n\nTổng ${res.data.totalItems} sản phẩm, ${res.data.totalQuantity} cái`);
+                    } else {
+                        const errors = res.data?.errors ? res.data.errors.join('\n') : 'Giỏ hàng không hợp lệ';
+                        alert(`❌ Giỏ hàng không hợp lệ!\n\n${errors}`);
+                    }
                 })
-                .catch(err => log('log-checkout', err.message));
+                .catch(err => {
+                    log('log-checkout', err.message);
+                    alert('❌ Lỗi: ' + err.message);
+                });
         }
 
         function testCheckoutPreview() {
             const params = new URLSearchParams();
             const baseData = buildCheckoutQueryOrBody(false);
+            
+            if (!baseData.shippingAddressId || !baseData.paymentMethodId) {
+                alert("Vui lòng chọn địa chỉ giao hàng và phương thức thanh toán");
+                return;
+            }
             
             if (baseData.shippingAddressId) params.append('shippingAddressId', baseData.shippingAddressId);
             if (baseData.paymentMethodId) params.append('paymentMethodId', baseData.paymentMethodId);
@@ -875,14 +1082,23 @@
             const query = params.toString() ? '?' + params.toString() : '';
             fetch(`${BASE_URL}/checkout/preview${query}`, { method: 'GET', headers: getHeaders() })
                 .then(res => res.json())
-                .then(res => log('log-checkout', res))
+                .then(res => {
+                    if (res.success) {
+                        renderCheckoutSummary(res.data);
+                        log('log-checkout', res);
+                        alert('✅ Xem trước đơn hàng thành công!');
+                    } else {
+                        log('log-checkout', res);
+                        alert('❌ ' + res.message);
+                    }
+                })
                 .catch(err => log('log-checkout', err.message));
         }
 
         function testCheckoutSmart() {
             const body = buildCheckoutQueryOrBody(false);
             if (!body.shippingAddressId || !body.paymentMethodId) {
-                alert("Vui lòng nhập Address ID và Payment ID!");
+                alert("Vui lòng chọn địa chỉ giao hàng và phương thức thanh toán!");
                 return;
             }
             
@@ -896,28 +1112,68 @@
                     .then(res => {
                         log('log-checkout', res);
                         if (res.success) {
-                            alert(`🎉 Đặt hàng ${selectedCartItems.length} item thành công!\nGiỏ hàng còn lại những item chưa mua.`);
+                            const paymentInfo = res.data.paymentInfo;
+                            let successMsg = `🎉 Đặt hàng ${selectedCartItems.length} item thành công!\n\n`;
+                            successMsg += `Mã đơn: ${res.data.orderCode}\n`;
+                            successMsg += `Trạng thái: ${res.data.orderStatus}\n`;
+                            successMsg += `Tổng tiền: ${Number(res.data.summary.totalAmount).toLocaleString('vi-VN')} đ\n`;
+                            
+                            if (res.data.paymentMethodCode === 'BANK_TRANSFER') {
+                                successMsg += `\n💳 Thông tin chuyển khoản:\n`;
+                                successMsg += `Mã TT: ${res.data.paymentInfo.bankTransferCode || 'N/A'}\n`;
+                                if (paymentInfo.bankName) successMsg += `Ngân hàng: ${paymentInfo.bankName}\n`;
+                                if (paymentInfo.accountName) successMsg += `Chủ TK: ${paymentInfo.accountName}\n`;
+                                if (paymentInfo.accountNumber) successMsg += `Số TK: ${paymentInfo.accountNumber}\n`;
+                            }
+                            
+                            alert(successMsg);
                             selectedCartItems = [];
                             document.querySelectorAll('.cart-item-checkbox').forEach(cb => cb.checked = false);
                             testGetCart(); 
                             testGetMyOrders(); 
+                            document.getElementById('checkout-summary').style.display = 'none';
+                        } else {
+                            alert('❌ ' + res.message);
                         }
                     })
-                    .catch(err => log('log-checkout', err.message));
+                    .catch(err => {
+                        log('log-checkout', err.message);
+                        alert('❌ Lỗi: ' + err.message);
+                    });
             } else {
-                // Nếu không có items được chọn → checkout tất cả items
+                // Nếu không có items được chọn → checkout tất cả items (không gắn cartItemIds)
                 console.log('Checkout all items:', body);
                 fetch(`${BASE_URL}/checkout`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) })
                     .then(res => res.json())
                     .then(res => {
                         log('log-checkout', res);
                         if (res.success) {
-                            alert('🎉 Đặt hàng tất cả sản phẩm thành công!');
+                            const paymentInfo = res.data.paymentInfo;
+                            let successMsg = `🎉 Đặt hàng tất cả sản phẩm thành công!\n\n`;
+                            successMsg += `Mã đơn: ${res.data.orderCode}\n`;
+                            successMsg += `Trạng thái: ${res.data.orderStatus}\n`;
+                            successMsg += `Tổng tiền: ${Number(res.data.summary.totalAmount).toLocaleString('vi-VN')} đ\n`;
+                            
+                            if (res.data.paymentMethodCode === 'BANK_TRANSFER') {
+                                successMsg += `\n💳 Thông tin chuyển khoản:\n`;
+                                successMsg += `Mã TT: ${res.data.paymentInfo.bankTransferCode || 'N/A'}\n`;
+                                if (paymentInfo.bankName) successMsg += `Ngân hàng: ${paymentInfo.bankName}\n`;
+                                if (paymentInfo.accountName) successMsg += `Chủ TK: ${paymentInfo.accountName}\n`;
+                                if (paymentInfo.accountNumber) successMsg += `Số TK: ${paymentInfo.accountNumber}\n`;
+                            }
+                            
+                            alert(successMsg);
                             testGetCart(); 
                             testGetMyOrders(); 
+                            document.getElementById('checkout-summary').style.display = 'none';
+                        } else {
+                            alert('❌ ' + res.message);
                         }
                     })
-                    .catch(err => log('log-checkout', err.message));
+                    .catch(err => {
+                        log('log-checkout', err.message);
+                        alert('❌ Lỗi: ' + err.message);
+                    });
             }
         }
 
