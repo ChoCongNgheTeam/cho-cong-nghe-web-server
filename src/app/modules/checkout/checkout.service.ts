@@ -23,6 +23,7 @@ export const validateCartItems = async (userId: string, cartItemIds?: string[]):
       totalQuantity: 0,
       items: [],
       errors: ["Giỏ hàng trống hoặc chưa có sản phẩm nào được chọn, vui lòng chọn sản phẩm"],
+      totalPromotionDiscount: 0,
     };
   }
 
@@ -55,6 +56,7 @@ export const validateCartItems = async (userId: string, cartItemIds?: string[]):
     totalQuantity: cartPricing.totalQuantity,
     items: validatedItems,
     errors,
+    totalPromotionDiscount: cartPricing.totalPromotionDiscount || 0,
   };
 };
 
@@ -200,6 +202,9 @@ export const prepareCheckoutData = async (userId: string, input: CheckoutInput):
   }));
   const subtotalAmount = items.reduce((sum, i) => sum + i.subtotal, 0);
 
+  // 🔥 Lấy thêm tổng tiền giảm giá khuyến mãi từ hàm validate 
+  const totalPromotionDiscount = validation.totalPromotionDiscount || 0; 
+
   // 🔥 TÍNH PHÍ SHIP CỰC NHANH: Dùng Pure Function, truyền thẳng tên Tỉnh/Thành
   const shippingFee = calculateShippingFee(subtotalAmount, address.province.name);
 
@@ -216,6 +221,7 @@ export const prepareCheckoutData = async (userId: string, input: CheckoutInput):
     subtotalAmount,
     shippingFee,
     voucherDiscount,
+    totalPromotionDiscount, 
     totalAmount,
     paymentMethodId,
     paymentMethodCode: paymentMethod.code,
