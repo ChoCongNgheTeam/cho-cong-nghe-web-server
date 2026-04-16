@@ -8,6 +8,9 @@ import prisma from "prisma/client";
 import { findProductsForComparison, findProductsOnSaleDate, findSaleScheduleDays, findTrendingSearchSuggestions, getAdminProductStats, getProductIdsFromPromotions } from "./product.repository";
 import { normalizeVariant } from "./product.helpers";
 import { NotFoundError, BadRequestError, ConflictError } from "@/errors";
+import { invalidateFilterCache } from "./product_filter.service";
+
+invalidateFilterCache();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INTERNAL HELPERS

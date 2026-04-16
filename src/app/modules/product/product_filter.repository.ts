@@ -136,6 +136,74 @@ export const getVariantAttributesByCategories = async (categoryIds: string[]) =>
   return categoryAttributes.map((ca) => ca.attribute);
 };
 
+/**
+ * Batch version của getActiveAttributeOptionValues.
+ * Thay vì N queries (1 per attribute), chỉ dùng 1 query duy nhất
+ * rồi group kết quả theo attributeCode ở app layer.
+ *
+ * Return: Map<attributeCode, { optionId, value, label }[]>
+ */
+export const getBatchActiveAttributeOptions = async (attributeCodes: string[], categoryIds: string[]): Promise<Map<string, { optionId: string; value: string; label: string }[]>> => {
+  if (attributeCodes.length === 0) return new Map();
+
+  const rows = await prisma.variants_attributes.findMany({
+    where: {
+      productVariant: {
+        isActive: true,
+        deletedAt: null,
+        product: {
+          isActive: true,
+          deletedAt: null,
+          categoryId: { in: categoryIds },
+        },
+      },
+      attributeOption: {
+        attribute: {
+          code: { in: attributeCodes }, // tất cả codes trong 1 query
+        },
+      },
+    },
+    select: {
+      attributeOption: {
+        select: {
+          id: true,
+          value: true,
+          label: true,
+          attribute: {
+            select: { code: true },
+          },
+        },
+      },
+    },
+    // distinct không support multi-field trong Prisma → dedupe ở app layer
+  });
+
+  // Group và dedupe theo attributeCode + value
+  const resultMap = new Map<string, Map<string, { optionId: string; value: string; label: string }>>();
+
+  for (const row of rows) {
+    const { id, value, label, attribute } = row.attributeOption;
+    const code = attribute.code;
+
+    if (!resultMap.has(code)) {
+      resultMap.set(code, new Map());
+    }
+
+    // Dùng value làm key để dedupe
+    if (!resultMap.get(code)!.has(value)) {
+      resultMap.get(code)!.set(value, { optionId: id, value, label });
+    }
+  }
+
+  // Convert inner Map → array
+  const output = new Map<string, { optionId: string; value: string; label: string }[]>();
+  for (const [code, valueMap] of resultMap.entries()) {
+    output.set(code, Array.from(valueMap.values()));
+  }
+
+  return output;
+};
+
 //
 // Lấy distinct attribute option values thực sự có trong products của category
 // (tránh show option không có sản phẩm nào)

@@ -231,12 +231,12 @@ export const buildProductWhere = async (
   }
 
   //  Category (slug → toàn bộ sub-category IDs)
-  if (query.category) {
-    const tree = await getDescendantCategoryIds(query.category);
-    if (tree) {
-      where.categoryId = { in: tree.ids };
-    }
-  }
+  // if (query.category) {
+  //   const tree = await getDescendantCategoryIds(query.category);
+  //   if (tree) {
+  //     where.categoryId = { in: tree.ids };
+  //   }
+  // }
 
   if (query.category) {
     const ids = await resolveCategoryIds(query.category, prisma);

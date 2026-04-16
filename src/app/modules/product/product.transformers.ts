@@ -133,35 +133,65 @@ const buildAvailableOptionsWithStatus = (variants: RawVariant[], colorImages: an
 const buildVariantBundles = (variants: RawVariant[], selectedVariantId: string, colorImages: any[]): AvailableOption[] => {
   const BUNDLE_ATTR_ORDER = ["ram", "storage", "gpu", "capacity_cooling", "capacity_washing", "capacity_fridge", "connection"];
 
-  const bundleValues = variants
-    .filter((v) => v.isActive)
-    .map((v) => {
-      // Build label theo thứ tự ưu tiên
-      const attrMap = new Map(v.variantAttributes.map((va) => [va.attributeOption.attribute.code, va.attributeOption.label]));
+  // Color attr codes — những attr này KHÔNG đưa vào bundle label
+  const COLOR_ATTRS = new Set(["color"]);
 
-      const labelParts: string[] = [];
-      for (const code of BUNDLE_ATTR_ORDER) {
-        const label = attrMap.get(code);
-        if (label) labelParts.push(label.toUpperCase());
-      }
+  // Group variants theo bundle label (bỏ qua color)
+  const bundleMap = new Map<
+    string,
+    {
+      label: string;
+      variantIds: string[]; // tất cả variantId có cùng label này
+      price: number;
+      enabled: boolean;
+    }
+  >();
 
-      const label = labelParts.length > 0 ? labelParts.join(" / ") : v.code || v.id;
+  for (const v of variants) {
+    if (!v.isActive) continue;
 
-      return {
-        id: v.id,
-        value: v.id,
-        label,
-        enabled: v.isActive,
-        selected: v.id === selectedVariantId,
-        price: Number(v.price),
-        image: null,
-      };
-    });
+    const attrMap = new Map(v.variantAttributes.filter((va) => !COLOR_ATTRS.has(va.attributeOption.attribute.code)).map((va) => [va.attributeOption.attribute.code, va.attributeOption.label]));
+
+    const labelParts: string[] = [];
+    for (const code of BUNDLE_ATTR_ORDER) {
+      const label = attrMap.get(code);
+      if (label) labelParts.push(label.toUpperCase());
+    }
+
+    const label = labelParts.length > 0 ? labelParts.join(" / ") : v.code || v.id;
+
+    if (!bundleMap.has(label)) {
+      bundleMap.set(label, { label, variantIds: [], price: Number(v.price), enabled: true });
+    }
+    bundleMap.get(label)!.variantIds.push(v.id);
+  }
+
+  // Tìm bundle đang selected: label của selectedVariantId
+  const selectedVariant = variants.find((v) => v.id === selectedVariantId);
+  const selectedAttrMap = new Map(
+    (selectedVariant?.variantAttributes ?? []).filter((va) => !COLOR_ATTRS.has(va.attributeOption.attribute.code)).map((va) => [va.attributeOption.attribute.code, va.attributeOption.label]),
+  );
+  const selectedBundleLabel =
+    BUNDLE_ATTR_ORDER.map((code) => selectedAttrMap.get(code))
+      .filter(Boolean)
+      .join(" / ")
+      .toUpperCase() || selectedVariantId;
+
+  const bundleValues = Array.from(bundleMap.values()).map((bundle) => ({
+    id: bundle.variantIds[0], // đại diện 1 variantId (FE sẽ resolve lại theo color)
+    value: bundle.variantIds[0],
+    label: bundle.label,
+    enabled: bundle.enabled,
+    selected: bundle.label === selectedBundleLabel,
+    price: bundle.price,
+    image: null,
+    // Metadata để FE có thể resolve đúng variant khi kết hợp với color
+    variantIds: bundle.variantIds,
+  }));
 
   const result: AvailableOption[] = [{ type: "bundle", values: bundleValues }];
 
-  // Thêm color selector riêng nếu có nhiều màu khác nhau
-  // (hoặc chỉ 1 màu — vẫn render để user biết đang chọn màu nào)
+  // Color selector — giữ nguyên logic cũ
   const colorMap = new Map<string, any>();
   for (const v of variants) {
     if (!v.isActive) continue;
@@ -194,40 +224,68 @@ const buildVariantBundles = (variants: RawVariant[], selectedVariantId: string, 
   return result;
 };
 
+/**
+ * Stock status dựa trên variant có inventory thấp nhất.
+ *
+ * Logic: user quan tâm đến "cấu hình họ muốn còn không", không phải tổng kho.
+ * → Dùng min quantity của active variants làm signal.
+ *
+ * Threshold low_stock: 5 (nhất quán với getLowStockProducts threshold=5 ở repo)
+ */
+const LOW_STOCK_THRESHOLD = 5;
+
 export const calculateOverallStockStatus = (variants: RawVariant[]): "in_stock" | "low_stock" | "out_of_stock" | "pre_order" => {
   const activeVariants = variants.filter((v) => v.isActive);
 
-  let totalAvailable = 0;
-  activeVariants.forEach((v) => {
-    totalAvailable += Math.max(0, v.quantity);
-  });
+  if (activeVariants.length === 0) return "out_of_stock";
 
-  if (totalAvailable === 0) return "out_of_stock";
-  if (totalAvailable <= 10) return "low_stock";
+  const quantities = activeVariants.map((v) => Math.max(0, v.quantity));
+  const totalStock = quantities.reduce((sum, q) => sum + q, 0);
+  const minQuantity = Math.min(...quantities);
+
+  // Tất cả active variants đều hết hàng
+  if (totalStock === 0) return "out_of_stock";
+
+  // Variant có stock thấp nhất đang cảnh báo
+  // (dùng min thay vì total để không bị "che" bởi các variants khác còn nhiều)
+  if (minQuantity <= LOW_STOCK_THRESHOLD) return "low_stock";
+
   return "in_stock";
 };
-
+/**
+ * Detect xem product có nên dùng bundle mode không.
+ *
+ * Bundle mode = FE hiển thị selector dạng "8GB / 256GB" thay vì 2 selector riêng.
+ *
+ * Rules:
+ * 1. variantDisplay === "CARD" → luôn bundle (admin đã config tường minh)
+ * 2. Có ít nhất 1 "config attribute" (ram, gpu, capacity...) → bundle
+ *    Vì những attr này không có nghĩa khi chọn độc lập mà cần kết hợp.
+ * 3. Chỉ có color, storage, size (chọn độc lập được) → KHÔNG bundle
+ *
+ * Lý do tách storage ra khỏi BUNDLE_TRIGGER:
+ *   - Điện thoại thường: storage đi kèm ram → bundle (ram trigger trước)
+ *   - Phụ kiện (ổ cứng, thẻ nhớ): chỉ có storage → không bundle, hiện individual
+ */
+const BUNDLE_TRIGGER_ATTRS = new Set(["ram", "gpu", "capacity_cooling", "capacity_washing", "capacity_fridge", "connection", "screen_size_laptop"]);
 /**
  * Detect xem product có nên dùng bundle mode không.
  * Bundle khi: variantDisplay = CARD, HOẶC có attribute ngoài color (ram, gpu, capacity...)
  */
 const shouldUseBundleMode = (product: any, validVariants: RawVariant[]): boolean => {
+  // Rule 1: admin config tường minh
   if (product.variantDisplay === "CARD") return true;
 
-  // Collect tất cả attribute types từ variants
-  const attrTypes = new Set<string>();
+  // Rule 2: có bất kỳ BUNDLE_TRIGGER_ATTRS nào → bundle
   for (const v of validVariants) {
     for (const va of v.variantAttributes) {
-      attrTypes.add(va.attributeOption.attribute.code);
+      if (BUNDLE_TRIGGER_ATTRS.has(va.attributeOption.attribute.code)) {
+        return true;
+      }
     }
   }
 
-  // Nếu có attribute nào ngoài color → bundle
-  const NON_BUNDLE_ATTRS = new Set(["color", "storage", "size"]); // chỉ color → individual
-  for (const type of attrTypes) {
-    if (!NON_BUNDLE_ATTRS.has(type)) return true;
-  }
-
+  // Rule 3: chỉ có color/storage/size → individual selectors
   return false;
 };
 

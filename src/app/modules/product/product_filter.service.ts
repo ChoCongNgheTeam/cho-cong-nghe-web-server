@@ -1,3 +1,5 @@
+// product_filter.service.ts
+
 import { FilterType } from "@prisma/client";
 import {
   getDescendantCategoryIds,
@@ -5,13 +7,62 @@ import {
   getDistinctSpecValues,
   getSpecValueRange,
   getVariantAttributesByCategories,
-  getActiveAttributeOptionValues,
   getPriceRangeByCategories,
   getActiveBrandsByCategories,
+  getBatchActiveAttributeOptions, // ← import hàm mới
 } from "./product_filter.repository";
 import { CategoryFiltersResponse, FilterGroup } from "./product_filter.types";
 
-// Heuristic fallback: dùng khi spec.filterType = null (chưa được config)
+// ─────────────────────────────────────────────────────────────────────────────
+// CACHE
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface CacheEntry<T> {
+  value: T;
+  expiresAt: number;
+}
+
+class SimpleCache<T> {
+  private store = new Map<string, CacheEntry<T>>();
+
+  get(key: string): T | null {
+    const entry = this.store.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+      this.store.delete(key);
+      return null;
+    }
+    return entry.value;
+  }
+
+  set(key: string, value: T, ttlMs: number): void {
+    this.store.set(key, { value, expiresAt: Date.now() + ttlMs });
+  }
+
+  invalidate(key: string): void {
+    this.store.delete(key);
+  }
+
+  invalidateAll(): void {
+    this.store.clear();
+  }
+}
+
+const filterCache = new SimpleCache<CategoryFiltersResponse>();
+const FILTER_CACHE_TTL = 5 * 60 * 1000; // 5 phút
+
+export const invalidateFilterCache = (categorySlug?: string) => {
+  if (categorySlug) {
+    filterCache.invalidate(`filters:${categorySlug}`);
+  } else {
+    filterCache.invalidateAll();
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS (giữ nguyên từ file cũ)
+// ─────────────────────────────────────────────────────────────────────────────
+
 const detectFilterTypeFallback = (values: string[]): FilterType => {
   if (values.length === 0) return FilterType.ENUM;
 
@@ -38,7 +89,6 @@ const detectFilterTypeFallback = (values: string[]): FilterType => {
   return FilterType.ENUM;
 };
 
-// ENUM spec keys: nên sort value theo số (VD: "6 GB" < "8 GB" < "12 GB")
 const numericSortKeys = new Set(["ram", "storage", "screen_size", "battery_capacity", "refresh_rate"]);
 
 const sortEnumValues = (values: string[], key: string): string[] => {
@@ -46,18 +96,27 @@ const sortEnumValues = (values: string[], key: string): string[] => {
     return [...values].sort((a, b) => {
       const na = parseFloat(a.replace(/[^0-9.]/g, ""));
       const nb = parseFloat(b.replace(/[^0-9.]/g, ""));
-      if (!isNaN(na) && !isNaN(nb)) return nb - na; // desc: 512 > 256 > 128
+      if (!isNaN(na) && !isNaN(nb)) return nb - na;
       return a.localeCompare(b);
     });
   }
   return values.sort((a, b) => a.localeCompare(b, "vi"));
 };
-// Attribute codes luôn bỏ qua (vì chúng được render ở variant selector)
-// Chỉ filter attribute nào thực sự hữu ích để lọc danh sách sản phẩm
+
 const SKIP_ATTRIBUTES = new Set(["color"]);
-// MAIN SERVICE: Build dynamic filter config cho một category slug
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const getCategoryFilters = async (categorySlug: string): Promise<CategoryFiltersResponse> => {
-  // Resolve category + tất cả category con
+  const cacheKey = `filters:${categorySlug}`;
+
+  // Cache hit → trả về ngay, không chạm DB
+  const cached = filterCache.get(cacheKey);
+  if (cached) return cached;
+
+  // Resolve category tree
   const categoryTree = await getDescendantCategoryIds(categorySlug);
   if (!categoryTree) {
     throw new Error(`Category không tìm thấy: ${categorySlug}`);
@@ -65,6 +124,7 @@ export const getCategoryFilters = async (categorySlug: string): Promise<Category
 
   const { ids: categoryIds, rootId, rootName, rootSlug } = categoryTree;
 
+  // Fetch tất cả data cần thiết song song
   const [brands, priceRange, filterableSpecs, variantAttributes] = await Promise.all([
     getActiveBrandsByCategories(categoryIds),
     getPriceRangeByCategories(categoryIds),
@@ -74,7 +134,7 @@ export const getCategoryFilters = async (categorySlug: string): Promise<Category
 
   const filters: FilterGroup[] = [];
 
-  //  Built-in filter 1: Brand
+  // Built-in filter 1: Brand
   if (brands.length > 0) {
     filters.push({
       key: "brandId",
@@ -82,10 +142,7 @@ export const getCategoryFilters = async (categorySlug: string): Promise<Category
       type: "ENUM",
       source: "built-in",
       sortOrder: 0,
-      options: brands.map((b) => ({
-        value: b.id,
-        label: b.name,
-      })),
+      options: brands.map((b) => ({ value: b.id, label: b.name })),
     });
   }
 
@@ -99,41 +156,44 @@ export const getCategoryFilters = async (categorySlug: string): Promise<Category
     range: priceRange,
   });
 
-  // Dynamic filters: Variant Attributes (RAM, Storage, etc.)
-  // Bỏ qua "color" vì FE đã có variant selector
-  const attrFilters = await Promise.all(
-    variantAttributes
-      .filter((attr) => !SKIP_ATTRIBUTES.has(attr.code))
-      .map(async (attr, idx) => {
-        const activeValues = await getActiveAttributeOptionValues(attr.code, categoryIds);
+  // ─────────────────────────────────────────────────────────────────────────
+  // FIX #3: Batch query thay vì N queries
+  // ─────────────────────────────────────────────────────────────────────────
+  const filteredAttrs = variantAttributes.filter((attr) => !SKIP_ATTRIBUTES.has(attr.code));
 
-        if (activeValues.length === 0) return null;
-
-        // Attribute luôn là ENUM (storage: 128GB, 256GB...; RAM: 4GB, 8GB...)
-        const sortedValues = sortEnumValues(
-          activeValues.map((v) => v.value),
-          attr.code,
-        );
-
-        // Map lại để lấy label
-        const valueMap = new Map(activeValues.map((v) => [v.value, v.label]));
-
-        return {
-          key: `attr_${attr.code}`,
-          name: attr.name,
-          type: "ENUM" as const,
-          source: "attribute" as const,
-          sortOrder: 10 + idx,
-          options: sortedValues.map((v) => ({
-            value: v,
-            label: valueMap.get(v) || v,
-          })),
-        } satisfies FilterGroup;
-      }),
+  // 1 query duy nhất lấy tất cả attribute options
+  const batchAttrOptions = await getBatchActiveAttributeOptions(
+    filteredAttrs.map((a) => a.code),
+    categoryIds,
   );
 
-  //  Dynamic filters: Specifications
-  // Loại bỏ trùng lặp theo spec.id
+  const attrFilters: FilterGroup[] = filteredAttrs
+    .map((attr, idx) => {
+      const activeValues = batchAttrOptions.get(attr.code) ?? [];
+      if (activeValues.length === 0) return null;
+
+      const sortedValues = sortEnumValues(
+        activeValues.map((v) => v.value),
+        attr.code,
+      );
+      const valueMap = new Map(activeValues.map((v) => [v.value, v.label]));
+
+      return {
+        key: `attr_${attr.code}`,
+        name: attr.name,
+        type: "ENUM" as const,
+        source: "attribute" as const,
+        sortOrder: 10 + idx,
+        options: sortedValues.map((v) => ({
+          value: v,
+          label: valueMap.get(v) || v,
+        })),
+      } satisfies FilterGroup;
+    })
+    .filter((f): f is NonNullable<typeof f> => f !== null);
+  // ─────────────────────────────────────────────────────────────────────────
+  // Spec filters (giữ nguyên logic cũ)
+  // ─────────────────────────────────────────────────────────────────────────
   const seenSpecIds = new Set<string>();
   const uniqueSpecs = filterableSpecs.filter((cs) => {
     if (seenSpecIds.has(cs.specification.id)) return false;
@@ -145,10 +205,7 @@ export const getCategoryFilters = async (categorySlug: string): Promise<Category
     uniqueSpecs.map(async (cs, idx) => {
       const spec = cs.specification;
 
-      // Ưu tiên filterType đã được config trong DB (Prisma enum)
-      // Fallback sang heuristic nếu chưa set (filterType = null)
       let filterType: FilterType;
-
       if (spec.filterType) {
         filterType = spec.filterType;
       } else {
@@ -157,7 +214,6 @@ export const getCategoryFilters = async (categorySlug: string): Promise<Category
         filterType = detectFilterTypeFallback(sampleValues);
       }
 
-      // Build filter group theo type
       if (filterType === FilterType.RANGE) {
         const rangeData = await getSpecValueRange(spec.id, categoryIds);
         if (!rangeData) return null;
@@ -205,14 +261,17 @@ export const getCategoryFilters = async (categorySlug: string): Promise<Category
   );
 
   // Gộp tất cả, bỏ null, sort theo sortOrder
-  const allFilters: FilterGroup[] = [...filters, ...(attrFilters.filter((f) => f !== null) as FilterGroup[]), ...(specFilters.filter((f) => f !== null) as FilterGroup[])].sort(
-    (a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99),
-  );
+  const allFilters: FilterGroup[] = [...filters, ...attrFilters, ...(specFilters.filter((f) => f !== null) as FilterGroup[])].sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99));
 
-  return {
+  const result: CategoryFiltersResponse = {
     categoryId: rootId,
     categorySlug: rootSlug,
     categoryName: rootName,
     filters: allFilters,
   };
+
+  // Lưu cache trước khi trả về
+  filterCache.set(cacheKey, result, FILTER_CACHE_TTL);
+
+  return result;
 };
