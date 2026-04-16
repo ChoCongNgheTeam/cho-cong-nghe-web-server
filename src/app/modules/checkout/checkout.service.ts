@@ -59,17 +59,74 @@ export const validateCartItems = async (userId: string, cartItemIds?: string[]):
 };
 
 // =======================================================
-// 2. Tính phí vận chuyển
+// 2. Tính phí vận chuyển (Đã nâng cấp theo vùng miền)
 // =======================================================
-export const calculateShippingFee = async (subtotal: number, addressId: string): Promise<number> => {
-  const address = await repo.findAddressWithProvince(addressId).catch(handlePrismaError);
-  if (!address) throw new NotFoundError("Địa chỉ giao hàng");
 
-  // Freeship cho đơn từ 5tr
-  if (subtotal >= 5000000) return 0;
+// Helper: Phân loại tỉnh thành theo khu vực (Có thể đưa ra file config riêng sau này)
+const REGION_MAP = {
+  HCM: ["Hồ Chí Minh"],
+  MIEN_BAC: [
+    "Hà Nội", "Hải Phòng", "Hà Giang", "Cao Bằng", "Lai Châu", "Lào Cai",
+    "Điện Biên", "Yên Bái", "Sơn La", "Hòa Bình", "Thái Nguyên", "Tuyên Quang",
+    "Phú Thọ", "Bắc Giang", "Bắc Kạn", "Lạng Sơn", "Quảng Ninh", "Bắc Ninh",
+    "Hà Nam", "Hải Dương", "Hưng Yên", "Nam Định", "Ninh Bình", "Thái Bình", "Vĩnh Phúc"
+  ],
+  MIEN_TRUNG: [
+    "Đà Nẵng", "Thanh Hóa", "Nghệ An", "Hà Tĩnh", "Quảng Bình", "Quảng Trị",
+    "Thừa Thiên Huế", "Quảng Nam", "Quảng Ngãi", "Bình Định", "Phú Yên",
+    "Khánh Hòa", "Ninh Thuận", "Bình Thuận", "Kon Tum", "Gia Lai", "Đắk Lắk",
+    "Đắk Nông", "Lâm Đồng"
+  ],
+  // Các tỉnh Miền Nam còn lại (ngoài HCM)
+  MIEN_NAM: [
+    "Cần Thơ", "Bình Phước", "Bình Dương", "Đồng Nai", "Tây Ninh",
+    "Bà Rịa - Vũng Tàu", "Long An", "Đồng Tháp", "Tiền Giang", "An Giang",
+    "Bến Tre", "Vĩnh Long", "Trà Vinh", "Hậu Giang", "Kiên Giang", "Sóc Trăng",
+    "Bạc Liêu", "Cà Mau"
+  ]
+};
 
-  // Phí ship: HCM 30k, tỉnh khác 50k
-  return address.province.name.includes("Hồ Chí Minh") ? 30000 : 50000;
+// Hàm tìm khu vực dựa vào tên tỉnh
+const getRegionCategory = (provinceName: string): string => {
+  if (REGION_MAP.HCM.some(p => provinceName.includes(p))) return "HCM";
+  if (REGION_MAP.MIEN_BAC.some(p => provinceName.includes(p))) return "MIEN_BAC";
+  if (REGION_MAP.MIEN_TRUNG.some(p => provinceName.includes(p))) return "MIEN_TRUNG";
+  return "MIEN_NAM";
+};
+
+// 🔥 Đã xóa logic query DB. Bây giờ hàm này tính toán tức thì (Synchronous)
+export const calculateShippingFee = (subtotal: number, provinceName: string): number => {
+  const region = getRegionCategory(provinceName);
+
+  if (region === "HCM") {
+    if (subtotal >= 3000000) return 0;     // Đơn > 3 triệu -> Freeship hoàn toàn
+    return 30000;                         // Đơn < 3 triệu -> Mặc định 30k
+  }
+
+  // 2. Khu vực Miền Trung
+  if (region === "MIEN_TRUNG") {
+    if (subtotal >= 10000000) return 0;    // Đơn > 10 triệu -> Freeship
+    if (subtotal >= 2000000) return 20000; // Đơn > 2 triệu -> Được trợ giá còn 20k
+    return 40000;                         // Đơn < 2 triệu -> Phí cơ bản 40k
+  }
+
+  // 3. Khu vực Miền Bắc
+  if (region === "MIEN_BAC") {
+    if (subtotal >= 20000000) return 0;    // Vì xa kho trung tâm (giả sử kho ở Nam/Trung), đơn > 2tr mới freeship
+    if (subtotal >= 3000000) return 30000; // Đơn > 3 triệu -> Trợ giá còn 30k
+    if (provinceName.includes("Hà Nội")) return 30000; // Nội thành HN
+    return 50000;                         // Liên tỉnh/Vùng xa
+  }
+
+  // 4. Các tỉnh Miền Nam còn lại (Đồng bằng Sông Cửu Long, Đông Nam Bộ)
+  if (region === "MIEN_NAM") {
+    if (subtotal >= 5000000) return 0;    // Đơn > 5 triệu -> Freeship
+    if (subtotal >= 1000000) return 20000; // Trợ giá
+    return 35000;                         // Phí cơ bản
+  }
+
+  // Fallback an toàn (trường hợp tên tỉnh bị lỗi không map được)
+  return 40000;
 };
 
 // =======================================================
@@ -120,29 +177,34 @@ export const validateAndApplyVoucher = async (voucherId: string | undefined, sub
 export const prepareCheckoutData = async (userId: string, input: CheckoutInput): Promise<CheckoutSummary> => {
   const { paymentMethodId, shippingAddressId, voucherId, cartItemIds } = input;
 
-  const [validation, paymentMethod] = await Promise.all([validateCartItems(userId, cartItemIds), repo.findPaymentMethodById(paymentMethodId).catch(handlePrismaError)]);
+  // 🔥 TỐI ƯU PERFORMANCE: Bắn đồng loạt 3 Query Validation + Payment + Address cùng một lúc
+  const [validation, paymentMethod, address] = await Promise.all([
+    validateCartItems(userId, cartItemIds),
+    repo.findPaymentMethodById(paymentMethodId).catch(handlePrismaError),
+    repo.findAddressWithProvince(shippingAddressId).catch(handlePrismaError) // Fetch address ở đây
+  ]);
 
-  if (!validation.isValid) {
-    throw new BadRequestError(`Giỏ hàng không hợp lệ: ${validation.errors.join(", ")}`);
-  }
+  // Xử lý các lỗi nếu có
+  if (!validation.isValid) throw new BadRequestError(`Giỏ hàng không hợp lệ: ${validation.errors.join(", ")}`);
+  if (!paymentMethod) throw new NotFoundError("Phương thức thanh toán");
+  if (!address) throw new NotFoundError("Địa chỉ giao hàng");
 
-  if (!paymentMethod) {
-    throw new NotFoundError("Phương thức thanh toán");
-  }
-
+  // Tính tổng tiền giỏ hàng
   const items = validation.items.map((item) => ({
     productVariantId: item.productVariantId,
     quantity: item.quantity,
-    unitPrice: Number(item.unitPrice), // 🔥 Tại đây nó sẽ bốc đúng cái giá Promotion đã được gán ở hàm validateCartItems
+    unitPrice: Number(item.unitPrice),
     subtotal: Number(item.unitPrice) * item.quantity,
     productName: item.productName || "Unknown Product",
     variantCode: item.variantCode ?? null,
   }));
-
   const subtotalAmount = items.reduce((sum, i) => sum + i.subtotal, 0);
 
-  // Parallel: shipping fee + voucher
-  const [shippingFee, { discount: voucherDiscount }] = await Promise.all([calculateShippingFee(subtotalAmount, shippingAddressId), validateAndApplyVoucher(voucherId, subtotalAmount, userId)]);
+  // 🔥 TÍNH PHÍ SHIP CỰC NHANH: Dùng Pure Function, truyền thẳng tên Tỉnh/Thành
+  const shippingFee = calculateShippingFee(subtotalAmount, address.province.name);
+
+  // Validate Voucher (Cần có subtotalAmount nên phải chạy sau)
+  const { discount: voucherDiscount } = await validateAndApplyVoucher(voucherId, subtotalAmount, userId);
 
   const totalAmount = subtotalAmount + shippingFee - voucherDiscount;
 
@@ -160,7 +222,7 @@ export const prepareCheckoutData = async (userId: string, input: CheckoutInput):
     shippingAddressId,
     voucherId,
     bankTransferCode,
-    cartItemIds, // Lưu mảng ID vào summary để mang sang repo xóa
+    cartItemIds,
   };
 };
 
