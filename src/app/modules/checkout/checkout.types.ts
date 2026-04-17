@@ -33,6 +33,7 @@ export interface CartValidationResult {
   totalQuantity: number;
   items: CartItemValidation[];
   errors: string[];
+  totalPromotionDiscount: number;
 }
 
 /**
@@ -52,6 +53,7 @@ export interface CheckoutSummary {
   subtotalAmount: number;
   shippingFee: number;
   voucherDiscount: number;
+  totalPromotionDiscount: number;
   totalAmount: number;
   paymentMethodId: string;
   paymentMethodCode: string;
