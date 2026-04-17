@@ -1,9 +1,19 @@
 import * as repo from "./voucher.repository";
-import { CreateVoucherInput, UpdateVoucherInput, ListVouchersQuery, ValidateVoucherInput, AssignVoucherToUsersInput, BulkDeleteVouchersInput } from "./voucher.validation";
+import {
+  CreateVoucherInput,
+  UpdateVoucherInput,
+  ListVouchersQuery,
+  ValidateVoucherInput,
+  AssignVoucherToUsersInput,
+  BulkDeleteVouchersInput,
+  ListVoucherUsagesQuery,
+  ListVoucherUsersQuery,
+} from "./voucher.validation";
 import { transformVoucherCard, transformVoucherDetail, transformUserVoucher, calculateDiscount, hasVoucherStarted, isVoucherExpired } from "./voucher.transformers";
 import { VoucherCard, VoucherValidationResult } from "./voucher.types";
 import { DiscountType } from "@prisma/client";
 import { NotFoundError, BadRequestError } from "@/errors";
+import prisma from "prisma/client";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -18,11 +28,9 @@ type CartItemWithTotal = {
   categoryId?: string;
   brandId?: string;
   categoryPath?: string[];
-  /** Thành tiền item (unit_price × quantity, sau promotion) */
   itemTotal?: number;
 };
 
-/** Kiểm tra 1 item có khớp target không */
 const itemMatchesTarget = (item: CartItemWithTotal, target: { targetType: string; targetId?: string | null }): boolean => {
   if (!target.targetId) return false;
   switch (target.targetType) {
@@ -37,23 +45,16 @@ const itemMatchesTarget = (item: CartItemWithTotal, target: { targetType: string
   }
 };
 
-/**
- * Tính subtotal của các item đủ điều kiện áp voucher.
- * - targets rỗng hoặc có ALL → toàn bộ orderTotal
- * - Ngược lại → cộng itemTotal của các item match target
- * - Nếu FE không gửi itemTotal → fallback về orderTotal (backward-compat)
- */
 const computeEligibleTotal = (targets: { targetType: string; targetId?: string | null }[], cartItems: CartItemWithTotal[], orderTotal: number): number => {
   if (!targets || targets.length === 0) return orderTotal;
   if (targets.some((t) => t.targetType === "ALL")) return orderTotal;
 
   const hasItemTotals = cartItems.some((item) => (item.itemTotal ?? 0) > 0);
-  if (!hasItemTotals) return orderTotal; // backward-compat
+  if (!hasItemTotals) return orderTotal;
 
   return cartItems.filter((item) => targets.some((t) => itemMatchesTarget(item, t))).reduce((sum, item) => sum + (item.itemTotal ?? 0), 0);
 };
 
-/** Giỏ hàng có ít nhất 1 item khớp target không */
 const checkVoucherTargets = (targets: { targetType: string; targetId?: string | null }[], cartItems: CartItemWithTotal[]): boolean => {
   if (!targets || targets.length === 0) return true;
   if (targets.some((t) => t.targetType === "ALL")) return true;
@@ -68,26 +69,18 @@ export const getVouchers = async (query: ListVouchersQuery) => {
 
   const transformed = result.data.map(transformVoucherCard);
 
-  // Sort theo 4 nhóm
   const sorted = transformed.sort((a, b) => {
     const scoreA = getVoucherScore(a, cartTotal);
     const scoreB = getVoucherScore(b, cartTotal);
 
-    // Nhóm khác nhau → nhóm cao hơn lên trước
-    if (scoreA.group !== scoreB.group) {
-      return scoreA.group - scoreB.group;
-    }
+    if (scoreA.group !== scoreB.group) return scoreA.group - scoreB.group;
 
-    // Cùng nhóm → sort theo rule phụ
-    // 1. discountValue DESC (giảm nhiều hơn lên trước)
     const discountDiff = b.discountValue - a.discountValue;
     if (discountDiff !== 0) return discountDiff;
 
-    // 2. minOrderValue ASC (dễ dùng hơn lên trước)
     const minOrderDiff = a.minOrderValue - b.minOrderValue;
     if (minOrderDiff !== 0) return minOrderDiff;
 
-    // 3. endDate ASC (sắp hết hạn lên trước)
     if (a.endDate && b.endDate) {
       return new Date(a.endDate).getTime() - new Date(b.endDate).getTime();
     }
@@ -100,27 +93,14 @@ export const getVouchers = async (query: ListVouchersQuery) => {
   return { ...result, data: sorted };
 };
 
-// Helper — tính nhóm ưu tiên (số nhỏ = ưu tiên cao)
 const getVoucherScore = (voucher: VoucherCard, cartTotal: number): { group: number } => {
-  const now = new Date();
+  if (!voucher.isActive || voucher.isExpired) return { group: 4 };
 
-  // Hết hạn hoặc không active → nhóm 4 (thấp nhất)
-  if (!voucher.isActive || voucher.isExpired) {
-    return { group: 4 };
-  }
-
-  // Chưa đủ điều kiện → nhóm 3
   const meetsMinOrder = cartTotal >= voucher.minOrderValue;
-  if (!meetsMinOrder) {
-    return { group: 3 };
-  }
+  if (!meetsMinOrder) return { group: 3 };
 
-  // Dùng được ngay + hết lượt → nhóm 3
-  if (!voucher.isAvailable) {
-    return { group: 3 };
-  }
+  if (!voucher.isAvailable) return { group: 3 };
 
-  // Dùng được ngay → nhóm 1
   return { group: 1 };
 };
 
@@ -148,7 +128,11 @@ export const validateVoucher = async (input: ValidateVoucherInput): Promise<Vouc
   if (!voucher.isActive) return { isValid: false, message: "Mã voucher đã bị vô hiệu hóa" };
   if (!hasVoucherStarted(voucher.startDate)) return { isValid: false, message: "Mã voucher chưa có hiệu lực" };
   if (isVoucherExpired(voucher.endDate)) return { isValid: false, message: "Mã voucher đã hết hạn" };
-  if (orderTotal < Number(voucher.minOrderValue)) return { isValid: false, message: `Đơn hàng tối thiểu ${Number(voucher.minOrderValue).toLocaleString("vi-VN")}đ` };
+  if (orderTotal < Number(voucher.minOrderValue))
+    return {
+      isValid: false,
+      message: `Đơn hàng tối thiểu ${Number(voucher.minOrderValue).toLocaleString("vi-VN")}đ`,
+    };
   if (voucher.maxUses && voucher.usesCount >= voucher.maxUses) return { isValid: false, message: "Mã voucher đã hết lượt sử dụng" };
 
   if (!checkVoucherTargets(voucher.targets ?? [], cartItems)) {
@@ -157,33 +141,19 @@ export const validateVoucher = async (input: ValidateVoucherInput): Promise<Vouc
 
   if (userId) {
     const userVoucher = await repo.findUserVoucherUsage(userId, voucher.id);
-
     const isPrivateVoucher = await repo.hasVoucherUsers(voucher.id);
 
-    // PRIVATE voucher
     if (isPrivateVoucher) {
-      if (!userVoucher) {
-        return { isValid: false, message: "Voucher này không dành cho bạn" };
-      }
-
-      if (userVoucher.usedCount >= userVoucher.maxUses) {
-        return { isValid: false, message: "Bạn đã hết lượt sử dụng voucher này" };
-      }
-    }
-
-    // PUBLIC voucher
-    else {
+      if (!userVoucher) return { isValid: false, message: "Voucher này không dành cho bạn" };
+      if (userVoucher.usedCount >= userVoucher.maxUses) return { isValid: false, message: "Bạn đã hết lượt sử dụng voucher này" };
+    } else {
       if (voucher.maxUsesPerUser) {
         const usageCount = await repo.countVoucherUsage(userId, voucher.id);
-
-        if (usageCount >= voucher.maxUsesPerUser) {
-          return { isValid: false, message: "Bạn đã hết lượt sử dụng voucher này" };
-        }
+        if (usageCount >= voucher.maxUsesPerUser) return { isValid: false, message: "Bạn đã hết lượt sử dụng voucher này" };
       }
     }
   }
 
-  // Tính eligible subtotal (chỉ các item khớp target)
   const targets = voucher.targets ?? [];
   const eligibleTotal = computeEligibleTotal(targets, cartItems, orderTotal);
   const maxDiscount = voucher.maxDiscountValue ? Number(voucher.maxDiscountValue) : null;
@@ -200,9 +170,45 @@ export const getVoucherById = async (id: string) => {
 
 // ── Mutates ───────────────────────────────────────────────────────────────────
 
-export const createVoucher = async (input: CreateVoucherInput) => {
+/**
+ * Tạo voucher.
+ *
+ * Nếu payload có `userIds` → gán người dùng riêng tư ngay trong cùng 1 lần tạo.
+ * Repository `create` đã xử lý `userIds` trong Prisma transaction nên
+ * không cần gọi thêm `assignToUsers` sau đó — tránh race condition.
+ */
+export const createVoucher = async (input: CreateVoucherInput & { userIds?: string[] }) => {
   const exists = await repo.checkVoucherCode(input.code);
   if (exists) throw new BadRequestError("Mã voucher đã tồn tại");
+
+  // Validate userIds nếu có
+  if (input.userIds && input.userIds.length > 0) {
+    const uniqueIds = [...new Set(input.userIds)];
+    if (uniqueIds.length !== input.userIds.length) {
+      input = { ...input, userIds: uniqueIds };
+    }
+    // Kiểm tra user tồn tại (optional — có thể bỏ nếu muốn nhanh)
+    const userCount = await prisma.users.count({
+      where: { id: { in: input.userIds } },
+    });
+    if (input.userIds && input.userIds.length > 0) {
+      const uniqueIds = [...new Set(input.userIds)];
+
+      const userIds = uniqueIds;
+
+      const userCount = await prisma.users.count({
+        where: { id: { in: userIds } },
+      });
+
+      if (userCount !== userIds.length) {
+        throw new BadRequestError("Một hoặc nhiều user không tồn tại");
+      }
+
+      input = { ...input, userIds };
+    }
+  }
+
+  // repo.create đã xử lý userIds bên trong — gán atomically
   const voucher = await repo.create(input);
   return transformVoucherDetail(voucher);
 };
@@ -248,4 +254,24 @@ export const hardDeleteVoucher = async (id: string) => {
 export const assignVoucherToUsers = async (input: AssignVoucherToUsersInput) => {
   await getVoucherById(input.voucherId);
   return repo.assignToUsers(input.voucherId, input.userIds, input.maxUsesPerUser);
+};
+
+// ── Usages ────────────────────────────────────────────────────────────────────
+
+export const getVoucherUsages = async (query: ListVoucherUsagesQuery) => {
+  return repo.findAllUsages(query);
+};
+
+// ── Voucher Users (private) ───────────────────────────────────────────────────
+
+export const getVoucherUsers = async (query: ListVoucherUsersQuery) => {
+  return repo.findAllVoucherUsers(query);
+};
+
+export const revokeVoucherUser = async (voucherId: string, userId: string) => {
+  const assignment = await prisma.voucher_user.findUnique({
+    where: { voucherId_userId: { voucherId, userId } },
+  });
+  if (!assignment) throw new NotFoundError("Assignment không tồn tại");
+  return repo.revokeVoucherUser(voucherId, userId);
 };

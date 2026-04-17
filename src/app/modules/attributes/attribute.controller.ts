@@ -56,6 +56,7 @@ export const createOptionHandler = async (req: Request, res: Response) => {
 
 export const updateOptionHandler = async (req: Request, res: Response) => {
   const input = updateOptionSchema.parse(req.body);
-  const data = await service.updateOption(req.params.optionId, input);
+  // ← truyền cả attributeId (req.params.id) để service kiểm tra duplicate value
+  const data = await service.updateOption(req.params.id, req.params.optionId, input);
   res.json({ data, message: "Cập nhật option thành công" });
 };

@@ -9,6 +9,10 @@ import {
   createSpecificationHandler,
   updateSpecificationHandler,
   toggleSpecificationActiveHandler,
+  getCategorySpecsHandler,
+  upsertCategorySpecHandler,
+  bulkUpsertCategorySpecsHandler,
+  removeCategorySpecHandler,
 } from "./specification.controller";
 
 const router = Router();
@@ -23,5 +27,9 @@ router.post("/admin", ...adminAuth, asyncHandler(createSpecificationHandler));
 router.get("/admin/:id", ...adminAuth, asyncHandler(getSpecificationDetailHandler));
 router.patch("/admin/:id", ...adminAuth, asyncHandler(updateSpecificationHandler));
 router.patch("/admin/:id/toggle", ...adminAuth, asyncHandler(toggleSpecificationActiveHandler));
+router.get("/admin/category-specs/:categoryId", ...adminAuth, asyncHandler(getCategorySpecsHandler));
+router.post("/admin/category-specs/:categoryId/upsert", ...adminAuth, asyncHandler(upsertCategorySpecHandler));
+router.put("/admin/category-specs/:categoryId/bulk", ...adminAuth, asyncHandler(bulkUpsertCategorySpecsHandler));
+router.delete("/admin/category-specs/:categoryId/:specificationId", ...adminAuth, asyncHandler(removeCategorySpecHandler));
 
 export default router;

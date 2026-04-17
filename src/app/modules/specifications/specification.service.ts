@@ -1,6 +1,7 @@
 import * as repo from "./specification.repository";
 import { ListSpecificationsQuery, CreateSpecificationInput, UpdateSpecificationInput } from "./specification.validation";
 import { NotFoundError, BadRequestError } from "@/errors";
+import { BulkUpsertCategorySpecsInput, UpsertCategorySpecInput } from "./specification.validation";
 
 const assertExists = async (id: string) => {
   const spec = await repo.findById(id);
@@ -32,4 +33,29 @@ export const updateSpecification = async (id: string, input: UpdateSpecification
 export const toggleSpecificationActive = async (id: string) => {
   const spec = await assertExists(id);
   return repo.update(id, { isActive: !spec.isActive });
+};
+
+export const getCategorySpecs = async (categoryId: string) => {
+  const cat = await repo.checkCategoryExists(categoryId);
+  if (!cat) throw new NotFoundError("Danh mục");
+  const items = await repo.findCategorySpecs(categoryId);
+  return { category: cat, items };
+};
+
+export const upsertCategorySpec = async (categoryId: string, input: UpsertCategorySpecInput) => {
+  const cat = await repo.checkCategoryExists(categoryId);
+  if (!cat) throw new NotFoundError("Danh mục");
+  const spec = await repo.findById(input.specificationId);
+  if (!spec) throw new NotFoundError("Thông số");
+  return repo.upsertCategorySpec(categoryId, input);
+};
+
+export const bulkUpsertCategorySpecs = async (categoryId: string, input: BulkUpsertCategorySpecsInput) => {
+  const cat = await repo.checkCategoryExists(categoryId);
+  if (!cat) throw new NotFoundError("Danh mục");
+  return repo.bulkUpsertCategorySpecs(categoryId, input.items);
+};
+
+export const removeCategorySpec = async (categoryId: string, specificationId: string) => {
+  await repo.removeCategorySpec(categoryId, specificationId);
 };

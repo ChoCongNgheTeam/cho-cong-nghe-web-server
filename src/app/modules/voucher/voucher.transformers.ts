@@ -83,6 +83,7 @@ export const transformVoucherDetail = (voucher: RawVoucher): VoucherDetail => {
         id: target.id,
         targetType: target.targetType as TargetType,
         targetId: target.targetId ?? undefined,
+        targetName: target.targetName ?? undefined,
       })) || [],
   };
 };

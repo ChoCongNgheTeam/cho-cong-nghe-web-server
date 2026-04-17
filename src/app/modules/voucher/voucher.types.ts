@@ -20,6 +20,7 @@ export interface VoucherTarget {
   id: string;
   targetType: TargetType;
   targetId?: string;
+  targetName?: string;
 }
 
 export interface VoucherUser {

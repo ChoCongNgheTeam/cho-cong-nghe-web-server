@@ -29,7 +29,6 @@ export const cartItemSchema = z.object({
   categoryId: z.string().uuid().optional(),
   brandId: z.string().uuid().optional(),
   categoryPath: z.array(z.string()).optional(),
-  // Giá sau khi đã áp promotion (unit_price × quantity)
   itemTotal: z.coerce.number().nonnegative().optional(),
 });
 
@@ -76,7 +75,16 @@ export const createVoucherSchema = z
     priority: z.coerce.number().int().default(0),
     isActive: z.boolean().default(true),
     targets: z.array(voucherTargetSchema).optional().default([]),
-    userIds: z.array(z.string().uuid()).optional(),
+
+    /**
+     * Gán voucher cho danh sách user ngay khi tạo (voucher riêng tư).
+     * Nếu có userIds → voucher này chỉ dành cho những user trong list.
+     * maxUsesPerUser sẽ được dùng làm maxUses cho mỗi voucher_user record.
+     */
+    userIds: z
+      .array(z.string().uuid("User ID không hợp lệ"))
+      .optional()
+      .transform((ids) => (ids && ids.length > 0 ? [...new Set(ids)] : ids)), // dedup
   })
   .refine(
     (data) => {
@@ -91,6 +99,14 @@ export const createVoucherSchema = z
       return true;
     },
     { message: "Ngày bắt đầu phải trước ngày kết thúc", path: ["endDate"] },
+  )
+  .refine(
+    (data) => {
+      // Nếu có userIds mà không có maxUsesPerUser → mặc định 1 (handled in repo)
+      // Không block, chỉ warn logic ở service
+      return true;
+    },
+    { message: "" },
   );
 
 export const updateVoucherSchema = z
@@ -119,12 +135,39 @@ export const updateVoucherSchema = z
 
 export const assignVoucherToUsersSchema = z.object({
   voucherId: z.string().uuid(),
-  userIds: z.array(z.string().uuid()).min(1, "Phải chọn ít nhất 1 user"),
+  userIds: z
+    .array(z.string().uuid("User ID không hợp lệ"))
+    .min(1, "Phải chọn ít nhất 1 user")
+    .transform((ids) => [...new Set(ids)]), // dedup
   maxUsesPerUser: z.coerce.number().int().positive().default(1),
 });
 
 export const bulkDeleteVouchersSchema = z.object({
   ids: z.array(z.string().uuid("ID không hợp lệ")).min(1, "Phải chọn ít nhất 1 voucher"),
+});
+
+export const listVoucherUsagesSchema = z.object({
+  page: z.coerce.number().positive().default(1),
+  limit: z.coerce.number().positive().max(100).default(20),
+  voucherId: z.string().uuid().optional(),
+  userId: z.string().uuid().optional(),
+  orderId: z.string().uuid().optional(),
+  dateFrom: z.coerce.date().optional(),
+  dateTo: z.coerce.date().optional(),
+  sortBy: z.enum(["usedAt"]).default("usedAt"),
+  sortOrder: z.enum(["asc", "desc"]).default("desc"),
+});
+
+export const listVoucherUsersSchema = z.object({
+  page: z.coerce.number().positive().default(1),
+  limit: z.coerce.number().positive().max(100).default(20),
+  voucherId: z.string().uuid().optional(),
+  userId: z.string().uuid().optional(),
+});
+
+export const revokeVoucherUserSchema = z.object({
+  voucherId: z.string().uuid(),
+  userId: z.string().uuid(),
 });
 
 // =====================
@@ -138,3 +181,6 @@ export type UpdateVoucherInput = z.infer<typeof updateVoucherSchema>;
 export type AssignVoucherToUsersInput = z.infer<typeof assignVoucherToUsersSchema>;
 export type BulkDeleteVouchersInput = z.infer<typeof bulkDeleteVouchersSchema>;
 export type CartItem = z.infer<typeof cartItemSchema>;
+export type ListVoucherUsagesQuery = z.infer<typeof listVoucherUsagesSchema>;
+export type ListVoucherUsersQuery = z.infer<typeof listVoucherUsersSchema>;
+export type RevokeVoucherUserInput = z.infer<typeof revokeVoucherUserSchema>;

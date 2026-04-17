@@ -68,19 +68,17 @@ export const createPromotion = async (input: CreatePromotionInput) => {
 export const updatePromotion = async (id: string, input: UpdatePromotionInput) => {
   const existing = await assertPromotionExists(id, { isAdmin: true });
 
-  // console.log(existing);
-
   if (input.name && input.name !== (existing as any).name) {
     const nameExists = await repo.checkPromotionName(input.name, id);
     if (nameExists) throw new BadRequestError("Tên khuyến mãi đã tồn tại");
   }
 
-  const promotion = await repo.update(id, input);
-  // console.log(promotion);
+  await repo.update(id, input);
 
-  return transformPromotionDetailWithExisting(promotion as any, existing.targets);
+  // Fetch lại với targetName đầy đủ (như findById đã làm lookup brand/category/product)
+  const updated = await repo.findById(id, { isAdmin: true });
+  return transformPromotionDetail(updated as any);
 };
-
 // =====================
 // === ADMIN: soft delete, restore, hard delete, trash ===
 // =====================

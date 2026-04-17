@@ -44,6 +44,11 @@ export const createOption = async (attributeId: string, input: CreateOptionInput
   return repo.createOption(attributeId, input);
 };
 
-export const updateOption = async (optionId: string, input: UpdateOptionInput) => {
+export const updateOption = async (attributeId: string, optionId: string, input: UpdateOptionInput) => {
+  // Nếu có thay đổi value → kiểm tra duplicate trong cùng attribute
+  if (input.value) {
+    const exists = await repo.checkOptionValueExists(attributeId, input.value, optionId);
+    if (exists) throw new BadRequestError(`Value "${input.value}" đã tồn tại trong thuộc tính này`);
+  }
   return repo.updateOption(optionId, input);
 };

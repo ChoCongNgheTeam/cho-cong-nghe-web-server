@@ -28,20 +28,60 @@ export const findAll = async (query: ListAttributesQuery) => {
   const skip = (page - 1) * limit;
   const where = buildWhere(query);
 
+  // sortBy "optionCount" cần xử lý riêng vì Prisma chưa hỗ trợ sort theo _count trực tiếp
+  if (sortBy === "optionCount") {
+    const [allData, total, activeCount, inactiveCount] = await prisma.$transaction([
+      prisma.attributes.findMany({
+        where,
+        select: selectAttribute,
+        orderBy: { options: { _count: sortOrder } },
+        skip,
+        take: limit,
+      }),
+      prisma.attributes.count({ where }),
+      prisma.attributes.count({ where: { isActive: true } }),
+      prisma.attributes.count({ where: { isActive: false } }),
+    ]);
+
+    return {
+      data: allData,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      activeCounts: {
+        ALL: activeCount + inactiveCount,
+        ACTIVE: activeCount,
+        INACTIVE: inactiveCount,
+      },
+    };
+  }
+
   const [data, total, activeCount, inactiveCount] = await prisma.$transaction([
-    prisma.attributes.findMany({ where, select: selectAttribute, orderBy: { [sortBy]: sortOrder }, skip, take: limit }),
+    prisma.attributes.findMany({
+      where,
+      select: selectAttribute,
+      orderBy: { [sortBy]: sortOrder },
+      skip,
+      take: limit,
+    }),
     prisma.attributes.count({ where }),
     prisma.attributes.count({ where: { isActive: true } }),
     prisma.attributes.count({ where: { isActive: false } }),
   ]);
 
-  const activeCounts = {
-    ALL: activeCount + inactiveCount,
-    ACTIVE: activeCount,
-    INACTIVE: inactiveCount,
+  return {
+    data,
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
+    activeCounts: {
+      ALL: activeCount + inactiveCount,
+      ACTIVE: activeCount,
+      INACTIVE: inactiveCount,
+    },
   };
-
-  return { data, page, limit, total, totalPages: Math.ceil(total / limit), activeCounts };
 };
 
 // Public: chỉ lấy active, dùng cho ProductForm

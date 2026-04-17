@@ -6,24 +6,33 @@ import { DashboardQuery, AnalyticsQuery, DashboardResponse, AnalyticsResponse, O
 
 const resolvePeriodRange = (period: DashboardQuery["period"] = "month"): { from: Date; to: Date } => {
   const now = new Date();
+
   const to = new Date(now);
   to.setHours(23, 59, 59, 999);
+
   const from = new Date(now);
   from.setHours(0, 0, 0, 0);
 
   switch (period) {
     case "today":
       break;
-    case "week":
-      from.setDate(from.getDate() - 6);
+
+    case "week": {
+      const day = from.getDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      from.setDate(from.getDate() + diff);
       break;
+    }
+
     case "month":
       from.setDate(1);
       break;
+
     case "year":
       from.setMonth(0, 1);
       break;
   }
+
   return { from, to };
 };
 
@@ -180,7 +189,18 @@ export const getDashboard = async (query: DashboardQuery): Promise<DashboardResp
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
 export const getAnalytics = async (query: AnalyticsQuery): Promise<AnalyticsResponse> => {
-  const { from, to, granularity = "day" } = query;
+  let from: Date;
+  let to: Date;
+
+  const { granularity = "day" } = query;
+
+  if (query.period) {
+    ({ from, to } = resolvePeriodRange(query.period));
+  } else {
+    from = new Date(query.from!);
+    to = new Date(query.to!);
+  }
+
   const { from: prevFrom, to: prevTo } = repo.getPreviousPeriodRange(from, to);
 
   const [revenueOverTime, comparisonRaw, revenueByPaymentMethod, revenueByCategory, topCustomers, conversionFunnel, currentSummary, previousSummary, heatmap] = await Promise.all([
@@ -195,7 +215,6 @@ export const getAnalytics = async (query: AnalyticsQuery): Promise<AnalyticsResp
     repo.getOrderHeatmap(from, to),
   ]);
 
-  // Forecast chỉ tính khi granularity là day (có nghĩa hơn)
   const forecast: ForecastPoint[] = granularity === "day" ? buildForecast(revenueOverTime, 7) : [];
 
   // Normalize comparison — đảm bảo cùng số điểm với revenueOverTime

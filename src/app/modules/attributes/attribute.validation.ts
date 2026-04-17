@@ -7,8 +7,8 @@ export const listAttributesSchema = z.object({
   limit: z.coerce.number().positive().max(200).default(50),
   search: z.string().optional(),
   isActive: queryBoolean,
-  sortBy: z.enum(["createdAt", "name", "code"]).default("createdAt"),
-  sortOrder: z.enum(["asc", "desc"]).default("asc"),
+  sortBy: z.enum(["createdAt", "name", "code", "optionCount"]).default("createdAt"),
+  sortOrder: z.enum(["asc", "desc"]).default("desc"),
 });
 
 export const attributeParamsSchema = z.object({
@@ -29,16 +29,20 @@ export const updateAttributeSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+// Value cho phép: chữ thường/số/gạch ngang/gạch dưới HOẶC mã HEX (#rgb hoặc #rrggbb)
+const optionValueSchema = z
+  .string()
+  .min(1, "Value không được để trống")
+  .refine((v) => /^[a-z0-9_-]+$/.test(v) || /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v), "Value chỉ gồm chữ thường, số, gạch dưới/ngang hoặc mã màu HEX (#rgb / #rrggbb)");
+
 export const createOptionSchema = z.object({
-  value: z
-    .string()
-    .min(1, "Value không được để trống")
-    .regex(/^[a-z0-9_-]+$/, "Value chỉ gồm chữ thường, số, gạch dưới/ngang"),
+  value: optionValueSchema,
   label: z.string().min(1, "Label không được để trống"),
   isActive: z.boolean().default(true),
 });
 
 export const updateOptionSchema = z.object({
+  value: optionValueSchema.optional(), // ← mới: cho phép sửa value
   label: z.string().min(1).optional(),
   isActive: z.boolean().optional(),
 });

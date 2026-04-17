@@ -19,8 +19,11 @@ router.post("/my/:id/reorder", authMiddleware(true), asyncHandler(c.reorderUserH
 router.use("/admin", authMiddleware(true));
 
 router.get("/admin/all", requireRole("STAFF", "ADMIN"), validate(orderQuerySchema, "query"), asyncHandler(c.getAllOrdersAdminHandler));
+
 router.get("/admin/:id", requireRole("STAFF", "ADMIN"), asyncHandler(c.getOrderAdminDetailHandler));
 router.patch("/admin/:id", requireRole("STAFF", "ADMIN"), validate(updateOrderAdminSchema, "body"), asyncHandler(c.updateOrderAdminHandler));
+router.post("/admin/:id/confirm-refund", requireRole("STAFF", "ADMIN"), asyncHandler(c.confirmManualRefundHandler));
+
 router.post("/admin/:id/cancel", requireRole("STAFF", "ADMIN"), asyncHandler(c.cancelOrderAdminHandler));
 
 // ================== ADMIN ONLY ==================

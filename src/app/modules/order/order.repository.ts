@@ -1,6 +1,7 @@
 import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
 import { OrderQuery } from "./order.validation";
+import { buildKeywordVariants } from "../search/search.helpers";
 
 export const orderSelect = {
   id: true,
@@ -31,6 +32,9 @@ export const orderSelect = {
   bankTransferExpiredAt: true,
   paymentExpiredAt: true,
   paymentRedirectUrl: true,
+  refundedAt: true,
+  refundedBy: true,
+  refundNote: true,
   orderItems: {
     select: {
       id: true,
@@ -124,11 +128,20 @@ export const findAllOrders = async (query: OrderQuery) => {
   const { page = 1, limit = 20, search, status, paymentStatus, dateFrom, dateTo } = query;
   const skip = (page - 1) * limit;
 
+  const searchConditions = search
+    ? buildKeywordVariants(search).flatMap((v) => [
+        { orderCode: { contains: v, mode: "insensitive" as const } },
+        { shippingPhone: { contains: v } },
+        { shippingContactName: { contains: v, mode: "insensitive" as const } },
+        { user: { fullName: { contains: v, mode: "insensitive" as const } } },
+        { user: { email: { contains: v, mode: "insensitive" as const } } },
+        { user: { phone: { contains: v } } },
+      ])
+    : [];
+
   const baseWhere: Prisma.ordersWhereInput = {
     ...(paymentStatus && { paymentStatus }),
-    ...(search && {
-      OR: [{ orderCode: { contains: search, mode: "insensitive" } }, { shippingPhone: { contains: search } }, { shippingContactName: { contains: search, mode: "insensitive" } }],
-    }),
+    ...(searchConditions.length > 0 && { OR: searchConditions }),
     ...((dateFrom || dateTo) && {
       orderDate: {
         ...(dateFrom && { gte: new Date(dateFrom) }),

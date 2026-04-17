@@ -4,6 +4,12 @@ import { z } from "zod";
 // z.coerce.boolean() sẽ coerce string "false" → true vì string non-empty là truthy
 const queryBoolean = z.preprocess((v) => (v === "true" ? true : v === "false" ? false : v), z.boolean().optional());
 
+const formBoolean = z.preprocess((v) => {
+  if (v === "true") return true;
+  if (v === "false") return false;
+  return v;
+}, z.boolean());
+
 export const brandParamsSchema = z.object({
   id: z.string().uuid("ID thương hiệu không hợp lệ"),
 });
@@ -43,8 +49,8 @@ export const createBrandSchema = z.object({
   description: z.string().trim().max(500, "Mô tả tối đa 500 ký tự").optional().or(z.literal("")),
   imageUrl: z.string().url().optional(),
   imagePath: z.string().optional(),
-  isFeatured: z.coerce.boolean().optional().default(false),
-  isActive: z.coerce.boolean().optional().default(true),
+  isFeatured: formBoolean.optional().default(false),
+  isActive: formBoolean.optional().default(true),
 });
 
 export const updateBrandSchema = z.object({
@@ -52,8 +58,8 @@ export const updateBrandSchema = z.object({
   description: z.string().trim().max(500, "Mô tả tối đa 500 ký tự").optional().or(z.literal("")),
   imageUrl: z.string().url().optional(),
   imagePath: z.string().optional(),
-  isFeatured: z.coerce.boolean().optional(),
-  isActive: z.coerce.boolean().optional(),
+  isFeatured: formBoolean.optional().default(false),
+  isActive: formBoolean.optional().default(true),
   removeImage: z.boolean().optional(),
 });
 

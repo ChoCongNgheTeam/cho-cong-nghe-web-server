@@ -33,6 +33,28 @@ export const createSpecificationSchema = z.object({
   sortOrder: z.coerce.number().int().default(0),
 });
 
+export const categorySpecParamsSchema = z.object({
+  categoryId: z.string().uuid("categoryId không hợp lệ"),
+});
+
+export const upsertCategorySpecSchema = z.object({
+  specificationId: z.string().uuid(),
+  groupName: z.string().min(1).default("Thông số khác"),
+  isRequired: z.boolean().default(false),
+  sortOrder: z.coerce.number().int().default(0),
+});
+
+export const bulkUpsertCategorySpecsSchema = z.object({
+  items: z.array(upsertCategorySpecSchema).min(1),
+});
+
+export const removeCategorySpecSchema = z.object({
+  specificationId: z.string().uuid(),
+});
+
+export type UpsertCategorySpecInput = z.infer<typeof upsertCategorySpecSchema>;
+export type BulkUpsertCategorySpecsInput = z.infer<typeof bulkUpsertCategorySpecsSchema>;
+
 export const updateSpecificationSchema = createSpecificationSchema.partial().omit({ key: true });
 
 export type ListSpecificationsQuery = z.infer<typeof listSpecificationsSchema>;

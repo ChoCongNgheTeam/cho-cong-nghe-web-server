@@ -18,6 +18,9 @@ import {
   restoreVoucherHandler,
   hardDeleteVoucherHandler,
   assignVoucherToUsersHandler,
+  getVoucherUsagesHandler,
+  getVoucherUsersHandler,
+  revokeVoucherUserHandler,
 } from "./voucher.controller";
 import {
   listVouchersSchema,
@@ -28,6 +31,8 @@ import {
   updateVoucherSchema,
   assignVoucherToUsersSchema,
   bulkDeleteVouchersSchema,
+  listVoucherUsagesSchema,
+  listVoucherUsersSchema,
 } from "./voucher.validation";
 
 const router = Router();
@@ -44,6 +49,10 @@ router.get("/admin/all", ...adminAuth, validate(listVouchersSchema, "query"), as
 
 /** Thùng rác */
 router.get("/admin/trash", ...adminAuth, asyncHandler(getDeletedVouchersHandler));
+
+router.get("/admin/usages", ...adminAuth, validate(listVoucherUsagesSchema, "query"), asyncHandler(getVoucherUsagesHandler));
+router.get("/admin/private-users", ...adminAuth, validate(listVoucherUsersSchema, "query"), asyncHandler(getVoucherUsersHandler));
+router.delete("/admin/:voucherId/users/:userId", ...adminAuth, asyncHandler(revokeVoucherUserHandler));
 
 /** Assign to users */
 router.post("/admin/assign", ...adminAuth, validate(assignVoucherToUsersSchema, "body"), asyncHandler(assignVoucherToUsersHandler));

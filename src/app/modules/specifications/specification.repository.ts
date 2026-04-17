@@ -1,6 +1,6 @@
 import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
-import { ListSpecificationsQuery, CreateSpecificationInput, UpdateSpecificationInput } from "./specification.validation";
+import { ListSpecificationsQuery, CreateSpecificationInput, UpdateSpecificationInput, UpsertCategorySpecInput } from "./specification.validation";
 
 const selectSpec = {
   id: true,
@@ -84,4 +84,77 @@ export const create = async (data: CreateSpecificationInput) => {
 
 export const update = async (id: string, data: UpdateSpecificationInput) => {
   return prisma.specifications.update({ where: { id }, data, select: selectSpec });
+};
+
+const selectCategorySpec = {
+  categoryId: true,
+  specificationId: true,
+  groupName: true,
+  isRequired: true,
+  sortOrder: true,
+  specification: { select: selectSpec },
+} satisfies Prisma.category_specificationsSelect;
+
+export const findCategorySpecs = async (categoryId: string) => {
+  return prisma.category_specifications.findMany({
+    where: { categoryId },
+    select: selectCategorySpec,
+    orderBy: [{ groupName: "asc" }, { sortOrder: "asc" }],
+  });
+};
+
+export const upsertCategorySpec = async (categoryId: string, data: UpsertCategorySpecInput) => {
+  return prisma.category_specifications.upsert({
+    where: {
+      categoryId_specificationId: {
+        categoryId,
+        specificationId: data.specificationId,
+      },
+    },
+    create: { categoryId, ...data },
+    update: {
+      groupName: data.groupName,
+      isRequired: data.isRequired,
+      sortOrder: data.sortOrder,
+    },
+    select: selectCategorySpec,
+  });
+};
+
+export const bulkUpsertCategorySpecs = async (categoryId: string, items: UpsertCategorySpecInput[]) => {
+  return prisma.$transaction(
+    items.map((item) =>
+      prisma.category_specifications.upsert({
+        where: {
+          categoryId_specificationId: {
+            categoryId,
+            specificationId: item.specificationId,
+          },
+        },
+        create: { categoryId, ...item },
+        update: {
+          groupName: item.groupName,
+          isRequired: item.isRequired,
+          sortOrder: item.sortOrder,
+        },
+        select: selectCategorySpec,
+      }),
+    ),
+  );
+};
+
+export const removeCategorySpec = async (categoryId: string, specificationId: string) => {
+  return prisma.category_specifications.delete({
+    where: {
+      categoryId_specificationId: { categoryId, specificationId },
+    },
+  });
+};
+
+export const checkCategoryExists = async (categoryId: string) => {
+  const cat = await prisma.categories.findUnique({
+    where: { id: categoryId, deletedAt: null },
+    select: { id: true, name: true },
+  });
+  return cat;
 };

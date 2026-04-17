@@ -74,3 +74,9 @@ export const createOrderAdminHandler = async (req: Request, res: Response) => {
   const newOrder = await service.createOrderAdmin(req.body);
   res.status(201).json({ data: newOrder, message: "Tạo đơn hàng hộ thành công" });
 };
+
+export const confirmManualRefundHandler = async (req: Request, res: Response) => {
+  const { refundNote } = req.body;
+  await service.confirmManualRefund(req.params.id, req.user!.id, refundNote);
+  res.json({ success: true, message: "Đã xác nhận hoàn tiền thành công" });
+};

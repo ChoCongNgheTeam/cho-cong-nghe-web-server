@@ -3,12 +3,14 @@ import { CommentTargetType } from "./comment.types";
 
 //  List / Filter
 
+const queryBoolean = z.preprocess((v) => (v === "true" ? true : v === "false" ? false : v), z.boolean().optional());
+
 export const listCommentsSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
   targetType: z.nativeEnum(CommentTargetType).optional(),
   targetId: z.string().uuid().optional(),
-  isApproved: z.coerce.boolean().optional(),
+  isApproved: queryBoolean,
   parentId: z
     .union([z.string().uuid(), z.literal("null")])
     .transform((val) => (val === "null" ? null : val))
@@ -38,19 +40,19 @@ export const createCommentSchema = z.object({
 export const updateCommentSchema = z
   .object({
     content: z.string().min(1).max(1000).optional(),
-    isApproved: z.boolean().optional(),
+    isApproved: queryBoolean,
   })
   .strict();
 
 export const approveCommentSchema = z.object({
-  isApproved: z.boolean(),
+  isApproved: queryBoolean,
 });
 
 //  Bulk
 
 export const bulkApproveSchema = z.object({
   commentIds: z.array(z.string().uuid()).min(1, "Cần ít nhất 1 comment ID"),
-  isApproved: z.boolean(),
+  isApproved: queryBoolean,
 });
 
 export const bulkDeleteSchema = z.object({

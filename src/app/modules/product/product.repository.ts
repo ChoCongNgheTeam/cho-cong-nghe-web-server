@@ -2409,13 +2409,16 @@ export const getOutOfStockProducts = async (limit = 20) => {
     where: {
       deletedAt: null,
       isActive: true,
-      variants: {
-        some: {
-          isActive: true,
-          deletedAt: null,
-          quantity: { lte: 0 },
+      AND: [
+        { variants: { some: { isActive: true, deletedAt: null } } },
+        {
+          variants: {
+            every: {
+              OR: [{ isActive: false }, { deletedAt: { not: null } }, { isActive: true, deletedAt: null, quantity: { lte: 0 } }],
+            },
+          },
         },
-      },
+      ],
     },
     select: {
       id: true,

@@ -1,6 +1,6 @@
 import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
-import { ListVouchersQuery } from "./voucher.validation";
+import { ListVouchersQuery, ListVoucherUsagesQuery, ListVoucherUsersQuery } from "./voucher.validation";
 
 // =====================
 // === SELECT OBJECTS ===
@@ -52,6 +52,26 @@ const selectVoucherDetail = {
   },
 };
 
+const resolveTargetNames = async (targets: { id: string; targetType: string; targetId: string | null }[]) => {
+  return Promise.all(
+    targets.map(async (target) => {
+      if (!target.targetId) return { ...target, targetName: undefined };
+      let targetName: string | undefined;
+      switch (target.targetType) {
+        case "BRAND":
+          targetName = (await prisma.brands.findUnique({ where: { id: target.targetId }, select: { name: true } }))?.name;
+          break;
+        case "CATEGORY":
+          targetName = (await prisma.categories.findUnique({ where: { id: target.targetId }, select: { name: true } }))?.name;
+          break;
+        case "PRODUCT":
+          targetName = (await prisma.products.findUnique({ where: { id: target.targetId }, select: { name: true } }))?.name;
+          break;
+      }
+      return { ...target, targetName };
+    }),
+  );
+};
 // =====================
 // === QUERY BUILDERS ===
 // =====================
@@ -164,17 +184,23 @@ export const findDeleted = async () => {
   });
 };
 
-export const findById = (id: string, includeDeleted = false) =>
-  prisma.vouchers.findFirst({
+export const findById = async (id: string, includeDeleted = false) => {
+  const voucher = await prisma.vouchers.findFirst({
     where: { id, ...(!includeDeleted && { deletedAt: null }) },
     select: selectVoucherDetail,
   });
+  if (!voucher) return null;
+  return { ...voucher, targets: await resolveTargetNames(voucher.targets) };
+};
 
-export const findByCode = (code: string) =>
-  prisma.vouchers.findFirst({
+export const findByCode = async (code: string) => {
+  const voucher = await prisma.vouchers.findFirst({
     where: { code: code.toUpperCase(), deletedAt: null },
     select: selectVoucherDetail,
   });
+  if (!voucher) return null;
+  return { ...voucher, targets: await resolveTargetNames(voucher.targets) };
+};
 
 export const findUserVouchers = async (userId: string) => {
   const voucherUsers = await prisma.voucher_user.findMany({
@@ -237,12 +263,10 @@ export const create = async (data: any) => {
 
 export const update = async (id: string, data: any) => {
   const { targets, ...updateData } = data;
-
   if (targets !== undefined) {
     await prisma.voucher_targets.deleteMany({ where: { voucherId: id } });
   }
-
-  return prisma.vouchers.update({
+  const voucher = await prisma.vouchers.update({
     where: { id },
     data: {
       ...updateData,
@@ -250,8 +274,8 @@ export const update = async (id: string, data: any) => {
     },
     select: selectVoucherDetail,
   });
+  return { ...voucher, targets: await resolveTargetNames(voucher.targets) };
 };
-
 // =====================
 // === SOFT DELETE / RESTORE / HARD DELETE ===
 // =====================
@@ -400,4 +424,82 @@ export const getVoucherByCode = async (code: string, userId?: string) => {
     userUsedCount,
     userMaxUses,
   };
+};
+
+// =====================
+// === USAGES ===
+// =====================
+
+export const findAllUsages = async (query: ListVoucherUsagesQuery) => {
+  const { page, limit, voucherId, userId, orderId, dateFrom, dateTo, sortBy, sortOrder } = query;
+  const skip = (page - 1) * limit;
+
+  const where: Prisma.voucher_usagesWhereInput = {};
+  if (voucherId) where.voucherId = voucherId;
+  if (userId) where.userId = userId;
+  if (orderId) where.orderId = orderId;
+  if (dateFrom || dateTo) {
+    where.usedAt = {
+      ...(dateFrom && { gte: dateFrom }),
+      ...(dateTo && { lte: new Date(new Date(dateTo).setHours(23, 59, 59, 999)) }),
+    };
+  }
+
+  const [data, total] = await prisma.$transaction([
+    prisma.voucher_usages.findMany({
+      where,
+      orderBy: { [sortBy]: sortOrder },
+      skip,
+      take: limit,
+      select: {
+        id: true,
+        usedAt: true,
+        voucher: { select: { id: true, code: true, discountType: true, discountValue: true } },
+        user: { select: { id: true, email: true, fullName: true } },
+        order: { select: { id: true, orderCode: true, totalAmount: true } },
+      },
+    }),
+    prisma.voucher_usages.count({ where }),
+  ]);
+
+  return { data, page, limit, total, totalPages: Math.ceil(total / limit) };
+};
+
+// =====================
+// === VOUCHER USERS (private assignments) ===
+// =====================
+
+export const findAllVoucherUsers = async (query: ListVoucherUsersQuery) => {
+  const { page, limit, voucherId, userId } = query;
+  const skip = (page - 1) * limit;
+
+  const where: Prisma.voucher_userWhereInput = {};
+  if (voucherId) where.voucherId = voucherId;
+  if (userId) where.userId = userId;
+
+  const [data, total] = await prisma.$transaction([
+    prisma.voucher_user.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+      select: {
+        id: true,
+        maxUses: true,
+        usedCount: true,
+        createdAt: true,
+        voucher: { select: { id: true, code: true, discountType: true, discountValue: true, endDate: true, isActive: true } },
+        user: { select: { id: true, email: true, fullName: true } },
+      },
+    }),
+    prisma.voucher_user.count({ where }),
+  ]);
+
+  return { data, page, limit, total, totalPages: Math.ceil(total / limit) };
+};
+
+export const revokeVoucherUser = async (voucherId: string, userId: string) => {
+  return prisma.voucher_user.delete({
+    where: { voucherId_userId: { voucherId, userId } },
+  });
 };

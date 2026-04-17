@@ -177,7 +177,8 @@ export interface DashboardQuery {
 }
 
 export interface AnalyticsQuery {
-  from: Date;
-  to: Date;
+  period?: "today" | "week" | "month" | "year";
+  from?: string;
+  to?: string;
   granularity?: TimeGranularity;
 }

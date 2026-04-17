@@ -45,6 +45,7 @@ enum OrderStatus {
 enum PaymentStatus {
   UNPAID
   PAID
+  REFUND_PENDING
   REFUNDED
 }
 
@@ -649,6 +650,11 @@ model orders {
   isChatbotRequest        Boolean       @default(false)        // true = request từ chatbot
   requestAcknowledgedAt   DateTime?                            // Khi staff confirm
   requestRejectionReason  String?                              // Nếu staff từ chối
+
+   // ===== REFUND AUDIT =====
+  refundedAt     DateTime?
+  refundedBy     String?   @db.Uuid  // userId của staff xác nhận
+  refundNote     String?             // ghi chú hoàn tiền (tuỳ chọn)
 
   // ===== RELATIONS =====
   user            users                  @relation(fields: [userId], references: [id])

@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import * as voucherService from "./voucher.service";
-import { ListVouchersQuery, ValidateVoucherInput, bulkDeleteVouchersSchema } from "./voucher.validation";
+import { ListVouchersQuery, ValidateVoucherInput, bulkDeleteVouchersSchema, listVoucherUsagesSchema, listVoucherUsersSchema } from "./voucher.validation";
 
 const getActorId = (req: Request): string => (req as any).user?.id ?? "system";
 
@@ -104,4 +104,30 @@ export const hardDeleteVoucherHandler = async (req: Request, res: Response) => {
 export const assignVoucherToUsersHandler = async (req: Request, res: Response) => {
   const result = await voucherService.assignVoucherToUsers(req.body);
   res.json({ data: result, message: `Gán voucher cho ${result.assigned} người dùng thành công` });
+};
+
+export const getVoucherUsagesHandler = async (req: Request, res: Response) => {
+  const query = listVoucherUsagesSchema.parse(req.query);
+  const result = await voucherService.getVoucherUsages(query);
+  res.json({
+    data: result.data,
+    meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
+    message: "Lấy lịch sử dùng voucher thành công",
+  });
+};
+
+export const getVoucherUsersHandler = async (req: Request, res: Response) => {
+  const query = listVoucherUsersSchema.parse(req.query);
+  const result = await voucherService.getVoucherUsers(query);
+  res.json({
+    data: result.data,
+    meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
+    message: "Lấy danh sách voucher riêng tư thành công",
+  });
+};
+
+export const revokeVoucherUserHandler = async (req: Request, res: Response) => {
+  const { voucherId, userId } = req.params;
+  await voucherService.revokeVoucherUser(voucherId, userId);
+  res.json({ message: "Thu hồi voucher thành công" });
 };

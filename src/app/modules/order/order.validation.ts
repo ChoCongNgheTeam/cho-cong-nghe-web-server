@@ -5,7 +5,7 @@ export const orderQuerySchema = z.object({
   limit: z.coerce.number().min(1).max(100).default(20).optional(),
   search: z.string().optional(),
   status: z.enum(["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"]).optional(),
-  paymentStatus: z.enum(["UNPAID", "PAID", "REFUNDED"]).optional(),
+  paymentStatus: z.enum(["UNPAID", "PAID", "REFUND_PENDING", "REFUNDED"]).optional(),
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),
 });
@@ -15,10 +15,15 @@ export type OrderQuery = z.infer<typeof orderQuerySchema>;
 // Ép Admin dùng API Cancel riêng để xử lý tồn kho an toàn
 export const updateOrderAdminSchema = z.object({
   orderStatus: z.enum(["PENDING", "PROCESSING", "SHIPPED", "DELIVERED"]).optional(),
-  paymentStatus: z.enum(["UNPAID", "PAID", "REFUNDED"]).optional(),
-  paymentMethodId: z.string().uuid("ID phương thức thanh toán không hợp lệ").optional(), // ← thêm
+  paymentStatus: z.enum(["UNPAID", "PAID", "REFUND_PENDING", "REFUNDED"]).optional(),
+  paymentMethodId: z.string().uuid().optional(),
   shippingFee: z.number().min(0).optional(),
   voucherDiscount: z.number().min(0).optional(),
+});
+
+// Schema riêng cho action confirm refund
+export const confirmRefundSchema = z.object({
+  refundNote: z.string().optional(),
 });
 
 export const createOrderAdminSchema = z

@@ -61,7 +61,7 @@ export const getNewCustomers = async (from: Date, to: Date): Promise<number> => 
 
 export const getProductStockSummary = async () => {
   const [totalActive, lowStock, outOfStock] = await prisma.$transaction([
-    prisma.products_variants.count({ where: { isActive: true, deletedAt: null } }),
+    prisma.products.count({ where: { isActive: true, deletedAt: null } }),
     prisma.products_variants.count({ where: { isActive: true, deletedAt: null, quantity: { gt: 0, lte: 5 } } }),
     prisma.products_variants.count({ where: { isActive: true, deletedAt: null, quantity: 0 } }),
   ]);

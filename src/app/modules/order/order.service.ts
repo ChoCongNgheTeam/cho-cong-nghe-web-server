@@ -4,6 +4,92 @@ import { NotFoundError, BadRequestError, ForbiddenError } from "@/errors";
 import prisma from "@/config/db";
 import { sendOrderStatusNotification, sendOrderCreatedAdminNotification } from "../notification/notification.service";
 
+// Tách thành helper riêng để dễ test
+const triggerRefundIfEligible = async (orderId: string) => {
+  const order = await prisma.orders.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      totalAmount: true,
+      paymentMethodId: true,
+      paymentMethod: { select: { code: true } },
+    },
+  });
+  if (!order) return;
+
+  const methodCode = (order.paymentMethod?.code ?? "").toUpperCase();
+  const isBankTransfer = methodCode.includes("BANK_TRANSFER") || methodCode.includes("SEPAY");
+
+  if (isBankTransfer) {
+    // Manual: giữ REFUND_PENDING, staff sẽ xác nhận sau
+    // Có thể gửi notification cho staff ở đây
+    return;
+  }
+
+  // Sandbox auto-refund (MoMo, VNPay, ZaloPay, Stripe)
+  // Giả lập gọi API thành công → mark REFUNDED ngay
+  await prisma.orders.update({
+    where: { id: orderId },
+    data: {
+      paymentStatus: "REFUNDED",
+      refundedAt: new Date(),
+      // refundedBy null vì là auto
+    },
+  });
+
+  // Tạo refund transaction để có audit log
+  await prisma.payment_transactions.create({
+    data: {
+      orderId: order.id,
+      paymentMethodId: order.paymentMethodId!,
+      amount: order.totalAmount,
+      transactionRef: `REFUND_AUTO_${Date.now()}`,
+      status: "REFUNDED",
+      payload: { type: "auto_refund_sandbox", triggeredAt: new Date().toISOString() },
+    },
+  });
+};
+
+// Chỉ staff/admin gọi — xác nhận đã chuyển tiền hoàn tay
+export const confirmManualRefund = async (orderId: string, staffId: string, refundNote?: string) => {
+  const order = await prisma.orders.findUnique({
+    where: { id: orderId },
+    select: { id: true, paymentStatus: true, totalAmount: true, paymentMethodId: true },
+  });
+  if (!order) throw new NotFoundError("Đơn hàng");
+  if (order.paymentStatus !== "REFUND_PENDING") {
+    throw new BadRequestError("Đơn hàng không ở trạng thái chờ hoàn tiền");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.orders.update({
+      where: { id: orderId },
+      data: {
+        paymentStatus: "REFUNDED",
+        refundedAt: new Date(),
+        refundedBy: staffId,
+        refundNote: refundNote ?? null,
+      },
+    });
+
+    await tx.payment_transactions.create({
+      data: {
+        orderId: order.id,
+        paymentMethodId: order.paymentMethodId!,
+        amount: order.totalAmount,
+        transactionRef: `REFUND_MANUAL_${Date.now()}`,
+        status: "REFUNDED",
+        payload: {
+          type: "manual_refund",
+          confirmedBy: staffId,
+          confirmedAt: new Date().toISOString(),
+          note: refundNote,
+        },
+      },
+    });
+  });
+};
+
 // ================== PUBLIC SERVICES (USER) ==================
 
 export const getMyOrders = async (userId: string) => {
@@ -42,14 +128,17 @@ export const getOrderPaymentInfo = async (orderCode: string, userId: string) => 
   };
 };
 
+// cancelOrderUser — thêm refund logic
 export const cancelOrderUser = async (orderId: string, userId: string) => {
   const order = await repo.findOrderById(orderId);
   if (!order) throw new NotFoundError("Đơn hàng");
   if (order.userId !== userId) throw new ForbiddenError("Không có quyền");
   if (order.orderStatus === "CANCELLED") throw new BadRequestError("Đơn hàng đã được hủy trước đó");
   if (order.orderStatus !== "PENDING" && order.orderStatus !== "PROCESSING") {
-    throw new BadRequestError("Chỉ có thể hủy đơn hàng ở trạng thái Chờ xác nhận hoặc Đang xử lý");
+    throw new BadRequestError("Chỉ có thể hủy đơn ở trạng thái Chờ xác nhận hoặc Đang xử lý");
   }
+
+  const wasPaid = order.paymentStatus === "PAID";
 
   await prisma.$transaction(async (tx) => {
     for (const item of order.orderItems) {
@@ -58,8 +147,20 @@ export const cancelOrderUser = async (orderId: string, userId: string) => {
         data: { quantity: { increment: item.quantity }, soldCount: { decrement: item.quantity } },
       });
     }
-    await tx.orders.update({ where: { id: orderId }, data: { orderStatus: "CANCELLED" } });
+    await tx.orders.update({
+      where: { id: orderId },
+      data: {
+        orderStatus: "CANCELLED",
+        // Nếu đã PAID → chuyển sang REFUND_PENDING thay vì giữ PAID
+        ...(wasPaid && { paymentStatus: "REFUND_PENDING" }),
+      },
+    });
   });
+
+  // Nếu đã PAID và dùng ví điện tử sandbox → auto refund
+  if (wasPaid) {
+    await triggerRefundIfEligible(orderId);
+  }
 };
 
 export const reorderUser = async (orderId: string, userId: string) => {
@@ -110,7 +211,7 @@ export const updateOrderAdmin = async (orderId: string, input: UpdateOrderAdminI
     data: {
       orderStatus: input.orderStatus,
       paymentStatus: input.paymentStatus,
-      paymentMethodId: input.paymentMethodId,  // ← thêm
+      paymentMethodId: input.paymentMethodId, // ← thêm
       shippingFee: input.shippingFee,
       voucherDiscount: input.voucherDiscount,
     },
@@ -124,13 +225,16 @@ export const updateOrderAdmin = async (orderId: string, input: UpdateOrderAdminI
   return repo.updateOrder(orderId, input);
 };
 
+// cancelOrderAdmin — tương tự
 export const cancelOrderAdmin = async (orderId: string) => {
   const order = await repo.findOrderById(orderId);
   if (!order) throw new NotFoundError("Đơn hàng");
   if (order.orderStatus === "CANCELLED") throw new BadRequestError("Đơn hàng đã được hủy trước đó");
   if (order.orderStatus === "SHIPPED" || order.orderStatus === "DELIVERED") {
-    throw new BadRequestError("Không thể hủy đơn hàng đang giao hoặc đã giao thành công. Hành động này sẽ làm sai lệch tồn kho!");
+    throw new BadRequestError("Không thể hủy đơn đang giao hoặc đã giao");
   }
+
+  const wasPaid = order.paymentStatus === "PAID";
 
   await prisma.$transaction(async (tx) => {
     for (const item of order.orderItems) {
@@ -139,12 +243,20 @@ export const cancelOrderAdmin = async (orderId: string) => {
         data: { quantity: { increment: item.quantity }, soldCount: { decrement: item.quantity } },
       });
     }
-    await tx.orders.update({ where: { id: orderId }, data: { orderStatus: "CANCELLED" } });
+    await tx.orders.update({
+      where: { id: orderId },
+      data: {
+        orderStatus: "CANCELLED",
+        ...(wasPaid && { paymentStatus: "REFUND_PENDING" }),
+      },
+    });
   });
-  // [THÊM MỚI] Gửi thông báo
-  sendOrderStatusNotification(order.userId, order.orderCode, "CANCELLED").catch((err) => {
-    console.error("[Notification Error] Lỗi gửi thông báo order status:", err);
-  });
+
+  sendOrderStatusNotification(order.userId, order.orderCode, "CANCELLED").catch(console.error);
+
+  if (wasPaid) {
+    await triggerRefundIfEligible(orderId);
+  }
 };
 
 export const createOrderAdmin = async (input: CreateOrderAdminInput) => {
