@@ -2,29 +2,31 @@ import prisma from "@/config/db";
 import { CreateAddressInput, UpdateAddressInput } from "./user-address.types";
 import { ListAddressesQuery } from "./user-address.validation";
 
-const selectAddressWithRelations = {
+// ==================== SELECT SHAPE ====================
+
+const selectAddress = {
   id: true,
   userId: true,
   contactName: true,
   phone: true,
+  provinceCode: true,
+  provinceName: true,
+  wardCode: true,
+  wardName: true,
   detailAddress: true,
   type: true,
   isDefault: true,
   createdAt: true,
   updatedAt: true,
   deletedAt: true,
-  province: {
-    select: { id: true, code: true, name: true, fullName: true, type: true },
-  },
-  ward: {
-    select: { id: true, code: true, name: true, fullName: true, type: true },
-  },
 };
+
+// ==================== USER ADDRESS REPOSITORY ====================
 
 export const findByUserId = async (userId: string) => {
   return prisma.user_addresses.findMany({
     where: { userId, deletedAt: null },
-    select: selectAddressWithRelations,
+    select: selectAddress,
     orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
   });
 };
@@ -36,26 +38,32 @@ export const findAddressById = async (id: string, userId?: string, includeDelete
       ...(userId ? { userId } : {}),
       ...(!includeDeleted ? { deletedAt: null } : {}),
     },
-    select: selectAddressWithRelations,
+    select: selectAddress,
   });
 };
 
 export const findDefaultAddress = async (userId: string) => {
   return prisma.user_addresses.findFirst({
     where: { userId, isDefault: true, deletedAt: null },
-    select: selectAddressWithRelations,
+    select: selectAddress,
   });
 };
 
-export const createAddress = async (data: CreateAddressInput & { userId: string }) => {
-  return prisma.user_addresses.create({ data, select: selectAddressWithRelations });
+export const createAddress = async (
+  data: CreateAddressInput & {
+    userId: string;
+    provinceName: string;
+    wardName: string;
+  }
+) => {
+  return prisma.user_addresses.create({ data, select: selectAddress });
 };
 
-export const updateAddress = async (id: string, data: UpdateAddressInput) => {
+export const updateAddress = async (id: string, data: Partial<UpdateAddressInput & { provinceName?: string; wardName?: string; isDefault?: boolean }>) => {
   return prisma.user_addresses.update({
     where: { id },
     data: data as any,
-    select: selectAddressWithRelations,
+    select: selectAddress,
   });
 };
 
@@ -86,23 +94,19 @@ export const hardDeleteAddress = async (id: string) => {
 
 // ==================== ADMIN / STAFF REPOSITORY ====================
 
-/**
- * [FIX] Thêm userId vào where clause để filter đúng địa chỉ của user đó.
- * Khi FE gọi ?userId=xxx thì chỉ trả về địa chỉ của user đó, không phải toàn DB.
- */
 export const findAllAddressesAdmin = async (query: ListAddressesQuery) => {
-  const { search, userId, provinceId, wardId, includeDeleted, page = 1, perPage = 20 } = query;
+  const { search, userId, provinceCode, wardCode, includeDeleted, page = 1, perPage = 20 } = query;
   const where: any = {};
 
   if (!includeDeleted) where.deletedAt = null;
-
-  // [FIX] Filter theo userId nếu có
   if (userId) where.userId = userId;
-
-  if (provinceId) where.provinceId = provinceId;
-  if (wardId) where.wardId = wardId;
+  if (provinceCode) where.provinceCode = provinceCode;
+  if (wardCode) where.wardCode = wardCode;
   if (search) {
-    where.OR = [{ contactName: { contains: search, mode: "insensitive" } }, { phone: { contains: search } }];
+    where.OR = [
+      { contactName: { contains: search, mode: "insensitive" } },
+      { phone: { contains: search } },
+    ];
   }
 
   const skip = (page - 1) * perPage;
@@ -111,7 +115,7 @@ export const findAllAddressesAdmin = async (query: ListAddressesQuery) => {
       where,
       skip,
       take: perPage,
-      select: selectAddressWithRelations,
+      select: selectAddress,
       orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
     }),
     prisma.user_addresses.count({ where }),
@@ -123,54 +127,7 @@ export const findAllAddressesAdmin = async (query: ListAddressesQuery) => {
 export const findAllDeletedAddresses = async () => {
   return prisma.user_addresses.findMany({
     where: { deletedAt: { not: null } },
-    select: { ...selectAddressWithRelations },
+    select: selectAddress,
     orderBy: { deletedAt: "desc" },
   });
 };
-
-// ==================== LOCATIONS REPOSITORY ====================
-
-export const findAllProvinces = async () => {
-  return prisma.provinces.findMany({
-    select: { id: true, code: true, name: true, fullName: true, type: true },
-    orderBy: { name: "asc" },
-  });
-};
-
-export const findProvinceById = async (provinceId: string) => {
-  return prisma.provinces.findUnique({
-    where: { id: provinceId },
-    select: { id: true, code: true, name: true, fullName: true, type: true },
-  });
-};
-
-export const findWardsByProvince = async (provinceId: string, page: number, perPage: number, search?: string) => {
-  const skip = (page - 1) * perPage;
-  const where: any = { provinceId };
-  if (search) where.name = { contains: search, mode: "insensitive" };
-
-  const [wards, total] = await Promise.all([
-    prisma.wards.findMany({
-      where,
-      select: { id: true, code: true, name: true, fullName: true, type: true },
-      skip,
-      take: perPage,
-      orderBy: [{ type: "asc" }, { name: "asc" }],
-    }),
-    prisma.wards.count({ where }),
-  ]);
-
-  return { data: wards, meta: { total, page, perPage, totalPages: Math.ceil(total / perPage) } };
-};
-
-export const findWardById = async (wardId: string) => {
-  return prisma.wards.findUnique({
-    where: { id: wardId },
-    select: { id: true, code: true, name: true, fullName: true, type: true, provinceId: true },
-  });
-};
-
-export const findProvinceByCode = async (code: string) => prisma.provinces.findUnique({ where: { code } });
-export const createProvince = async (data: any) => prisma.provinces.create({ data });
-export const findWardByCode = async (code: string) => prisma.wards.findUnique({ where: { code } });
-export const createWard = async (data: any) => prisma.wards.create({ data });

@@ -342,15 +342,15 @@ paths:
             type: string
           description: Tìm kiếm theo tên người nhận hoặc số điện thoại
         - in: query
-          name: provinceId
+          name: provinceCode
           schema:
-            type: string
-            format: uuid
+            type: integer
+          description: Mã tỉnh/thành phố
         - in: query
-          name: wardId
+          name: wardCode
           schema:
-            type: string
-            format: uuid
+            type: integer
+          description: Mã phường/xã
         - in: query
           name: includeDeleted
           schema:
@@ -557,22 +557,16 @@ components:
         province:
           type: object
           properties:
-            id:
-              type: string
-              format: uuid
+            code:
+              type: integer
             name:
-              type: string
-            fullName:
               type: string
         ward:
           type: object
           properties:
-            id:
-              type: string
-              format: uuid
+            code:
+              type: integer
             name:
-              type: string
-            fullName:
               type: string
         detailAddress:
           type: string
@@ -596,8 +590,8 @@ components:
       required:
         - contactName
         - phone
-        - provinceId
-        - wardId
+        - provinceCode
+        - wardCode
         - detailAddress
       properties:
         contactName:
@@ -607,12 +601,12 @@ components:
         phone:
           type: string
           pattern: '^(\+84|0)[0-9]{9,10}$'
-        provinceId:
-          type: string
-          format: uuid
-        wardId:
-          type: string
-          format: uuid
+        provinceCode:
+          type: integer
+          description: Mã tỉnh/thành phố
+        wardCode:
+          type: integer
+          description: Mã phường/xã
         detailAddress:
           type: string
           minLength: 1
@@ -634,12 +628,12 @@ components:
         phone:
           type: string
           pattern: '^(\+84|0)[0-9]{9,10}$'
-        provinceId:
-          type: string
-          format: uuid
-        wardId:
-          type: string
-          format: uuid
+        provinceCode:
+          type: integer
+          description: Mã tỉnh/thành phố
+        wardCode:
+          type: integer
+          description: Mã phường/xã
         detailAddress:
           type: string
           minLength: 1

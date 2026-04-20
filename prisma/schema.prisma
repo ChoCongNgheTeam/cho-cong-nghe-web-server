@@ -246,64 +246,31 @@ model refresh_tokens {
   @@index([userId])
 }
 
-// Không cần soft delete: đây là dữ liệu địa lý hệ thống, không xóa tùy tiện
-model provinces {
-  id        String   @id @default(uuid()) @db.Uuid
-  code      String   @unique
-  name      String
-  fullName  String
-  type      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  wards         wards[]
-  userAddresses user_addresses[]
-}
-
-// CASCADE theo province
-model wards {
-  id         String   @id @default(uuid()) @db.Uuid
-  code       String   @unique
-  name       String
-  fullName   String
-  type       String
-  provinceId String   @db.Uuid
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  province      provinces      @relation(fields: [provinceId], references: [id], onDelete: Cascade)
-  userAddresses user_addresses[]
-
-  @@index([provinceId])
-}
-
-// SOFT DELETE: địa chỉ user — không nên hard delete vì orders tham chiếu đến
-// Nếu user xóa địa chỉ → soft delete, order vẫn giữ snapshot địa chỉ
 model user_addresses {
   id            String      @id @default(uuid()) @db.Uuid
   userId        String      @db.Uuid
   contactName   String
   phone         String
-  provinceId    String      @db.Uuid
-  wardId        String      @db.Uuid
+  
+  // Thay provinceId/wardId bằng code từ external API
+  provinceCode  Int         // VD: 79 (TP.HCM)
+  provinceName  String      // Snapshot tên, tránh phụ thuộc external API lúc đọc
+  wardCode      Int         // VD: 26560
+  wardName      String      // Snapshot tên
+  
   detailAddress String
   type          AddressType?
   isDefault     Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  // --- Soft Delete ---
   deletedAt     DateTime?
-  deletedBy     String?   @db.Uuid
+  deletedBy     String?     @db.Uuid
 
-  user     users      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  province provinces  @relation(fields: [provinceId], references: [id])
-  ward     wards      @relation(fields: [wardId], references: [id])
+  user          users       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, detailAddress, phone])
   @@index([userId])
-  @@index([provinceId])
-  @@index([wardId])
   @@index([deletedAt])
 }
 

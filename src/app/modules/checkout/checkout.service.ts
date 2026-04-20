@@ -206,7 +206,7 @@ export const prepareCheckoutData = async (userId: string, input: CheckoutInput):
   const totalPromotionDiscount = validation.totalPromotionDiscount || 0; 
 
   // 🔥 TÍNH PHÍ SHIP CỰC NHANH: Dùng Pure Function, truyền thẳng tên Tỉnh/Thành
-  const shippingFee = calculateShippingFee(subtotalAmount, address.province.name);
+  const shippingFee = calculateShippingFee(subtotalAmount, address.provinceName);
 
   // Validate Voucher (Cần có subtotalAmount nên phải chạy sau)
   const { discount: voucherDiscount } = await validateAndApplyVoucher(voucherId, subtotalAmount, userId);
