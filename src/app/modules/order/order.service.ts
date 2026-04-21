@@ -281,16 +281,20 @@ export const createOrderAdmin = async (input: CreateOrderAdminInput) => {
     }
 
     if (!finalShippingAddressId && newAddress && finalUserId) {
-      const province = await tx.provinces.findUnique({ where: { id: newAddress.provinceId } });
-      const ward = await tx.wards.findUnique({ where: { id: newAddress.wardId } });
+      // Lấy tên tỉnh/thành từ external API
+      const provinceRes = await fetch(`https://provinces.open-api.vn/api/v2/p/${newAddress.provinceCode}?depth=2`);
+      const provinceData = await provinceRes.json();
+      const wardData = provinceData.wards?.find((w: any) => w.code === newAddress.wardCode);
 
       const newAddr = await tx.user_addresses.create({
         data: {
           userId: finalUserId,
           contactName: customerInfo!.fullName,
           phone: customerInfo!.phone,
-          provinceId: newAddress.provinceId,
-          wardId: newAddress.wardId,
+          provinceCode: newAddress.provinceCode,
+          provinceName: provinceData.name || "",
+          wardCode: newAddress.wardCode,
+          wardName: wardData?.name || "",
           detailAddress: newAddress.detailAddress,
           isDefault: true,
         },
@@ -299,21 +303,20 @@ export const createOrderAdmin = async (input: CreateOrderAdminInput) => {
       addressSnapshot = {
         shippingContactName: customerInfo!.fullName,
         shippingPhone: customerInfo!.phone,
-        shippingProvince: province?.fullName || "",
-        shippingWard: ward?.fullName || "",
+        shippingProvince: provinceData.name || "",
+        shippingWard: wardData?.name || "",
         shippingDetail: newAddress.detailAddress,
       };
     } else if (finalShippingAddressId) {
       const existingAddr = await tx.user_addresses.findUnique({
         where: { id: finalShippingAddressId },
-        include: { province: true, ward: true },
       });
       if (existingAddr) {
         addressSnapshot = {
           shippingContactName: existingAddr.contactName,
           shippingPhone: existingAddr.phone,
-          shippingProvince: existingAddr.province.fullName,
-          shippingWard: existingAddr.ward.fullName,
+          shippingProvince: existingAddr.provinceName,
+          shippingWard: existingAddr.wardName,
           shippingDetail: existingAddr.detailAddress,
         };
       }

@@ -1,14 +1,16 @@
 import { AddressType } from "@prisma/client";
 
-// ==================== INTERFACE ====================
+// ==================== INTERFACES ====================
 
 export interface UserAddress {
   id: string;
   userId: string;
   contactName: string;
   phone: string;
-  provinceId: string;
-  wardId: string;
+  provinceCode: number;
+  provinceName: string;
+  wardCode: number;
+  wardName: string;
   detailAddress: string;
   type: AddressType | null;
   isDefault: boolean;
@@ -16,28 +18,11 @@ export interface UserAddress {
   updatedAt: Date;
 }
 
-export interface UserAddressWithRelations extends UserAddress {
-  province: {
-    id: string;
-    code: string;
-    name: string;
-    fullName: string;
-    type: string;
-  };
-  ward: {
-    id: string;
-    code: string;
-    name: string;
-    fullName: string;
-    type: string;
-  };
-}
-
 export interface CreateAddressInput {
   contactName: string;
   phone: string;
-  provinceId: string;
-  wardId: string;
+  provinceCode: number;
+  wardCode: number;
   detailAddress: string;
   type?: AddressType;
   isDefault?: boolean;
@@ -46,8 +31,8 @@ export interface CreateAddressInput {
 export interface UpdateAddressInput {
   contactName?: string;
   phone?: string;
-  provinceId?: string;
-  wardId?: string;
+  provinceCode?: number;
+  wardCode?: number;
   detailAddress?: string;
   type?: AddressType | null;
   isDefault?: boolean;
@@ -60,14 +45,12 @@ export interface AddressResponse {
   contactName: string;
   phone: string;
   province: {
-    id: string;
+    code: number;
     name: string;
-    fullName: string;
   };
   ward: {
-    id: string;
+    code: number;
     name: string;
-    fullName: string;
   };
   detailAddress: string;
   fullAddress: string;
@@ -77,33 +60,19 @@ export interface AddressResponse {
   updatedAt: Date;
 }
 
-export interface Province {
-  id: string;
-  code: string;
+// Shape trả về từ external Vietnam Provinces API
+export interface ExternalProvinceResponse {
   name: string;
-  fullName: string;
-  type: string;
+  code: number;
+  division_type: string;
+  codename: string;
+  wards?: ExternalWardResponse[];
 }
 
-export interface Ward {
-  id: string;
-  code: string;
+export interface ExternalWardResponse {
   name: string;
-  fullName: string;
-  type: string;
-}
-
-export interface CreateProvinceInput {
-  code: string;
-  name: string;
-  fullName: string;
-  type: string;
-}
-
-export interface CreateWardInput {
-  code: string;
-  name: string;
-  fullName: string;
-  type: string;
-  provinceId: string;
+  code: number;
+  division_type: string;
+  codename: string;
+  province_code: number;
 }

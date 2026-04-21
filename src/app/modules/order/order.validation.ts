@@ -39,8 +39,8 @@ export const createOrderAdminSchema = z
       .optional(),
     newAddress: z
       .object({
-        provinceId: z.string().uuid(),
-        wardId: z.string().uuid(),
+        provinceCode: z.number().int("Mã tỉnh/thành phố phải là số nguyên"),
+        wardCode: z.number().int("Mã phường/xã phải là số nguyên"),
         detailAddress: z.string().min(1),
       })
       .optional(),

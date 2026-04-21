@@ -12,7 +12,6 @@ export const findCartItemsWithProduct = async (userId: string) => {
 export const findAddressWithProvince = async (addressId: string) => {
   return prisma.user_addresses.findUnique({
     where: { id: addressId },
-    include: { province: true },
   });
 };
 
@@ -63,7 +62,6 @@ export const executeOrderTransaction = async (userId: string, checkoutSummary: C
     // 0. Snapshot Address
     const address = await tx.user_addresses.findUnique({
       where: { id: checkoutSummary.shippingAddressId },
-      include: { province: true, ward: true },
     });
 
     if (!address) throw new Error("Không tìm thấy thông tin địa chỉ giao hàng");
@@ -78,8 +76,8 @@ export const executeOrderTransaction = async (userId: string, checkoutSummary: C
         shippingAddressId: checkoutSummary.shippingAddressId,
         shippingContactName: address.contactName,
         shippingPhone: address.phone,
-        shippingProvince: address.province.fullName,
-        shippingWard: address.ward.fullName,
+        shippingProvince: address.provinceName,
+        shippingWard: address.wardName,
         shippingDetail: address.detailAddress,
         subtotalAmount: new Prisma.Decimal(checkoutSummary.subtotalAmount),
         shippingFee: new Prisma.Decimal(checkoutSummary.shippingFee),
