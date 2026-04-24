@@ -12,10 +12,30 @@ export interface ChatRequest {
   sessionId?: string;
 }
 
+// ─── ProductCard: dữ liệu gọn để FE render card + nút thêm giỏ ─────────────
+export interface ProductCard {
+  id: string;
+  name: string;
+  slug: string;
+  productUrl: string;
+  thumbnail: string;
+  priceMin: number;
+  priceMax: number;
+  originalPriceMin: number;
+  originalPriceMax: number;
+  inStock: boolean;
+  promotionLabel?: string;
+  /** Chỉ có khi SP có đúng 1 variant → FE thêm giỏ 1 click không cần chọn */
+  defaultVariantId?: string;
+  variants?: { id: string; label: string }[];
+}
+
 export interface ChatResponse {
   reply: string;
   sessionId?: string;
   toolsUsed?: string[];
+  /** Structured product data để FE render card với nút thêm giỏ hàng */
+  products?: ProductCard[];
 }
 
 // ---- Tool input types ----
@@ -52,7 +72,7 @@ export interface ProductSearchResult {
   id: string;
   name: string;
   slug: string;
-  productUrl: string; // URL đầy đủ, ghép sẵn từ backend — AI chỉ được copy nguyên văn
+  productUrl: string;
   thumbnail: string;
   originalPriceMin: number;
   originalPriceMax: number;
@@ -64,13 +84,15 @@ export interface ProductSearchResult {
   rating: number;
   highlights: { name: string; key: string; value: string }[];
   promotionLabel?: string;
+  defaultVariantId?: string;
+  variants?: { id: string; label: string }[];
 }
 
 export interface ProductDetailResult {
   id: string;
   name: string;
   slug: string;
-  productUrl: string; // URL đầy đủ, ghép sẵn từ backend — AI chỉ được copy nguyên văn
+  productUrl: string;
   thumbnail: string;
   description?: string;
   brand: string;
@@ -83,7 +105,13 @@ export interface ProductDetailResult {
   rating: number;
   promotionLabel?: string;
   specifications: { group: string; items: { name: string; value: string }[] }[];
-  variants: { label: string; originalPrice: number; price: number; inStock: boolean }[];
+  variants: {
+    id: string; // ← thêm id để FE dùng cho cart API
+    label: string;
+    originalPrice: number;
+    price: number;
+    inStock: boolean;
+  }[];
 }
 
 export interface PolicyResult {

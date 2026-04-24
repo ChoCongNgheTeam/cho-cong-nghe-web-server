@@ -1,381 +1,1078 @@
-<!-- http://localhost:3000/chatbox-test.html để chạy demo -->
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Test Chatbot - Chợ Công Nghệ</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        accent: '#2563eb',
+                        'accent-hover': '#1d4ed8',
+                        neutral: {
+                            DEFAULT: '#e5e7eb',
+                            light: '#f9fafb',
+                            'light-hover': '#f3f4f6',
+                            'light-active': '#ffffff',
+                            dark: '#374151'
+                        },
+                        primary: '#111827'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
-        :root {
-            --primary-color: #007bff; /* Màu xanh công nghệ */
-            --bg-color: #f4f7f6;
-            --chat-bg: #ffffff;
-            --text-color: #333;
-            --bot-msg-bg: #f1f1f1;
-            --user-msg-bg: #007bff;
-            --user-msg-text: #ffffff;
+        body { font-family: 'Inter', sans-serif; background-color: #f4f7f6; margin: 0; }
+
+        /* Animations from ChatButton.tsx */
+        @keyframes chatSlideIn {
+            from { opacity: 0; transform: scale(0.92) translateY(8px); }
+            to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes chatSlideUp {
+            from { opacity: 0; transform: translateY(100%); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes chatMsgIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes chatPulse {
+            0%, 100% { transform: scale(1); }
+            50%       { transform: scale(1.25); }
+        }
+        @keyframes dotBounce {
+            0%, 80%, 100% { transform: translateY(0); }
+            40%           { transform: translateY(-5px); }
         }
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-color);
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-
-        .chat-container {
-            width: 100%;
-            max-width: 450px;
-            height: 80vh;
-            background-color: var(--chat-bg);
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            border: 1px solid #eaeaea;
-        }
-
-        /* Header */
-        .chat-header {
-            background-color: var(--primary-color);
-            color: white;
-            padding: 15px 20px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            font-size: 16px;
-            font-weight: 600;
-        }
-        .chat-header .bot-avatar {
-            width: 40px;
-            height: 40px;
-            background-color: white;
-            color: var(--primary-color);
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 20px;
-        }
-        .chat-header .status {
-            font-size: 12px;
-            font-weight: 400;
-            opacity: 0.8;
-            display: block;
-        }
-
-        /* Vùng hiển thị tin nhắn */
-        .chat-messages {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            background-color: #fafafa;
-        }
-
-        /* Bong bóng chat chung */
-        .message {
-            max-width: 80%;
-            padding: 12px 16px;
-            border-radius: 15px;
-            font-size: 14.5px;
-            line-height: 1.5;
-            word-wrap: break-word;
-            animation: fadeIn 0.3s ease;
-        }
-
-        /* Bong bóng Bot */
-        .message.bot {
-            align-self: flex-start;
-            background-color: var(--bot-msg-bg);
-            color: var(--text-color);
-            border-bottom-left-radius: 5px;
-        }
+        .chat-panel-enter-desktop { animation: chatSlideIn 0.24s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+        .chat-panel-enter-mobile  { animation: chatSlideUp 0.28s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+        .chat-msg-enter   { animation: chatMsgIn 0.22s ease-out forwards; }
+        .chat-bubble      { transition: box-shadow 0.15s ease; }
+        .chat-bubble:hover{ box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
         
-        /* Chỉnh CSS cho Markdown trong bot message */
-        .message.bot p { margin: 0 0 8px 0; }
-        .message.bot p:last-child { margin: 0; }
-        .message.bot strong { color: #111; }
-        .message.bot ul { padding-left: 20px; margin: 5px 0; }
-        .message.bot img {
-            max-width: 100%;
-            max-height: 300px;
+        .dot-1 { animation: dotBounce 1.2s ease-in-out infinite 0ms; }
+        .dot-2 { animation: dotBounce 1.2s ease-in-out infinite 150ms; }
+        .dot-3 { animation: dotBounce 1.2s ease-in-out infinite 300ms; }
+        .unread-pulse { animation: chatPulse 1.8s ease-in-out infinite; }
+
+        /* Prose styles for markdown */
+        .prose-chat p  { margin: 0 0 0.25em; }
+        .prose-chat p:last-child { margin-bottom: 0; }
+        .prose-chat ul { margin: 0.2em 0; padding-left: 1.1em; list-style: disc; }
+        .prose-chat ul + ul { margin-top: 0; }
+        .prose-chat li { margin: 0; line-height: 1.5; }
+        .prose-chat strong { font-weight: 600; }
+        .prose-chat em { font-style: italic; }
+        .prose-chat code { font-family: monospace; background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+        
+        .chat-link { color: #2563eb; text-decoration: underline; text-underline-offset: 2px; }
+        .chat-link:hover { opacity: 0.75; }
+
+        .chat-img {
+            max-width: min(100%, 160px);
+            max-height: 110px;
             border-radius: 8px;
+            object-fit: contain;
             display: block;
-            margin: 8px 0;
+            margin: 4px 0;
+            background: #f5f5f5;
         }
 
-        /* Bong bóng User */
-        .message.user {
-            align-self: flex-end;
-            background-color: var(--user-msg-bg);
-            color: var(--user-msg-text);
-            border-bottom-right-radius: 5px;
-        }
-
-        /* Vùng nhập liệu */
-        .chat-input-area {
-            padding: 15px 20px;
-            background-color: white;
-            border-top: 1px solid #eee;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-
-        .chat-input-area input {
-            flex: 1;
-            padding: 12px 15px;
-            border: 1px solid #ddd;
-            border-radius: 25px;
-            outline: none;
-            font-size: 14px;
-            font-family: 'Inter', sans-serif;
-            transition: border-color 0.2s;
-        }
-
-        .chat-input-area input:focus {
-            border-color: var(--primary-color);
-        }
-
-        .chat-input-area button {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 18px;
-            transition: transform 0.2s, background-color 0.2s;
-        }
-
-        .chat-input-area button:hover {
-            transform: scale(1.05);
-            background-color: #0069d9;
-        }
-
-        .chat-input-area button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        /* Hiệu ứng gõ chữ (Loading) */
-        .typing-indicator {
+        .chat-mobile-backdrop {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 9998;
+            backdrop-filter: blur(2px);
             display: none;
-            align-self: flex-start;
-            background-color: var(--bot-msg-bg);
-            padding: 12px 16px;
-            border-radius: 15px;
-            border-bottom-left-radius: 5px;
-            gap: 5px;
-            align-items: center;
         }
-        .typing-indicator span {
-            width: 8px;
-            height: 8px;
-            background-color: #90949c;
-            border-radius: 50%;
-            animation: bounce 1.5s infinite ease-in-out both;
-        }
-        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
-        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
 
-        @keyframes bounce {
-            0%, 80%, 100% { transform: scale(0); }
-            40% { transform: scale(1); }
+        /* Window control dots */
+        .wc-btn {
+            width: 12px; height: 12px;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            transition: filter 0.15s, transform 0.1s; cursor: pointer; border: none; padding: 0; flex-shrink: 0;
         }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        .wc-btn:hover { filter: brightness(0.82); transform: scale(1.12); }
+        .wc-btn svg { opacity: 0; transition: opacity 0.15s; width: 7px; height: 7px; }
+        .wc-group:hover .wc-btn svg { opacity: 1; }
+        .wc-close  { background: #ff5f57; }
+        .wc-min    { background: #febc2e; }
+        .wc-max    { background: #28c840; }
+
+        .chat-textarea-ios {
+            font-size: 16px !important;
+            transform-origin: left top;
         }
+        @supports not (-webkit-touch-callout: none) {
+            .chat-textarea-ios { font-size: 14px !important; transform: none; }
+        }
+
+        .chat-newline-btn {
+            height: 36px; padding: 0 8px; border-radius: 8px;
+            border: 1px solid rgba(0,0,0,0.12); background: rgba(0,0,0,0.04);
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.15s, transform 0.1s; cursor: pointer; color: #666; flex-shrink: 0;
+        }
+        .chat-newline-btn:active { background: rgba(0,0,0,0.1); transform: scale(0.94); }
 
         /* Scrollbar gọn gàng */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 10px; }
+
+        /* Panel sizing variables */
+        :root {
+            --panel-width: 380px;
+            --panel-height: 540px;
+            --btn-size: 56px;
+        }
+
+        #chatPanel {
+            position: fixed;
+            bottom: 80px;
+            right: 22px;
+            width: var(--panel-width);
+            height: var(--panel-height);
+            z-index: 51;
+            transition: width 0.25s cubic-bezier(0.4,0,0.2,1), height 0.25s cubic-bezier(0.4,0,0.2,1);
+            display: none;
+        }
+
+        #chatPanel.is-maximized {
+            width: 580px;
+            height: calc(100vh - 32px);
+            max-height: 700px;
+        }
+
+        #chatToggleBtn {
+            position: fixed;
+            right: 22px;
+            bottom: 80px;
+            width: var(--btn-size);
+            height: var(--btn-size);
+            z-index: 10000;
+        }
+
+        /* Token Panel (outside chatbot) */
+        #tokenPanel {
+            position: fixed;
+            right: 22px;
+            bottom: 145px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            z-index: 9999;
+            max-width: 320px;
+            transition: all 0.3s ease;
+        }
+
+        #tokenPanel.collapsed {
+            width: 56px;
+            height: 56px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #tokenPanel.expanded {
+            width: 320px;
+            padding: 12px;
+        }
+
+        #tokenExpandBtn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s, transform 0.1s;
+            font-size: 18px;
+        }
+
+        #tokenExpandBtn:hover { background: #1d4ed8; }
+        #tokenExpandBtn:active { transform: scale(0.95); }
+
+        #tokenContent {
+            display: none;
+            animation: slideInUp 0.3s ease-out;
+        }
+
+        #tokenPanel.expanded #tokenContent {
+            display: block;
+        }
+
+        #tokenContent .text-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+
+        #tokenContent .token-controls {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        #tokenContent input {
+            flex: 1;
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+            font-size: 10px;
+            font-family: 'Courier New', monospace;
+        }
+
+        #tokenContent input:focus {
+            outline: none;
+            border-color: #2563eb;
+            background: #f0f9ff;
+        }
+
+        #tokenContent button {
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: none;
+            font-size: 10px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        #tokenSaveBtn {
+            background: #2563eb;
+            color: white;
+        }
+
+        #tokenSaveBtn:hover { background: #1d4ed8; }
+        #tokenSaveBtn:active { transform: scale(0.95); }
+
+        #tokenClearBtn {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        #tokenClearBtn:hover { background: #fecaca; }
+        #tokenClearBtn:active { transform: scale(0.95); }
+
+        #tokenStatus {
+            font-size: 9px;
+            color: #666;
+            margin-top: 6px;
+            padding: 4px;
+            border-radius: 4px;
+            background: #f9fafb;
+        }
+
+        @keyframes slideInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            #tokenPanel {
+                bottom: calc(145px + env(safe-area-inset-bottom));
+            }
+        }
+
+        @media (max-width: 768px) {
+            #chatPanel {
+                bottom: 0 !important; right: 0 !important;
+                width: 100% !important; height: 100% !important;
+                border-radius: 0 !important;
+                padding-bottom: env(safe-area-inset-bottom);
+                z-index: 9999;
+            }
+            #chatToggleBtn {
+                bottom: calc(130px + env(safe-area-inset-bottom));
+            }
+            .chat-mobile-backdrop.show { display: block; }
+            .desktop-controls { display: none !important; }
+            .mobile-controls { display: flex !important; }
+        }
+
+        /* Toast notification styles */
+        #toastContainer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 50000;
+            max-width: 380px;
+        }
+
+        .toast {
+            background: white;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .toast.success {
+            border-left: 4px solid #10b981;
+        }
+
+        .toast.error {
+            border-left: 4px solid #ef4444;
+        }
+
+        .toast.warning {
+            border-left: 4px solid #f59e0b;
+        }
+
+        .toast-icon {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toast.success .toast-icon { color: #10b981; }
+        .toast.error .toast-icon { color: #ef4444; }
+        .toast.warning .toast-icon { color: #f59e0b; }
+
+        .toast-text {
+            font-size: 14px;
+            color: #333;
+            flex: 1;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes slideOut {
+            from { opacity: 1; transform: translateX(0); }
+            to { opacity: 0; transform: translateX(20px); }
+        }
+
+        .toast.removing {
+            animation: slideOut 0.3s ease-out;
+        }
+    
     </style>
 </head>
 <body>
 
-    <div class="chat-container">
-        <div class="chat-header">
-            <div class="bot-avatar">
-                <i class="fa-solid fa-robot"></i>
+    <div id="toastContainer"></div>
+
+    <div class="chat-mobile-backdrop" id="mobileBackdrop"></div>
+
+    <div id="chatPanel" class="rounded-2xl border border-neutral bg-neutral-light shadow-2xl overflow-hidden flex flex-col chat-panel-enter-desktop">
+        <div class="bg-accent px-4 flex items-center justify-between shrink-0 select-none py-3" id="chatHeader">
+            <div class="flex items-center gap-2.5 pointer-events-none">
+                <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center overflow-hidden shrink-0">
+                    <i data-lucide="bot" class="text-white" style="width: 20px; height: 20px;"></i>
+                </div>
+                <div>
+                    <p class="text-white text-[13px] font-semibold leading-tight">Trợ lý Chợ Công Nghệ</p>
+                    <p class="text-white/70 text-[11px]">Trả lời tức thì · AI</p>
+                </div>
             </div>
-            <div>
-                <div>Chợ Công Nghệ AI</div>
-                <span class="status"><i class="fa-solid fa-circle" style="color: #4ade80; font-size: 8px; margin-right: 4px;"></i>Đang trực tuyến</span>
+
+            <div class="flex items-center gap-2">
+                <button id="clearHistoryBtn" title="Xóa lịch sử" class="text-white/60 hover:text-white transition-colors cursor-pointer p-1.5 rounded-md hover:bg-white/10 mr-1 hidden">
+                    <i data-lucide="rotate-ccw" style="width: 13px; height: 13px;"></i>
+                </button>
+
+                <div class="wc-group flex items-center gap-1.5 desktop-controls">
+                    <button class="wc-btn wc-close" id="closePanelBtnDesktop" title="Đóng">
+                        <svg viewBox="0 0 8 8" fill="none" stroke="#8B0000" stroke-width="1.5" stroke-linecap="round"><line x1="1.5" y1="1.5" x2="6.5" y2="6.5" /><line x1="6.5" y1="1.5" x2="1.5" y2="6.5" /></svg>
+                    </button>
+                    <button class="wc-btn wc-min" id="minPanelBtn" title="Thu nhỏ">
+                        <svg viewBox="0 0 8 8" fill="none" stroke="#7A5200" stroke-width="1.5" stroke-linecap="round"><line x1="1.5" y1="4" x2="6.5" y2="4" /></svg>
+                    </button>
+                    <button class="wc-btn wc-max" id="maxPanelBtn" title="Phóng to">
+                        <i data-lucide="maximize-2" color="#0A5C00" stroke-width="2.5" style="width: 7px; height: 7px;"></i>
+                    </button>
+                </div>
+
+                <button id="closePanelBtnMobile" class="text-white/70 hover:text-white transition-colors cursor-pointer p-1.5 rounded-md hover:bg-white/10 hidden mobile-controls">
+                    <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+                </button>
             </div>
         </div>
 
-        <div class="chat-messages" id="chatMessages">
-            <div class="message bot">
-                Xin chào! Mình là trợ lý AI của Chợ Công Nghệ 👋<br/>
-                Mình có thể giúp bạn:<br/>
-                📱 Tìm kiếm điện thoại, laptop, máy tính bảng<br/>
-                🏠 Tìm kiếm điện máy (tivi, máy giặt, tủ lạnh, máy lạnh...)<br/>
-                🎧 Gợi ý tai nghe, loa, phụ kiện công nghệ<br/>
-                💰 Tư vấn giá, khuyến mãi, chính sách<br/>
-                <br/>Hỏi mình gì đi nào? 😊
+        <div id="chatMessages" class="flex-1 overflow-y-auto flex flex-col gap-2.5 px-3 py-3 bg-neutral-light-hover min-h-0">
+            <div id="welcomeScreen" class="flex flex-col items-center justify-center h-full gap-2 text-center px-4">
+                <div class="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center mb-1 overflow-hidden">
+                    <i data-lucide="bot" class="text-accent" style="width: 32px; height: 32px;"></i>
+                </div>
+                <p class="text-[13px] text-primary font-semibold">Xin chào! 👋</p>
+                <p class="text-[13px] text-primary leading-relaxed">Tôi có thể tư vấn sản phẩm, giá cả và tình trạng hàng cho bạn.</p>
             </div>
-            
-            <div class="typing-indicator" id="typingIndicator">
-                <span></span><span></span><span></span>
+
+            <div id="typingIndicator" class="hidden items-end gap-1.5 chat-msg-enter">
+                <div class="w-6 h-6 rounded-full bg-accent/10 shrink-0 flex items-center justify-center">
+                    <i data-lucide="bot" class="text-accent" style="width: 12px; height: 12px;"></i>
+                </div>
+                <div class="bg-white border border-neutral rounded-2xl rounded-bl-sm px-3.5 py-3 shadow-sm">
+                    <div class="flex gap-1 items-center">
+                        <span class="w-1.5 h-1.5 rounded-full bg-neutral-dark/35 dot-1"></span>
+                        <span class="w-1.5 h-1.5 rounded-full bg-neutral-dark/35 dot-2"></span>
+                        <span class="w-1.5 h-1.5 rounded-full bg-neutral-dark/35 dot-3"></span>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="chat-input-area">
-            <input type="text" id="userInput" placeholder="VD: Có iPhone 15 không? Tìm laptop gaming dưới 20 triệu, Giá máy lạnh..." autocomplete="off">
-            <button id="sendBtn" onclick="sendMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+        <div id="quickReplies" class="px-3 pt-2 pb-2 flex flex-wrap gap-1.5 border-t border-neutral bg-neutral-light shrink-0">
+            </div>
+
+        <div class="px-3 py-3 border-t border-neutral flex items-end gap-2 bg-neutral-light shrink-0">
+            <textarea
+                id="userInput"
+                rows="1"
+                placeholder="Nhập tin nhắn... (Shift+Enter để xuống hàng)"
+                autocomplete="off"
+                spellcheck="false"
+                class="flex-1 px-3 py-2 rounded-lg bg-neutral-light-active text-primary placeholder:text-neutral-dark/90 border border-neutral focus:outline-none focus:border-accent/50 transition-colors disabled:cursor-not-allowed resize-none overflow-y-auto leading-relaxed chat-textarea-ios"
+                style="min-height: 36px; max-height: 120px;"
+            ></textarea>
+
+            <button id="mobileNewlineBtn" title="Xuống hàng" class="chat-newline-btn hidden mobile-controls" aria-label="Xuống hàng">
+                <i data-lucide="corner-down-left" style="width: 14px; height: 14px; stroke-width: 2;"></i>
+            </button>
+
+            <button id="sendBtn" class="w-8 h-8 rounded-lg bg-accent flex items-center justify-center cursor-pointer shrink-0 transition-all duration-150 disabled:opacity-35 disabled:cursor-not-allowed hover:bg-accent-hover active:scale-95" disabled>
+                <i data-lucide="send" class="text-white" style="width: 13px; height: 13px; stroke-width: 2;"></i>
+            </button>
+        </div>
+    </div>
+
+    <button id="chatToggleBtn" class="relative rounded-full bg-white border border-neutral-100 flex items-center justify-center shadow-[0_8px_30px_rgb(0,0,0,0.14)] hover:shadow-[0_12px_36px_rgb(0,0,0,0.20)] transition-all duration-300 select-none active:scale-90 overflow-visible">
+        <span id="unreadBadge" class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white z-10 unread-pulse hidden"></span>
+        <span id="onlineBadge" class="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white z-10"></span>
+        
+        <div id="btnIconBot" class="transition-all duration-300">
+            <i data-lucide="bot" class="text-accent" style="width: 32px; height: 32px;"></i>
+        </div>
+        <div id="btnIconClose" class="hidden transition-all duration-300">
+            <i data-lucide="x" class="text-neutral-600" style="width: 18px; height: 18px; stroke-width: 2.5;"></i>
+        </div>
+    </button>
+
+    <!-- Token Panel (Outside Chatbot) -->
+    <div id="tokenPanel" class="collapsed">
+        <button id="tokenExpandBtn" title="Mở token panel">🔑</button>
+        <div id="tokenContent">
+            <div class="text-title">Auth Token</div>
+            <div class="token-controls">
+                <input 
+                    id="tokenInput"
+                    type="password"
+                    placeholder="Dán token tại đây..."
+                />
+                <button id="tokenSaveBtn" title="Lưu token">Lưu</button>
+                <button id="tokenClearBtn" title="Xóa token">✕</button>
+            </div>
+            <div id="tokenStatus">Chưa có token</div>
         </div>
     </div>
 
     <script>
         // ╔════════════════════════════════════════════════════════════════╗
         // ║ CHO CÔNG NGHỆ CHATBOT TEST CLIENT                             ║
-        // ║ BE Update: AI render thumbnail + productUrl (v3.2)            ║
-        // ║ API contract giữ nguyên: POST /api/v1/chatbot                ║
         // ╚════════════════════════════════════════════════════════════════╝
-        
-        // CẤU HÌNH API - Chú ý sửa cổng (PORT) nếu server chạy khác
-        const API_URL = 'http://localhost:5000/api/v1/chatbot'; 
-        
-        // Mảy lưu trữ lịch sử tin nhắn để gửi lên server
-        // Backend sẽ:
-        // 1. Lấy 10 turn gần nhất (20 messages)
-        // 2. Gọi OpenAI tool-calling với Business Rules
-        // 3. Execute tools (search_products, get_product_detail, v.v.)
-        // 4. Trả lời tự nhiên dựa trên dữ liệu thực tế
-        let chatHistory = [];
+        const API_URL = 'http://localhost:5000/api/v1/chatbot';
+        const CART_API_URL = 'http://localhost:5000/api/v1/cart';
+        const STORAGE_KEY = "cho-cong-nghe:chat-history";
+        const AUTH_TOKEN_KEY = "cho-cong-nghe:auth-token";
+        const QUICK_REPLIES = ["Có iPhone 15 không?", "Laptop dưới 15 triệu?", "Tai nghe không dây tốt?", "Chuột gaming giá rẻ?"];
 
+        // State Variables
+        let chatHistory = [];
+        let isPanelOpen = false;
+        let isMaximized = false;
+        let isMobile = window.innerWidth <= 768;
+        let isLoading = false;
+
+        // DOM Elements
+        const chatPanel = document.getElementById('chatPanel');
+        const chatToggleBtn = document.getElementById('chatToggleBtn');
         const chatMessages = document.getElementById('chatMessages');
         const userInput = document.getElementById('userInput');
         const sendBtn = document.getElementById('sendBtn');
         const typingIndicator = document.getElementById('typingIndicator');
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        const quickRepliesDiv = document.getElementById('quickReplies');
+        const mobileBackdrop = document.getElementById('mobileBackdrop');
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+        const btnIconBot = document.getElementById('btnIconBot');
+        const btnIconClose = document.getElementById('btnIconClose');
+        const unreadBadge = document.getElementById('unreadBadge');
+        const onlineBadge = document.getElementById('onlineBadge');
 
-        // Bắt sự kiện nhấn Enter để gửi
-        userInput.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
-
-        async function sendMessage() {
-            const text = userInput.value.trim();
-            if (!text) return;
-
-            // 1. Hiển thị tin nhắn của User lên UI
-            appendMessage('user', text);
-            userInput.value = '';
+        // Toast Notification System
+        function showToast(message, type = 'success', duration = 3000) {
+            const toastContainer = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
             
-            // Thêm vào lịch sử (để gửi API)
-            chatHistory.push({ role: 'user', content: text });
+            const iconMap = {
+                success: '✓',
+                error: '✕',
+                warning: '!'
+            };
+            
+            toast.innerHTML = `
+                <div class="toast-icon">${iconMap[type] || '•'}</div>
+                <div class="toast-text">${message}</div>
+            `;
+            
+            toastContainer.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('removing');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
 
-            // 2. Hiện trạng thái đang gõ và khóa nút gửi
-            showTyping(true);
+        // Add to Cart Function
+        async function addToCart(productVariantId, productName = 'Sản phẩm') {
+            // Check if user is authenticated
+            const token = localStorage.getItem(AUTH_TOKEN_KEY);
+            
+            if (!token) {
+                showToast('Vui lòng đăng nhập để thêm vào giỏ hàng', 'warning', 4000);
+                return false;
+            }
 
             try {
-                // 3. Gọi API với messages (Backend sẽ lấy 10 turn gần nhất)
-                const payload = { messages: chatHistory };
-                console.log('📤 Gửi request đến:', API_URL);
-                console.log('📤 Payload:', JSON.stringify(payload, null, 2));
-                
-                const response = await fetch(API_URL, {
+                const response = await fetch(CART_API_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({
+                        productVariantId: productVariantId,
+                        quantity: 1
+                    })
                 });
 
-                console.log('📥 Response status:', response.status);
-                const responseText = await response.text();
-                
-                let result;
-                try {
-                    result = JSON.parse(responseText);
-                } catch (parseError) {
-                    console.error('❌ JSON parse error:', parseError);
-                    appendMessage('bot', `❌ Lỗi server (${response.status}): ${responseText.substring(0, 200)}`);
-                    return;
-                }
+                const result = await response.json();
 
-                if (response.ok && result.success) {
-                    const botReply = result.data.reply;
-                    
-                    // Thêm phản hồi của bot vào lịch sử
-                    chatHistory.push({ role: 'assistant', content: botReply });
-                    
-                    // Hiển thị tin nhắn bình thường (Markdown)
-                    const parsedHtml = marked.parse(botReply);
-                    appendMessage('bot', parsedHtml, true);
-                    
-                    // Debug: Log tools được sử dụng
-                    if (result.data.toolsUsed && result.data.toolsUsed.length > 0) {
-                        console.log('🔨 Tools đã sử dụng:', result.data.toolsUsed.join(', '));
-                    }
+                if (response.ok || response.status === 201) {
+                    showToast(`✓ Đã thêm ${productName} vào giỏ hàng`, 'success', 3000);
+                    return true;
                 } else {
-                    const errorMsg = result.message || `Server error ${response.status}`;
-                    appendMessage('bot', '❌ ' + errorMsg);
-                    console.error('API Error:', result);
+                    const errorMsg = result.message || 'Không thể thêm vào giỏ hàng';
+                    showToast(`✕ ${errorMsg}`, 'error', 3000);
+                    return false;
                 }
-
             } catch (error) {
-                appendMessage('bot', `❌ Lỗi mạng: ${error.message}`);
-                console.error('Network Error:', error);
-            } finally {
-                // 4. Tắt trạng thái đang gõ
-                showTyping(false);
+                console.error('Add to cart error:', error);
+                showToast('✕ Lỗi kết nối. Vui lòng thử lại', 'error', 3000);
+                return false;
             }
         }
 
-        function appendMessage(sender, text, isHtml = false) {
-            const messageDiv = document.createElement('div');
-            messageDiv.classList.add('message', sender);
+        // Token Management Functions
+        function updateTokenStatus() {
+            const token = localStorage.getItem(AUTH_TOKEN_KEY);
+            const statusDiv = document.getElementById('tokenStatus');
+            const tokenInput = document.getElementById('tokenInput');
             
-            if (isHtml) {
-                messageDiv.innerHTML = text; // Render HTML nếu là Markdown đã parse
+            if (token) {
+                const displayToken = token.substring(0, 20) + '...' + token.substring(token.length - 10);
+                statusDiv.innerHTML = `<span style="color: #10b981;">✓ Token đã lưu: ${displayToken}</span>`;
+                tokenInput.value = token;
             } else {
-                messageDiv.textContent = text; // Chống XSS cho tin nhắn user
+                statusDiv.innerHTML = '<span style="color: #666;">Chưa có token</span>';
+                tokenInput.value = '';
+            }
+        }
+
+        function saveToken() {
+            const tokenInput = document.getElementById('tokenInput');
+            const token = tokenInput.value.trim();
+            
+            if (!token) {
+                showToast('⚠️ Vui lòng nhập token', 'warning', 2000);
+                return;
+            }
+            
+            localStorage.setItem(AUTH_TOKEN_KEY, token);
+            updateTokenStatus();
+            showToast('✓ Token đã được lưu', 'success', 2000);
+        }
+
+        function clearToken() {
+            localStorage.removeItem(AUTH_TOKEN_KEY);
+            updateTokenStatus();
+            showToast('✓ Token đã được xóa', 'success', 2000);
+        }
+
+        function toggleTokenPanel() {
+            const tokenPanel = document.getElementById('tokenPanel');
+            tokenPanel.classList.toggle('collapsed');
+            tokenPanel.classList.toggle('expanded');
+        }
+
+        // Khởi tạo
+        function init() {
+            lucide.createIcons();
+            loadHistory();
+            renderQuickReplies();
+            checkMobile();
+            updateTokenStatus();
+            window.addEventListener("resize", checkMobile);
+            
+            // Token button listeners
+            document.getElementById('tokenSaveBtn').addEventListener('click', saveToken);
+            document.getElementById('tokenClearBtn').addEventListener('click', clearToken);
+            document.getElementById('tokenExpandBtn').addEventListener('click', toggleTokenPanel);
+            
+            // Allow Enter to save token
+            document.getElementById('tokenInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') saveToken();
+            });
+        }
+
+        function checkMobile() {
+            isMobile = window.innerWidth <= 768;
+            if(isMobile) {
+                if(isPanelOpen) document.body.style.overflow = "hidden";
+                userInput.placeholder = "Nhập tin nhắn...";
+            } else {
+                document.body.style.overflow = "";
+                userInput.placeholder = "Nhập tin nhắn... (Shift+Enter để xuống hàng)";
+            }
+        }
+
+        // Logic Mở/Đóng Panel
+        chatToggleBtn.addEventListener('click', togglePanel);
+        document.getElementById('closePanelBtnDesktop').addEventListener('click', togglePanel);
+        document.getElementById('closePanelBtnMobile').addEventListener('click', togglePanel);
+        document.getElementById('minPanelBtn').addEventListener('click', togglePanel);
+        mobileBackdrop.addEventListener('click', togglePanel);
+
+        function togglePanel() {
+            isPanelOpen = !isPanelOpen;
+            if (isPanelOpen) {
+                chatPanel.style.display = 'flex';
+                btnIconBot.classList.add('hidden');
+                btnIconClose.classList.remove('hidden');
+                onlineBadge.classList.add('hidden');
+                unreadBadge.classList.add('hidden');
+                if(isMobile) document.body.style.overflow = "hidden";
+                mobileBackdrop.classList.add('show');
+                
+                chatPanel.className = `rounded-2xl border border-neutral bg-neutral-light shadow-2xl overflow-hidden flex flex-col ${isMobile ? 'chat-panel-enter-mobile' : 'chat-panel-enter-desktop'}`;
+                
+                setTimeout(() => userInput.focus(), 150);
+                scrollToBottom();
+            } else {
+                chatPanel.style.display = 'none';
+                btnIconBot.classList.remove('hidden');
+                btnIconClose.classList.add('hidden');
+                onlineBadge.classList.remove('hidden');
+                document.body.style.overflow = "";
+                mobileBackdrop.classList.remove('show');
+            }
+        }
+
+        // Phóng to/Thu nhỏ (Desktop)
+        document.getElementById('maxPanelBtn').addEventListener('click', () => {
+            isMaximized = !isMaximized;
+            if (isMaximized) {
+                chatPanel.classList.add('is-maximized');
+                document.getElementById('maxPanelBtn').innerHTML = '<i data-lucide="minimize-2" color="#0A5C00" stroke-width="2.5" style="width: 7px; height: 7px;"></i>';
+            } else {
+                chatPanel.classList.remove('is-maximized');
+                document.getElementById('maxPanelBtn').innerHTML = '<i data-lucide="maximize-2" color="#0A5C00" stroke-width="2.5" style="width: 7px; height: 7px;"></i>';
+            }
+            lucide.createIcons();
+        });
+
+        // Xử lý Input
+        userInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+            sendBtn.disabled = this.value.trim() === '' || isLoading;
+        });
+
+        userInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                if (isMobile) return; // Mobile dùng phím Enter trên bàn phím để xuống dòng
+                if (!e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            }
+        });
+
+        // Nút xuống dòng riêng cho Mobile
+        document.getElementById('mobileNewlineBtn').addEventListener('click', () => {
+            const start = userInput.selectionStart;
+            const end = userInput.selectionEnd;
+            const val = userInput.value;
+            userInput.value = val.substring(0, start) + "\n" + val.substring(end);
+            userInput.focus();
+            userInput.selectionEnd = start + 1;
+            userInput.dispatchEvent(new Event('input'));
+        });
+
+        sendBtn.addEventListener('click', () => sendMessage());
+
+        // Quick Replies
+        function renderQuickReplies() {
+            if (chatHistory.length > 0) {
+                quickRepliesDiv.style.display = 'none';
+                return;
+            }
+            quickRepliesDiv.style.display = 'flex';
+            quickRepliesDiv.innerHTML = QUICK_REPLIES.map(q => 
+                `<button type="button" onclick="sendMessage('${q}')" class="text-[11px] px-2.5 py-1 rounded-full border border-accent/30 text-accent bg-accent/5 hover:bg-accent/15 active:scale-95 transition-all cursor-pointer whitespace-nowrap">${q}</button>`
+            ).join('');
+        }
+
+        // Clear History
+        clearHistoryBtn.addEventListener('click', () => {
+            chatHistory = [];
+            localStorage.removeItem(STORAGE_KEY);
+            document.querySelectorAll('.message-bubble').forEach(el => el.remove());
+            welcomeScreen.style.display = 'flex';
+            clearHistoryBtn.classList.add('hidden');
+            renderQuickReplies();
+        });
+
+        // Parse Text Format từ BE
+        function cleanContent(text) {
+            return text.replace(/\\n/g, "\n").replace(/\n{3,}/g, "\n\n").replace(/[ \t]+$/gm, "").trim();
+        }
+
+        // Logic phân tích Product Cards
+        function parseProductCards(text) {
+            const blocks = text.split(/\n(?=\d+\.\s)/);
+            if (blocks.length < 2) return null;
+
+            const cards = [];
+            for (const block of blocks) {
+                const card = { highlights: [] };
+
+                const imgMatch = block.match(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/);
+                if (imgMatch) { card.imageAlt = imgMatch[1]; card.image = imgMatch[2]; }
+
+                const nameMatch = block.match(/\*\*(?:Tên|Name):\*\*\s*(.+)/);
+                if (nameMatch) { card.name = nameMatch[1].trim(); } 
+                else {
+                    const boldMatch = block.match(/\*\*([^*]+)\*\*/);
+                    if (boldMatch && !boldMatch[1].startsWith("Giá") && !boldMatch[1].startsWith("Khuyến")) {
+                        card.name = boldMatch[1].trim();
+                    }
+                }
+
+                const priceMatch = block.match(/\*\*(?:Giá|Price):\*\*\s*(.+)/);
+                if (priceMatch) card.price = priceMatch[1].trim();
+
+                const promoMatch = block.match(/\*\*(?:Khuyến mãi|Promo):\*\*\s*(.+)/);
+                if (promoMatch) card.promo = promoMatch[1].trim();
+
+                const linkMatches = [...block.matchAll(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g)];
+                if (linkMatches.length > 0) {
+                    const last = linkMatches[linkMatches.length - 1];
+                    card.linkLabel = last[1];
+                    card.link = last[2];
+                }
+
+                const highlightMatches = [...block.matchAll(/^\s*-\s+(.+)$/gm)];
+                for (const m of highlightMatches) { card.highlights.push(m[1].trim()); }
+
+                if (card.name || card.image) cards.push(card);
+            }
+            return cards.length >= 2 ? cards : null;
+        }
+
+        function renderProductCardHTML(cards) {
+            return `<div class="flex flex-col gap-2 w-full">` + cards.map(card => `
+                <div class="bg-white border border-neutral rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex gap-0">
+                        ${card.image ? `
+                        <div class="w-[68px] shrink-0 bg-neutral-50 flex items-center justify-center p-1">
+                            <img src="${card.image}" alt="${card.imageAlt || 'Product'}" class="w-full h-[60px] object-contain" loading="lazy" onerror="this.style.display='none'" />
+                        </div>` : ''}
+                        <div class="flex-1 p-2 min-w-0">
+                            ${card.name ? `<p class="text-[11.5px] font-semibold text-neutral-800 leading-tight line-clamp-2 mb-1">${card.name}</p>` : ''}
+                            ${card.price ? `<p class="text-[12px] font-bold text-accent mb-1">${card.price}</p>` : ''}
+                            ${card.highlights.length > 0 ? `<ul class="flex flex-col gap-0.5 mb-1">
+                                ${card.highlights.slice(0, 3).map(h => `<li class="text-[10.5px] text-neutral-600 flex items-start gap-1"><span class="mt-0.5 shrink-0 text-accent">•</span><span class="line-clamp-1">${h}</span></li>`).join('')}
+                            </ul>` : ''}
+                            <div class="flex items-center justify-between gap-2 mt-1.5">
+                                ${card.promo ? `<span class="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded-full font-medium shrink-0">${card.promo}</span>` : '<span></span>'}
+                                ${card.link ? `<a href="${card.link}" target="_blank" class="ml-auto text-[10.5px] px-2.5 py-1 rounded-lg bg-accent text-white font-medium hover:bg-accent-hover transition-colors whitespace-nowrap shrink-0">${card.linkLabel || 'Xem chi tiết'}</a>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('') + `</div>`;
+        }
+
+        // Trình dựng UI cho thẻ sản phẩm từ API (dữ liệu cấu trúc) - ĐÃ LÀM ĐẸP
+       // Trình dựng UI cho thẻ sản phẩm từ API (dữ liệu cấu trúc) - ĐÃ TÍCH HỢP DROPDOWN
+function renderStructuredProductCards(products) {
+    const formatPrice = (price) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(price);
+    
+    return `<div class="flex flex-col gap-2.5 w-full mt-1">` + products.map(product => {
+        const priceDisplay = product.priceMin === product.priceMax 
+            ? formatPrice(product.priceMin)
+            : `${formatPrice(product.priceMin)} - ${formatPrice(product.priceMax)}`;
+        
+        const originalPriceDisplay = formatPrice(product.originalPriceMin);
+        const hasDiscount = product.priceMin < product.originalPriceMin;
+        const discountPercent = hasDiscount ? Math.round(((product.originalPriceMin - product.priceMin) / product.originalPriceMin) * 100) : 0;
+        
+        // ─── XỬ LÝ KHU VỰC NÚT BẤM VÀ DROPDOWN ───
+        let actionArea = '';
+        
+        if (product.variants && product.variants.length > 0) {
+            // Tạo ID ngẫu nhiên cho thẻ select để tránh lỗi click nhầm nếu bot render 2 máy giống nhau
+            const selectId = `sel-${product.id}-${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Tạo danh sách các tuỳ chọn (options)
+            const options = product.variants.map(v => `<option value="${v.id}">${v.label}</option>`).join('');
+            
+            // Giao diện Dropdown (select) + Nút Thêm
+            actionArea = `
+                <div class="flex flex-col gap-1.5 mt-2">
+                    <select id="${selectId}" class="w-full text-[11.5px] px-2.5 py-1.5 rounded-lg border border-neutral bg-neutral-50 text-neutral-dark focus:outline-none focus:border-accent appearance-none cursor-pointer shadow-sm" style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%236b7280%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right 8px top 50%; background-size: 8px auto;">
+                        ${options}
+                    </select>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="addToCart(document.getElementById('${selectId}').value, '${product.name.replace(/'/g, "\\'")}'); return false;" class="flex-1 flex items-center justify-center gap-1 text-[11.5px] px-2 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold hover:bg-emerald-100 transition-colors active:scale-95 shadow-sm" title="Thêm vào giỏ hàng">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                            Thêm vào giỏ
+                        </button>
+                        <a href="${product.productUrl}" target="_blank" class="w-[30px] h-[30px] flex items-center justify-center rounded-lg bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-colors shrink-0 shadow-sm" title="Xem chi tiết">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                        </a>
+                    </div>
+                </div>
+            `;
+        } else if (product.defaultVariantId) {
+            // Fallback: 1 Nút mua ngay nếu SP chỉ có 1 option duy nhất
+            actionArea = `
+                <div class="flex items-center gap-1.5 mt-2">
+                    <button onclick="addToCart('${product.defaultVariantId}', '${product.name.replace(/'/g, "\\'")}'); return false;" class="flex-1 flex items-center justify-center gap-1 text-[11.5px] px-2 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold hover:bg-emerald-100 transition-colors active:scale-95 shadow-sm" title="Thêm vào giỏ hàng">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                        Mua ngay
+                    </button>
+                    <a href="${product.productUrl}" target="_blank" class="w-[30px] h-[30px] flex items-center justify-center rounded-lg bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-colors shrink-0 shadow-sm" title="Xem chi tiết">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                    </a>
+                </div>
+            `;
+        } else {
+            // Fallback: search_products bình thường
+            actionArea = `
+                <div class="flex items-center gap-1.5 mt-2">
+                    <a href="${product.productUrl}" target="_blank" class="flex-1 flex items-center justify-center gap-1 text-[11.5px] px-2 py-1.5 rounded-lg bg-accent/10 border border-accent/20 text-accent font-semibold hover:bg-accent/20 transition-colors shadow-sm">Xem tuỳ chọn</a>
+                </div>
+            `;
+        }
+        
+        return `
+        <div class="bg-white border border-neutral rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all">
+            <div class="flex gap-2.5 p-2.5">
+                <div class="w-[76px] shrink-0 bg-neutral-50 rounded-lg flex items-center justify-center p-1.5 relative border border-black/5">
+                    ${hasDiscount ? `<div class="absolute -top-1 -left-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-br-lg rounded-tl-lg z-10 shadow-sm">-${discountPercent}%</div>` : ''}
+                    <img src="${product.thumbnail}" alt="${product.name}" class="w-full h-[64px] object-contain mix-blend-multiply" loading="lazy" onerror="this.style.display='none'" />
+                    ${!product.inStock ? '<div class="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center rounded-lg"><span class="bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">Hết hàng</span></div>' : ''}
+                </div>
+                <div class="flex-1 min-w-0 flex flex-col justify-between">
+                    <div>
+                        <p class="text-[12px] font-semibold text-neutral-800 leading-snug line-clamp-2 mb-1">${product.name}</p>
+                        <div class="flex items-baseline gap-1.5 mb-0.5">
+                            <p class="text-[13.5px] font-bold text-accent">${priceDisplay}</p>
+                            ${hasDiscount ? `<p class="text-[10.5px] text-neutral-400 line-through">${originalPriceDisplay}</p>` : ''}
+                        </div>
+                        ${product.promotionLabel ? `<p class="text-[10.5px] text-emerald-600 font-medium line-clamp-1 flex items-center gap-1"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"></polyline><rect width="20" height="5" x="2" y="7"></rect><line x1="12" x2="12" y1="22" y2="7"></line><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg> ${product.promotionLabel}</p>` : ''}
+                    </div>
+                    ${actionArea}
+                </div>
+            </div>
+        </div>
+        `;
+    }).join('') + `</div>`;
+}
+        // Hiển thị tin nhắn lên UI (hỗ trợ cả markdown và structured product data)
+        function appendMessage(role, content, products = null) {
+            welcomeScreen.style.display = 'none';
+            clearHistoryBtn.classList.remove('hidden');
+            quickRepliesDiv.style.display = 'none';
+
+            const isUser = role === 'user';
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message-bubble flex items-end gap-1.5 chat-msg-enter ${isUser ? "flex-row-reverse" : "flex-row"}`;
+            
+            let htmlContent = '';
+            
+            if (isUser) {
+                const safeContent = content.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                htmlContent = `<div class="max-w-[82%] px-3 py-2 rounded-2xl text-[12.5px] leading-relaxed chat-bubble bg-accent text-white rounded-br-sm whitespace-pre-wrap">${safeContent}</div>`;
+            } else {
+                const cleanedContent = cleanContent(content);
+                
+                if (products && products.length > 0) {
+                    let introText = cleanedContent;
+                    if (cleanedContent.match(/^\d+\.\s/m)) {
+                        introText = cleanedContent.split('\n\n')[0] || cleanedContent.substring(0, 100);
+                    }
+                    introText = introText.replace(/^\d+\.\s.+/gm, '').trim();
+                    
+                    // XỬ LÝ MARKDOWN CHO TEXT GIỚI THIỆU & BỌC BUBBLE TRẮNG
+                    let introHtml = '';
+                    if (introText) {
+                        let parsedIntro = marked.parse(introText);
+                        parsedIntro = parsedIntro.replace(/<a /g, '<a target="_blank" class="chat-link" ').replace(/<img /g, '<img class="chat-img" loading="lazy" ');
+                        introHtml = `<div class="w-fit max-w-[100%] px-3 py-2 rounded-2xl text-[12.5px] leading-relaxed chat-bubble bg-white text-neutral-dark border border-neutral rounded-bl-sm shadow-sm prose-chat">${parsedIntro}</div>`;
+                    }
+                    
+                    htmlContent = `<div class="flex-1 min-w-[240px] flex flex-col gap-1.5">
+                        ${introHtml}
+                        ${renderStructuredProductCards(products)}
+                    </div>`;
+                } else {
+                    // Fallback: parse markdown bình thường
+                    const productCards = parseProductCards(cleanedContent);
+                    
+                    if (productCards) {
+                        let introText = "";
+                        const introMatch = cleanedContent.match(/^([^1-9\n][^\n]*\n?)/);
+                        if (introMatch) {
+                            let parsedIntro = marked.parse(introMatch[1].trim());
+                            introText = `<div class="w-fit max-w-[100%] px-3 py-2 rounded-2xl text-[12.5px] leading-relaxed chat-bubble bg-white text-neutral-dark border border-neutral rounded-bl-sm shadow-sm prose-chat">${parsedIntro}</div>`;
+                        }
+                        
+                        htmlContent = `<div class="flex-1 min-w-[240px] flex flex-col gap-1.5">${introText}${renderProductCardHTML(productCards)}</div>`;
+                    } else {
+                        let parsedMarkdown = marked.parse(cleanedContent);
+                        parsedMarkdown = parsedMarkdown.replace(/<a /g, '<a target="_blank" class="chat-link" ').replace(/<img /g, '<img class="chat-img" loading="lazy" ');
+                        
+                        htmlContent = `<div class="max-w-[82%] px-3 py-2 rounded-2xl text-[12.5px] leading-relaxed chat-bubble bg-white text-neutral-dark border border-neutral rounded-bl-sm shadow-sm prose-chat">${parsedMarkdown}</div>`;
+                    }
+                }
             }
 
-            // Chèn tin nhắn mới lên TRƯỚC cái typing indicator
+            messageDiv.innerHTML = `
+                <div class="w-6 h-6 rounded-full shrink-0 flex items-center justify-center ${isUser ? "bg-accent/20" : "bg-accent/10"} mb-1">
+                    <i data-lucide="${isUser ? 'user' : 'bot'}" class="text-accent" style="width: 12px; height: 12px;"></i>
+                </div>
+                ${htmlContent}
+            `;
+
             chatMessages.insertBefore(messageDiv, typingIndicator);
+            lucide.createIcons();
             scrollToBottom();
         }
 
-        function showTyping(isTyping) {
-            if (isTyping) {
-                typingIndicator.style.display = 'flex';
-                sendBtn.disabled = true;
-                userInput.disabled = true;
-                scrollToBottom();
-            } else {
+        // Gửi tin nhắn
+        async function sendMessage(text = '') {
+            const msgContent = text || userInput.value.trim();
+            if (!msgContent || isLoading) return;
+
+            // Update UI User
+            userInput.value = '';
+            userInput.style.height = 'auto';
+            sendBtn.disabled = true;
+            appendMessage('user', msgContent);
+            
+            chatHistory.push({ role: 'user', content: msgContent });
+            saveHistory();
+
+            // Hiển thị loading
+            isLoading = true;
+            typingIndicator.style.display = 'flex';
+            scrollToBottom();
+
+            try {
+                // Lọc lịch sử để gửi (giống react)
+                const payloadHistory = chatHistory.filter((_, i, arr) => i >= arr.findIndex(m => m.role === "user")).map(({ role, content }) => ({ role, content }));
+                
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages: payloadHistory })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    const botReply = result.data.reply;
+                    const products = result.data.products || null;
+                    const toolsUsed = result.data.toolsUsed || [];
+                    
+                    chatHistory.push({ role: 'assistant', content: botReply });
+                    appendMessage('assistant', botReply, products);
+                    saveHistory();
+                    
+                    if (!isPanelOpen) unreadBadge.classList.remove('hidden');
+                } else {
+                    appendMessage('assistant', "❌ " + (result.message || "Lỗi server"));
+                }
+            } catch (error) {
+                appendMessage('assistant', "❌ Lỗi kết nối. Vui lòng thử lại sau.");
+                console.error(error);
+            } finally {
+                isLoading = false;
                 typingIndicator.style.display = 'none';
-                sendBtn.disabled = false;
-                userInput.disabled = false;
-                userInput.focus();
+                if(isPanelOpen) userInput.focus();
+                scrollToBottom();
             }
         }
 
         function scrollToBottom() {
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+            setTimeout(() => {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }, 80);
         }
+
+        // Local Storage
+        function saveHistory() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(chatHistory.slice(-20)));
+        }
+
+        function loadHistory() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                try {
+                    chatHistory = JSON.parse(stored);
+                    chatHistory.forEach(msg => appendMessage(msg.role, msg.content));
+                } catch(e) {}
+            }
+        }
+
+        // Chạy khởi tạo
+        document.addEventListener("DOMContentLoaded", init);
+
     </script>
 </body>
 </html>
