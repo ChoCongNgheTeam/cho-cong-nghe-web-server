@@ -87,11 +87,21 @@ export const createMomoPaymentUrl = async (orderId: string, amount: number, orde
 // ─── Return handler (redirect FE, không xử lý logic) ─────────────────────────
 
 export const momoReturnHandler = (req: Request, res: Response): void => {
-  const { orderId, orderInfo } = req.query as { orderId: string; orderInfo: string };
-  // Extract orderCode từ orderInfo ("Thanh toan don hang CCN98RF9321B6")
-  const match = orderInfo?.match(/CCN[A-Z0-9]+/);
-  const ref = match ? match[0] : orderId;
-  redirectToFrontend(res, ref);
+  const { orderId, orderInfo } = req.query as {
+    orderId: string;
+    orderInfo: string;
+  };
+
+  // Extract orderCode từ orderInfo: "Thanh toan don hang CCN08DJ403F77"
+  const match = decodeURIComponent(orderInfo ?? "").match(/CCN[A-Z0-9]+/);
+
+  if (match) {
+    // Dùng orderCode trực tiếp → redirectToFrontend sẽ tìm được
+    redirectToFrontend(res, match[0]);
+  } else {
+    // Fallback: dùng momoOrderId
+    redirectToFrontend(res, orderId);
+  }
 };
 
 // ─── IPN handler ──────────────────────────────────────────────────────────────

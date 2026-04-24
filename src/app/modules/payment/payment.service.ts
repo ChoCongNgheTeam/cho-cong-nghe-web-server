@@ -8,7 +8,11 @@ import prisma from "@/config/db";
  * mà value có thể không phải UUID format.
  */
 export const redirectToFrontend = async (res: Response, ref: string): Promise<void> => {
+  console.log("[redirectToFrontend] ref =", ref); // ← thêm dòng này
+
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+
+  console.log("[redirectToFrontend] frontendUrl =", frontendUrl); // ← và dòng này
 
   if (!ref) {
     res.redirect(`${frontendUrl}/account/orders`);
