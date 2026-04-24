@@ -18,7 +18,7 @@ export const checkoutSchema = z.object({
     .optional()
     .or(z.literal("").transform(() => undefined)),
   cartItemIds: z
-    .array(z.string().uuid("ID sản phẩm trong giỏ không hợp lệ"))
+    .array(z.string().min(1, "ID sản phẩm trong giỏ không hợp lệ"))
     .min(1, "Vui lòng chọn ít nhất 1 sản phẩm")
     .optional(),
 });
