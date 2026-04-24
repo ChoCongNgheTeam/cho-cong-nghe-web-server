@@ -19,7 +19,7 @@ export const redirectToFrontend = async (res: Response, ref: string): Promise<vo
     let orderCode: string | null = null;
 
     // 1. orderCode trực tiếp (format CCN-...)
-    if (ref.startsWith("CCN-")) {
+    if (ref.startsWith("CCN")) {
       const order = await prisma.orders.findFirst({
         where: { orderCode: ref },
         select: { orderCode: true },
