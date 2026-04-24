@@ -7,6 +7,7 @@ import {
   GetPromotionsArgs,
   ProductSearchResult,
   ProductDetailResult,
+  ProductCard,
   PolicyResult,
   PromotionResult,
 } from "../chatbot.types";
@@ -195,10 +196,22 @@ export const executeSearchProducts = async (
         },
         variants: {
           where: { isActive: true, deletedAt: null },
-          select: { price: true, quantity: true },
-          orderBy: { price: "asc" },
-          take: 5,
-        },
+          select: { 
+            id: true, 
+            price: true, 
+            quantity: true,
+        // 👇 Thêm phần này để lấy label phân loại
+        variantAttributes: {
+          select: {
+            attributeOption: {
+              select: { label: true }
+        }
+      }
+    }
+  },
+        orderBy: { price: "asc" },
+        take: 10, // Có thể lấy nhiều hơn để khách chọn
+},
         productSpecifications: {
           where: { isHighlight: true },
           select: {
@@ -217,7 +230,9 @@ export const executeSearchProducts = async (
     const prices = p.variants.map((v) => Number(v.price));
     const priceMin = prices.length ? Math.min(...prices) : 0;
     const priceMax = prices.length ? Math.max(...prices) : 0;
-    const inStock = p.variants.some((v) => v.quantity > 0);
+    const inStockVariants = p.variants.filter((v) => v.quantity > 0);
+    const inStock = inStockVariants.length > 0;
+    const defaultVariantId = inStockVariants.length > 0 ? inStockVariants[0].id : undefined;
 
     const { finalPriceMin, finalPriceMax, promotionLabel } = applyPromotion(
       priceMin,
@@ -230,7 +245,6 @@ export const executeSearchProducts = async (
       id: p.id,
       name: p.name,
       slug: p.slug,
-      // ✅ FIX: ghép sẵn URL đầy đủ từ slug DB — AI chỉ copy nguyên văn, không tự tạo
       productUrl: `${PRODUCT_BASE_URL}/${p.slug}`,
       thumbnail: p.img[0]?.imageUrl || "",
       originalPriceMin: priceMin,
@@ -247,6 +261,13 @@ export const executeSearchProducts = async (
         value: ps.value,
       })),
       promotionLabel,
+      defaultVariantId,
+      variants: p.variants
+    .filter((v) => v.quantity > 0)
+    .map((v) => ({
+      id: v.id,
+      label: v.variantAttributes.map((va) => va.attributeOption.label).join(" / ") || "Mặc định"
+    })),
     };
   });
 
@@ -282,7 +303,7 @@ export const executeGetProductDetail = async (
         variants: {
           where: { isActive: true, deletedAt: null },
           select: {
-            id: true,
+            id: true, // ← quan trọng: cần id để FE gọi cart API
             price: true,
             quantity: true,
             variantAttributes: {
@@ -352,6 +373,7 @@ export const executeGetProductDetail = async (
       .map((va) => va.attributeOption.label)
       .join(" / ");
     return {
+      id: v.id, // ← expose ra để extractProductCards dùng
       label: attrLabels || "Mặc định",
       originalPrice: Number(v.price),
       price: applyPromoPrice(Number(v.price)),
@@ -458,4 +480,71 @@ export const executeGetPolicy = async (
     .slice(0, 2000);
 
   return { title: page.title, content: plainContent };
+};
+
+// ─── 5. EXTRACT PRODUCT CARDS ───────────────────────────────
+// Chuyển tool result JSON → ProductCard[] để đính vào ChatResponse
+// Đặt ở đây vì executor đã biết shape của ProductSearchResult & ProductDetailResult
+export const extractProductCards = (
+  toolName: string,
+  rawContent: string,
+): ProductCard[] => {
+  let parsed: any;
+  try {
+    parsed = JSON.parse(rawContent);
+  } catch {
+    return [];
+  }
+
+  if (!parsed?.found) return [];
+
+  // ── search_products: mảng nhiều sản phẩm ──────────────────
+  if (toolName === "search_products") {
+    const items: ProductSearchResult[] = parsed.data ?? [];
+    return items.map((p) => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      productUrl: p.productUrl,
+      thumbnail: p.thumbnail,
+      priceMin: p.priceMin,
+      priceMax: p.priceMax,
+      originalPriceMin: p.originalPriceMin,
+      originalPriceMax: p.originalPriceMax,
+      inStock: p.inStock,
+      promotionLabel: p.promotionLabel,
+      defaultVariantId: p.defaultVariantId,
+      variants: p.variants,
+    }));
+  }
+
+  // ── get_product_detail: 1 sản phẩm, có đủ variants ────────
+  if (toolName === "get_product_detail") {
+    const p: ProductDetailResult = parsed.data;
+    if (!p) return [];
+
+    // Tìm variant còn hàng rẻ nhất (đã sort by price asc từ DB)
+    const firstInStockVariant = p.variants.find((v) => v.inStock);
+
+    return [
+      {
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        productUrl: p.productUrl,
+        thumbnail: p.thumbnail,
+        priceMin: p.priceMin,
+        priceMax: p.priceMax,
+        originalPriceMin: p.originalPriceMin,
+        originalPriceMax: p.originalPriceMax,
+        inStock: p.inStock,
+        promotionLabel: p.promotionLabel,
+       variants: p.variants
+          .filter((v) => v.inStock) // Chỉ lấy các bản còn hàng
+          .map((v) => ({ id: v.id, label: v.label })),
+      },
+    ];
+  }
+
+  return [];
 };
