@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { env } from "@/config/env";
-import { ChatMessage, ChatResponse } from "./chatbot.types";
+import { ChatMessage, ChatResponse, ProductCard } from "./chatbot.types";
 import { CHATBOT_SYSTEM_PROMPT } from "./prompts/system.prompt";
 import { CHATBOT_TOOLS } from "./tools/tool.definitions";
 import {
@@ -8,6 +8,7 @@ import {
   executeGetProductDetail,
   executeGetActivePromotions,
   executeGetPolicy,
+  extractProductCards,
 } from "./tools/tool.executor";
 
 // ============================================================
@@ -66,12 +67,10 @@ const dispatchTool = async (
 export const getChatReply = async (
   userMessages: ChatMessage[],
 ): Promise<ChatResponse> => {
-  // FIX: Bỏ slice ở controller, chỉ slice 1 lần ở đây — lấy 20 messages gần nhất
-  // (10 turn = 10 user + 10 assistant)
+  // Lấy 20 messages gần nhất (10 turn = 10 user + 10 assistant)
   const recentMessages = userMessages.slice(-20);
 
-  // FIX: contextMessages là array LOCAL cho mỗi request — không share state giữa các request
-  // Tool results (kể cả lỗi) chỉ sống trong scope này, không nhiễm sang request khác
+  // contextMessages là array LOCAL cho mỗi request — không share state giữa các request
   const contextMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: CHATBOT_SYSTEM_PROMPT },
     ...recentMessages.map((m) => ({
@@ -81,6 +80,9 @@ export const getChatReply = async (
   ];
 
   const toolsUsed: string[] = [];
+  // Tích lũy product cards xuyên suốt tất cả rounds
+  // Dùng Map để tự dedup by id (AI có thể gọi search + detail cùng 1 SP)
+  const productCardMap = new Map<string, ProductCard>();
   let rounds = 0;
 
   while (rounds < MAX_TOOL_ROUNDS) {
@@ -99,11 +101,14 @@ export const getChatReply = async (
 
     // Không có tool call → AI đã có đủ thông tin để trả lời
     if (!message.tool_calls || message.tool_calls.length === 0) {
+      const products = productCardMap.size > 0
+        ? [...productCardMap.values()]
+        : undefined;
+
       return {
-        reply:
-          message.content ||
-          "Xin lỗi, mình không hiểu câu hỏi. Bạn có thể nói rõ hơn không?",
+        reply: message.content || "Xin lỗi, mình không hiểu câu hỏi. Bạn có thể nói rõ hơn không?",
         toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined,
+        products,
       };
     }
 
@@ -134,6 +139,10 @@ export const getChatReply = async (
         const result = await dispatchTool(toolCall.function.name, args);
         toolsUsed.push(toolCall.function.name);
 
+        // Extract product cards từ tool result và tích lũy vào map (tự dedup by id)
+        const cards = extractProductCards(toolCall.function.name, result);
+        cards.forEach((c) => productCardMap.set(c.id, c));
+
         return {
           role: "tool" as const,
           tool_call_id: toolCall.id,
@@ -159,11 +168,16 @@ export const getChatReply = async (
     max_tokens: 800,
   });
 
+  const products = productCardMap.size > 0
+    ? [...productCardMap.values()]
+    : undefined;
+
   return {
     reply:
       finalResponse.choices[0].message.content ||
       "Xin lỗi bạn, hiện tại mình chưa tìm thấy thông tin phù hợp cho yêu cầu này. Bạn có thể liên hệ Hotline 1800.6060 (Nhánh 1) để được hỗ trợ nhanh nhất nhé!",
     toolsUsed,
+    products,
   };
 };
 
