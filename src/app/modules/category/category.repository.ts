@@ -107,7 +107,7 @@ export const findAllAdmin = async (query: ListCategoriesQuery) => {
       take: limit,
       select: {
         ...selectCategoryAdmin,
-        _count: { select: { children: true } },
+        _count: { select: { children: true ,products: true} },
       },
     }),
     prisma.categories.count({ where }),
