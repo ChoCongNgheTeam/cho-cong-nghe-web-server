@@ -607,12 +607,17 @@ export const getProductsByPromotion = async (promotionId: string, limit = 20) =>
 
 export const getFeaturedProducts = async (limit = 12) => {
   const products = await repo.findFeaturedProducts(limit);
+
   return products.flatMap((product) => {
     const variantsForCards = getVariantsForCards(product);
-    return variantsForCards.flatMap((variant) => {
-      const entry = buildCardEntry(product, variant);
-      return entry ? [entry] : [];
-    });
+
+    // chỉ lấy 1 variant
+    const variant = variantsForCards[0];
+
+    if (!variant) return [];
+
+    const entry = buildCardEntry(product, variant);
+    return entry ? [entry] : [];
   });
 };
 
