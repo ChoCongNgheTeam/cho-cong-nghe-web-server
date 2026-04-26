@@ -199,33 +199,57 @@ export const getProductVariantOptions = async (slug: string, options?: Record<st
   const product = await repo.findBySlug(slug);
   if (!product || !product.isActive) throw new NotFoundError("Sản phẩm");
 
-  // Lấy tất cả active variants
   const allVariants = await repo.findAllActiveVariants(product.id);
 
-  // Filter theo storage nếu có
-  const storageFilter = options?.storage?.toLowerCase();
+  // Discover tất cả attribute codes có trong product này
+  const allAttrCodes = new Set<string>();
+  for (const v of allVariants) {
+    for (const va of v.variantAttributes) {
+      allAttrCodes.add(va.attributeOption.attribute.code);
+    }
+  }
 
-  const filtered = storageFilter
-    ? allVariants.filter((v: any) => v.variantAttributes.some((va: any) => va.attributeOption.attribute.code === "storage" && va.attributeOption.value.toLowerCase() === storageFilter))
-    : allVariants;
+  // Filter theo query params nếu có (ví dụ ?storage=128gb&color=black)
+  const filtered = allVariants.filter((v: any) => {
+    return Object.entries(options ?? {}).every(([code, val]) => {
+      if (!val) return true;
+      return v.variantAttributes.some((va: any) => va.attributeOption.attribute.code === code && va.attributeOption.value.toLowerCase() === val.toLowerCase());
+    });
+  });
 
-  // Map sang VariantOption format
   return filtered.map((v: any) => {
-    const colorAttr = v.variantAttributes.find((va: any) => va.attributeOption.attribute.code === "color");
-    const storageAttr = v.variantAttributes.find((va: any) => va.attributeOption.attribute.code === "storage");
+    // Map tất cả attributes động
+    const attrMap: Record<string, { value: string; label: string }> = {};
+    for (const va of v.variantAttributes) {
+      const code = va.attributeOption.attribute.code;
+      attrMap[code] = {
+        value: va.attributeOption.value,
+        label: va.attributeOption.label,
+      };
+    }
 
-    // Tìm ảnh cho color này
-    const colorImage = product.img?.find((img: any) => img.color === colorAttr?.attributeOption.value);
+    // Color image
+    const colorValue = attrMap["color"]?.value;
+    const colorImage = colorValue ? product.img?.find((img: any) => img.color === colorValue) : null;
 
     return {
-      id: v.id, // variantId — đúng cho changeVariant
-      colorLabel: colorAttr?.attributeOption.label ?? "",
-      colorValue: colorAttr?.attributeOption.value ?? "",
-      storageLabel: storageAttr?.attributeOption.label ?? "",
-      // price: Number(v.price),
-      // price: Number(10000000000),
+      id: v.id,
+      code: v.code ?? "",
+      price: Number(v.price),
       available: v.isActive && v.quantity > 0,
+      isDefault: v.isDefault,
       imageUrl: colorImage?.imageUrl ?? null,
+
+      // Trả về từng attribute: colorLabel, colorValue, storageLabel, storageValue, ramLabel, ramValue...
+      // Đồng thời trả về map động để FE dùng
+      ...Object.fromEntries(
+        Object.entries(attrMap).flatMap(([code, { value, label }]) => [
+          [`${code}Label`, label],
+          [`${code}Value`, value],
+        ]),
+      ),
+      // attributes map đầy đủ cho FE generic
+      attributes: attrMap,
     };
   });
 };

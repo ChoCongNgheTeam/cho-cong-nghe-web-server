@@ -245,10 +245,20 @@ export const restoreVoucher = async (id: string) => {
 
 export const hardDeleteVoucher = async (id: string) => {
   const voucher = await assertVoucherExists(id, true);
-  if (!voucher.deletedAt) throw new BadRequestError("Chỉ có thể xoá vĩnh viễn voucher đã chuyển vào thùng rác");
+  if (!voucher.deletedAt) throw new BadRequestError("...");
+
+  const usageCount = await prisma.voucher_usages.count({ where: { voucherId: id } });
+  if (usageCount > 0) {
+    throw new BadRequestError(`Không thể xóa: voucher đã được sử dụng ${usageCount} lần trong lịch sử đơn hàng`);
+  }
+
+  const orderCount = await prisma.orders.count({ where: { voucherId: id } });
+  if (orderCount > 0) {
+    throw new BadRequestError(`Không thể xóa: voucher đang được áp dụng trong ${orderCount} đơn hàng`);
+  }
+
   return repo.hardDelete(id);
 };
-
 // ── Assign ────────────────────────────────────────────────────────────────────
 
 export const assignVoucherToUsers = async (input: AssignVoucherToUsersInput) => {

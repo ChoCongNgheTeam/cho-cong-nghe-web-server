@@ -4,7 +4,8 @@ import { requireRole } from "@/app/middlewares/role.middleware";
 import { validate } from "@/app/middlewares/validate.middleware";
 import { asyncHandler } from "@/utils/async-handler";
 import * as c from "./order.controller";
-import { updateOrderAdminSchema, createOrderAdminSchema, orderQuerySchema } from "./order.validation";
+import { updateOrderAdminSchema, createOrderAdminSchema, orderQuerySchema, exportOrderSchema } from "./order.validation";
+import { exportOrdersAdminHandler } from "./order.controller";
 
 const router = Router();
 
@@ -19,6 +20,8 @@ router.post("/my/:id/reorder", authMiddleware(true), asyncHandler(c.reorderUserH
 router.use("/admin", authMiddleware(true));
 
 router.get("/admin/all", requireRole("STAFF", "ADMIN"), validate(orderQuerySchema, "query"), asyncHandler(c.getAllOrdersAdminHandler));
+
+router.get("/admin/export", requireRole("STAFF", "ADMIN"), validate(exportOrderSchema, "query"), asyncHandler(exportOrdersAdminHandler));
 
 router.get("/admin/:id", requireRole("STAFF", "ADMIN"), asyncHandler(c.getOrderAdminDetailHandler));
 router.patch("/admin/:id", requireRole("STAFF", "ADMIN"), validate(updateOrderAdminSchema, "body"), asyncHandler(c.updateOrderAdminHandler));

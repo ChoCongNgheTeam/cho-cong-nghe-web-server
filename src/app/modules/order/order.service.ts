@@ -1,8 +1,12 @@
 import * as repo from "./order.repository";
-import { CreateOrderAdminInput, UpdateOrderAdminInput, OrderQuery } from "./order.validation";
+import { CreateOrderAdminInput, UpdateOrderAdminInput, OrderQuery, ExportOrderQuery } from "./order.validation";
+import { mapOrderToExportRow, buildCsvBuffer, buildExcelBuffer } from "./order.export";
 import { NotFoundError, BadRequestError, ForbiddenError } from "@/errors";
 import prisma from "@/config/db";
 import { sendOrderStatusNotification, sendOrderCreatedAdminNotification } from "../notification/notification.service";
+import { orderSelect, formatOrderResponse } from "./order.repository";
+import { Prisma } from "@prisma/client";
+import { buildKeywordVariants } from "../search/search.helpers";
 
 // Tách thành helper riêng để dễ test
 const triggerRefundIfEligible = async (orderId: string) => {
@@ -395,4 +399,61 @@ export const createOrderAdmin = async (input: CreateOrderAdminInput) => {
   }
 
   return order;
+};
+
+/**
+ * exportOrdersAdmin
+ * Lấy tối đa `limit` đơn hàng theo filter rồi trả buffer + metadata để controller stream.
+ */
+export const exportOrdersAdmin = async (query: ExportOrderQuery) => {
+  const { format = "excel", status, paymentStatus, search, dateFrom, dateTo, limit = 5000 } = query;
+
+  // Build where condition (tương tự findAllOrders nhưng không phân trang)
+  const searchConditions = search
+    ? buildKeywordVariants(search).flatMap((v) => [
+        { orderCode: { contains: v, mode: "insensitive" as const } },
+        { shippingPhone: { contains: v } },
+        { shippingContactName: { contains: v, mode: "insensitive" as const } },
+        { user: { fullName: { contains: v, mode: "insensitive" as const } } },
+        { user: { email: { contains: v, mode: "insensitive" as const } } },
+        { user: { phone: { contains: v } } },
+      ])
+    : [];
+
+  const where: Prisma.ordersWhereInput = {
+    ...(paymentStatus && { paymentStatus }),
+    ...(status && { orderStatus: status }),
+    ...(searchConditions.length > 0 && { OR: searchConditions }),
+    ...((dateFrom || dateTo) && {
+      orderDate: {
+        ...(dateFrom && { gte: new Date(dateFrom) }),
+        ...(dateTo && { lte: new Date(dateTo) }),
+      },
+    }),
+  };
+
+  const orders = await prisma.orders.findMany({
+    where,
+    take: limit,
+    select: orderSelect,
+    orderBy: { orderDate: "desc" },
+  });
+
+  const rows = orders.map(formatOrderResponse).map(mapOrderToExportRow);
+
+  if (format === "csv") {
+    return {
+      buffer: buildCsvBuffer(rows),
+      contentType: "text/csv; charset=utf-8",
+      filename: `orders_export_${Date.now()}.csv`,
+      count: rows.length,
+    };
+  }
+
+  return {
+    buffer: await buildExcelBuffer(rows),
+    contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    filename: `orders_export_${Date.now()}.xlsx`,
+    count: rows.length,
+  };
 };
