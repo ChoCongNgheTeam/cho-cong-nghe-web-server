@@ -53,6 +53,9 @@ import {
   // Admin — variant
   softDeleteVariantHandler,
   restoreVariantHandler,
+  exportProductsAdminHandler,
+  getImportTemplateHandler,
+  importProductsAdminHandler,
 } from "./product.controller";
 
 // ── NEW handlers ──────────────────────────────────────────────────────────────
@@ -68,6 +71,7 @@ import {
   searchSuggestSchema,
   variantQuerySchema,
   bulkActionSchema,
+  exportProductsSchema,
 } from "./product.validation";
 
 import { searchSuggestTrendingSchema, saleScheduleQuerySchema, saleByDateQuerySchema, compareProductsSchema } from "./product.validation";
@@ -76,6 +80,19 @@ import { parseJsonFields } from "@/app/middlewares/parse-json-fields.middleware"
 import { asyncHandler } from "@/utils/async-handler";
 import { getCategoryFiltersHandler } from "./product_filter.controller";
 import { categoryFiltersQuerySchema } from "./product_filter.validation";
+import multer from "multer";
+
+// Memory storage cho import (không cần ghi ra disk)
+const uploadMemory = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel", "text/csv", "application/csv"];
+    const nameOk = /\.(xlsx|xls|csv)$/i.test(file.originalname);
+    if (allowed.includes(file.mimetype) || nameOk) cb(null, true);
+    else cb(new Error("Chỉ chấp nhận file .xlsx hoặc .csv"));
+  },
+});
 
 const router = Router();
 
@@ -143,6 +160,11 @@ router.get("/admin/stats", ...adminAuth, asyncHandler(getProductStatsHandler));
 router.get("/admin/all", ...adminAuth, validate(adminListProductsSchema, "query"), asyncHandler(getProductsAdminHandler));
 router.get("/admin/trash", ...adminAuth, asyncHandler(getProductsTrashHandler));
 
+router.get("/admin/export", ...adminAuth, validate(exportProductsSchema, "query"), asyncHandler(exportProductsAdminHandler));
+
+router.get("/admin/import/template", ...adminAuth, asyncHandler(getImportTemplateHandler));
+
+router.post("/admin/import", ...adminAuth, uploadMemory.single("file"), asyncHandler(importProductsAdminHandler));
 // Create
 router.post("/admin", ...adminAuth, upload.any(), parseJsonFields, asyncHandler(createProductHandler));
 
