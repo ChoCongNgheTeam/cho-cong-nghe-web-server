@@ -101,7 +101,7 @@ const getSaleScheduleForHome = async (userId?: string): Promise<HomeSaleSchedule
 export const getHomePageData = async (userId?: string): Promise<HomeResponse> => {
   const [allMedia, featuredCategories, saleSchedule, activeCampaigns, featuredProducts, bestSellingProducts, blogs] = await Promise.all([
     mediaService.getAllActiveMedia(),
-    categoryService.getFeaturedCategories(12),
+    categoryService.getFeaturedCategories(24),
     getSaleScheduleForHome(userId),
     getActiveHomeCampaigns(),
     getFeaturedProductsWithPricing(12, userId),

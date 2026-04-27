@@ -125,6 +125,10 @@ export const restoreUser = async (id: string) => {
 };
 
 export const hardDeleteUser = async (id: string) => {
+  const orderCount = await prisma.orders.count({ where: { userId: id } });
+  if (orderCount > 0) {
+    throw new BadRequestError(`Không thể xóa: người dùng có ${orderCount} đơn hàng trong lịch sử`);
+  }
   const user = (await userRepository.findById(id, { includeDeleted: true, isAdmin: true })) as any;
   if (!user) throw new NotFoundError("Người dùng");
 

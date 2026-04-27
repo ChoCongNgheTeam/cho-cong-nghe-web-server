@@ -105,17 +105,15 @@ export const restorePromotion = async (id: string) => {
 };
 
 export const hardDeletePromotion = async (id: string) => {
-  const promotion = (await repo.findById(id, {
-    includeDeleted: true,
-    isAdmin: true,
-  })) as any;
+  const promotion = (await repo.findById(id, { includeDeleted: true, isAdmin: true })) as any;
   if (!promotion) throw new NotFoundError("Khuyến mãi");
+  if (!promotion.deletedAt) throw new ForbiddenError("Phải soft delete trước...");
 
-  if (!promotion.deletedAt) {
-    throw new ForbiddenError("Phải soft delete trước khi xóa vĩnh viễn. Dùng DELETE /admin/promotions/:id");
+  // Nên thêm — cảnh báo nghiệp vụ dù DB không constraint:
+  if (promotion.usedCount > 0) {
+    throw new BadRequestError(`Không thể xóa: khuyến mãi đã được áp dụng ${promotion.usedCount} lần`);
   }
 
-  // Rules & targets tự xóa qua Cascade
   return repo.hardDelete(id);
 };
 

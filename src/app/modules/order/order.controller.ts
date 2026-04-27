@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import * as service from "./order.service";
-import { orderQuerySchema } from "./order.validation";
+import { orderQuerySchema, exportOrderSchema } from "./order.validation";
+import { exportOrdersAdmin } from "./order.service";
 
 // ================== PUBLIC (USER) ==================
 
@@ -79,4 +80,14 @@ export const confirmManualRefundHandler = async (req: Request, res: Response) =>
   const { refundNote } = req.body;
   await service.confirmManualRefund(req.params.id, req.user!.id, refundNote);
   res.json({ success: true, message: "Đã xác nhận hoàn tiền thành công" });
+};
+
+export const exportOrdersAdminHandler = async (req: Request, res: Response) => {
+  const query = exportOrderSchema.parse(req.query);
+  const { buffer, contentType, filename, count } = await exportOrdersAdmin(query);
+
+  res.setHeader("Content-Type", contentType);
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.setHeader("X-Export-Count", String(count)); // FE có thể đọc để show toast
+  res.send(buffer);
 };

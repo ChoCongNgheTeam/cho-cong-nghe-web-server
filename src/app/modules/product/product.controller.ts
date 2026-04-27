@@ -11,6 +11,7 @@ import {
   searchSuggestTrendingSchema,
   saleScheduleQuerySchema,
   saleByDateQuerySchema,
+  exportProductsSchema,
 } from "./product.validation";
 import { cleanupTempFiles, parseMultipartData, uploadColorImages, deleteOldImages } from "./product.helpers";
 import { getProductsWithPricing } from "../pricing/use-cases/getProductsWithPricing.service";
@@ -21,7 +22,17 @@ import { getFlashSaleProductsWithPricing } from "../pricing/use-cases/getFlashSa
 import { getNewArrivalProductsWithPricing } from "../pricing/use-cases/getNewArrivalProductsWithPricing.service";
 import { getBestSellingProductsWithPricing } from "../pricing/use-cases/getBestSellingProductsWithPricing.service";
 // import { getProductVariantOptions } from "../pricing/use-cases/product.variant-pricing.orchestrator";
-import { compareProducts, getProductsOnSaleDate, getProductStats, getProductVariantOptions, getSaleScheduleV2, getSearchSuggestionsTrending } from "./product.service";
+import {
+  compareProducts,
+  exportProductsAdmin,
+  getImportTemplate,
+  getProductsOnSaleDate,
+  getProductStats,
+  getProductVariantOptions,
+  getSaleScheduleV2,
+  getSearchSuggestionsTrending,
+  importProductsAdmin,
+} from "./product.service";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -584,4 +595,38 @@ export const compareProductsHandler = async (req: Request, res: Response) => {
 export const getProductStatsHandler = async (_req: Request, res: Response) => {
   const stats = await getProductStats();
   res.json({ data: stats, message: "Lấy thống kê sản phẩm thành công" });
+};
+
+// ─── GET /products/admin/export ───────────────────────────────────────────────
+
+export const exportProductsAdminHandler = async (req: Request, res: Response) => {
+  const query = exportProductsSchema.parse(req.query);
+  const { buffer, contentType, filename, count } = await exportProductsAdmin(query);
+
+  res.setHeader("Content-Type", contentType);
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.setHeader("X-Export-Count", String(count));
+  res.send(buffer);
+};
+
+// ─── GET /products/admin/import/template ──────────────────────────────────────
+
+export const getImportTemplateHandler = async (req: Request, res: Response) => {
+  const { buffer, contentType, filename } = await getImportTemplate();
+
+  res.setHeader("Content-Type", contentType);
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.send(buffer);
+};
+
+// ─── POST /products/admin/import ──────────────────────────────────────────────
+
+export const importProductsAdminHandler = async (req: Request, res: Response) => {
+  const file = req.file;
+  const result = await importProductsAdmin(file!);
+
+  res.json({
+    data: result,
+    message: result.errors.length === 0 ? `Import thành công ${result.updated} biến thể` : `Import xong: ${result.updated} thành công, ${result.skipped} bỏ qua, ${result.errors.length} lỗi`,
+  });
 };
