@@ -5,6 +5,7 @@ import { ReviewStatus } from "@prisma/client";
 import prisma from "@/config/db";
 import { moderateContent } from "@/services/moderation";
 import { sendReviewNewAdminNotification } from "@/app/modules/notification/notification.service";
+import { isSettingEnabled } from "../settings/settings.service";
 
 // ── Helper ─────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,10 @@ const getProductIdFromReview = async (reviewId: string): Promise<string | null> 
 
 export const createUserReview = async (userId: string, input: CreateReviewInput) => {
   const { orderItemId, rating, comment } = input;
+
+  if (!(await isSettingEnabled("ecommerce", "enable_product_review"))) {
+    throw new BadRequestError("Chức năng đánh giá sản phẩm hiện đang tắt");
+  }
 
   // 1. Validate order item
   const orderItem = await prisma.order_items.findUnique({

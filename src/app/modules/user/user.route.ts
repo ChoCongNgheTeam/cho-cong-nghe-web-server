@@ -8,6 +8,8 @@ import {
   getMeHandler,
   updateMeHandler,
   changePasswordHandler,
+  getMyNotifPreferencesHandler,
+  updateMyNotifPreferencesHandler,
   getUsersHandler,
   getUserByIdHandler,
   createUserHandler,
@@ -16,8 +18,9 @@ import {
   restoreUserHandler,
   hardDeleteUserHandler,
   getDeletedUsersHandler,
+  exportUsersAdminHandler,
 } from "./user.controller";
-import { createUserSchema, changePasswordSchema, getUsersQuerySchema } from "./user.validation";
+import { createUserSchema, changePasswordSchema, getUsersQuerySchema, exportUsersSchema, updateNotifPreferencesSchema } from "./user.validation";
 
 const router = Router();
 
@@ -34,11 +37,16 @@ router.patch("/me", authMiddleware(), userUpload.single("avatarImage"), asyncHan
 
 router.patch("/me/change-password", authMiddleware(), validate(changePasswordSchema, "body"), asyncHandler(changePasswordHandler));
 
+router.get("/me/notification-preferences", authMiddleware(), asyncHandler(getMyNotifPreferencesHandler));
+router.patch("/me/notification-preferences", authMiddleware(), validate(updateNotifPreferencesSchema, "body"), asyncHandler(updateMyNotifPreferencesHandler));
+
 // ─── Admin — static ───────────────────────────────────────────────────────────
 
 router.get("/admin", ...staffAdminAuth, validate(getUsersQuerySchema, "query"), asyncHandler(getUsersHandler));
 router.post("/admin", ...adminAuth, validate(createUserSchema, "body"), asyncHandler(createUserHandler));
 router.get("/admin/trash", ...adminAuth, asyncHandler(getDeletedUsersHandler));
+
+router.get("/admin/export", ...staffAdminAuth, validate(exportUsersSchema, "query"), asyncHandler(exportUsersAdminHandler));
 
 // ─── Admin — param + suffix ───────────────────────────────────────────────────
 

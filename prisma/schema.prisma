@@ -170,7 +170,14 @@ model users {
   avatarImage  String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-  
+
+  notifEmail        Boolean @default(true)
+  notifPush         Boolean @default(true)
+  notifWeeklyReport Boolean @default(false)
+  notifOrderStatus  Boolean @default(true)
+  notifUserInactive Boolean @default(true)
+  notifReviewNew    Boolean @default(true)
+    
 
   // --- Soft Delete ---
   deletedAt    DateTime?
@@ -241,6 +248,11 @@ model refresh_tokens {
   deviceId  String?
   userAgent String?
   ip        String?
+
+  deviceName  String?
+  browser     String?
+  location    String?
+  lastUsedAt  DateTime?
 
   user users @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1025,4 +1037,105 @@ model chat_sessions {
  
   @@index([sessionKey])
   @@index([expiresAt])
+}
+
+
+// ─────────────────────────────────────────
+// SETTINGS
+// ─────────────────────────────────────────
+
+model system_settings {
+  id        String   @id @default(uuid()) @db.Uuid
+  group     String
+  key       String
+  value     String   @db.Text
+  dataType  SettingDataType @default(STRING)
+  updatedBy String?  @db.Uuid
+  updatedAt DateTime @updatedAt
+
+  @@unique([group, key])
+  @@index([group])
+}
+
+enum SettingDataType {
+  STRING
+  BOOLEAN
+  NUMBER
+  JSON
+}
+
+// ─────────────────────────────────────────
+// AUDIT
+// ─────────────────────────────────────────
+
+enum AuditSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  RESTORE
+  BULK_ACTION
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  SETTINGS_CHANGE
+  PERMISSION_CHANGE
+  EXPORT
+}
+
+model audit_logs {
+  id          String        @id @default(uuid()) @db.Uuid
+
+  // WHO
+  userId      String?       @db.Uuid
+  userName    String?
+  userRole    String?
+
+  // WHAT
+  action      AuditAction
+  module      String
+  targetId    String?
+  targetType  String?
+  description String
+  diff        Json?
+
+  // WHERE
+  ip          String?
+  userAgent   String?
+  location    String?
+
+  // META
+  severity    AuditSeverity @default(INFO)
+  isSuccess   Boolean       @default(true)
+  errorMsg    String?
+
+  createdAt   DateTime      @default(now())
+
+  @@index([userId])
+  @@index([module])
+  @@index([severity])
+  @@index([createdAt])
+  @@index([ip, createdAt])
+}
+
+model login_history {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @db.Uuid
+  email      String?
+  isSuccess  Boolean
+  ip         String?
+  userAgent  String?
+  location   String?
+  failReason String?
+
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([ip, createdAt])
+  @@index([createdAt])
 }

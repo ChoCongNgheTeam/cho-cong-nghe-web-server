@@ -1,9 +1,10 @@
 import { Request, Response } from "express";
 import * as userService from "./user.service";
-import { getUsersQuerySchema, updateProfileSchema, updateUserSchema } from "./user.validation";
+import { exportUsersSchema, getUsersQuerySchema, updateNotifPreferencesSchema, updateProfileSchema, updateUserSchema } from "./user.validation";
 import { parseMultipartData, uploadAvatarImage } from "./user.helpers";
 import { cleanupFile } from "@/services/file-cleanup.service";
 import { ForbiddenError } from "@/errors";
+import { exportUsersAdmin } from "./user.service";
 
 // ─── Self ─────────────────────────────────────────────────────────────────────
 
@@ -40,6 +41,17 @@ export const updateMeHandler = async (req: Request, res: Response) => {
 export const changePasswordHandler = async (req: Request, res: Response) => {
   await userService.changeMyPassword(req.user!.id, req.body);
   res.json({ message: "Đổi mật khẩu thành công" });
+};
+
+export const getMyNotifPreferencesHandler = async (req: Request, res: Response) => {
+  const prefs = await userService.getMyNotifPreferences(req.user!.id);
+  res.json({ data: prefs, message: "Lấy tùy chọn thông báo thành công" });
+};
+
+export const updateMyNotifPreferencesHandler = async (req: Request, res: Response) => {
+  const validatedBody = updateNotifPreferencesSchema.parse(req.body);
+  const prefs = await userService.updateMyNotifPreferences(req.user!.id, validatedBody);
+  res.json({ data: prefs, message: "Cập nhật tùy chọn thông báo thành công" });
 };
 
 // ─── Staff & Admin ────────────────────────────────────────────────────────────
@@ -137,4 +149,14 @@ export const getDeletedUsersHandler = async (req: Request, res: Response) => {
     },
     message: "Lấy danh sách người dùng đã xóa thành công",
   });
+};
+
+export const exportUsersAdminHandler = async (req: Request, res: Response) => {
+  const query = exportUsersSchema.parse(req.query);
+  const { buffer, contentType, filename, count } = await exportUsersAdmin(query);
+
+  res.setHeader("Content-Type", contentType);
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.setHeader("X-Export-Count", String(count));
+  res.send(buffer);
 };

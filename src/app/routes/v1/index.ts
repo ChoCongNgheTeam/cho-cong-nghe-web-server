@@ -51,6 +51,10 @@ import categoryVariantAttributeRoute from "@/app/modules/category-variant/catego
 import { aiContentRoute } from "@/app/modules/ai-content/ai-content.route";
 import aiCompareRouter from "@/app/modules/ai-compare/ai-compare.router";
 
+import settingsRouter from "@/app/modules/settings/settings.route";
+import auditRouter from "@/app/modules/audit/audit.route";
+import { initSettingsCache } from "@/app/modules/settings/settings.service";
+
 const router = Router();
 
 // ===== Core & Auth =====
@@ -110,5 +114,12 @@ router.use("/analytics", analyticsRouter);
 
 // ===== Category Variant =====
 router.use("/category-variant-attributes", categoryVariantAttributeRoute);
+
+// Đăng ký routes
+router.use("/settings", settingsRouter);
+router.use("/audit", auditRouter);
+
+// Warm cache khi app khởi động
+initSettingsCache().catch(console.error);
 
 export default router;

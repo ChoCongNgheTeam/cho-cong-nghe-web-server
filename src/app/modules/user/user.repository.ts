@@ -1,6 +1,16 @@
 import { Prisma } from "@prisma/client";
 import prisma from "@/config/db";
-import { GetUsersQuery } from "./user.validation";
+import { GetUsersQuery, UpdateNotifPreferencesInput } from "./user.validation";
+
+// Fields trả về cho notification preferences
+export const selectNotifPreferences = {
+  notifEmail: true,
+  notifPush: true,
+  notifWeeklyReport: true,
+  notifOrderStatus: true,
+  notifUserInactive: true,
+  notifReviewNew: true,
+} satisfies Prisma.usersSelect;
 
 // Fields trả về cho user thường / self — không expose sensitive data
 export const selectPublicUser = {
@@ -188,4 +198,19 @@ export const findAllDeleted = async (options: Pick<GetUsersQuery, "page" | "limi
   ]);
 
   return { users, total, page, limit };
+};
+
+export const getNotifPreferences = async (id: string) => {
+  return prisma.users.findFirst({
+    where: { id, deletedAt: null },
+    select: selectNotifPreferences,
+  });
+};
+
+export const updateNotifPreferences = async (id: string, data: UpdateNotifPreferencesInput) => {
+  return prisma.users.update({
+    where: { id, deletedAt: null },
+    data,
+    select: selectNotifPreferences,
+  });
 };

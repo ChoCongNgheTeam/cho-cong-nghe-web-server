@@ -96,6 +96,39 @@ export const getUsersQuerySchema = z.object({
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
 });
 
+/**
+ * GET /users/admin/export
+ * Filter giống getUsersQuerySchema nhưng không có page/limit.
+ * Thêm: format, withOrderStats, limit (max 5000).
+ */
+export const exportUsersSchema = z.object({
+  format: z.enum(["csv", "excel"]).default("excel"),
+  search: z.string().trim().optional(),
+  role: z.enum(["CUSTOMER", "ADMIN", "STAFF"]).optional(),
+  isActive: z.preprocess((v) => (v === "true" ? true : v === "false" ? false : v), z.boolean().optional()),
+  gender: z.enum(["MALE", "FEMALE", "OTHER"]).optional(),
+  // Có lấy thêm số đơn hàng + tổng chi tiêu không (tốn thêm 1 query)?
+  withOrderStats: z.preprocess((v) => (v === "true" ? true : v === "false" ? false : v), z.boolean().optional()).default(false),
+  limit: z.coerce.number().min(1).max(5000).default(5000).optional(),
+});
+
+export const updateNotifPreferencesSchema = z
+  .object({
+    notifEmail: z.boolean().optional(),
+    notifPush: z.boolean().optional(),
+    notifWeeklyReport: z.boolean().optional(),
+    notifOrderStatus: z.boolean().optional(),
+    notifUserInactive: z.boolean().optional(),
+    notifReviewNew: z.boolean().optional(),
+  })
+  .strict()
+  .refine((d) => Object.keys(d).length > 0, {
+    message: "Vui lòng cung cấp ít nhất một tùy chọn cần cập nhật",
+  });
+
+export type ExportUsersQuery = z.infer<typeof exportUsersSchema>;
+export type UpdateNotifPreferencesInput = z.infer<typeof updateNotifPreferencesSchema>;
+
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
