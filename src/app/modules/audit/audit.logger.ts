@@ -21,7 +21,6 @@ interface AuditLogInput {
 }
 
 export const auditLog = (input: AuditLogInput): void => {
-  // fire-and-forget — không block response
   setImmediate(async () => {
     try {
       const ip = input.req ? extractIp(input.req) : undefined;
@@ -37,7 +36,7 @@ export const auditLog = (input: AuditLogInput): void => {
           targetId: input.targetId,
           targetType: input.targetType,
           description: input.description,
-          diff: input.diff ?? undefined,
+          diff: input.diff ? JSON.parse(JSON.stringify(input.diff)) : undefined,
           ip,
           userAgent,
           severity: input.severity ?? AuditSeverity.INFO,
@@ -46,13 +45,29 @@ export const auditLog = (input: AuditLogInput): void => {
         },
       });
     } catch (err) {
-      // Không để audit fail ảnh hưởng app
       console.error("[AuditLog] Failed to write:", err);
     }
   });
 };
 
-export const auditLoginHistory = (data: { userId?: string; email?: string; isSuccess: boolean; ip?: string; userAgent?: string; location?: string; failReason?: string }): void => {
+/**
+ * Write a login_history row — fire-and-forget.
+ *
+ * Accepts pre-parsed browser + location strings produced by buildSessionMeta()
+ * so we don't duplicate the UA parsing work done in auth.service.
+ */
+export const auditLoginHistory = (data: {
+  userId?: string;
+  email?: string;
+  isSuccess: boolean;
+  ip?: string;
+  userAgent?: string;
+  /** e.g. "Chrome 147 / Windows 10" — from buildSessionMeta */
+  browser?: string;
+  /** e.g. "Ho Chi Minh City, VN" — from buildSessionMeta */
+  location?: string;
+  failReason?: string;
+}): void => {
   setImmediate(async () => {
     try {
       await prisma.login_history.create({ data });

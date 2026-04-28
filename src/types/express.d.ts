@@ -6,6 +6,7 @@ declare global {
       user?: {
         id: string;
         role: string; // "ADMIN" | "STAFF" | "CUSTOMER"
+        userName: string;
       };
       file?: Multer.File;
     }

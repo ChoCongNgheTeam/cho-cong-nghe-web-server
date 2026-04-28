@@ -22,9 +22,12 @@ export const authMiddleware = (required = true) => {
     try {
       const decoded = verifyAccessToken(token);
 
+      // console.log(decoded);
+
       req.user = {
         id: decoded.userId,
         role: decoded.role,
+        userName: decoded.userName,
       };
 
       next();

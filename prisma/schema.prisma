@@ -177,6 +177,10 @@ model users {
   notifOrderStatus  Boolean @default(true)
   notifUserInactive Boolean @default(true)
   notifReviewNew    Boolean @default(true)
+
+  isVerified                  Boolean   @default(false)
+  verificationToken           String?   @unique
+  verificationTokenExpiresAt  DateTime?
     
 
   // --- Soft Delete ---
@@ -1131,6 +1135,7 @@ model login_history {
   ip         String?
   userAgent  String?
   location   String?
+  browser   String?
   failReason String?
 
   createdAt  DateTime @default(now())
