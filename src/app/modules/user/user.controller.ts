@@ -5,6 +5,7 @@ import { parseMultipartData, uploadAvatarImage } from "./user.helpers";
 import { cleanupFile } from "@/services/file-cleanup.service";
 import { ForbiddenError } from "@/errors";
 import { exportUsersAdmin } from "./user.service";
+import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
 
 // ─── Self ─────────────────────────────────────────────────────────────────────
 
@@ -85,7 +86,8 @@ export const deleteUserHandler = async (req: Request, res: Response) => {
   const requester = req.user!;
   const target = await userService.getUserById(req.params.id);
 
-  if (requester.role === "STAFF" && (target as any).role !== "CUSTOMER") {
+  // Mọi staff role (SALES/MARKETING/SUPPORT/ACCOUNTING) chỉ được xóa CUSTOMER
+  if (STAFF_ROLES.includes(requester.role as any) && (target as any).role !== "CUSTOMER") {
     throw new ForbiddenError("Staff chỉ được phép xóa tài khoản khách hàng");
   }
 

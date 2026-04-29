@@ -53,6 +53,8 @@ import { initSettingsCache } from "@/app/modules/settings/settings.service";
 // Audit middleware — tự động ghi log mọi mutation có xác thực
 import { auditMiddleware } from "@/app/middlewares/audit.middleware";
 
+import staffPermissionsRouter from "@/app/modules/staff-permissions/staff-permissions.route";
+
 const router = Router();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -137,7 +139,10 @@ router.use("/category-variant-attributes", categoryVariantAttributeRoute);
 
 // ===== Settings & Audit =====
 router.use("/settings", settingsRouter);
+
 router.use("/audit", auditRouter);
+
+router.use("/admin/staff-permissions", staffPermissionsRouter);
 
 // Warm cache khi app khởi động
 initSettingsCache().catch(console.error);

@@ -214,3 +214,34 @@ export const updateNotifPreferences = async (id: string, data: UpdateNotifPrefer
     select: selectNotifPreferences,
   });
 };
+
+export const findMeById = async (id: string) => {
+  return prisma.users.findFirst({
+    where: { id, deletedAt: null },
+    select: {
+      ...selectPublicUser,
+      // Include permissions nếu là staff
+      staffPermissions: {
+        select: {
+          canViewOrders: true,
+          canCreateOrder: true,
+          canUpdateOrder: true,
+          canViewProducts: true,
+          canUpdateStock: true,
+          canBlogs: true,
+          canMedia: true,
+          canCampaigns: true,
+          canVouchers: true,
+          canPromotions: true,
+          canAiContent: true,
+          canReviews: true,
+          canComments: true,
+          canNotifications: true,
+          canViewUsers: true,
+          canAnalytics: true,
+          canPaymentView: true,
+        },
+      },
+    },
+  });
+};

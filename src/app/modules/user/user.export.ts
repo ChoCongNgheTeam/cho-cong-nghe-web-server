@@ -29,7 +29,10 @@ export interface ExportUserRow {
 
 const ROLE_LABEL: Record<string, string> = {
   ADMIN: "Quản trị viên",
-  STAFF: "Nhân viên",
+  SALES: "Nhân viên bán hàng",
+  MARKETING: "Nhân viên marketing",
+  SUPPORT: "Nhân viên CSKH",
+  ACCOUNTING: "Kế toán",
   CUSTOMER: "Khách hàng",
 };
 
@@ -131,8 +134,11 @@ export async function buildUserExcelBuffer(rows: ExportUserRow[]): Promise<Buffe
   // ── Role colors ────────────────────────────────────────────────────────────
   const ROLE_COLOR: Record<string, string> = {
     "Quản trị viên": "FFE9D5FF", // purple
-    "Nhân viên": "FFDBEAFE", // blue
-    "Khách hàng": "FFD1FAE5", // green
+    "Nhân viên bán hàng": "FFDBEAFE", // blue
+    "Nhân viên marketing": "FFFDE68A", // amber
+    "Nhân viên CSKH": "FFD1FAE5", // green
+    "Kế toán": "FFFFE4E6", // pink
+    "Khách hàng": "FFF3F4F6", // gray
   };
 
   // ── Data rows ──────────────────────────────────────────────────────────────

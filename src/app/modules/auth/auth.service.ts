@@ -34,6 +34,8 @@ import prisma from "prisma/client";
 import { sendWelcomeVoucherNotification } from "@/app/modules/notification/notification.service";
 import { buildSessionMeta } from "./session.util";
 import { auditLoginHistory } from "@/app/modules/audit/audit.logger";
+import { getPermissionsForAuth } from "@/app/modules/staff-permissions/staff-permissions.service";
+import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
 
 // ─── Register ─────────────────────────────────────────────────────────────────
 
@@ -247,6 +249,8 @@ export const login = async (input: LoginInput, meta?: { userAgent?: string; ip?:
       userName: user!.userName,
       fullName: user!.fullName,
       role: user!.role,
+      // Trả permissions nếu là staff role — FE dùng để render sidebar/guard page
+      permissions: STAFF_ROLES.includes(user!.role as any) ? await getPermissionsForAuth(user!.id) : null,
     },
   };
 };
