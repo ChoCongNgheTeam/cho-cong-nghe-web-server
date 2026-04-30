@@ -7,6 +7,8 @@ import { deleteOldAvatarImage } from "./user.helpers";
 import { ChangePasswordInput, CreateUserInput, ExportUsersQuery, GetUsersQuery, UpdateNotifPreferencesInput, UpdateProfileInput, UpdateUserInput } from "./user.validation";
 import { Prisma } from "@prisma/client";
 import { buildUserCsvBuffer, buildUserExcelBuffer, mapUsersToExportRows } from "./user.export";
+import { seedDefaultPermissions } from "@/app/modules/staff-permissions/staff-permissions.service";
+import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
 
 // Helper
 
@@ -19,7 +21,17 @@ const assertUserExists = async (id: string, options: { includeDeleted?: boolean;
 // Self (user đang đăng nhập)
 
 export const getMe = async (userId: string) => {
-  return assertUserExists(userId);
+  const user = await userRepository.findMeById(userId);
+  if (!user) throw new NotFoundError("Người dùng");
+
+  // Flatten staffPermissions ra ngoài, bỏ field nested
+  const { staffPermissions, ...rest } = user as any;
+
+  return {
+    ...rest,
+    // Chỉ trả permissions nếu có (staff roles) — ADMIN/CUSTOMER trả undefined
+    ...(staffPermissions ? { permissions: staffPermissions } : {}),
+  };
 };
 
 export const updateMe = async (userId: string, input: UpdateProfileInput) => {
@@ -75,7 +87,14 @@ export const getUserById = async (id: string, options: { includeDeleted?: boolea
 export const createUser = async (input: CreateUserInput) => {
   const { password, ...rest } = input;
   const passwordHash = await bcrypt.hash(password, 10);
-  return userRepository.create({ ...rest, passwordHash }).catch(handlePrismaError);
+  const newUser = await userRepository.create({ ...rest, passwordHash }).catch(handlePrismaError);
+
+  // Tự động tạo permissions mặc định nếu là staff role
+  if (STAFF_ROLES.includes((newUser as any).role)) {
+    await seedDefaultPermissions((newUser as any).id, (newUser as any).role);
+  }
+
+  return newUser;
 };
 
 export const updateUser = async (id: string, input: UpdateUserInput) => {
@@ -103,7 +122,19 @@ export const updateUser = async (id: string, input: UpdateUserInput) => {
 
   delete data.removeAvatar;
 
-  return userRepository.update(id, data).catch(handlePrismaError);
+  const updated = await userRepository.update(id, data).catch(handlePrismaError);
+
+  // Nếu admin đổi role → re-seed permissions theo role mới
+  if (data.role && data.role !== user.role) {
+    const newRole = data.role as string;
+    if (STAFF_ROLES.includes(newRole as any)) {
+      // Đổi sang staff role → reset permissions về preset của role mới
+      await seedDefaultPermissions(id, newRole);
+    }
+    // Đổi sang CUSTOMER/ADMIN → không cần permissions (cascade delete nếu muốn dọn sạch)
+  }
+
+  return updated;
 };
 
 // Soft delete — Staff & Admin

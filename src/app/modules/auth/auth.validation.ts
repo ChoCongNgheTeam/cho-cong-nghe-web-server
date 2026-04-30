@@ -3,10 +3,7 @@ import { z } from "zod";
 const passwordRule = z
   .string()
   .min(6, "Mật khẩu phải ít nhất 6 ký tự")
-  .regex(
-    /^(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]+$/,
-    "Mật khẩu phải có chữ hoa, số và không chứa ký tự có dấu"
-  );
+  .regex(/^(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]+$/, "Mật khẩu phải có chữ hoa, số và không chứa ký tự có dấu");
 
 const userNameRule = z
   .string()
@@ -18,15 +15,11 @@ const userNameRule = z
 export const registerSchema = z.object({
   userName: userNameRule,
 
-  email: z.email("Email không hợp lệ"),
+  email: z.string().email("Email không hợp lệ"),
 
   password: passwordRule,
 
-  fullName: z
-    .string()
-    .trim()
-    .min(3, "Họ và tên phải từ 3 ký tự")
-    .max(30, "Họ và tên tối đa 30 ký tự"),
+  fullName: z.string().trim().min(3, "Họ và tên phải từ 3 ký tự").max(30, "Họ và tên tối đa 30 ký tự"),
 
   phone: z
     .string()
@@ -43,7 +36,11 @@ export const loginSchema = z.object({
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z.email("Email không hợp lệ"),
+  email: z.string().email("Email không hợp lệ"),
+});
+
+export const resendVerificationSchema = z.object({
+  email: z.string().email("Email không hợp lệ"),
 });
 
 export const resetPasswordSchema = z
@@ -76,3 +73,4 @@ export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;

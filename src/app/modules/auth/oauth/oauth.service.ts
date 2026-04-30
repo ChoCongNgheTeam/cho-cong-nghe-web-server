@@ -9,6 +9,7 @@ import crypto from "crypto";
 import { OAuthResolvedUser } from "./oauth.types";
 import { sendWelcomeVoucherNotification } from "@/app/modules/notification/notification.service";
 import prisma from "prisma/client";
+import { buildSessionMeta } from "../session.util";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,33 +32,26 @@ interface OAuthLoginMeta {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Sinh userName duy nhất từ email (không dùng ký tự đặc biệt) */
 const generateUserName = (email: string): string => {
   const base = email
     .split("@")[0]
     .replace(/[^a-zA-Z0-9_]/g, "_")
     .slice(0, 20);
-  const suffix = crypto.randomBytes(3).toString("hex"); // 6 chars
+  const suffix = crypto.randomBytes(3).toString("hex");
   return `${base}_${suffix}`;
 };
 
-/**
- * Tìm hoặc tạo user từ profile OAuth rồi trả về tokens.
- * Logic chung dùng cho mọi provider.
- */
 export const findOrCreateOAuthUser = async (provider: string, profile: OAuthUserProfile, meta?: OAuthLoginMeta) => {
-  // Đã có tài khoản OAuth này chưa?
   let oauthAccount = await findOAuthAccount(provider, profile.providerAccountId);
-
   let user: OAuthResolvedUser | null = oauthAccount?.user ?? null;
+
   if (!user) {
-    // Email đã tồn tại? → link account
     const existingUser = profile.email ? await findByEmail(profile.email) : null;
 
     if (existingUser) {
       user = existingUser;
     } else {
-      // 1. Map dữ liệu giới tính của Facebook
+      // Map gender
       let mappedGender: any = null;
       if (profile.gender) {
         const fbGender = profile.gender.toLowerCase();
@@ -66,21 +60,20 @@ export const findOrCreateOAuthUser = async (provider: string, profile: OAuthUser
         else mappedGender = "OTHER";
       }
 
-      // 2. Xử lý ngày sinh chuẩn hóa
+      // Parse birthday
       let parsedDateOfBirth: Date | null = null;
       if (profile.birthday) {
-        const parts = profile.birthday.split("/"); // FB Format: MM/DD/YYYY hoặc YYYY
+        const parts = profile.birthday.split("/");
         if (parts.length === 3) {
           const month = parseInt(parts[0], 10);
           const day = parseInt(parts[1], 10);
           const year = parseInt(parts[2], 10);
           parsedDateOfBirth = new Date(Date.UTC(year, month - 1, day));
         } else if (parts.length === 1 && parts[0].length === 4) {
-          const year = parseInt(parts[0], 10);
-          parsedDateOfBirth = new Date(Date.UTC(year, 0, 1));
+          parsedDateOfBirth = new Date(Date.UTC(parseInt(parts[0], 10), 0, 1));
         }
       }
-      // Tạo user mới
+
       user = await createUserFromOAuth({
         email: profile.email,
         fullName: profile.fullName,
@@ -92,7 +85,7 @@ export const findOrCreateOAuthUser = async (provider: string, profile: OAuthUser
 
       setImmediate(async () => {
         try {
-          if (!user) return; // ← guard để TS không complain
+          if (!user) return;
           const welcomeVoucher = await prisma.vouchers.create({
             data: {
               code: `WELCOME_${user.id.slice(0, 8).toUpperCase()}`,
@@ -121,7 +114,6 @@ export const findOrCreateOAuthUser = async (provider: string, profile: OAuthUser
       });
     }
 
-    // Tạo bản ghi oauth_accounts
     await createOAuthAccount({
       userId: user.id,
       provider,
@@ -132,20 +124,23 @@ export const findOrCreateOAuthUser = async (provider: string, profile: OAuthUser
     });
   }
 
-  if (!user) {
-    throw new Error("OAuth user creation failed");
-  }
+  if (!user) throw new Error("OAuth user creation failed");
 
-  if (!user.isActive) {
-    throw new UnauthorizedError("Tài khoản đã bị vô hiệu hóa");
-  }
+  if (!user.isActive) throw new UnauthorizedError("Tài khoản đã bị vô hiệu hóa");
 
-  // Phát token (mặc định short session, không có rememberMe cho OAuth)
-  const accessToken = signAccessToken({ userId: user.id, role: user.role });
+  const accessToken = signAccessToken({
+    userId: user.id,
+    role: user.role,
+    userName: user.userName ?? user.email ?? user.id,
+  });
+
   const accessTokenTTL = jwtConfig.accessToken.ttl;
   const refreshTokenTTL = jwtConfig.refreshToken.ttl.short;
 
   const newRefreshToken = signRefreshToken({ userId: user.id }, refreshTokenTTL);
+
+  // Build enriched session metadata
+  const sessionMeta = buildSessionMeta(meta?.userAgent, meta?.ip);
 
   await createRefreshToken({
     userId: user.id,
@@ -153,8 +148,11 @@ export const findOrCreateOAuthUser = async (provider: string, profile: OAuthUser
     expiresAt: new Date(Date.now() + refreshTokenTTL),
     absoluteExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     ttlType: "short",
-    userAgent: meta?.userAgent,
-    ip: meta?.ip,
+    userAgent: sessionMeta.userAgent,
+    ip: sessionMeta.ip,
+    deviceName: sessionMeta.deviceName,
+    browser: sessionMeta.browser,
+    location: sessionMeta.location,
   });
 
   return {
@@ -172,7 +170,7 @@ export const findOrCreateOAuthUser = async (provider: string, profile: OAuthUser
   };
 };
 
-// Google
+// ─── Google ───────────────────────────────────────────────────────────────────
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -212,14 +210,11 @@ export const loginWithFacebook = async (accessToken: string, meta?: OAuthLoginMe
   const data = (await response.json()) as any;
 
   if (!response.ok || data.error) {
-    // IN LỖI RA MÀN HÌNH TERMINAL (NODE.JS)
     console.log("==== LỖI TỪ FACEBOOK ====", data.error);
     throw new UnauthorizedError("Facebook token không hợp lệ");
   }
 
-  if (!data.id) {
-    throw new UnauthorizedError("Không lấy được thông tin từ Facebook");
-  }
+  if (!data.id) throw new UnauthorizedError("Không lấy được thông tin từ Facebook");
 
   const profile: OAuthUserProfile = {
     providerAccountId: data.id,
@@ -227,7 +222,6 @@ export const loginWithFacebook = async (accessToken: string, meta?: OAuthLoginMe
     fullName: data.name ?? "Facebook User",
     avatarImage: data.picture?.data?.url,
     accessToken,
-    // Xóa gender và birthday
   };
 
   return findOrCreateOAuthUser("facebook", profile, meta);
@@ -241,9 +235,7 @@ export const exchangeFacebookCode = async (code: string, redirectUri: string, me
     code,
   });
 
-  const tokenRes = await fetch(
-    `https://graph.facebook.com/v25.0/oauth/access_token?${params}`
-  );
+  const tokenRes = await fetch(`https://graph.facebook.com/v25.0/oauth/access_token?${params}`);
   const tokenData = (await tokenRes.json()) as any;
 
   if (!tokenRes.ok || tokenData.error) {

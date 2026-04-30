@@ -3,7 +3,7 @@ import { jwtConfig } from "@/config/jwt";
 import { AccessTokenPayload } from "@/types/jwt";
 import { randomUUID } from "crypto";
 
-export const signAccessToken = (payload: { userId: string; role: string }) => {
+export const signAccessToken = (payload: { userId: string; role: string; userName: string }) => {
   return jwt.sign(payload, jwtConfig.accessToken.secret as Secret, {
     expiresIn: jwtConfig.accessToken.expiresIn,
   });

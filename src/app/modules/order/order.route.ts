@@ -1,11 +1,13 @@
 import { Router } from "express";
 import { authMiddleware } from "@/app/middlewares/auth.middleware";
 import { requireRole } from "@/app/middlewares/role.middleware";
+import { requirePermission } from "@/app/middlewares/auth.middleware";
 import { validate } from "@/app/middlewares/validate.middleware";
 import { asyncHandler } from "@/utils/async-handler";
 import * as c from "./order.controller";
 import { updateOrderAdminSchema, createOrderAdminSchema, orderQuerySchema, exportOrderSchema } from "./order.validation";
 import { exportOrdersAdminHandler } from "./order.controller";
+import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
 
 const router = Router();
 
@@ -17,19 +19,23 @@ router.post("/my/:id/cancel", authMiddleware(true), asyncHandler(c.cancelOrderUs
 router.post("/my/:id/reorder", authMiddleware(true), asyncHandler(c.reorderUserHandler));
 
 // ================== STAFF & ADMIN ==================
+// authMiddleware áp dụng cho tất cả /admin routes
 router.use("/admin", authMiddleware(true));
 
-router.get("/admin/all", requireRole("STAFF", "ADMIN"), validate(orderQuerySchema, "query"), asyncHandler(c.getAllOrdersAdminHandler));
+// Xem danh sách & chi tiết đơn — cần canViewOrders
+router.get("/admin/all", requireRole(...STAFF_ROLES, "ADMIN"), requirePermission("canViewOrders"), validate(orderQuerySchema, "query"), asyncHandler(c.getAllOrdersAdminHandler));
 
-router.get("/admin/export", requireRole("STAFF", "ADMIN"), validate(exportOrderSchema, "query"), asyncHandler(exportOrdersAdminHandler));
+router.get("/admin/export", requireRole(...STAFF_ROLES, "ADMIN"), requirePermission("canViewOrders"), validate(exportOrderSchema, "query"), asyncHandler(exportOrdersAdminHandler));
 
-router.get("/admin/:id", requireRole("STAFF", "ADMIN"), asyncHandler(c.getOrderAdminDetailHandler));
-router.patch("/admin/:id", requireRole("STAFF", "ADMIN"), validate(updateOrderAdminSchema, "body"), asyncHandler(c.updateOrderAdminHandler));
-router.post("/admin/:id/confirm-refund", requireRole("STAFF", "ADMIN"), asyncHandler(c.confirmManualRefundHandler));
+router.get("/admin/:id", requireRole(...STAFF_ROLES, "ADMIN"), requirePermission("canViewOrders"), asyncHandler(c.getOrderAdminDetailHandler));
 
-router.post("/admin/:id/cancel", requireRole("STAFF", "ADMIN"), asyncHandler(c.cancelOrderAdminHandler));
+// Cập nhật trạng thái đơn — cần canUpdateOrder
+router.patch("/admin/:id", requireRole(...STAFF_ROLES, "ADMIN"), requirePermission("canUpdateOrder"), validate(updateOrderAdminSchema, "body"), asyncHandler(c.updateOrderAdminHandler));
+
+router.post("/admin/:id/confirm-refund", requireRole(...STAFF_ROLES, "ADMIN"), requirePermission("canUpdateOrder"), asyncHandler(c.confirmManualRefundHandler));
+
+router.post("/admin/:id/cancel", requireRole(...STAFF_ROLES, "ADMIN"), requirePermission("canUpdateOrder"), asyncHandler(c.cancelOrderAdminHandler));
 
 // ================== ADMIN ONLY ==================
-router.post("/admin", requireRole("ADMIN"), validate(createOrderAdminSchema, "body"), asyncHandler(c.createOrderAdminHandler));
-
+router.post("/admin", requireRole(...STAFF_ROLES, "ADMIN"), requirePermission("canCreateOrder"), validate(createOrderAdminSchema, "body"), asyncHandler(c.createOrderAdminHandler));
 export default router;

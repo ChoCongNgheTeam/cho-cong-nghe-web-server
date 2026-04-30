@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { authMiddleware } from "@/app/middlewares/auth.middleware";
+import { authMiddleware, requirePermission } from "@/app/middlewares/auth.middleware";
 import { requireRole } from "@/app/middlewares/role.middleware";
 import { validate } from "@/app/middlewares/validate.middleware";
 import { asyncHandler } from "@/utils/async-handler";
@@ -23,44 +23,41 @@ import {
   stripeReturnHandler,
 } from "./payment.controller";
 import { createPaymentMethodSchema, updatePaymentMethodSchema } from "./payment.validation";
+import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
 
 const router = Router();
 
-// Public — FE dùng để render select
+const staffAdminAuth = [authMiddleware(), requireRole(...STAFF_ROLES, "ADMIN")] as const;
+const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
+
+// ── Public ─────────────────────────────────────────────────────────────────────
 router.get("/active", asyncHandler(getActivePaymentMethodsHandler));
 
-// Admin CRUD
-router.get("/admin/all", authMiddleware(), requireRole("ADMIN"), asyncHandler(getAllPaymentMethodsHandler));
-router.post("/admin", authMiddleware(), requireRole("ADMIN"), validate(createPaymentMethodSchema), asyncHandler(createPaymentMethodHandler));
-router.patch("/admin/:id", authMiddleware(), requireRole("ADMIN"), validate(updatePaymentMethodSchema), asyncHandler(updatePaymentMethodHandler));
-router.delete("/admin/:id", authMiddleware(), requireRole("ADMIN"), asyncHandler(deletePaymentMethodHandler));
+// ── Admin CRUD — cấu hình payment method ──────────────────────────────────────
+// ACCOUNTING có canPaymentView — chỉ xem
+// ADMIN full CRUD
+router.get("/admin/all", ...staffAdminAuth, requirePermission("canPaymentView"), asyncHandler(getAllPaymentMethodsHandler));
+router.post("/admin", ...adminAuth, validate(createPaymentMethodSchema), asyncHandler(createPaymentMethodHandler));
+router.patch("/admin/:id", ...adminAuth, validate(updatePaymentMethodSchema), asyncHandler(updatePaymentMethodHandler));
+router.delete("/admin/:id", ...adminAuth, asyncHandler(deletePaymentMethodHandler));
 
-// SePay (bank transfer)
-
+// ── Webhooks — public (từ payment gateway gọi vào) ────────────────────────────
 router.post("/webhook/sepay", asyncHandler(sepayWebhookHandler));
+router.post("/webhook/momo", asyncHandler(momoWebhookHandler));
+router.get("/webhook/vnpay", asyncHandler(vnpayWebhookHandler));
+router.post("/webhook/zalopay", asyncHandler(zaloPayCallbackHandler));
 
-// MoMo
-
+// ── User payment flows ────────────────────────────────────────────────────────
 router.post("/momo/create", authMiddleware(), asyncHandler(createMomoPaymentHandler));
-router.post("/webhook/momo", asyncHandler(momoWebhookHandler)); // MoMo IPN — public
 router.get("/momo/return", asyncHandler(momoReturnHandler));
 
-// VNPay
-
 router.post("/vnpay/create", authMiddleware(), asyncHandler(createVnpayPaymentHandler));
-router.get("/webhook/vnpay", asyncHandler(vnpayWebhookHandler)); // VNPay IPN — GET — public
 router.get("/vnpay/return", asyncHandler(vnpayReturnHandler));
 
-// ZaloPay
-
 router.post("/zalopay/create", authMiddleware(), asyncHandler(createZaloPayPaymentHandler));
-router.post("/webhook/zalopay", asyncHandler(zaloPayCallbackHandler)); // ZaloPay POST callback
 router.get("/zalopay/return", asyncHandler(zaloPayReturnHandler));
 
-// Stripe Payment Element — FE gọi để lấy clientSecret
 router.post("/stripe/create", authMiddleware(), asyncHandler(createStripePaymentHandler));
-
-// Stripe Return URL — Stripe redirect FE về đây
 router.get("/stripe/return", asyncHandler(stripeReturnHandler));
 
 export default router;

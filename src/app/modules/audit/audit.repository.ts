@@ -32,17 +32,37 @@ export const findLoginHistory = async (query: ListLoginHistoryQuery & { selfOnly
   return { data, page, limit, total, totalPages: Math.ceil(total / limit) };
 };
 
+/**
+ * Active sessions for the session management UI.
+ *
+ * Returns all non-revoked, non-expired refresh_token rows for a user.
+ * Fields returned cover everything the FE ActiveSession type needs:
+ *   id, deviceName, browser, ip, location, lastUsedAt, createdAt
+ *
+ * NOTE: lastUsedAt is stamped during token rotation (each /refresh call),
+ * so it reflects the last time the client requested a new access token —
+ * a reliable "last active" proxy for sessions that are still alive.
+ */
 export const findActiveSessions = async (userId: string) => {
   return prisma.refresh_tokens.findMany({
     where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
     orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      deviceName: true,
+      browser: true,
+      ip: true,
+      location: true,
+      lastUsedAt: true,
+      createdAt: true,
+      userAgent: true,
+    },
   });
 };
 
 export const revokeSession = async (tokenId: string, requesterId: string, isAdmin: boolean) => {
   const token = await prisma.refresh_tokens.findUnique({ where: { id: tokenId } });
   if (!token) return null;
-  // Staff chỉ được revoke session của chính mình
   if (!isAdmin && token.userId !== requesterId) return null;
   return prisma.refresh_tokens.update({
     where: { id: tokenId },
@@ -61,7 +81,7 @@ export const revokeAllSessions = async (userId: string, exceptTokenId?: string) 
   });
 };
 
-// Anomaly: login fail > 5 lần trong 10 phút từ cùng IP
+// Anomaly: > 5 failed logins from the same IP within 10 minutes
 export const findBruteForceAttempts = async () => {
   const since = new Date(Date.now() - 10 * 60 * 1000);
   return prisma.login_history.groupBy({

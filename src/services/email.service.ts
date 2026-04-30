@@ -142,6 +142,38 @@ export const sendResetPasswordEmail = async (email: string, resetLink: string) =
   await transporter.sendMail(mailOptions);
 };
 
+export const sendVerificationEmail = async (email: string, verifyLink: string): Promise<void> => {
+  await transporter.sendMail({
+    to: email,
+    subject: "Xác nhận tài khoản của bạn",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto;">
+        <h2 style="color: #333;">Xác nhận email</h2>
+        <p>Cảm ơn bạn đã đăng ký! Vui lòng nhấp vào nút bên dưới để xác nhận địa chỉ email và kích hoạt tài khoản.</p>
+        <a
+          href="${verifyLink}"
+          style="
+            display: inline-block;
+            margin-top: 16px;
+            padding: 12px 24px;
+            background-color: #4f46e5;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: bold;
+          "
+        >
+          Xác nhận email
+        </a>
+        <p style="margin-top: 24px; color: #666; font-size: 13px;">
+          Link có hiệu lực trong <strong>24 giờ</strong>. Nếu bạn không đăng ký tài khoản này, hãy bỏ qua email này.
+        </p>
+        <p style="color: #999; font-size: 12px;">Hoặc copy link sau vào trình duyệt:<br />${verifyLink}</p>
+      </div>
+    `,
+  });
+};
+
 // Thêm vào cuối email.service.ts
 
 export const sendNotificationEmail = async (email: string, title: string, body: string, data?: Record<string, any>) => {
@@ -434,4 +466,109 @@ export const sendOrderConfirmationEmail = async (
   };
 
   await transporter.sendMail(mailOptions);
+};
+
+export interface NewDeviceAlertPayload {
+  browser: string; // e.g. "Chrome 147 / Windows 10"
+  deviceName: string; // e.g. "Desktop" | "Apple iPhone"
+  location: string; // e.g. "Ho Chi Minh City, VN"
+  ip: string; // e.g. "113.161.x.x"
+  time: Date; // login timestamp
+}
+
+/**
+ * Sent the first time a user logs in from a browser+device combo we've
+ * never seen before in the past 30 days.
+ *
+ * Contains:
+ *  - What device/browser logged in
+ *  - Where (location + IP)
+ *  - When
+ *  - CTA to change password immediately if it wasn't them
+ */
+export const sendNewDeviceLoginAlert = async (email: string, payload: NewDeviceAlertPayload): Promise<void> => {
+  const { browser, deviceName, location, ip, time } = payload;
+
+  // Format time in Vietnamese locale
+  const timeStr = time.toLocaleString("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    dateStyle: "full",
+    timeStyle: "short",
+  });
+
+  const changePasswordUrl = `${process.env.FRONTEND_URL}/settings?tab=security`;
+
+  await transporter.sendMail({
+    to: email,
+    subject: "⚠️ Đăng nhập từ thiết bị mới",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto; color: #333;">
+ 
+        <div style="background: #f59e0b; padding: 16px 24px; border-radius: 12px 12px 0 0;">
+          <h2 style="margin: 0; color: #fff; font-size: 18px;">⚠️ Phát hiện đăng nhập mới</h2>
+        </div>
+ 
+        <div style="background: #fff; border: 1px solid #e5e7eb; border-top: none;
+                    padding: 24px; border-radius: 0 0 12px 12px;">
+ 
+          <p style="margin-top: 0;">
+            Chúng tôi phát hiện tài khoản của bạn vừa được đăng nhập từ một
+            <strong>thiết bị chưa từng sử dụng trước đây</strong>.
+          </p>
+ 
+          <!-- Detail table -->
+          <table style="width: 100%; border-collapse: collapse; margin: 16px 0;
+                        font-size: 14px; background: #f9fafb; border-radius: 8px;
+                        overflow: hidden;">
+            <tr>
+              <td style="padding: 10px 14px; color: #6b7280; width: 40%;">🖥️ Thiết bị</td>
+              <td style="padding: 10px 14px; font-weight: 600;">${deviceName}</td>
+            </tr>
+            <tr style="background: #f3f4f6;">
+              <td style="padding: 10px 14px; color: #6b7280;">🌐 Trình duyệt</td>
+              <td style="padding: 10px 14px; font-weight: 600;">${browser}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 14px; color: #6b7280;">📍 Vị trí</td>
+              <td style="padding: 10px 14px; font-weight: 600;">${location}</td>
+            </tr>
+            <tr style="background: #f3f4f6;">
+              <td style="padding: 10px 14px; color: #6b7280;">🔌 Địa chỉ IP</td>
+              <td style="padding: 10px 14px; font-weight: 600; font-family: monospace;">${ip}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 14px; color: #6b7280;">🕐 Thời gian</td>
+              <td style="padding: 10px 14px; font-weight: 600;">${timeStr}</td>
+            </tr>
+          </table>
+ 
+          <!-- Was it you? -->
+          <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px;
+                      padding: 14px 16px; margin: 16px 0;">
+            <p style="margin: 0; font-size: 14px;">
+              <strong>Nếu đây là bạn</strong> — không cần làm gì thêm.
+            </p>
+            <p style="margin: 6px 0 0; font-size: 14px;">
+              <strong>Nếu không phải bạn</strong> — hãy đổi mật khẩu ngay và
+              thu hồi tất cả phiên đăng nhập khác.
+            </p>
+          </div>
+ 
+          <a
+            href="${changePasswordUrl}"
+            style="display: inline-block; margin-top: 8px; padding: 12px 24px;
+                   background: #dc2626; color: #fff; text-decoration: none;
+                   border-radius: 8px; font-weight: bold; font-size: 14px;"
+          >
+            🔒 Đổi mật khẩu ngay
+          </a>
+ 
+          <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">
+            Email này được gửi tự động từ hệ thống bảo mật.
+            Bạn nhận được vì tài khoản liên kết với địa chỉ email này.
+          </p>
+        </div>
+      </div>
+    `,
+  });
 };

@@ -297,6 +297,7 @@ export const sendReviewNewAdminNotification = async (customerName: string, produ
         role: { in: ["ADMIN", "STAFF"] },
         isActive: true,
         deletedAt: null,
+        notifReviewNew: true,
       },
       select: { id: true },
     });
