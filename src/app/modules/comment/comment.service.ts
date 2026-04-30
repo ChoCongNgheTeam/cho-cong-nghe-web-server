@@ -3,7 +3,7 @@ import * as repo from "./comment.repository";
 import { transformComment, transformCommentsList } from "./comment.transformers";
 import { CreateCommentInput, UpdateCommentInput, ListCommentsQuery, CommentTargetType } from "./comment.validation";
 import { NotFoundError, BadRequestError, ForbiddenError } from "@/errors";
-import { sendCommentNewAdminNotification } from "@/app/modules/notification/notification.service";
+import { sendCommentNewAdminNotification, sendCommentReplyUserNotification } from "@/app/modules/notification/notification.service";
 import prisma from "@/config/db";
 
 // ── Helper ────────────────────────────────────────────────────────────────────
@@ -95,11 +95,37 @@ export const createComment = async (userId: string, input: CreateCommentInput) =
   // 5. Notify admin/staff — fire-and-forget, không block response
   setImmediate(async () => {
     try {
-      const [user, targetName] = await Promise.all([prisma.users.findUnique({ where: { id: userId }, select: { fullName: true } }), resolveTargetName(input.targetType, input.targetId)]);
+      const [commenter, targetName] = await Promise.all([
+        prisma.users.findUnique({ where: { id: userId }, select: { fullName: true, role: true } }),
+        resolveTargetName(input.targetType, input.targetId),
+      ]);
 
-      await sendCommentNewAdminNotification(user?.fullName ?? "Khách hàng", targetName, comment.id, input.targetId);
+      const isAdmin = commenter?.role === "ADMIN" || commenter?.role === "STAFF";
+
+      if (!isAdmin) {
+        // Khách hàng comment → notify admin
+        await sendCommentNewAdminNotification(commenter?.fullName ?? "Khách hàng", targetName, comment.id, input.targetId);
+      } else if (input.parentId) {
+        const parentComment = await repo.findById(input.parentId);
+        const product = await prisma.products.findUnique({
+          where: { id: input.targetId },
+          select: { name: true, slug: true },
+        });
+
+        // Guard: parentComment null hoặc userId null thì skip
+        if (parentComment && parentComment.userId) {
+          await sendCommentReplyUserNotification(
+            parentComment.userId,          // ← không còn null
+            commenter?.fullName ?? "Nhân viên",
+            product?.name ?? "",
+            comment.id,
+            input.targetId,
+            product?.slug ?? "",
+          );
+        }
+      }
     } catch (err) {
-      console.error("[Notification] Lỗi gửi notify comment mới:", err);
+      console.error("[Notification] Lỗi gửi notify comment:", err);
     }
   });
 

@@ -322,3 +322,23 @@ export const sendReviewNewAdminNotification = async (customerName: string, produ
     console.error("[Notification Error] Lỗi khi gửi thông báo review mới:", error);
   }
 };
+
+export const sendCommentReplyUserNotification = async (
+  userId: string,
+  adminName: string,
+  productName: string,
+  commentId: string,
+  productId: string,
+  productSlug: string,
+) => {
+  return createAndSend(
+    {
+      userId,
+      type: "COMMENT_NEW",
+      title: "💬 Bình luận của bạn có phản hồi mới!",
+      body: `${adminName} vừa phản hồi bình luận của bạn về "${productName}".`,
+      data: { commentId, productId, productName, productSlug },
+    },
+    ["IN_APP"],
+  );
+};
