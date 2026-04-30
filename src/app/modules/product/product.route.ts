@@ -100,9 +100,8 @@ router.get("/slug/:slug/related", validate(productBySlugParamsSchema, "params"),
 router.get("/slug/:slug/reviews", validate(productBySlugParamsSchema, "params"), validate(reviewsQuerySchema, "query"), asyncHandler(getProductReviewsHandler));
 router.get("/promotion/:promotionId", asyncHandler(getProductsByPromotionHandler));
 
-// ── Admin — stats, list, trash ────────────────────────────────────────────────
-// Stats: ADMIN only (dashboard overview)
-router.get("/admin/stats", ...adminAuth, asyncHandler(getProductStatsHandler));
+// Stats: Admin + Staff có canViewProducts
+router.get("/admin/stats", authMiddleware(true), requireRole(...STAFF_ROLES, "ADMIN"), requirePermission("canViewProducts"), asyncHandler(getProductStatsHandler));
 
 // Xem danh sách — SALES + MARKETING có canViewProducts
 router.get("/admin/all", ...staffAdminAuth, requirePermission("canViewProducts"), validate(adminListProductsSchema, "query"), asyncHandler(getProductsAdminHandler));
