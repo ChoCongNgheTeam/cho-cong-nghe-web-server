@@ -1,20 +1,16 @@
 import { Router } from "express";
 import { authMiddleware } from "@/app/middlewares/auth.middleware";
 import { requireRole } from "@/app/middlewares/role.middleware";
+import { requirePermission } from "@/app/middlewares/auth.middleware";
 import { validate } from "@/app/middlewares/validate.middleware";
 import { asyncHandler } from "@/utils/async-handler";
 import * as c from "./user-address.controller";
-import {
-  createAddressSchema,
-  updateAddressSchema,
-  addressIdSchema,
-  listAddressesQuerySchema,
-} from "./user-address.validation";
+import { createAddressSchema, updateAddressSchema, addressIdSchema, listAddressesQuerySchema } from "./user-address.validation";
+import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
 
 const router = Router();
 
-// ==================== PROTECTED ROUTES (tất cả phải đăng nhập) ====================
-
+// ==================== PROTECTED ROUTES ====================
 router.use(authMiddleware(true));
 
 // --- User ---
@@ -26,9 +22,9 @@ router.patch("/:addressId", validate(addressIdSchema, "params"), validate(update
 router.delete("/:addressId", validate(addressIdSchema, "params"), asyncHandler(c.deleteAddressHandler));
 router.put("/:addressId/set-default", validate(addressIdSchema, "params"), asyncHandler(c.setDefaultAddressHandler));
 
-// --- Staff & Admin ---
-router.get("/admin/all", requireRole("STAFF", "ADMIN"), validate(listAddressesQuerySchema, "query"), asyncHandler(c.getAllAddressesAdminHandler));
-router.delete("/admin/:addressId", requireRole("STAFF", "ADMIN"), validate(addressIdSchema, "params"), asyncHandler(c.softDeleteAddressAdminHandler));
+// --- Staff & Admin --- xem địa chỉ users → canViewUsers
+router.get("/admin/all", requireRole(...STAFF_ROLES, "ADMIN"), requirePermission("canViewUsers"), validate(listAddressesQuerySchema, "query"), asyncHandler(c.getAllAddressesAdminHandler));
+router.delete("/admin/:addressId", requireRole(...STAFF_ROLES, "ADMIN"), requirePermission("canViewUsers"), validate(addressIdSchema, "params"), asyncHandler(c.softDeleteAddressAdminHandler));
 
 // --- Admin only (trash & hard delete) ---
 router.get("/admin/trash/addresses", requireRole("ADMIN"), asyncHandler(c.getDeletedAddressesHandler));

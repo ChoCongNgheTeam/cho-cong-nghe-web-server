@@ -1,5 +1,25 @@
 import { PrismaClient } from "@prisma/client";
-import { seedBrands, seedCategories, seedAttributesAndOptions, seedSpecifications, seedProductSpecifications, seedProductHighlights, seedPaymentMethods, seedUsers, seedProducts, seedVariants, seedProductColorImages, seedUserAddresses, seedVouchers, seedPromotions, seedBlogs, seedComments, seedImageMedia, seedCategoryVariantAttributes, seedCampaigns,  seedPages } from "./seeds";
+import {
+  seedBrands,
+  seedCategories,
+  seedAttributesAndOptions,
+  seedSpecifications,
+  seedProductSpecifications,
+  seedProductHighlights,
+  seedPaymentMethods,
+  seedProducts,
+  seedVariants,
+  seedProductColorImages,
+  seedUserAddresses,
+  seedVouchers,
+  seedPromotions,
+  seedBlogs,
+  seedComments,
+  seedImageMedia,
+  seedCategoryVariantAttributes,
+  seedCampaigns,
+  seedPages,
+} from "./seeds";
 
 const prisma = new PrismaClient();
 
@@ -12,9 +32,9 @@ async function main() {
 
   await seedCampaigns(prisma);
 
-  const users = await seedUsers(prisma);
+  // const users = await seedUsers(prisma);
 
-  await seedUserAddresses(prisma, { users });
+  // await seedUserAddresses(prisma, { users });
 
   console.log("Seeding attribute options and specifications...");
 
@@ -29,7 +49,11 @@ async function main() {
     categories,
   });
 
-  (await seedProductSpecifications(prisma), await seedProductHighlights(prisma), await seedVariants(prisma, { products }), await seedProductColorImages(prisma, { products }), await Promise.all([seedPaymentMethods(prisma), seedVouchers(prisma), seedPromotions(prisma), seedBlogs(prisma), seedComments(prisma), seedImageMedia(prisma)]));
+  (await seedProductSpecifications(prisma),
+    await seedProductHighlights(prisma),
+    await seedVariants(prisma, { products }),
+    await seedProductColorImages(prisma, { products }),
+    await Promise.all([seedPaymentMethods(prisma), seedVouchers(prisma), seedPromotions(prisma), seedBlogs(prisma), seedComments(prisma), seedImageMedia(prisma)]));
 
   await seedPages(prisma);
 

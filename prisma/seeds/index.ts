@@ -5,7 +5,7 @@ export * from "./specifications.seed";
 export * from "./product-specifications.seed";
 export * from "./product-highlight.seed";
 export * from "./payment-method.seed";
-export * from "./user.seed";
+// export * from "./user.seed";
 export * from "./product.seed";
 export * from "./variant.seed";
 export * from "./product-color-images.seed";

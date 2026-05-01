@@ -3,6 +3,7 @@ import { sendPushNotification } from "@/app/modules/integrations/firebase.servic
 import { sendNotificationEmail } from "@/services/email.service";
 import { CreateNotificationInput, NotificationPayload } from "./notification.types";
 import prisma from "@/config/db";
+import { STAFF_ROLES } from "../staff-permissions/staff-permissions.types";
 
 /**
  * Core function — tạo notification trong DB + gửi push/email nếu cần
@@ -207,7 +208,9 @@ export const sendOrderCreatedAdminNotification = async (orderCode: string) => {
   try {
     const adminsAndStaffs = await prisma.users.findMany({
       where: {
-        role: { in: ["ADMIN", "STAFF"] },
+        role: {
+          in: ["ADMIN", ...STAFF_ROLES],
+        },
         isActive: true,
         deletedAt: null,
       },
@@ -250,7 +253,9 @@ export const sendCommentNewAdminNotification = async (customerName: string, prod
   try {
     const adminsAndStaffs = await prisma.users.findMany({
       where: {
-        role: { in: ["ADMIN", "STAFF"] },
+        role: {
+          in: ["ADMIN", ...STAFF_ROLES],
+        },
         isActive: true,
         deletedAt: null,
       },
@@ -294,7 +299,9 @@ export const sendReviewNewAdminNotification = async (customerName: string, produ
   try {
     const adminsAndStaffs = await prisma.users.findMany({
       where: {
-        role: { in: ["ADMIN", "STAFF"] },
+        role: {
+          in: ["ADMIN", ...STAFF_ROLES],
+        },
         isActive: true,
         deletedAt: null,
         notifReviewNew: true,
