@@ -252,6 +252,20 @@ export const getProductVariantOptions = async (slug: string, options?: Record<st
       ),
       // attributes map đầy đủ cho FE generic
       attributes: attrMap,
+
+      // pricingContext — dùng bởi getProductVariantOptionsWithPricing use-case
+      // để tính giá sale (không expose ra client trực tiếp)
+      pricingContext: {
+        productId: product.id,
+        variantId: v.id,
+        price: Number(v.price),
+        brandId: product.brand?.id,
+        categoryPath: buildCategoryPath(product.category),
+        variantAttributes: (v.variantAttributes ?? []).map((va: any) => ({
+          code: va.attributeOption.attribute.code,
+          value: va.attributeOption.value,
+        })),
+      },
     };
   });
 };
