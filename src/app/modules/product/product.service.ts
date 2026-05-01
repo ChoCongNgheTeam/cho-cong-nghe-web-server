@@ -1,14 +1,16 @@
 import { slugify } from "transliteration";
 import * as repo from "./product.repository";
-import { CreateProductInput, UpdateProductInput, ListProductsQuery, ReviewsQuery, SearchSuggestQuery } from "./product.validation";
+import { CreateProductInput, UpdateProductInput, ListProductsQuery, ReviewsQuery, SearchSuggestQuery, ExportProductsQuery } from "./product.validation";
 import { transformProductCard, transformProductDetail, transformProductSpecifications, transformProductHighlights, transformProductVariantResponse } from "./product.transformers";
-import { RawVariant, ReviewStats } from "./product.types";
 import { buildCategoryPath } from "../category/category.helpers";
 import prisma from "prisma/client";
 import { findProductsForComparison, findProductsOnSaleDate, findSaleScheduleDays, findTrendingSearchSuggestions, getAdminProductStats, getProductIdsFromPromotions } from "./product.repository";
 import { normalizeVariant } from "./product.helpers";
 import { NotFoundError, BadRequestError, ConflictError } from "@/errors";
 import { invalidateFilterCache } from "./product_filter.service";
+import { mapProductsToExportRows, buildProductCsvBuffer, buildProductExcelBuffer, buildImportTemplateBuffer } from "./product.export";
+import { parseExcelBuffer, parseCsvBuffer, bulkImportVariants, ImportResult } from "./product.import";
+import { Prisma } from "@prisma/client";
 
 invalidateFilterCache();
 
@@ -1093,4 +1095,122 @@ export const getProductVariantsBySelection = async (slug: string, selectedOption
     variants: normalizedVariants,
     images: filteredImages,
   };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPORT
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const exportProductsAdmin = async (query: ExportProductsQuery) => {
+  const { format = "excel", brandId, categoryId, isActive, inStock, search, limit = 5000 } = query;
+
+  // Build where
+  const where: Prisma.productsWhereInput = { deletedAt: null };
+
+  if (isActive !== undefined) where.isActive = isActive;
+
+  if (search?.trim()) {
+    where.OR = [{ name: { contains: search.trim(), mode: "insensitive" } }];
+  }
+
+  if (brandId) {
+    const ids = Array.isArray(brandId) ? brandId : [brandId];
+    where.brandId = ids.length === 1 ? ids[0] : { in: ids };
+  }
+
+  if (categoryId) where.categoryId = categoryId;
+
+  const variantWhere: Prisma.products_variantsWhereInput = { deletedAt: null };
+  if (inStock) variantWhere.quantity = { gt: 0 };
+
+  const products = await prisma.products.findMany({
+    where,
+    take: limit,
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      isActive: true,
+      createdAt: true,
+      brand: { select: { id: true, name: true } },
+      category: { select: { id: true, name: true } },
+      variants: {
+        where: variantWhere,
+        select: {
+          id: true,
+          code: true,
+          price: true,
+          quantity: true,
+          soldCount: true,
+          isDefault: true,
+          isActive: true,
+          variantAttributes: {
+            select: {
+              attributeOption: {
+                select: {
+                  value: true,
+                  label: true,
+                  attribute: { select: { code: true, name: true } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const rows = mapProductsToExportRows(products);
+
+  if (format === "csv") {
+    return {
+      buffer: buildProductCsvBuffer(rows),
+      contentType: "text/csv; charset=utf-8",
+      filename: `products_export_${Date.now()}.csv`,
+      count: rows.length,
+    };
+  }
+
+  return {
+    buffer: await buildProductExcelBuffer(rows),
+    contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    filename: `products_export_${Date.now()}.xlsx`,
+    count: rows.length,
+  };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IMPORT TEMPLATE
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getImportTemplate = async () => {
+  const buffer = await buildImportTemplateBuffer();
+  return {
+    buffer,
+    contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    filename: "product_import_template.xlsx",
+  };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IMPORT
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const importProductsAdmin = async (file: Express.Multer.File): Promise<ImportResult> => {
+  if (!file) throw new BadRequestError("Không có file được upload");
+
+  const mime = file.mimetype.toLowerCase();
+  const name = file.originalname.toLowerCase();
+
+  const isExcel = mime.includes("spreadsheetml") || mime.includes("excel") || name.endsWith(".xlsx") || name.endsWith(".xls");
+
+  const isCsv = mime.includes("csv") || name.endsWith(".csv");
+
+  if (!isExcel && !isCsv) {
+    throw new BadRequestError("Chỉ hỗ trợ file .xlsx hoặc .csv");
+  }
+
+  const rows = isExcel ? await parseExcelBuffer(file.buffer) : parseCsvBuffer(file.buffer);
+
+  return bulkImportVariants(rows);
 };

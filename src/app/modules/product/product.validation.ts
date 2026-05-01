@@ -54,6 +54,23 @@ export const variantQuerySchema = z
     { message: "Phải cung cấp code hoặc ít nhất một thuộc tính sản phẩm" },
   );
 
+export type CompareProductsQuery = z.infer<typeof compareProductsSchema>;
+
+/**
+ * GET /products/admin/export
+ * Filter giống adminListProductsSchema nhưng không có page/limit (lấy toàn bộ).
+ * Thêm format + giới hạn 5000 rows.
+ */
+export const exportProductsSchema = z.object({
+  format: z.enum(["csv", "excel"]).default("excel"),
+  brandId: z.union([z.string().uuid(), z.array(z.string().uuid())]).optional(),
+  categoryId: z.string().uuid().optional(),
+  isActive: z.preprocess((v) => (v === "true" ? true : v === "false" ? false : v), z.boolean().optional()),
+  inStock: z.preprocess((v) => (v === "true" ? true : v === "false" ? false : v), z.boolean().optional()),
+  search: z.string().optional(),
+  limit: z.coerce.number().min(1).max(5000).default(5000).optional(),
+});
+
 export const productParamsSchema = z.object({
   id: z.uuid({ message: "ID sản phẩm không hợp lệ" }),
 });
@@ -257,7 +274,7 @@ export const compareProductsSchema = z.object({
     .pipe(z.array(z.string().uuid("ID sản phẩm không hợp lệ")).min(2, "Cần ít nhất 2 sản phẩm").max(4, "Tối đa 4 sản phẩm")),
 });
 
-export type CompareProductsQuery = z.infer<typeof compareProductsSchema>;
+export type ExportProductsQuery = z.infer<typeof exportProductsSchema>;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INFERRED TYPES

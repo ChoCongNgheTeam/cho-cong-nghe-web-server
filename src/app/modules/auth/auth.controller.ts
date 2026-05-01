@@ -1,5 +1,5 @@
-import { CookieOptions, Request, Response } from "express";
-import { register, login, forgotPassword, resetPassword, changePassword, logout, refreshTokenRotation } from "./auth.service";
+import { Request, Response } from "express";
+import { register, login, forgotPassword, resetPassword, changePassword, logout, refreshTokenRotation, verifyEmail, resendVerificationEmail } from "./auth.service";
 import { REFRESH_COOKIE_OPTIONS } from "@/config/cookie";
 
 const setRefreshTokenCookie = (res: Response, token: string, maxAge: number) => {
@@ -11,7 +11,10 @@ const setRefreshTokenCookie = (res: Response, token: string, maxAge: number) => 
 
 export const registerHandler = async (req: Request, res: Response) => {
   const user = await register(req.body);
-  res.status(201).json({ data: user, message: "Đăng ký thành công" });
+  res.status(201).json({
+    data: user,
+    message: "Đăng ký thành công. Vui lòng kiểm tra email để xác nhận tài khoản.",
+  });
 };
 
 export const loginHandler = async (req: Request, res: Response) => {
@@ -24,7 +27,7 @@ export const loginHandler = async (req: Request, res: Response) => {
 
   res.json({
     user,
-    accessToken, // FE lưu vào memory (biến JS / React state)
+    accessToken,
     accessTokenTTL,
     message: "Đăng nhập thành công",
   });
@@ -42,7 +45,7 @@ export const refreshTokenHandler = async (req: Request, res: Response) => {
   setRefreshTokenCookie(res, refreshToken, refreshTokenTTL);
 
   return res.json({
-    accessToken, // FE cập nhật lại memory
+    accessToken,
     accessTokenTTL,
     message: "Token refreshed",
   });
@@ -74,4 +77,34 @@ export const changePasswordHandler = async (req: Request, res: Response) => {
   const { currentPassword, newPassword } = req.body;
   await changePassword(req.user!.id, currentPassword, newPassword);
   res.json({ message: "Đổi mật khẩu thành công" });
+};
+
+/**
+ * GET /auth/verify-email?token=xxx
+ * Called when user clicks the link in the verification email.
+ * Redirects to frontend after verifying.
+ */
+export const verifyEmailHandler = async (req: Request, res: Response) => {
+  const { token } = req.query;
+
+  if (!token || typeof token !== "string") {
+    return res.redirect(`${process.env.FRONTEND_URL}/verify-email?status=invalid`);
+  }
+
+  try {
+    await verifyEmail(token);
+    return res.redirect(`${process.env.FRONTEND_URL}/verify-email?status=success`);
+  } catch {
+    return res.redirect(`${process.env.FRONTEND_URL}/verify-email?status=invalid`);
+  }
+};
+
+/**
+ * POST /auth/resend-verification
+ * Body: { email: string }
+ * Allows users who missed/lost the verification email to request a new one.
+ */
+export const resendVerificationHandler = async (req: Request, res: Response) => {
+  const result = await resendVerificationEmail(req.body.email);
+  res.json(result);
 };

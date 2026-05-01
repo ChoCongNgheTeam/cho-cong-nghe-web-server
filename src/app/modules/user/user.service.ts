@@ -4,7 +4,11 @@ import * as userRepository from "./user.repository";
 import { NotFoundError, ForbiddenError, BadRequestError } from "@/errors";
 import { handlePrismaError } from "@/utils/handle-prisma-error";
 import { deleteOldAvatarImage } from "./user.helpers";
-import { ChangePasswordInput, CreateUserInput, GetUsersQuery, UpdateProfileInput, UpdateUserInput } from "./user.validation";
+import { ChangePasswordInput, CreateUserInput, ExportUsersQuery, GetUsersQuery, UpdateNotifPreferencesInput, UpdateProfileInput, UpdateUserInput } from "./user.validation";
+import { Prisma } from "@prisma/client";
+import { buildUserCsvBuffer, buildUserExcelBuffer, mapUsersToExportRows } from "./user.export";
+import { seedDefaultPermissions } from "@/app/modules/staff-permissions/staff-permissions.service";
+import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
 
 // Helper
 
@@ -17,7 +21,17 @@ const assertUserExists = async (id: string, options: { includeDeleted?: boolean;
 // Self (user đang đăng nhập)
 
 export const getMe = async (userId: string) => {
-  return assertUserExists(userId);
+  const user = await userRepository.findMeById(userId);
+  if (!user) throw new NotFoundError("Người dùng");
+
+  // Flatten staffPermissions ra ngoài, bỏ field nested
+  const { staffPermissions, ...rest } = user as any;
+
+  return {
+    ...rest,
+    // Chỉ trả permissions nếu có (staff roles) — ADMIN/CUSTOMER trả undefined
+    ...(staffPermissions ? { permissions: staffPermissions } : {}),
+  };
 };
 
 export const updateMe = async (userId: string, input: UpdateProfileInput) => {
@@ -73,7 +87,14 @@ export const getUserById = async (id: string, options: { includeDeleted?: boolea
 export const createUser = async (input: CreateUserInput) => {
   const { password, ...rest } = input;
   const passwordHash = await bcrypt.hash(password, 10);
-  return userRepository.create({ ...rest, passwordHash }).catch(handlePrismaError);
+  const newUser = await userRepository.create({ ...rest, passwordHash }).catch(handlePrismaError);
+
+  // Tự động tạo permissions mặc định nếu là staff role
+  if (STAFF_ROLES.includes((newUser as any).role)) {
+    await seedDefaultPermissions((newUser as any).id, (newUser as any).role);
+  }
+
+  return newUser;
 };
 
 export const updateUser = async (id: string, input: UpdateUserInput) => {
@@ -101,7 +122,19 @@ export const updateUser = async (id: string, input: UpdateUserInput) => {
 
   delete data.removeAvatar;
 
-  return userRepository.update(id, data).catch(handlePrismaError);
+  const updated = await userRepository.update(id, data).catch(handlePrismaError);
+
+  // Nếu admin đổi role → re-seed permissions theo role mới
+  if (data.role && data.role !== user.role) {
+    const newRole = data.role as string;
+    if (STAFF_ROLES.includes(newRole as any)) {
+      // Đổi sang staff role → reset permissions về preset của role mới
+      await seedDefaultPermissions(id, newRole);
+    }
+    // Đổi sang CUSTOMER/ADMIN → không cần permissions (cascade delete nếu muốn dọn sạch)
+  }
+
+  return updated;
 };
 
 // Soft delete — Staff & Admin
@@ -146,4 +179,88 @@ export const hardDeleteUser = async (id: string) => {
 
 export const getDeletedUsers = async (query: Pick<GetUsersQuery, "page" | "limit">) => {
   return userRepository.findAllDeleted(query);
+};
+
+export const exportUsersAdmin = async (query: ExportUsersQuery) => {
+  const { format = "excel", search, role, isActive, gender, withOrderStats = false, limit = 5000 } = query;
+
+  // Build where — tương tự findAll trong repository
+  const where: Prisma.usersWhereInput = { deletedAt: null };
+
+  if (search?.trim()) {
+    where.OR = [
+      { email: { contains: search.trim(), mode: "insensitive" } },
+      { fullName: { contains: search.trim(), mode: "insensitive" } },
+      { userName: { contains: search.trim(), mode: "insensitive" } },
+      { phone: { contains: search.trim() } },
+    ];
+  }
+  if (role) where.role = role;
+  if (isActive !== undefined) where.isActive = isActive;
+  if (gender) where.gender = gender;
+
+  const users = await prisma.users.findMany({
+    where,
+    take: limit,
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      fullName: true,
+      userName: true,
+      email: true,
+      phone: true,
+      role: true,
+      gender: true,
+      isActive: true,
+      createdAt: true,
+    },
+  });
+
+  // Lấy order stats nếu cần (1 query aggregate)
+  const orderStatsMap = new Map<string, { orderCount: number; totalSpent: number }>();
+
+  if (withOrderStats && users.length > 0) {
+    const userIds = users.map((u) => u.id);
+    const stats = await prisma.orders.groupBy({
+      by: ["userId"],
+      where: { userId: { in: userIds } },
+      _count: { id: true },
+      _sum: { totalAmount: true },
+    });
+    for (const s of stats) {
+      orderStatsMap.set(s.userId, {
+        orderCount: s._count.id,
+        totalSpent: Number(s._sum.totalAmount ?? 0),
+      });
+    }
+  }
+
+  const rows = mapUsersToExportRows(users, orderStatsMap);
+
+  if (format === "csv") {
+    return {
+      buffer: buildUserCsvBuffer(rows),
+      contentType: "text/csv; charset=utf-8",
+      filename: `users_export_${Date.now()}.csv`,
+      count: rows.length,
+    };
+  }
+
+  return {
+    buffer: await buildUserExcelBuffer(rows),
+    contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    filename: `users_export_${Date.now()}.xlsx`,
+    count: rows.length,
+  };
+};
+
+export const getMyNotifPreferences = async (userId: string) => {
+  const prefs = await userRepository.getNotifPreferences(userId);
+  if (!prefs) throw new NotFoundError("Người dùng");
+  return prefs;
+};
+
+export const updateMyNotifPreferences = async (userId: string, input: UpdateNotifPreferencesInput) => {
+  await assertUserExists(userId);
+  return userRepository.updateNotifPreferences(userId, input).catch(handlePrismaError);
 };

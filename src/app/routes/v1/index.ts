@@ -41,17 +41,43 @@ import specificationRouter from "@/app/modules/specifications/specification.rout
 import { chatbotRoute } from "@/app/modules/chatbot/chatbot.route";
 
 import searchRoutes from "@/app/modules/search/search.route";
-
 import notificationRoutes from "@/app/modules/notification/notification.route";
-
 import analyticsRouter from "@/app/modules/analytics/analytics.route";
-
 import categoryVariantAttributeRoute from "@/app/modules/category-variant/category-variant-attribute.route";
-
 import { aiContentRoute } from "@/app/modules/ai-content/ai-content.route";
 import aiCompareRouter from "@/app/modules/ai-compare/ai-compare.router";
+import settingsRouter from "@/app/modules/settings/settings.route";
+import auditRouter from "@/app/modules/audit/audit.route";
+import { initSettingsCache } from "@/app/modules/settings/settings.service";
+
+// Audit middleware — tự động ghi log mọi mutation có xác thực
+import { auditMiddleware } from "@/app/middlewares/audit.middleware";
+
+import staffPermissionsRouter from "@/app/modules/staff-permissions/staff-permissions.route";
 
 const router = Router();
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Mount auditMiddleware MỘT LẦN DUY NHẤT tại đây.
+//
+// Tại sao đặt ở đây (routes/v1) thay vì app.ts?
+//   - app.ts mount trước express.json() nên body chưa parse được.
+//   - Ở đây body đã được parse (express.json() chạy trong app.ts trước routes).
+//
+// Tại sao không cần lo req.user chưa có?
+//   - auditMiddleware chỉ ĐĂNG KÝ res.on("finish"), rồi gọi next() ngay.
+//   - Listener "finish" chạy SAU KHI toàn bộ chain hoàn tất —
+//     lúc đó authMiddleware trong router con đã gắn req.user rồi.
+//   - Nếu req.user vẫn undefined (public route) → listener tự skip.
+//
+// Các route KHÔNG bị log (tự skip bên trong middleware):
+//   - GET requests (chỉ log mutation: POST/PUT/PATCH/DELETE)
+//   - /auth/*    (login/register có auditLoginHistory riêng)
+//   - /audit/*   (chính nó)
+//   - /notifications/*/read* (đánh dấu đọc)
+//   - /fcm-token (lưu push token)
+// ─────────────────────────────────────────────────────────────────────────────
+router.use(auditMiddleware);
 
 // ===== Core & Auth =====
 router.use("/auth", authRoutes);
@@ -110,5 +136,15 @@ router.use("/analytics", analyticsRouter);
 
 // ===== Category Variant =====
 router.use("/category-variant-attributes", categoryVariantAttributeRoute);
+
+// ===== Settings & Audit =====
+router.use("/settings", settingsRouter);
+
+router.use("/audit", auditRouter);
+
+router.use("/admin/staff-permissions", staffPermissionsRouter);
+
+// Warm cache khi app khởi động
+initSettingsCache().catch(console.error);
 
 export default router;

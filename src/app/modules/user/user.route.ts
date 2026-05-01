@@ -8,6 +8,8 @@ import {
   getMeHandler,
   updateMeHandler,
   changePasswordHandler,
+  getMyNotifPreferencesHandler,
+  updateMyNotifPreferencesHandler,
   getUsersHandler,
   getUserByIdHandler,
   createUserHandler,
@@ -16,12 +18,14 @@ import {
   restoreUserHandler,
   hardDeleteUserHandler,
   getDeletedUsersHandler,
+  exportUsersAdminHandler,
 } from "./user.controller";
-import { createUserSchema, changePasswordSchema, getUsersQuerySchema } from "./user.validation";
+import { createUserSchema, changePasswordSchema, getUsersQuerySchema, exportUsersSchema, updateNotifPreferencesSchema } from "./user.validation";
+import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
 
 const router = Router();
 
-const staffAdminAuth = [authMiddleware(), requireRole("STAFF", "ADMIN")] as const;
+const staffAdminAuth = [authMiddleware(), requireRole(...STAFF_ROLES, "ADMIN")] as const;
 const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
 
 // ─── Self — static ─────────────────────────────────────────────────────────────
@@ -34,11 +38,16 @@ router.patch("/me", authMiddleware(), userUpload.single("avatarImage"), asyncHan
 
 router.patch("/me/change-password", authMiddleware(), validate(changePasswordSchema, "body"), asyncHandler(changePasswordHandler));
 
+router.get("/me/notification-preferences", authMiddleware(), asyncHandler(getMyNotifPreferencesHandler));
+router.patch("/me/notification-preferences", authMiddleware(), validate(updateNotifPreferencesSchema, "body"), asyncHandler(updateMyNotifPreferencesHandler));
+
 // ─── Admin — static ───────────────────────────────────────────────────────────
 
 router.get("/admin", ...staffAdminAuth, validate(getUsersQuerySchema, "query"), asyncHandler(getUsersHandler));
 router.post("/admin", ...adminAuth, validate(createUserSchema, "body"), asyncHandler(createUserHandler));
 router.get("/admin/trash", ...adminAuth, asyncHandler(getDeletedUsersHandler));
+
+router.get("/admin/export", ...staffAdminAuth, validate(exportUsersSchema, "query"), asyncHandler(exportUsersAdminHandler));
 
 // ─── Admin — param + suffix ───────────────────────────────────────────────────
 

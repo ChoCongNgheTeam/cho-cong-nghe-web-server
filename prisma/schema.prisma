@@ -25,9 +25,11 @@ enum Gender {
 enum UserRole {
   CUSTOMER
   ADMIN
-  STAFF
+  SALES       // Nhân viên bán hàng tại quầy
+  MARKETING   // Marketing / content
+  SUPPORT     // CSKH / xử lý khiếu nại
+  ACCOUNTING  // Kế toán / báo cáo
 }
-
 enum AddressType {
   HOME
   OFFICE
@@ -170,7 +172,18 @@ model users {
   avatarImage  String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-  
+
+  notifEmail        Boolean @default(true)
+  notifPush         Boolean @default(true)
+  notifWeeklyReport Boolean @default(false)
+  notifOrderStatus  Boolean @default(true)
+  notifUserInactive Boolean @default(true)
+  notifReviewNew    Boolean @default(true)
+
+  isVerified                  Boolean   @default(false)
+  verificationToken           String?   @unique
+  verificationTokenExpiresAt  DateTime?
+    
 
   // --- Soft Delete ---
   deletedAt    DateTime?
@@ -190,7 +203,43 @@ model users {
   refreshTokens       refresh_tokens[]
   oauthAccounts       oauth_accounts[]
 
+  staffPermissions staff_permissions?
   @@index([deletedAt]) // để query isDeleted nhanh hơn
+}
+
+model staff_permissions {
+  userId String @id @db.Uuid
+
+  // Đơn hàng
+  canViewOrders    Boolean @default(false)
+  canCreateOrder   Boolean @default(false)
+  canUpdateOrder   Boolean @default(false)
+
+  // Sản phẩm / kho
+  canViewProducts  Boolean @default(false)
+  canUpdateStock   Boolean @default(false)
+
+  // Marketing
+  canBlogs         Boolean @default(false)
+  canMedia         Boolean @default(false)
+  canCampaigns     Boolean @default(false)
+  canVouchers      Boolean @default(false)
+  canPromotions    Boolean @default(false)
+  canAiContent     Boolean @default(false)
+
+  // CSKH
+  canReviews       Boolean @default(false)
+  canComments      Boolean @default(false)
+  canNotifications Boolean @default(false)
+  canViewUsers     Boolean @default(false)
+
+  // Báo cáo
+  canAnalytics     Boolean @default(false)
+  canPaymentView   Boolean @default(false)
+
+  updatedAt DateTime @updatedAt
+
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // CASCADE: oauth_accounts gắn chặt với user, xóa user thì xóa luôn
@@ -241,6 +290,11 @@ model refresh_tokens {
   deviceId  String?
   userAgent String?
   ip        String?
+
+  deviceName  String?
+  browser     String?
+  location    String?
+  lastUsedAt  DateTime?
 
   user users @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1025,4 +1079,106 @@ model chat_sessions {
  
   @@index([sessionKey])
   @@index([expiresAt])
+}
+
+
+// ─────────────────────────────────────────
+// SETTINGS
+// ─────────────────────────────────────────
+
+model system_settings {
+  id        String   @id @default(uuid()) @db.Uuid
+  group     String
+  key       String
+  value     String   @db.Text
+  dataType  SettingDataType @default(STRING)
+  updatedBy String?  @db.Uuid
+  updatedAt DateTime @updatedAt
+
+  @@unique([group, key])
+  @@index([group])
+}
+
+enum SettingDataType {
+  STRING
+  BOOLEAN
+  NUMBER
+  JSON
+}
+
+// ─────────────────────────────────────────
+// AUDIT
+// ─────────────────────────────────────────
+
+enum AuditSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  RESTORE
+  BULK_ACTION
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  SETTINGS_CHANGE
+  PERMISSION_CHANGE
+  EXPORT
+}
+
+model audit_logs {
+  id          String        @id @default(uuid()) @db.Uuid
+
+  // WHO
+  userId      String?       @db.Uuid
+  userName    String?
+  userRole    String?
+
+  // WHAT
+  action      AuditAction
+  module      String
+  targetId    String?
+  targetType  String?
+  description String
+  diff        Json?
+
+  // WHERE
+  ip          String?
+  userAgent   String?
+  location    String?
+
+  // META
+  severity    AuditSeverity @default(INFO)
+  isSuccess   Boolean       @default(true)
+  errorMsg    String?
+
+  createdAt   DateTime      @default(now())
+
+  @@index([userId])
+  @@index([module])
+  @@index([severity])
+  @@index([createdAt])
+  @@index([ip, createdAt])
+}
+
+model login_history {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @db.Uuid
+  email      String?
+  isSuccess  Boolean
+  ip         String?
+  userAgent  String?
+  location   String?
+  browser   String?
+  failReason String?
+
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([ip, createdAt])
+  @@index([createdAt])
 }
