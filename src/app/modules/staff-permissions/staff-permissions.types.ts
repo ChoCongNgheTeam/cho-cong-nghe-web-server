@@ -57,7 +57,7 @@ export const DEFAULT_PERMISSIONS: Record<string, PermissionPreset> = {
     canComments: false,
     canNotifications: false,
     canViewUsers: false,
-    canAnalytics: false,
+    canAnalytics: true,
     canPaymentView: false,
   },
   MARKETING: {
@@ -95,7 +95,7 @@ export const DEFAULT_PERMISSIONS: Record<string, PermissionPreset> = {
     canComments: true,
     canNotifications: false,
     canViewUsers: true,
-    canAnalytics: false,
+    canAnalytics: true,
     canPaymentView: false,
   },
   ACCOUNTING: {

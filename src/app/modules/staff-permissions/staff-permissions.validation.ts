@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { STAFF_ROLES } from "./staff-permissions.types";
 
 export const userIdParamsSchema = z.object({
   userId: z.string().uuid("userId không hợp lệ"),
@@ -27,8 +28,8 @@ export const updatePermissionsSchema = z
   .strict();
 
 export const resetPermissionsSchema = z.object({
-  role: z.enum(["SALES", "MARKETING", "SUPPORT", "ACCOUNTING"], {
-    errorMap: () => ({ message: "Role không hợp lệ. Chọn một trong: SALES, MARKETING, SUPPORT, ACCOUNTING" }),
+  role: z.enum(STAFF_ROLES, {
+    message: "Role không hợp lệ. Chọn một trong: SALES, MARKETING, SUPPORT, ACCOUNTING",
   }),
 });
 
