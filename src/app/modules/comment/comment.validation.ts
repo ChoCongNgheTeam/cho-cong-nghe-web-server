@@ -3,7 +3,13 @@ import { CommentTargetType } from "./comment.types";
 
 //  List / Filter
 
-const queryBoolean = z.preprocess((v) => (v === "true" ? true : v === "false" ? false : v), z.boolean().optional());
+const queryBoolean = z
+   .string()
+   .optional()
+   .transform((v) => {
+      if (v === undefined || v === "") return undefined;
+      return v === "true";
+   });
 
 export const listCommentsSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
