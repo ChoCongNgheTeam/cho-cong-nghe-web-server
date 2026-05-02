@@ -100,7 +100,7 @@ export const createComment = async (userId: string, input: CreateCommentInput) =
         resolveTargetName(input.targetType, input.targetId),
       ]);
 
-      const isAdmin = commenter?.role === "ADMIN" || commenter?.role === "STAFF";
+      const isAdmin = commenter?.role === "ADMIN" || commenter?.role === "SALES" || commenter?.role === "MARKETING" || commenter?.role === "SUPPORT";
 
       if (!isAdmin) {
         // Khách hàng comment → notify admin
@@ -115,7 +115,7 @@ export const createComment = async (userId: string, input: CreateCommentInput) =
         // Guard: parentComment null hoặc userId null thì skip
         if (parentComment && parentComment.userId) {
           await sendCommentReplyUserNotification(
-            parentComment.userId,          // ← không còn null
+            parentComment.userId, // ← không còn null
             commenter?.fullName ?? "Nhân viên",
             product?.name ?? "",
             comment.id,

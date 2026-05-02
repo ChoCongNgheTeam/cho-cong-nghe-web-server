@@ -141,6 +141,7 @@ export const getBlogWithCommentsAdmin = async (
     sortBy: "createdAt" as const,
     sortOrder: "desc" as const,
     includeDeleted: false,
+    isApproved: undefined,
   };
 
   const comments = await commentService.getCommentsAdmin(commentsQuery);

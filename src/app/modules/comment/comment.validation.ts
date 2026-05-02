@@ -4,12 +4,12 @@ import { CommentTargetType } from "./comment.types";
 //  List / Filter
 
 const queryBoolean = z
-   .string()
-   .optional()
-   .transform((v) => {
-      if (v === undefined || v === "") return undefined;
-      return v === "true";
-   });
+  .enum(["true", "false"])
+  .optional()
+  .transform((v) => {
+    if (v === undefined) return undefined;
+    return v === "true";
+  });
 
 export const listCommentsSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
