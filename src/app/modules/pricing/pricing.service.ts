@@ -9,7 +9,6 @@ import {
   getStackedPromotions,
 } from "./pricing.rules";
 import { calculateDiscountPercentage, formatPromotionDescription, formatVoucherDescription, validatePricingInput } from "./pricing.helpers";
-import { PromotionActionType } from "@prisma/client";
 import * as promotionRepo from "../promotion/promotion.repository";
 import * as voucherRepo from "../voucher/voucher.repository";
 

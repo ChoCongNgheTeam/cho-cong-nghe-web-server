@@ -18,6 +18,7 @@ import { getProductsWithPricing } from "../pricing/use-cases/getProductsWithPric
 import { getProductDetailWithPricing } from "../pricing/use-cases/getProductDetailWithPricing.service";
 import { getProductVariantWithPricing } from "../pricing/use-cases/getProductVariantPricing.service";
 import { getRelatedProductsWithPricing } from "../pricing/use-cases/getRelatedProductsWithPricing.service";
+import { getProductVariantOptionsWithPricing } from "../pricing/use-cases/getProductVariantOptionsWithPricing.service";
 import { getFlashSaleProductsWithPricing } from "../pricing/use-cases/getFlashSaleProductsWithPricing.service";
 import { getNewArrivalProductsWithPricing } from "../pricing/use-cases/getNewArrivalProductsWithPricing.service";
 import { getBestSellingProductsWithPricing } from "../pricing/use-cases/getBestSellingProductsWithPricing.service";
@@ -91,7 +92,7 @@ export const getProductVariantHandler = async (req: Request, res: Response) => {
 // };
 
 export const getProductVariantOptionsHandler = async (req: Request, res: Response) => {
-  const result = await getProductVariantOptions(req.params.slug, req.query as Record<string, string>);
+  const result = await getProductVariantOptionsWithPricing(req.params.slug, req.query as Record<string, string>, req.user?.id);
   res.json({ data: result, message: "Lấy danh sách variant thành công" });
 };
 
