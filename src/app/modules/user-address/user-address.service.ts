@@ -36,10 +36,7 @@ const formatAddressResponse = (address: any): AddressResponse => {
  * Trả về tên tỉnh và tên phường để snapshot vào DB.
  * Gọi depth=2 để lấy cả danh sách wards trong 1 request.
  */
-const validateAndFetchLocationNames = async (
-  provinceCode: number,
-  wardCode: number
-): Promise<{ provinceName: string; wardName: string }> => {
+const validateAndFetchLocationNames = async (provinceCode: number, wardCode: number): Promise<{ provinceName: string; wardName: string }> => {
   let provinceData: ExternalProvinceResponse;
 
   try {
@@ -53,7 +50,7 @@ const validateAndFetchLocationNames = async (
     throw new BadRequestError("Không thể kết nối tới dịch vụ địa chỉ, vui lòng thử lại");
   }
 
-  const ward = provinceData.wards?.find((w: ExternalWardResponse) => w.code === wardCode);
+  const ward = provinceData.wards?.find((w: ExternalWardResponse) => Number(w.code) === Number(wardCode));
   if (!ward) {
     throw new BadRequestError("Phường/Xã không thuộc Tỉnh/Thành phố đã chọn");
   }
@@ -87,13 +84,10 @@ export const getDefaultAddress = async (userId: string) => {
 };
 
 export const createAddress = async (userId: string, input: CreateAddressInput) => {
-  const { provinceName, wardName } = await validateAndFetchLocationNames(
-    input.provinceCode,
-    input.wardCode
-  );
+  const { provinceName, wardName } = await validateAndFetchLocationNames(input.provinceCode, input.wardCode);
 
   const currentAddresses = await repo.findByUserId(userId);
-  const isDefault = currentAddresses.length === 0 ? true : input.isDefault ?? false;
+  const isDefault = currentAddresses.length === 0 ? true : (input.isDefault ?? false);
 
   if (isDefault && currentAddresses.length > 0) {
     await repo.resetDefaultAddress(userId);
@@ -136,9 +130,7 @@ export const updateAddress = async (addressId: string, userId: string, input: Up
     await repo.resetDefaultAddress(userId);
   }
 
-  const updatedAddress = await repo
-    .updateAddress(addressId, { ...input, ...locationUpdate })
-    .catch(handlePrismaError);
+  const updatedAddress = await repo.updateAddress(addressId, { ...input, ...locationUpdate }).catch(handlePrismaError);
 
   return formatAddressResponse(updatedAddress);
 };
@@ -150,9 +142,7 @@ export const deleteAddress = async (addressId: string, userId: string) => {
   if (address.isDefault) {
     const allAddresses = await repo.findByUserId(userId);
     if (allAddresses.length > 1) {
-      throw new BadRequestError(
-        "Không thể xóa địa chỉ mặc định. Vui lòng thiết lập địa chỉ khác làm mặc định trước khi xóa."
-      );
+      throw new BadRequestError("Không thể xóa địa chỉ mặc định. Vui lòng thiết lập địa chỉ khác làm mặc định trước khi xóa.");
     }
   }
 
@@ -164,9 +154,7 @@ export const setDefaultAddress = async (addressId: string, userId: string) => {
   if (!address) throw new NotFoundError("Địa chỉ");
 
   await repo.resetDefaultAddress(userId);
-  const updatedAddress = await repo
-    .updateAddress(addressId, { isDefault: true })
-    .catch(handlePrismaError);
+  const updatedAddress = await repo.updateAddress(addressId, { isDefault: true }).catch(handlePrismaError);
 
   return formatAddressResponse(updatedAddress);
 };
