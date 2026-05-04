@@ -38,6 +38,7 @@ const formatAddressResponse = (address: any): AddressResponse => {
  */
 const validateAndFetchLocationNames = async (provinceCode: number, wardCode: number): Promise<{ provinceName: string; wardName: string }> => {
   let provinceData: ExternalProvinceResponse;
+  console.log(provinceCode, wardCode);
 
   try {
     const res = await fetch(`${VIETNAM_API_BASE}/p/${provinceCode}?depth=2`);
@@ -83,9 +84,8 @@ export const getDefaultAddress = async (userId: string) => {
   return address ? formatAddressResponse(address) : null;
 };
 
+// user-address.service.ts — bỏ hoàn toàn validateAndFetchLocationNames
 export const createAddress = async (userId: string, input: CreateAddressInput) => {
-  const { provinceName, wardName } = await validateAndFetchLocationNames(input.provinceCode, input.wardCode);
-
   const currentAddresses = await repo.findByUserId(userId);
   const isDefault = currentAddresses.length === 0 ? true : (input.isDefault ?? false);
 
@@ -99,9 +99,9 @@ export const createAddress = async (userId: string, input: CreateAddressInput) =
       contactName: input.contactName,
       phone: input.phone,
       provinceCode: input.provinceCode,
-      provinceName,
+      provinceName: input.provinceName, // ← lấy thẳng từ input
       wardCode: input.wardCode,
-      wardName,
+      wardName: input.wardName, // ← lấy thẳng từ input
       detailAddress: input.detailAddress,
       type: input.type,
       isDefault,

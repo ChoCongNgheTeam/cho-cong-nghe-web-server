@@ -22,7 +22,9 @@ export interface CreateAddressInput {
   contactName: string;
   phone: string;
   provinceCode: number;
+  provinceName: string;
   wardCode: number;
+  wardName: string;
   detailAddress: string;
   type?: AddressType;
   isDefault?: boolean;

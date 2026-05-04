@@ -4,64 +4,30 @@ import { AddressType } from "@prisma/client";
 // ==================== ADDRESS VALIDATION ====================
 
 export const createAddressSchema = z.object({
-  contactName: z
-    .string()
-    .trim()
-    .min(1, "Tên liên hệ không được để trống")
-    .max(100, "Tên liên hệ không quá 100 ký tự"),
+  contactName: z.string().trim().min(1, "Tên liên hệ không được để trống").max(100, "Tên liên hệ không quá 100 ký tự"),
   phone: z
     .string()
     .trim()
     .regex(/^(\+84|0)[0-9]{9,10}$/, "Số điện thoại không hợp lệ"),
-  provinceCode: z
-    .coerce
-    .number()
-    .int("Province code phải là số nguyên")
-    .positive("Province code không hợp lệ"),
-  wardCode: z
-    .coerce
-    .number()
-    .int("Ward code phải là số nguyên")
-    .positive("Ward code không hợp lệ"),
-  detailAddress: z
-    .string()
-    .trim()
-    .min(1, "Địa chỉ chi tiết không được để trống")
-    .max(500, "Địa chỉ chi tiết không quá 500 ký tự"),
+  provinceCode: z.coerce.number().int("Province code phải là số nguyên").positive("Province code không hợp lệ"),
+  wardCode: z.coerce.number().int("Ward code phải là số nguyên").positive("Ward code không hợp lệ"),
+  provinceName: z.string().trim().min(1, "Tên tỉnh không được để trống"),
+  wardName: z.string().trim().min(1, "Tên phường không được để trống"),
+  detailAddress: z.string().trim().min(1, "Địa chỉ chi tiết không được để trống").max(500, "Địa chỉ chi tiết không quá 500 ký tự"),
   type: z.nativeEnum(AddressType).optional(),
   isDefault: z.boolean().default(false).optional(),
 });
 
 export const updateAddressSchema = z.object({
-  contactName: z
-    .string()
-    .trim()
-    .min(1, "Tên liên hệ không được để trống")
-    .max(100, "Tên liên hệ không quá 100 ký tự")
-    .optional(),
+  contactName: z.string().trim().min(1, "Tên liên hệ không được để trống").max(100, "Tên liên hệ không quá 100 ký tự").optional(),
   phone: z
     .string()
     .trim()
     .regex(/^(\+84|0)[0-9]{9,10}$/, "Số điện thoại không hợp lệ")
     .optional(),
-  provinceCode: z
-    .coerce
-    .number()
-    .int("Province code phải là số nguyên")
-    .positive("Province code không hợp lệ")
-    .optional(),
-  wardCode: z
-    .coerce
-    .number()
-    .int("Ward code phải là số nguyên")
-    .positive("Ward code không hợp lệ")
-    .optional(),
-  detailAddress: z
-    .string()
-    .trim()
-    .min(1, "Địa chỉ chi tiết không được để trống")
-    .max(500, "Địa chỉ chi tiết không quá 500 ký tự")
-    .optional(),
+  provinceCode: z.coerce.number().int("Province code phải là số nguyên").positive("Province code không hợp lệ").optional(),
+  wardCode: z.coerce.number().int("Ward code phải là số nguyên").positive("Ward code không hợp lệ").optional(),
+  detailAddress: z.string().trim().min(1, "Địa chỉ chi tiết không được để trống").max(500, "Địa chỉ chi tiết không quá 500 ký tự").optional(),
   type: z.nativeEnum(AddressType).nullable().optional(),
   isDefault: z.boolean().optional(),
 });
