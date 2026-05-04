@@ -16,7 +16,7 @@ const router = Router();
 // ── Main ──────────────────────────────────────────────────────────────────────
 router.get("/", authMiddleware(false), asyncHandler(getHomePageHandler));
 
-// ── Flash Sale ────────────────────────────────────────────────────────────────
+// ── Flash Sale
 // Endpoint cũ — giữ backward compat
 // router.get("/flash-sale", authMiddleware(false), asyncHandler(getFlashSaleSectionHandler));
 
