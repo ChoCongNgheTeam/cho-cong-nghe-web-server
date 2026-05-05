@@ -93,9 +93,9 @@ export const verifyEmailHandler = async (req: Request, res: Response) => {
 
   try {
     await verifyEmail(token);
-    return res.redirect(`${process.env.FRONTEND_URL}/verify-email?status=success`);
+    return res.redirect(`${process.env.FRONTEND_URL}/account?verified=success`);
   } catch {
-    return res.redirect(`${process.env.FRONTEND_URL}/verify-email?status=invalid`);
+    return res.redirect(`${process.env.FRONTEND_URL}/account?verified=invalid`);
   }
 };
 
