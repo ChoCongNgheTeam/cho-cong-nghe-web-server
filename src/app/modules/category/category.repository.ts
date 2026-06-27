@@ -107,7 +107,7 @@ export const findAllAdmin = async (query: ListCategoriesQuery) => {
       take: limit,
       select: {
         ...selectCategoryAdmin,
-        _count: { select: { children: true ,products: true} },
+        _count: { select: { children: true, products: true } },
       },
     }),
     prisma.categories.count({ where }),
@@ -171,6 +171,38 @@ export const findAllCategoriesForTree = async (onlyActive = true) => {
       slug: true,
       parentId: true,
       position: true,
+    },
+    orderBy: { position: "asc" },
+  });
+};
+export const findChildrenByParentId = async (parentId: string) => {
+  return prisma.categories.findMany({
+    where: {
+      parentId,
+      deletedAt: null,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      parentId: true,
+      position: true,
+      imageUrl: true,
+      children: {
+        // ← grandchildren luôn
+        where: { deletedAt: null, isActive: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          position: true,
+        },
+        orderBy: { position: "asc" },
+      },
+      _count: {
+        select: { children: true },
+      },
     },
     orderBy: { position: "asc" },
   });

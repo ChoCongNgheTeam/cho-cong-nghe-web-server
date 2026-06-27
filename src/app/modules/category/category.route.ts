@@ -26,6 +26,7 @@ import {
   getAttributeOptionsHandler,
   getAllSpecificationsHandler,
   resolveCategoryHandler,
+  getCategoriesChildrenHandler,
 } from "./category.controller";
 import {
   listCategoriesQuerySchema,
@@ -51,6 +52,8 @@ router.get("/featured", validate(featuredCategoriesQuerySchema, "query"), asyncH
 router.get("/tree", asyncHandler(getCategoryTreeHandler));
 
 router.get("/resolve", validate(resolveCategoryQuerySchema, "query"), asyncHandler(resolveCategoryHandler));
+
+router.get("/:id/children", asyncHandler(getCategoriesChildrenHandler));
 
 // Public — param + suffix
 router.get("/slug/:slug", validate(categorySlugParamsSchema, "params"), asyncHandler(getCategoryBySlugHandler));

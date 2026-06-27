@@ -35,6 +35,12 @@ export const getCategoryTreeHandler = async (req: Request, res: Response) => {
   res.json({ data: tree, message: "Lấy cây danh mục thành công" });
 };
 
+export const getCategoriesChildrenHandler = async (req: Request, res: Response) => {
+  const parentId = req.params.id;
+  const categories = await categoryService.getCategoriesChildren(parentId);
+  res.json({ data: categories, total: categories.length, message: "Lấy danh sách danh mục con" });
+};
+
 export const getCategoryBySlugHandler = async (req: Request, res: Response) => {
   const category = await categoryService.getCategoryBySlug(req.params.slug);
   res.json({ data: category, message: "Lấy chi tiết danh mục thành công" });

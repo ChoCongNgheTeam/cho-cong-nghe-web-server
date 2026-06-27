@@ -123,6 +123,10 @@ export const getCategoryTree = async () => {
   return buildCategoryTree(categories);
 };
 
+export const getCategoriesChildren = async (parentId: string) => {
+  return repo.findChildrenByParentId(parentId);
+};
+
 export const getCategoryBySlug = async (slug: string) => {
   const category = await repo.findBySlug(slug);
   if (!category) throw new NotFoundError("Danh mục");
