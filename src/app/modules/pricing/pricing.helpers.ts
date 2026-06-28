@@ -1,5 +1,6 @@
 import { PromotionActionType } from "@prisma/client";
 import { PromotionRuleData } from "./pricing.types";
+import { getVariantPricing } from "./pricing.service";
 
 export const formatPrice = (amount: number): string => {
   return amount.toLocaleString("vi-VN") + "đ";
@@ -37,10 +38,7 @@ export const calculateDiscountPercentage = (basePrice: number, finalPrice: numbe
   return Math.round(percentage);
 };
 
-export const validatePricingInput = (
-  basePrice: number,
-  quantity: number,
-): { valid: boolean; error?: string } => {
+export const validatePricingInput = (basePrice: number, quantity: number): { valid: boolean; error?: string } => {
   if (basePrice < 0) {
     return { valid: false, error: "Giá không hợp lệ" };
   }
@@ -63,3 +61,22 @@ export const mapPricingToSummary = (pricing: any) => {
     hasPromotion: pricing.hasPromotion,
   };
 };
+
+export const enrichProductsWithPricing = async (items: Array<{ card: any; pricingContext: any }>, userId?: string): Promise<any[]> =>
+  Promise.all(
+    items.map(async ({ card, pricingContext }) => {
+      if (!pricingContext) return { ...card, price: null };
+
+      const pricing = await getVariantPricing(
+        pricingContext.productId,
+        pricingContext.variantId,
+        pricingContext.price,
+        pricingContext.brandId,
+        pricingContext.categoryPath,
+        userId,
+        pricingContext.variantAttributes, // ← forward ATTRIBUTE data
+      );
+
+      return { ...card, price: mapPricingToSummary(pricing) };
+    }),
+  );
