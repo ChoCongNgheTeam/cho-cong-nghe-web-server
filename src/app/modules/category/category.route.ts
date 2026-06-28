@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validate } from "@/app/middlewares/validate.middleware";
 import { authMiddleware } from "@/app/middlewares/auth.middleware";
 import { requireRole } from "@/app/middlewares/role.middleware";
-import { categoryUpload } from "@/app/middlewares/upload/categoryUpload";
+import { categoryUpload } from "@/app/middlewares/upload/upload.config";
 import { asyncHandler } from "@/utils/async-handler";
 import {
   getCategoriesPublicHandler,

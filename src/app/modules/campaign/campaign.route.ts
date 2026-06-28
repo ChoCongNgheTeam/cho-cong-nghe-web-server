@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validate } from "@/app/middlewares/validate.middleware";
 import { authMiddleware, requirePermission } from "@/app/middlewares/auth.middleware";
 import { requireRole } from "@/app/middlewares/role.middleware";
-import { campaignUpload } from "@/app/middlewares/upload/campaignUpload";
+import { campaignUpload } from "@/app/middlewares/upload/upload.config";
 import { parseMultipart } from "@/app/middlewares/parse-multipart-data";
 import { asyncHandler } from "@/utils/async-handler";
 import {

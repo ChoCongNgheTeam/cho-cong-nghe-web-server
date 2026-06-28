@@ -3,7 +3,7 @@ import * as service from "./settings.service";
 import { groupParamSchema, updateSettingsSchema } from "./settings.validation";
 import { uploadSettingImage } from "./settings.image";
 import { cleanupFile } from "@/integrations/file-cleanup.service";
-import { SETTINGS_IMAGE_FIELDS, SettingsImageField } from "@/app/middlewares/upload/settings.upload";
+import { SETTINGS_IMAGE_FIELDS, SettingsImageField } from "@/app/middlewares/upload/upload.config";
 
 export const getGroupHandler = async (req: Request, res: Response) => {
   const { group } = groupParamSchema.parse(req.params);

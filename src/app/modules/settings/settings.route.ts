@@ -6,7 +6,7 @@ import { asyncHandler } from "@/utils/async-handler";
 import { getGroupHandler, getAllHandler, updateGroupHandler } from "./settings.controller";
 import { groupParamSchema } from "./settings.validation";
 import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
-import { SETTINGS_IMAGE_FIELDS, settingsUpload } from "@/app/middlewares/upload/settings.upload";
+import { SETTINGS_IMAGE_FIELDS, settingsUpload } from "@/app/middlewares/upload/upload.config";
 
 const router = Router();
 const adminOnly = [authMiddleware(), requireRole("ADMIN")] as const;

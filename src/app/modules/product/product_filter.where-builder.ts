@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { getDescendantCategoryIds } from "./product_filter.repository";
-import { resolveCategoryIds } from "@/app/modules/search/shared.category-resolver";
+import { resolveCategoryIds } from "@/utils/shared.category-resolver";
 import prisma from "prisma/client";
 // Normalize: ?attr_storage=256GB hoặc ?attr_storage=256GB&attr_storage=512GB
 const toArray = (value: string | string[]): string[] => (Array.isArray(value) ? value.filter(Boolean) : [value].filter(Boolean));

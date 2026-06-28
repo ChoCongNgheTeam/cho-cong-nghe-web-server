@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validate } from "@/app/middlewares/validate.middleware";
 import { authMiddleware, requirePermission } from "@/app/middlewares/auth.middleware";
 import { requireRole } from "@/app/middlewares/role.middleware";
-import { mediaUpload } from "@/app/middlewares/upload/mediaUpload";
+import { mediaUpload } from "@/app/middlewares/upload/upload.config";
 import {
   getMediaByTypeHandler,
   getMediaByPositionHandler,

@@ -2,7 +2,7 @@ import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
 import { ListProductsQuery, ReviewsQuery } from "./product.validation";
 import { OrderStatus } from "@prisma/client";
-import { extractVariantOptions } from "@/helpers/variant-options";
+import { extractVariantOptions } from "@/utils/variant-options";
 import { HighlightSpecificationGroup } from "./product.types";
 import { buildOrderBy, buildProductWhere, buildSearchCategoryAndBrandIds } from "./product_filter.where-builder";
 import { validate as isUUID } from "uuid";

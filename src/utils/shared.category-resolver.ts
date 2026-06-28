@@ -16,7 +16,7 @@
  *   Bằng: const ids = await resolveCategoryIds(query.category, prisma)
  */
 
-import { normalizeVietnamese, buildKeywordVariants } from "./search.helpers";
+import { normalizeVietnamese, buildKeywordVariants } from "../app/modules/search/search.helpers";
 
 /**
  * Resolve category IDs (bao gồm toàn bộ descendants) từ một slug/text tùy ý.
