@@ -1,5 +1,5 @@
 import slugify from "slugify";
-import { uploadImage, deleteImage } from "@/services/cloudinary.service";
+import { uploadImage, deleteImage } from "@/integrations/cloudinary.service";
 
 export const generateBrandSlug = (name: string): string => {
   return slugify(name, {
@@ -9,11 +9,7 @@ export const generateBrandSlug = (name: string): string => {
   });
 };
 
-export const generateUniqueBrandSlug = async (
-  name: string,
-  checkSlugExists: (slug: string) => Promise<boolean>,
-  existingSlug?: string,
-): Promise<string> => {
+export const generateUniqueBrandSlug = async (name: string, checkSlugExists: (slug: string) => Promise<boolean>, existingSlug?: string): Promise<string> => {
   const baseSlug = generateBrandSlug(name);
 
   if (existingSlug && existingSlug === baseSlug) {

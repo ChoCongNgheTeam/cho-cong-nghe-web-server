@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import * as service from "./settings.service";
 import { groupParamSchema, updateSettingsSchema } from "./settings.validation";
 import { uploadSettingImage } from "./settings.image";
-import { cleanupFile } from "@/services/file-cleanup.service";
+import { cleanupFile } from "@/integrations/file-cleanup.service";
 import { SETTINGS_IMAGE_FIELDS, SettingsImageField } from "@/app/middlewares/upload/settings.upload";
 
 export const getGroupHandler = async (req: Request, res: Response) => {

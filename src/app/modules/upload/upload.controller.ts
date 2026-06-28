@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import fs from "fs";
-import { uploadImage } from "src/services/cloudinary.service"; // Service cũ của bạn
+import { uploadImage } from "@/integrations/cloudinary.service"; // Service cũ của bạn
 import { uploadBodySchema } from "./upload.validation";
 
 export const uploadFileHandler = async (req: Request, res: Response) => {
@@ -36,8 +36,8 @@ export const uploadFileHandler = async (req: Request, res: Response) => {
     }
 
     // Xử lý lỗi validation Zod hoặc lỗi server
-    if (error.name === 'ZodError') {
-        return res.status(400).json({ message: "Dữ liệu không hợp lệ", errors: error.errors });
+    if (error.name === "ZodError") {
+      return res.status(400).json({ message: "Dữ liệu không hợp lệ", errors: error.errors });
     }
 
     return res.status(500).json({

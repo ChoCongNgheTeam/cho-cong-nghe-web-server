@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { verifyAccessToken } from "src/services/token.service";
+import { verifyAccessToken } from "@/integrations/token.service";
 import { getPermissionsForAuth } from "@/app/modules/staff-permissions/staff-permissions.service";
 import { PermissionKey, STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
 

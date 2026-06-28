@@ -3,7 +3,7 @@ import { CreateReviewInput, UpdateReviewAdminInput, ListReviewsQuery } from "./r
 import { NotFoundError, BadRequestError, ForbiddenError } from "@/errors";
 import { ReviewStatus } from "@prisma/client";
 import prisma from "@/config/db";
-import { moderateContent } from "@/services/moderation";
+import { moderateContent } from "@/integrations/moderation";
 import { sendReviewNewAdminNotification } from "@/app/modules/notification/notification.service";
 import { isSettingEnabled } from "../settings/settings.service";
 

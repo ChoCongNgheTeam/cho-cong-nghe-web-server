@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import * as brandService from "./brand.service";
 import { parseMultipartData, uploadBrandImage } from "./brand.helpers";
-import { cleanupFile } from "@/services/file-cleanup.service";
+import { cleanupFile } from "@/integrations/file-cleanup.service";
 import { listBrandsQuerySchema, featuredBrandsQuerySchema, brandByCategoryQuerySchema } from "./brand.validation";
 
 // Public

@@ -1,6 +1,6 @@
 import { OAuth2Client } from "google-auth-library";
 import { UnauthorizedError, BadRequestError } from "@/errors";
-import { signAccessToken, signRefreshToken } from "@/services/token.service";
+import { signAccessToken, signRefreshToken } from "@/integrations/token.service";
 import { jwtConfig } from "src/config/jwt";
 import { createRefreshToken } from "../auth.repository";
 import { findOAuthAccount, createOAuthAccount, findByEmail, createUserFromOAuth } from "../auth.repository";

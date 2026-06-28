@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { campaignService } from "./campaign.service";
 import { uploadCampaignCategoryImage } from "./campaign.helpers";
-import { cleanupFile } from "@/services/file-cleanup.service";
+import { cleanupFile } from "@/integrations/file-cleanup.service";
 import { ListCampaignsQuery, UpdateCampaignCategoryInput, bulkDeleteCampaignsSchema } from "./campaign.validation";
 import { CampaignType } from "@prisma/client";
 

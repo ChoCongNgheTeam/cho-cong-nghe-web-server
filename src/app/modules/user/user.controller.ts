@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import * as userService from "./user.service";
 import { exportUsersSchema, getUsersQuerySchema, updateNotifPreferencesSchema, updateProfileSchema, updateUserSchema } from "./user.validation";
 import { parseMultipartData, uploadAvatarImage } from "./user.helpers";
-import { cleanupFile } from "@/services/file-cleanup.service";
+import { cleanupFile } from "@/integrations/file-cleanup.service";
 import { ForbiddenError } from "@/errors";
 import { exportUsersAdmin } from "./user.service";
 import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";

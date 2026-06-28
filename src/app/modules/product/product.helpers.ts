@@ -1,5 +1,5 @@
 import fs from "fs";
-import { uploadImage, deleteImage } from "@/services/cloudinary.service";
+import { uploadImage, deleteImage } from "@/integrations/cloudinary.service";
 import { RawVariant } from "./product.types";
 
 // Cleanup temporary uploaded files
@@ -59,10 +59,7 @@ export const parseMultipartData = (body: any): any => {
  * Expected format: colorImages = [{ color, altText }]
  * Files fieldname: `color_${color}_${index}`
  */
-export const uploadColorImages = async (
-  colorImages: any[],
-  files: Express.Multer.File[],
-): Promise<any[]> => {
+export const uploadColorImages = async (colorImages: any[], files: Express.Multer.File[]): Promise<any[]> => {
   if (!files || files.length === 0) return [];
 
   const uploadedImages: any[] = [];

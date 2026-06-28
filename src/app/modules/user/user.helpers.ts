@@ -1,4 +1,4 @@
-import { uploadImage, deleteImage } from "@/services/cloudinary.service";
+import { uploadImage, deleteImage } from "@/integrations/cloudinary.service";
 
 /**
  * parseMultipartData

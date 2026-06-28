@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import * as categoryService from "./category.service";
 import { parseMultipartData, uploadCategoryImage } from "./category.helpers";
-import { cleanupFile } from "@/services/file-cleanup.service";
+import { cleanupFile } from "@/integrations/file-cleanup.service";
 import { listCategoriesQuerySchema, featuredCategoriesQuerySchema, createCategorySchema, updateCategorySchema, resolveCategoryQuerySchema } from "./category.validation";
 import { resolveCategory } from "./category.service";
 

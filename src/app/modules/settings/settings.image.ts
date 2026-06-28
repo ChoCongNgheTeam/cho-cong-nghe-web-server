@@ -1,4 +1,4 @@
-import { uploadImage } from "@/services/cloudinary.service";
+import { uploadImage } from "@/integrations/cloudinary.service";
 
 /**
  * Map từ field name → cloudinary folder

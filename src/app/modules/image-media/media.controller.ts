@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import * as mediaService from "./media.service";
 import { MediaType, MediaPosition } from "./media.types";
 import { parseMultipartData, uploadMediaImage } from "./media.helpers";
-import { cleanupFile } from "@/services/file-cleanup.service";
+import { cleanupFile } from "@/integrations/file-cleanup.service";
 import { mediaByCategoryQuerySchema } from "./media.validation";
 
 export const getMediaByTypeHandler = async (req: Request, res: Response) => {

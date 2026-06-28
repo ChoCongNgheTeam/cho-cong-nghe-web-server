@@ -5,7 +5,7 @@ import { jwtConfig } from "src/config/jwt";
 import { DuplicateError, UnauthorizedError, BadRequestError } from "@/errors";
 import { handlePrismaError } from "@/utils/handle-prisma-error";
 import { RegisterInput, LoginInput, ResetPasswordInput } from "./auth.validation";
-import { signAccessToken, signRefreshToken, verifyRefreshToken } from "@/services/token.service";
+import { signAccessToken, signRefreshToken, verifyRefreshToken } from "@/integrations/token.service";
 import {
   findByEmailOrUserName,
   findByUserName,
@@ -27,7 +27,7 @@ import {
   markUserVerified,
   isKnownDevice,
 } from "./auth.repository";
-import { sendResetPasswordEmail, sendVerificationEmail, sendNewDeviceLoginAlert } from "@/services/email.service";
+import { sendResetPasswordEmail, sendVerificationEmail, sendNewDeviceLoginAlert } from "@/integrations/email.service";
 import { forgotPasswordRateLimit } from "@/utils/rateLimiter";
 import { Request } from "express";
 import prisma from "prisma/client";

@@ -1,4 +1,4 @@
-import { uploadImage, deleteImage } from "@/services/cloudinary.service";
+import { uploadImage, deleteImage } from "@/integrations/cloudinary.service";
 
 export const buildCategoryPath = (category: any): string[] => {
   const path: string[] = [];

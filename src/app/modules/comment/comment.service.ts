@@ -1,4 +1,4 @@
-import { moderateContent } from "@/services/moderation";
+import { moderateContent } from "@/integrations/moderation";
 import * as repo from "./comment.repository";
 import { transformComment, transformCommentsList } from "./comment.transformers";
 import { CreateCommentInput, UpdateCommentInput, ListCommentsQuery, CommentTargetType } from "./comment.validation";

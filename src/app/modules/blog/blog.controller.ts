@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import * as blogService from "./blog.service";
 import { ListBlogsQuery, listBlogsSchema, listDeletedBlogsSchema, createBlogSchema, updateBlogSchema } from "./blog.validation";
 import { parseMultipartData, uploadThumbnail } from "./blog.helpers";
-import { cleanupFile } from "@/services/file-cleanup.service";
+import { cleanupFile } from "@/integrations/file-cleanup.service";
 
 //  Public
 

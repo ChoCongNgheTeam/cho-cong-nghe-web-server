@@ -1,6 +1,6 @@
 import * as repo from "./notification.repository";
-import { sendPushNotification } from "@/app/modules/integrations/firebase.service";
-import { sendNotificationEmail } from "@/services/email.service";
+import { sendPushNotification } from "@/integrations/firebase.service";
+import { sendNotificationEmail } from "@/integrations/email.service";
 import { CreateNotificationInput, NotificationPayload } from "./notification.types";
 import prisma from "@/config/db";
 import { STAFF_ROLES } from "../staff-permissions/staff-permissions.types";
@@ -109,7 +109,7 @@ export const sendCampaignNotification = async (userIds: string[], title: string,
   const flatTokens = allTokens.flat().map((t) => t.token);
 
   if (flatTokens.length > 0) {
-    const { sendMulticastNotification } = await import("@/app/modules/integrations/firebase.service");
+    const { sendMulticastNotification } = await import("@/integrations/firebase.service");
     await sendMulticastNotification(flatTokens, title, body, data as any);
   }
 };
@@ -331,14 +331,7 @@ export const sendReviewNewAdminNotification = async (customerName: string, produ
   }
 };
 
-export const sendCommentReplyUserNotification = async (
-  userId: string,
-  adminName: string,
-  productName: string,
-  commentId: string,
-  productId: string,
-  productSlug: string,
-) => {
+export const sendCommentReplyUserNotification = async (userId: string, adminName: string, productName: string, commentId: string, productId: string, productSlug: string) => {
   return createAndSend(
     {
       userId,

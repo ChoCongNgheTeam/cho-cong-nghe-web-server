@@ -5,17 +5,12 @@ import { slugify } from "transliteration";
  * Ví dụ: "iPhone 15" → "iphone-15"
  *         "iPhone 15" (đã tồn tại) → "iphone-15-2"
  */
-export async function generateUniqueSlug(
-  model: any, // Prisma delegate, ví dụ: prisma.brands hoặc prisma.products
-  name: string,
-  field: string = "slug",
-): Promise<string> {
+export async function generateUniqueSlug(model: any, name: string, field: string = "slug"): Promise<string> {
   const baseSlug = slugify(name, { lowercase: true, separator: "-" }).replace(/[^a-z0-9-]/g, "-");
 
   let slug = baseSlug;
   let counter = 1;
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const existing = await model.findUnique({ where: { [field]: slug } });
     if (!existing) return slug;

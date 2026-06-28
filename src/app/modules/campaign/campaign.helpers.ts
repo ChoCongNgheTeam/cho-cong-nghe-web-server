@@ -1,5 +1,5 @@
 import slugify from "slugify";
-import { uploadImage, deleteImage } from "@/services/cloudinary.service";
+import { uploadImage, deleteImage } from "@/integrations/cloudinary.service";
 
 export const generateCampaignSlug = (name: string): string => {
   return slugify(name, {
