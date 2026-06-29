@@ -35,10 +35,9 @@ import {
   categorySlugParamsSchema,
   categoryIdParamSchema,
   attributeIdParamSchema,
-  createCategorySchema,
-  updateCategorySchema,
   reorderCategorySchema,
   resolveCategoryQuerySchema,
+  deletedCategoriesQuerySchema,
 } from "./category.validation";
 
 const router = Router();
@@ -63,7 +62,7 @@ router.get("/admin", ...adminAuth, validate(listCategoriesQuerySchema, "query"),
 router.post("/admin", ...adminAuth, categoryUpload.single("imageUrl"), asyncHandler(createCategoryHandler));
 router.get("/admin/all", ...adminAuth, asyncHandler(getAllCategoriesHandler));
 router.get("/admin/roots", ...adminAuth, asyncHandler(getRootCategoriesForAdminHandler));
-router.get("/admin/trash", ...adminAuth, asyncHandler(getDeletedCategoriesHandler));
+router.get("/admin/trash", ...adminAuth, validate(deletedCategoriesQuerySchema, "query"), asyncHandler(getDeletedCategoriesHandler));
 router.post("/admin/reorder", ...adminAuth, validate(reorderCategorySchema, "body"), asyncHandler(reorderCategoryHandler));
 
 // Attributes & Specifications — static (trước /:id để tránh conflict)

@@ -39,6 +39,11 @@ export const attributeIdParamSchema = z.object({
   attributeId: z.string().min(1, "Attribute ID không hợp lệ"),
 });
 
+export const deletedCategoriesQuerySchema = z.object({
+  page: z.coerce.number().positive().default(1),
+  limit: z.coerce.number().positive().max(100).default(20),
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // QUERY
 // parentId không dùng transform — giữ string, repository tự check

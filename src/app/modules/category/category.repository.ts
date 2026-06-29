@@ -208,16 +208,37 @@ export const findChildrenByParentId = async (parentId: string) => {
   });
 };
 
-export const findById = async (id: string, options: { includeDeleted?: boolean; isAdmin?: boolean } = {}) => {
-  const { includeDeleted = false, isAdmin = false } = options;
+export const findById = async (id: string) => {
+  return prisma.categories.findFirst({
+    where: { id, deletedAt: null },
+    select: selectCategory,
+  });
+};
 
+export const findByIdAdmin = async (id: string, options: { includeDeleted?: boolean } = {}) => {
   return prisma.categories.findFirst({
     where: {
       id,
-      ...(!isAdmin || !includeDeleted ? { deletedAt: null } : {}),
+      ...(!options.includeDeleted ? { deletedAt: null } : {}),
     },
-    select: isAdmin ? selectCategoryAdmin : selectCategory,
+    select: selectCategoryAdmin,
   });
+};
+
+export const findCategoryByKeywords = async (orConditions: Prisma.categoriesWhereInput["OR"]) => {
+  return prisma.categories.findMany({
+    where: {
+      deletedAt: null,
+      isActive: true,
+      OR: orConditions,
+    },
+    orderBy: [{ parentId: "asc" }, { position: "asc" }],
+    select: { id: true, name: true, slug: true, parentId: true },
+  });
+};
+
+export const reorderSiblings = async (updates: { id: string; position: number }[]) => {
+  return prisma.$transaction(updates.map(({ id, position }) => prisma.categories.update({ where: { id }, data: { position } })));
 };
 
 /**
@@ -378,14 +399,24 @@ async function getCategoryHierarchy(categoryId: string): Promise<string[]> {
   return result;
 }
 
-export const getCategoryVariantAttributes = async (categoryId: string) => {
+export const getCategoryVariantAttributesWithOptions = async (categoryId: string) => {
   const categoryIds = await getCategoryHierarchy(categoryId);
 
   const categoryAttributes = await prisma.category_variant_attributes.findMany({
     where: { categoryId: { in: categoryIds } },
     include: {
       attribute: {
-        select: { id: true, code: true, name: true, createdAt: true },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          createdAt: true,
+          // join options ngay tại đây
+          attributes_options: {
+            select: { id: true, value: true, label: true },
+            orderBy: { value: "asc" },
+          },
+        },
       },
     },
   });
@@ -398,6 +429,7 @@ export const getCategoryVariantAttributes = async (categoryId: string) => {
         code: ca.attribute.code,
         name: ca.attribute.name,
         isRequired: true,
+        options: ca.attribute.attributes_options,
       });
     }
   }

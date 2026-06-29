@@ -8,8 +8,6 @@ export const buildCategoryPath = (category: any): string[] => {
     if (current.id) path.push(current.id);
     current = current.parent;
   }
-  // console.log(path);
-
   return path;
 };
 

@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 // ===== Home =====
-import homeRouter from "@/app/modules/home/home.route";
+import homeRouter from "@/app/modules/home/home.route"; // pending
 
 // ===== Catalog =====
 import categoryRoutes from "@/app/modules/category/category.route";
