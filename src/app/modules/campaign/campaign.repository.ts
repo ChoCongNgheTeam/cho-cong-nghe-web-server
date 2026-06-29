@@ -157,7 +157,12 @@ export class CampaignRepository {
 
   async getActiveCampaigns(type?: CampaignType) {
     return prisma.campaigns.findMany({
-      where: { isActive: true, deletedAt: null, ...(type && { type }) },
+      where: {
+        isActive: true,
+        deletedAt: null,
+        endDate: { gt: new Date() },
+        ...(type && { type }),
+      },
       orderBy: [{ startDate: "desc" }, { createdAt: "desc" }],
       select: {
         id: true,
@@ -167,6 +172,7 @@ export class CampaignRepository {
         description: true,
         startDate: true,
         endDate: true,
+        isActive: true,
       },
     });
   }
