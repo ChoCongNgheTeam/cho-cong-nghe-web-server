@@ -1,6 +1,10 @@
 import { MediaType, MediaPosition, CampaignType } from "@prisma/client";
 
-export interface HomeSlider {
+// ============================================================
+// Media
+// ============================================================
+
+export interface HomeMedia {
   id: string;
   type: MediaType;
   position: MediaPosition;
@@ -10,15 +14,12 @@ export interface HomeSlider {
   order: number;
 }
 
-export interface HomeBanner {
-  id: string;
-  type: MediaType;
-  position: MediaPosition;
-  title: string | null;
-  imageUrl: string | null;
-  linkUrl: string | null;
-  order: number;
-}
+export type HomeSlider = HomeMedia;
+export type HomeBanner = HomeMedia;
+
+// ============================================================
+// Category
+// ============================================================
 
 export interface FeaturedCategory {
   id: string;
@@ -28,7 +29,17 @@ export interface FeaturedCategory {
   position: number;
 }
 
-// ============ Campaign Types ============
+// ============================================================
+// Campaign
+// ============================================================
+
+export interface CampaignCategoryItem {
+  id: string;
+  name: string;
+  slug: string;
+  imageUrl: string | null;
+  imagePath: string | null;
+}
 
 export interface CampaignCategory {
   id: string;
@@ -37,13 +48,7 @@ export interface CampaignCategory {
   imageUrl: string | null;
   title: string | null;
   description: string | null;
-  category: {
-    id: string;
-    name: string;
-    slug: string;
-    imageUrl: string | null;
-    imagePath: string | null;
-  };
+  category: CampaignCategoryItem;
 }
 
 export interface HomeCampaign {
@@ -57,7 +62,9 @@ export interface HomeCampaign {
   categories: CampaignCategory[];
 }
 
-// ============ Sale Schedule Types ============
+// ============================================================
+// Sale Schedule
+// ============================================================
 
 export interface SaleScheduleRule {
   actionType: string;
@@ -75,45 +82,75 @@ export interface SaleSchedulePromotion {
   rules: SaleScheduleRule[];
 }
 
-/** Một ô ngày trong lịch sale */
 export interface SaleScheduleDay {
-  date: string; // "2026-03-18"
+  date: string; // "YYYY-MM-DD"
   isToday: boolean;
   hasActiveSale: boolean;
   promotions: SaleSchedulePromotion[];
 }
 
-/** Response của GET /home/sale-schedule */
-export interface HomeSaleScheduleResponse {
-  /** Lịch sale 7 ngày (từ hôm nay) */
-  schedule: SaleScheduleDay[];
-  /** Flash sale hôm nay — load sẵn để render tab đầu tiên không cần request thêm */
-  todayProducts: {
-    products: any[];
-    total: number;
-    date: Date;
-    startDate: Date | null;
-    endDate: Date | null;
-    promotions: Array<{ id: string; name: string; description: string | null; priority: number }>;
-  };
+export interface TodayPromotionSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  priority: number;
 }
 
-// ============ Home Response ============
+export interface TodaySaleProducts {
+  products: unknown[];
+  total: number;
+  date: string;
+  startDate: Date | null;
+  endDate: Date | null;
+  promotions: TodayPromotionSummary[];
+}
 
-export interface HomeResponse {
+export interface HomeSaleScheduleResponse {
+  schedule: SaleScheduleDay[];
+  todayProducts: TodaySaleProducts;
+}
+
+// ============================================================
+// Shared
+// ============================================================
+
+export interface PaginatedResult<T> {
+  data: T[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+// ============================================================
+// 3 Response types tương ứng 3 endpoint mới
+// ============================================================
+
+/** GET /home/static — ít thay đổi, cache dài */
+export interface HomeStaticResponse {
   sliders: HomeSlider[];
-  featuredCategories: FeaturedCategory[];
   bannersTop: HomeBanner[];
-  saleSchedule: HomeSaleScheduleResponse;
   bannersSection1: HomeBanner[];
+  featuredCategories: FeaturedCategory[];
   activeCampaigns: HomeCampaign[];
-  featuredProducts: any[];
-  bestSellingProducts: any[];
-  blogs: {
-    data: any[];
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+  blogs: PaginatedResult<unknown>;
+}
+
+/** GET /home/products — thay đổi vài lần/ngày, cache trung bình */
+export interface HomeProductsResponse {
+  featuredProducts: unknown[];
+  bestSellingProducts: unknown[];
+}
+
+/** GET /home/sale-schedule — real-time, cache ngắn */
+export type HomeSaleScheduleOnlyResponse = HomeSaleScheduleResponse;
+
+// ============================================================
+// Service Input Types
+// ============================================================
+
+export interface GetProductsByDateOptions {
+  promotionId?: string;
+  page?: number;
+  limit?: number;
 }
