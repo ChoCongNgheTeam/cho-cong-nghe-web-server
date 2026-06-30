@@ -1,12 +1,11 @@
 import { handlePrismaError } from "@/utils/handle-prisma-error";
 import prisma from "@/config/db";
 import * as repo from "./category.repository";
+import * as helpers from "./category.helpers";
 import { CreateCategoryInput, UpdateCategoryInput, ListCategoriesQuery } from "./category.validation";
 import { generateUniqueSlug } from "@/utils/generate-unique-slug";
-import { deleteOldCategoryImage } from "./category.helpers";
 import { NotFoundError, BadRequestError, ForbiddenError } from "@/errors";
 import buildCategoryTree from "@/utils/build-category-tree";
-import { Prisma } from "@prisma/client";
 
 const assertCategoryExists = async (id: string) => {
   const category = await repo.findById(id);
@@ -20,9 +19,7 @@ const assertCategoryExistsAdmin = async (id: string, options: { includeDeleted?:
   return category;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // PUBLIC
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const getCategoriesPublic = async (query: ListCategoriesQuery) => {
   return repo.findAllPublic(query);
@@ -41,9 +38,7 @@ export const resolveCategory = async (keyword: string) => {
   const variants = buildKeywordVariants(q);
   const qNorm = normalizeVietnamese(q);
 
-  // ── Helper: score category theo mức độ match ─────────────────────────────
-  // Dùng để chọn category TỐT NHẤT khi có nhiều candidates
-  // Score thấp hơn = tốt hơn
+  // Score category theo mức độ match — số càng thấp càng tốt
   const scoreCategory = (cat: { name: string; slug: string; parentId: string | null }): number => {
     const nameNorm = normalizeVietnamese(cat.name);
     const slugNorm = cat.slug.replace(/-/g, " ");
@@ -54,7 +49,7 @@ export const resolveCategory = async (keyword: string) => {
     return 3; // partial match
   };
 
-  // ── Step 1: Tìm candidates với tất cả variants ────────────────────────────
+  // Step 1: tìm candidates với tất cả variants
   const orConditions = variants.flatMap((v) => [
     { slug: { equals: v, mode: "insensitive" as const } },
     { slug: { contains: v, mode: "insensitive" as const } },
@@ -64,24 +59,19 @@ export const resolveCategory = async (keyword: string) => {
   const candidates = await repo.findCategoryByKeywords(orConditions);
 
   if (candidates.length > 0) {
-    // Chọn candidate tốt nhất theo score
     const best = candidates.reduce((a, b) => (scoreCategory(a) <= scoreCategory(b) ? a : b));
     return best;
   }
 
-  // ── Step 2: Tách từng word, thử tìm category khớp từng word ──────────────
+  // Step 2: tách từng word, thử tìm category khớp từng word
   // Xử lý case "samsung galaxy", "iphone 17 pro", "laptop hp"...
-  // → tách thành ["samsung", "galaxy"] → thử từng word → lấy word match tốt nhất
-  const words = qNorm.split(/\s+/).filter((w) => w.length >= 3); // bỏ qua word quá ngắn ("hp" là exception, xử lý riêng)
-
-  // Thêm lại words ngắn nếu query chỉ có 1 word (vd user nhập "hp")
-  const searchWords = words.length > 0 ? words : qNorm.split(/\s+/).filter(Boolean);
+  const words = qNorm.split(/\s+/).filter((w) => w.length >= 3); // bỏ qua word quá ngắn
+  const searchWords = words.length > 0 ? words : qNorm.split(/\s+/).filter(Boolean); // giữ lại word ngắn nếu query chỉ có 1 word (vd "hp")
 
   for (const word of searchWords) {
     const wordCandidates = await repo.findCategoryByKeywords([{ slug: { contains: word, mode: "insensitive" } }, { name: { contains: word, mode: "insensitive" } }]);
 
     if (wordCandidates.length > 0) {
-      // Ưu tiên exact/prefix match
       const exactMatch = wordCandidates.find((c) => {
         const nameNorm = normalizeVietnamese(c.name);
         const slugNorm = c.slug.replace(/-/g, " ");
@@ -121,9 +111,7 @@ export const getCategoryBySlug = async (slug: string) => {
   return category;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN: LIST
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const getCategoriesAdmin = async (query: ListCategoriesQuery) => {
   return repo.findAllAdmin(query);
@@ -137,15 +125,11 @@ export const getRootCategoriesForAdmin = async () => {
   return repo.findRootCategories(false);
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN: DETAIL
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * getCategoryDetail
- *
- * Dùng findByIdWithRelations thay vì findAllCategoriesForTree để
- * trả về đầy đủ imageUrl, imagePath, description, timestamps, parent, children.
+ * Dùng findByIdWithRelations thay vì findAllCategoriesForTree để trả về
+ * đầy đủ imageUrl, imagePath, description, timestamps, parent, children.
  */
 export const getCategoryDetail = async (id: string, options: { isAdmin?: boolean } = {}) => {
   const category = await repo.findByIdWithRelations(id, {
@@ -155,9 +139,7 @@ export const getCategoryDetail = async (id: string, options: { isAdmin?: boolean
   return category;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN: CREATE / UPDATE
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const createCategory = async (input: CreateCategoryInput) => {
   const { name, parentId, position, ...rest } = input;
@@ -184,106 +166,6 @@ export const createCategory = async (input: CreateCategoryInput) => {
     .catch(handlePrismaError);
 };
 
-async function collectDescendantIds(tx: Prisma.TransactionClient, rootId: string): Promise<string[]> {
-  const allIds: string[] = [];
-  const queue = [rootId];
-
-  while (queue.length > 0) {
-    const currentId = queue.shift()!;
-    const children = await tx.categories.findMany({
-      where: { parentId: currentId, deletedAt: null },
-      select: { id: true },
-    });
-    const childIds = children.map((c) => c.id);
-    allIds.push(...childIds);
-    queue.push(...childIds);
-  }
-
-  return allIds; // không bao gồm rootId
-}
-
-async function cascadeDeactivate(categoryId: string): Promise<void> {
-  await prisma.$transaction(async (tx) => {
-    const descendantIds = await collectDescendantIds(tx, categoryId);
-    const allIds = [categoryId, ...descendantIds];
-
-    await tx.categories.updateMany({
-      where: { id: { in: allIds } },
-      data: { isActive: false },
-    });
-    await tx.products.updateMany({
-      where: { categoryId: { in: allIds }, deletedAt: null },
-      data: { isActive: false },
-    });
-  });
-}
-
-async function cascadeDeactivateTx(tx: any, categoryId: string): Promise<void> {
-  const children = await tx.categories.findMany({
-    where: { parentId: categoryId, deletedAt: null },
-    select: { id: true },
-  });
-
-  for (const child of children) {
-    await tx.categories.update({
-      where: { id: child.id },
-      data: { isActive: false },
-    });
-    await tx.products.updateMany({
-      where: { categoryId: child.id, deletedAt: null },
-      data: { isActive: false },
-    });
-    await cascadeDeactivateTx(tx, child.id);
-  }
-
-  // Ẩn products của chính category này
-  await tx.products.updateMany({
-    where: { categoryId, deletedAt: null },
-    data: { isActive: false },
-  });
-}
-
-async function cascadeActivate(categoryId: string): Promise<void> {
-  await prisma.$transaction(async (tx) => {
-    const descendantIds = await collectDescendantIds(tx, categoryId);
-    const allIds = [categoryId, ...descendantIds];
-
-    await tx.categories.updateMany({
-      where: { id: { in: allIds } },
-      data: { isActive: true },
-    });
-    await tx.products.updateMany({
-      where: { categoryId: { in: allIds }, deletedAt: null },
-      data: { isActive: true },
-    });
-  });
-}
-
-async function cascadeActivateTx(tx: any, categoryId: string): Promise<void> {
-  const children = await tx.categories.findMany({
-    where: { parentId: categoryId, deletedAt: null },
-    select: { id: true },
-  });
-
-  for (const child of children) {
-    await tx.categories.update({
-      where: { id: child.id },
-      data: { isActive: true },
-    });
-    await tx.products.updateMany({
-      where: { categoryId: child.id, deletedAt: null },
-      data: { isActive: true },
-    });
-    await cascadeActivateTx(tx, child.id);
-  }
-
-  // Bật products của chính category này
-  await tx.products.updateMany({
-    where: { categoryId, deletedAt: null },
-    data: { isActive: true },
-  });
-}
-
 export const updateCategory = async (id: string, input: UpdateCategoryInput) => {
   const { name, parentId, ...rest } = input;
 
@@ -308,17 +190,17 @@ export const updateCategory = async (id: string, input: UpdateCategoryInput) => 
     if (exists) throw new BadRequestError(`Tên danh mục "${name}" đã tồn tại trong cùng cấp`);
   }
 
-  let slug = (category as any).slug;
-  if (name && name !== (category as any).name) {
+  let slug = category.slug;
+  if (name && name !== category.name) {
     slug = await generateUniqueSlug(prisma.categories, name);
   }
 
-  if (input.imagePath && (category as any).imagePath) {
-    await deleteOldCategoryImage((category as any).imagePath);
+  if (input.imagePath && category.imagePath) {
+    await helpers.deleteOldCategoryImage(category.imagePath);
   }
 
-  if (input.removeImage && (category as any).imagePath) {
-    await deleteOldCategoryImage((category as any).imagePath);
+  if (input.removeImage && category.imagePath) {
+    await helpers.deleteOldCategoryImage(category.imagePath);
     (rest as any).imagePath = null;
     (rest as any).imageUrl = null;
   }
@@ -332,18 +214,17 @@ export const updateCategory = async (id: string, input: UpdateCategoryInput) => 
       ...rest,
     })
     .catch(handlePrismaError);
+
   if (input.isActive === false) {
-    await cascadeDeactivate(id);
+    await helpers.cascadeDeactivate(id);
   } else if (input.isActive === true) {
-    await cascadeActivate(id);
+    await helpers.cascadeActivate(id);
   }
 
   return updated;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN: DELETE / RESTORE / HARD DELETE
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const softDeleteCategory = async (id: string, deletedById: string) => {
   await assertCategoryExists(id);
@@ -374,7 +255,7 @@ export const hardDeleteCategory = async (id: string) => {
 
   if (!category.deletedAt) throw new ForbiddenError("Phải soft delete trước khi xóa vĩnh viễn. Dùng DELETE /admin/categories/:id");
 
-  if (category.imagePath) await deleteOldCategoryImage(category.imagePath);
+  if (category.imagePath) await helpers.deleteOldCategoryImage(category.imagePath);
 
   return repo.hardDelete(id);
 };
@@ -383,9 +264,7 @@ export const getDeletedCategories = async (options: { page?: number; limit?: num
   return repo.findAllDeleted(options);
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // REORDER
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const reorderCategory = async (categoryId: string, newPosition: number) => {
   const category = await assertCategoryExists(categoryId);
@@ -408,13 +287,11 @@ export const reorderCategory = async (categoryId: string, newPosition: number) =
   return { message: "Sắp xếp thành công" };
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // TEMPLATE / ATTRIBUTES / SPECIFICATIONS
-// ─────────────────────────────────────────────────────────────────────────────
+
 export const getCategoryTemplate = async (categoryId: string) => {
   const category = await assertCategoryExists(categoryId);
 
-  // Gọi hàm mới — không cần Promise.all map N queries nữa
   const [attributes, specifications] = await Promise.all([repo.getCategoryVariantAttributesWithOptions(categoryId), repo.getCategorySpecifications(categoryId)]);
 
   return {

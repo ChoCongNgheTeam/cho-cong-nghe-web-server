@@ -2,9 +2,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "@/config/db";
 import { ListCategoriesQuery } from "./category.validation";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SELECTS
-// ─────────────────────────────────────────────────────────────────────────────
+// selects
 
 const selectCategory = {
   id: true,
@@ -32,9 +30,7 @@ type UpdateCategoryData = Prisma.categoriesUpdateInput;
 
 type CategoryNode = { id: string; parentId: string | null };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// WHERE / ORDER BUILDERS
-// ─────────────────────────────────────────────────────────────────────────────
+// where
 
 const buildCategoryWhere = (query: ListCategoriesQuery, onlyActive: boolean, isAdmin: boolean): Prisma.categoriesWhereInput => {
   const where: Prisma.categoriesWhereInput = {};
@@ -72,9 +68,7 @@ const buildCategoryOrderBy = (query: ListCategoriesQuery): Prisma.categoriesOrde
   return [{ position: query.sortOrder }];
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // FINDS
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const findAllPublic = async (query: ListCategoriesQuery) => {
   const where = buildCategoryWhere(query, true, false);
@@ -175,6 +169,7 @@ export const findAllCategoriesForTree = async (onlyActive = true) => {
     orderBy: { position: "asc" },
   });
 };
+
 export const findChildrenByParentId = async (parentId: string) => {
   return prisma.categories.findMany({
     where: {
@@ -190,7 +185,7 @@ export const findChildrenByParentId = async (parentId: string) => {
       position: true,
       imageUrl: true,
       children: {
-        // ← grandchildren luôn
+        // grandchildren luôn
         where: { deletedAt: null, isActive: true },
         select: {
           id: true,
@@ -307,6 +302,8 @@ export const findBySlug = async (slug: string) => {
   });
 };
 
+// MUTATIONS
+
 export const create = async (data: CreateCategoryData) => {
   return prisma.categories.create({ data, select: selectCategory });
 };
@@ -341,6 +338,8 @@ export const restore = async (id: string) => {
 export const hardDelete = async (id: string) => {
   return prisma.categories.delete({ where: { id } });
 };
+
+// HELPERS / CHECKS
 
 export const countSiblings = async (parentId: string | null) => {
   return prisma.categories.count({
@@ -398,6 +397,8 @@ async function getCategoryHierarchy(categoryId: string): Promise<string[]> {
 
   return result;
 }
+
+// TEMPLATE / ATTRIBUTES / SPECIFICATIONS
 
 export const getCategoryVariantAttributesWithOptions = async (categoryId: string) => {
   const categoryIds = await getCategoryHierarchy(categoryId);

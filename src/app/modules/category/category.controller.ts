@@ -1,19 +1,19 @@
 import { Request, Response } from "express";
+import { z } from "zod";
 import * as categoryService from "./category.service";
 import { parseMultipartData, uploadCategoryImage } from "./category.helpers";
 import { cleanupFile } from "@/integrations/file-cleanup.service";
 import { listCategoriesQuerySchema, featuredCategoriesQuerySchema, createCategorySchema, updateCategorySchema, resolveCategoryQuerySchema, deletedCategoriesQuerySchema } from "./category.validation";
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
-// Route-level validate middleware đã check UUID rồi, cast là đủ
-const p = (req: Request, key = "id") => req.params[key] as string;
+type ListCategoriesQuery = z.infer<typeof listCategoriesQuerySchema>;
+type FeaturedCategoriesQuery = z.infer<typeof featuredCategoriesQuerySchema>;
+type ResolveCategoryQuery = z.infer<typeof resolveCategoryQuerySchema>;
+type DeletedCategoriesQuery = z.infer<typeof deletedCategoriesQuerySchema>;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PUBLIC
-// ─────────────────────────────────────────────────────────────────────────────
+// Public
 
 export const getCategoriesPublicHandler = async (req: Request, res: Response) => {
-  const query = listCategoriesQuerySchema.parse(req.query);
+  const query = req.query as unknown as ListCategoriesQuery;
   const categories = await categoryService.getCategoriesPublic(query);
   res.json({ data: categories, total: categories.length, message: "Lấy danh sách danh mục thành công" });
 };
@@ -24,13 +24,13 @@ export const getRootCategoriesHandler = async (req: Request, res: Response) => {
 };
 
 export const getFeaturedCategoriesHandler = async (req: Request, res: Response) => {
-  const { limit } = featuredCategoriesQuerySchema.parse(req.query);
+  const { limit } = req.query as unknown as FeaturedCategoriesQuery;
   const categories = await categoryService.getFeaturedCategories(limit);
   res.json({ data: categories, total: categories.length, message: "Lấy danh mục nổi bật thành công" });
 };
 
 export const resolveCategoryHandler = async (req: Request, res: Response) => {
-  const { q } = resolveCategoryQuerySchema.parse(req.query);
+  const { q } = req.query as unknown as ResolveCategoryQuery;
   const category = await categoryService.resolveCategory(q);
   res.json({ data: category, message: category ? "Tìm thấy danh mục" : "Không tìm thấy danh mục" });
 };
@@ -41,21 +41,20 @@ export const getCategoryTreeHandler = async (req: Request, res: Response) => {
 };
 
 export const getCategoriesChildrenHandler = async (req: Request, res: Response) => {
-  const categories = await categoryService.getCategoriesChildren(p(req));
+  const parentId = req.params.id;
+  const categories = await categoryService.getCategoriesChildren(parentId);
   res.json({ data: categories, total: categories.length, message: "Lấy danh sách danh mục con" });
 };
 
 export const getCategoryBySlugHandler = async (req: Request, res: Response) => {
-  const category = await categoryService.getCategoryBySlug(p(req, "slug"));
+  const category = await categoryService.getCategoryBySlug(req.params.slug);
   res.json({ data: category, message: "Lấy chi tiết danh mục thành công" });
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ADMIN: LIST
-// ─────────────────────────────────────────────────────────────────────────────
+// Admin: list, detail
 
 export const getCategoriesAdminHandler = async (req: Request, res: Response) => {
-  const query = listCategoriesQuerySchema.parse(req.query);
+  const query = req.query as unknown as ListCategoriesQuery;
   const result = await categoryService.getCategoriesAdmin(query);
   res.json({
     data: result.data,
@@ -80,8 +79,71 @@ export const getRootCategoriesForAdminHandler = async (req: Request, res: Respon
   res.json({ data: categories, total: categories.length, message: "Lấy danh mục gốc thành công" });
 };
 
+export const getCategoryDetailHandler = async (req: Request, res: Response) => {
+  const isAdmin = req.user!.role === "ADMIN";
+  const category = await categoryService.getCategoryDetail(req.params.id, { isAdmin });
+  res.json({ data: category, message: "Lấy chi tiết danh mục thành công" });
+};
+
+// Admin: create, update
+
+export const createCategoryHandler = async (req: Request, res: Response) => {
+  const file = req.file;
+  try {
+    const parsedBody = parseMultipartData(req.body);
+    // Validate sau khi parse để Zod thấy đúng kiểu dữ liệu (boolean thật, không phải string)
+    const validatedBody = createCategorySchema.parse(parsedBody);
+    const uploadedImage = file ? await uploadCategoryImage(file) : null;
+
+    const category = await categoryService.createCategory({
+      ...validatedBody,
+      ...(uploadedImage && { imageUrl: uploadedImage.url, imagePath: uploadedImage.publicId }),
+    });
+
+    res.status(201).json({ data: category, message: "Tạo danh mục thành công" });
+  } finally {
+    cleanupFile(file);
+  }
+};
+
+export const updateCategoryHandler = async (req: Request, res: Response) => {
+  const file = req.file;
+  try {
+    const parsedBody = parseMultipartData(req.body);
+    // Validate sau khi parse — đảm bảo isActive/isFeatured là boolean thật
+    const validatedBody = updateCategorySchema.parse(parsedBody);
+    const uploadedImage = file ? await uploadCategoryImage(file) : null;
+
+    const category = await categoryService.updateCategory(req.params.id, {
+      ...validatedBody,
+      ...(uploadedImage && { imageUrl: uploadedImage.url, imagePath: uploadedImage.publicId }),
+    });
+
+    res.json({ data: category, message: "Cập nhật danh mục thành công" });
+  } finally {
+    cleanupFile(file);
+  }
+};
+
+// Admin: soft delete, restore, hard delete, trash
+
+export const deleteCategoryHandler = async (req: Request, res: Response) => {
+  await categoryService.softDeleteCategory(req.params.id, req.user!.id);
+  res.json({ message: "Xóa danh mục thành công" });
+};
+
+export const restoreCategoryHandler = async (req: Request, res: Response) => {
+  const category = await categoryService.restoreCategory(req.params.id);
+  res.json({ data: category, message: "Khôi phục danh mục thành công" });
+};
+
+export const hardDeleteCategoryHandler = async (req: Request, res: Response) => {
+  await categoryService.hardDeleteCategory(req.params.id);
+  res.json({ message: "Xóa vĩnh viễn danh mục thành công" });
+};
+
 export const getDeletedCategoriesHandler = async (req: Request, res: Response) => {
-  const { page, limit } = deletedCategoriesQuerySchema.parse(req.query);
+  const { page, limit } = req.query as unknown as DeletedCategoriesQuery;
   const result = await categoryService.getDeletedCategories({ page, limit });
   res.json({
     data: result.data,
@@ -95,84 +157,17 @@ export const getDeletedCategoriesHandler = async (req: Request, res: Response) =
   });
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ADMIN: DETAIL
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const getCategoryDetailHandler = async (req: Request, res: Response) => {
-  const isAdmin = req.user!.role === "ADMIN";
-  const category = await categoryService.getCategoryDetail(p(req), { isAdmin });
-  res.json({ data: category, message: "Lấy chi tiết danh mục thành công" });
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ADMIN: CREATE / UPDATE
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const createCategoryHandler = async (req: Request, res: Response) => {
-  const file = req.file;
-  try {
-    const validatedBody = createCategorySchema.parse(parseMultipartData(req.body));
-    const uploadedImage = file ? await uploadCategoryImage(file) : null;
-    const category = await categoryService.createCategory({
-      ...validatedBody,
-      ...(uploadedImage && { imageUrl: uploadedImage.url, imagePath: uploadedImage.publicId }),
-    });
-    res.status(201).json({ data: category, message: "Tạo danh mục thành công" });
-  } finally {
-    cleanupFile(file);
-  }
-};
-
-export const updateCategoryHandler = async (req: Request, res: Response) => {
-  const file = req.file;
-  try {
-    const validatedBody = updateCategorySchema.parse(parseMultipartData(req.body));
-    const uploadedImage = file ? await uploadCategoryImage(file) : null;
-    const category = await categoryService.updateCategory(p(req), {
-      ...validatedBody,
-      ...(uploadedImage && { imageUrl: uploadedImage.url, imagePath: uploadedImage.publicId }),
-    });
-    res.json({ data: category, message: "Cập nhật danh mục thành công" });
-  } finally {
-    cleanupFile(file);
-  }
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ADMIN: DELETE / RESTORE / HARD DELETE
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const deleteCategoryHandler = async (req: Request, res: Response) => {
-  await categoryService.softDeleteCategory(p(req), req.user!.id);
-  res.json({ message: "Xóa danh mục thành công" });
-};
-
-export const restoreCategoryHandler = async (req: Request, res: Response) => {
-  const category = await categoryService.restoreCategory(p(req));
-  res.json({ data: category, message: "Khôi phục danh mục thành công" });
-};
-
-export const hardDeleteCategoryHandler = async (req: Request, res: Response) => {
-  await categoryService.hardDeleteCategory(p(req));
-  res.json({ message: "Xóa vĩnh viễn danh mục thành công" });
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// REORDER
-// ─────────────────────────────────────────────────────────────────────────────
+// Reorder
 
 export const reorderCategoryHandler = async (req: Request, res: Response) => {
   const result = await categoryService.reorderCategory(req.body.categoryId, req.body.newPosition);
   res.json(result);
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TEMPLATE / ATTRIBUTES / SPECIFICATIONS
-// ─────────────────────────────────────────────────────────────────────────────
+// Template, Attributes, Specifications
 
 export const getCategoryTemplateHandler = async (req: Request, res: Response) => {
-  const result = await categoryService.getCategoryTemplate(p(req, "categoryId"));
+  const result = await categoryService.getCategoryTemplate(req.params.categoryId);
   res.json({ data: result, message: "Lấy template thành công" });
 };
 
@@ -182,7 +177,7 @@ export const getAllAttributesHandler = async (req: Request, res: Response) => {
 };
 
 export const getAttributeOptionsHandler = async (req: Request, res: Response) => {
-  const result = await categoryService.getAttributeOptions(p(req, "attributeId"));
+  const result = await categoryService.getAttributeOptions(req.params.attributeId);
   res.json({ data: result, message: "Lấy options thành công" });
 };
 

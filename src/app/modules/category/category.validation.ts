@@ -1,13 +1,5 @@
 import { z } from "zod";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * booleanQuery — parse query string boolean đúng cách.
- * z.coerce.boolean() sai vì Boolean("false") === true.
- */
 const booleanQuery = z
   .union([z.boolean(), z.string()])
   .optional()
@@ -19,9 +11,7 @@ const booleanQuery = z
     return undefined;
   });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PARAMS
-// ─────────────────────────────────────────────────────────────────────────────
+// params
 
 export const categoryParamsSchema = z.object({
   id: z.string().uuid("ID danh mục không hợp lệ"),
@@ -44,12 +34,7 @@ export const deletedCategoriesQuerySchema = z.object({
   limit: z.coerce.number().positive().max(100).default(20),
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// QUERY
-// parentId không dùng transform — giữ string, repository tự check
-// "root" → WHERE parentId IS NULL
-// UUID   → WHERE parentId = UUID
-// ─────────────────────────────────────────────────────────────────────────────
+// query
 
 export const listCategoriesQuerySchema = z.object({
   page: z.coerce.number().positive().default(1),
@@ -72,9 +57,7 @@ export const resolveCategoryQuerySchema = z.object({
   q: z.string().min(1, "Từ khóa không được để trống"),
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CREATE / UPDATE
-// ─────────────────────────────────────────────────────────────────────────────
+// body
 
 export const createCategorySchema = z.object({
   name: z.string().trim().min(2, "Tên danh mục phải từ 2 ký tự").max(100, "Tên danh mục tối đa 100 ký tự"),
@@ -103,10 +86,6 @@ export const reorderCategorySchema = z.object({
   categoryId: z.string().uuid("Category ID không hợp lệ"),
   newPosition: z.number().int().min(0, "Position phải >= 0"),
 });
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TYPES
-// ─────────────────────────────────────────────────────────────────────────────
 
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
 export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;

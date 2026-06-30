@@ -1,12 +1,16 @@
+import { Prisma } from "@prisma/client";
+import prisma from "@/config/db";
 import { uploadImage, deleteImage } from "@/integrations/cloudinary.service";
 
-export const buildCategoryPath = (category: any): string[] => {
+type CategoryWithParent = { id: string; parent?: CategoryWithParent | null };
+
+export const buildCategoryPath = (category: CategoryWithParent | null): string[] => {
   const path: string[] = [];
 
   let current = category;
   while (current) {
     if (current.id) path.push(current.id);
-    current = current.parent;
+    current = current.parent ?? null;
   }
   return path;
 };
@@ -60,3 +64,55 @@ export const deleteOldCategoryImage = async (imagePath?: string) => {
     }
   }
 };
+
+// CASCADE: bật/tắt isActive cho toàn bộ cây con khi danh mục cha đổi trạng thái
+
+async function collectDescendantIds(tx: Prisma.TransactionClient, rootId: string): Promise<string[]> {
+  const allIds: string[] = [];
+  const queue = [rootId];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+    const children = await tx.categories.findMany({
+      where: { parentId: currentId, deletedAt: null },
+      select: { id: true },
+    });
+    const childIds = children.map((c) => c.id);
+    allIds.push(...childIds);
+    queue.push(...childIds);
+  }
+
+  return allIds; // không bao gồm rootId
+}
+
+export async function cascadeDeactivate(categoryId: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const descendantIds = await collectDescendantIds(tx, categoryId);
+    const allIds = [categoryId, ...descendantIds];
+
+    await tx.categories.updateMany({
+      where: { id: { in: allIds } },
+      data: { isActive: false },
+    });
+    await tx.products.updateMany({
+      where: { categoryId: { in: allIds }, deletedAt: null },
+      data: { isActive: false },
+    });
+  });
+}
+
+export async function cascadeActivate(categoryId: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const descendantIds = await collectDescendantIds(tx, categoryId);
+    const allIds = [categoryId, ...descendantIds];
+
+    await tx.categories.updateMany({
+      where: { id: { in: allIds } },
+      data: { isActive: true },
+    });
+    await tx.products.updateMany({
+      where: { categoryId: { in: allIds }, deletedAt: null },
+      data: { isActive: true },
+    });
+  });
+}
