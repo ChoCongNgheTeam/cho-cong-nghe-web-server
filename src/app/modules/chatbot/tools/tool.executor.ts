@@ -1,5 +1,6 @@
 import prisma from "@/config/db";
 import { buildProductWhere } from "@/app/modules/product/product_filter.where-builder";
+import { generateEmbedding } from "../sync/embedding.sync";
 import {
   SearchProductsArgs,
   GetProductDetailArgs,
@@ -132,22 +133,20 @@ export const executeSearchProducts = async (
   args: SearchProductsArgs,
 ): Promise<ProductSearchResult[]> => {
   const {
-    keyword,
     categorySlug,
     brandSlug,
     minPrice,
     maxPrice,
     storage,
     color,
-    specsFilter,
-    attrsFilter,
     limit = 5,
     sortBy = "BEST_SELLING",
   } = args;
+  
+  let { specsFilter, attrsFilter, semanticQuery } = args;
 
   const dynamicQuery: Record<string, any> = {};
 
-  if (keyword && keyword.trim() !== "") dynamicQuery.search = keyword.trim();
   if (categorySlug) dynamicQuery.category = categorySlug;
   if (minPrice) dynamicQuery.minPrice = minPrice;
   if (maxPrice) dynamicQuery.maxPrice = maxPrice;
@@ -163,25 +162,68 @@ export const executeSearchProducts = async (
   }
 
   if (specsFilter) {
-    for (const [key, value] of Object.entries(specsFilter)) {
-      dynamicQuery[key.startsWith("spec_") ? key : `spec_${key}`] = value;
+    if (typeof specsFilter === "string") {
+      try { specsFilter = JSON.parse(specsFilter); } catch (e) {}
+    }
+    if (typeof specsFilter === "object" && specsFilter !== null) {
+      for (const [key, value] of Object.entries(specsFilter)) {
+        dynamicQuery[key.startsWith("spec_") ? key : `spec_${key}`] = value;
+      }
     }
   }
 
   if (attrsFilter) {
-    for (const [key, value] of Object.entries(attrsFilter)) {
-      dynamicQuery[`attr_${key}`] = value;
+    if (typeof attrsFilter === "string") {
+      try { attrsFilter = JSON.parse(attrsFilter); } catch (e) {}
+    }
+    if (typeof attrsFilter === "object" && attrsFilter !== null) {
+      for (const [key, value] of Object.entries(attrsFilter)) {
+        dynamicQuery[`attr_${key}`] = value;
+      }
     }
   }
 
   const where = await buildProductWhere(dynamicQuery, true);
   const takeCount = sortBy !== "BEST_SELLING" ? 20 : Math.min(limit, 10);
 
+  let productIds: string[] = [];
+
+  if (semanticQuery && semanticQuery.trim() !== "") {
+    // 1. Lọc thô lấy ID
+    const candidates = await prisma.products.findMany({ where, select: { id: true } });
+    if (candidates.length > 0) {
+      const candidateIds = candidates.map((c) => `'${c.id}'`).join(',');
+      
+      console.time('generateEmbedding');
+      const embedding = await generateEmbedding(semanticQuery.trim(), 'query');
+      console.timeEnd('generateEmbedding');
+      
+      console.time('vectorQuery');
+      const vectorQuery = `
+        SELECT "productId" as id FROM products_vector
+        WHERE "productId" IN (${candidateIds})
+        ORDER BY embedding <-> '[${embedding.join(',')}]'::vector
+        LIMIT ${takeCount}
+      `;
+      const vectorRows: { id: string }[] = await prisma.$queryRawUnsafe(vectorQuery);
+      productIds = vectorRows.map(r => r.id);
+      console.timeEnd('vectorQuery');
+    }
+  } else {
+    // Nếu không có semantic query thì fallback về SQL truyền thống
+    const candidates = await prisma.products.findMany({ 
+      where, 
+      select: { id: true },
+      orderBy: [{ totalSoldCount: "desc" }, { ratingAverage: "desc" }],
+      take: takeCount
+    });
+    productIds = candidates.map(c => c.id);
+  }
+
+  console.time('fetchProductsData');
   const [products, promotions] = await Promise.all([
     prisma.products.findMany({
-      where,
-      take: takeCount,
-      orderBy: [{ totalSoldCount: "desc" }, { ratingAverage: "desc" }],
+      where: { id: { in: productIds } },
       select: {
         id: true,
         name: true,
@@ -200,18 +242,17 @@ export const executeSearchProducts = async (
             id: true, 
             price: true, 
             quantity: true,
-        // 👇 Thêm phần này để lấy label phân loại
-        variantAttributes: {
-          select: {
-            attributeOption: {
-              select: { label: true }
-        }
-      }
-    }
-  },
-        orderBy: { price: "asc" },
-        take: 10, // Có thể lấy nhiều hơn để khách chọn
-},
+            variantAttributes: {
+              select: {
+                attributeOption: {
+                  select: { label: true }
+                }
+              }
+            }
+          },
+          orderBy: { price: "asc" },
+          take: 10,
+        },
         productSpecifications: {
           where: { isHighlight: true },
           select: {
@@ -225,6 +266,10 @@ export const executeSearchProducts = async (
     }),
     getActivePromotionsCache(),
   ]);
+  console.timeEnd('fetchProductsData');
+
+  // Sort products to match the productIds order (vector search order)
+  products.sort((a, b) => productIds.indexOf(a.id) - productIds.indexOf(b.id));
 
   let mappedProducts = products.map((p) => {
     const prices = p.variants.map((v) => Number(v.price));
@@ -474,12 +519,24 @@ export const executeGetPolicy = async (
   if (!page) return null;
 
   const plainContent = page.content
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<li>/gi, "- ")
     .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
+    .replace(/\n\s*\n/g, "\n\n")
     .trim()
-    .slice(0, 2000);
+    .slice(0, 10000);
 
-  return { title: page.title, content: plainContent };
+  // Programmatically extract the Lưu ý and Footnotes at the bottom
+  const luuYMatch = plainContent.match(/(Lưu ý:[\s\S]+)$/i);
+  const exactNotes = luuYMatch ? luuYMatch[1].trim() : "";
+
+  console.log("=== POLICY PLAIN CONTENT ===");
+  console.log(plainContent);
+  console.log("============================");
+
+  return { title: page.title, content: plainContent, exactNotes };
 };
 
 // ─── 5. EXTRACT PRODUCT CARDS ───────────────────────────────

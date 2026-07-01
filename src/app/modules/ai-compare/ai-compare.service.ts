@@ -18,11 +18,7 @@ import {
 import { AICompareResult, CompareAIResult } from "./ai-compare.types";
 import { NotFoundError, BadRequestError } from "@/errors";
 
-// ─── OpenAI client (singleton) ────────────────────────────────────────────────
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { executeWithGroqRotation } from "@/utils/groq.util";
 
 // ─── Step 1: Fetch + validate ─────────────────────────────────────────────────
 
@@ -57,15 +53,15 @@ async function callOpenAI(payloads: ReturnType<typeof transformProductSpecs>[]):
   const aiPayloads = payloads.map((p) => p.payload);
   const userPrompt = buildCompareUserPrompt(aiPayloads);
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const response = await executeWithGroqRotation(client => client.chat.completions.create({
+    model: "llama-3.1-8b-instant",
     temperature: 0.3,       // thấp để output nhất quán
     response_format: { type: "json_object" }, // force JSON mode — không bao giờ trả markdown
     messages: [
       { role: "system", content: COMPARE_SYSTEM_PROMPT },
       { role: "user", content: userPrompt },
     ],
-  });
+  }));
 
   const rawText = response.choices[0]?.message?.content;
   if (!rawText) {

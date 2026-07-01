@@ -41,6 +41,7 @@ export interface ChatResponse {
 // ---- Tool input types ----
 
 export interface SearchProductsArgs {
+  semanticQuery?: string;
   keyword?: string;
   categorySlug?: string;
   brandSlug?: string;
@@ -117,6 +118,7 @@ export interface ProductDetailResult {
 export interface PolicyResult {
   title: string;
   content: string;
+  exactNotes?: string;
 }
 
 export interface PromotionResult {

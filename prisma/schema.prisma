@@ -1,10 +1,12 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  extensions = [vector]
 }
 
 // --------------------- ENUMS ---------------------
@@ -451,6 +453,7 @@ model products {
   variants              products_variants[]
   productSpecifications product_specifications[]
   wishlist              wishlist[]
+  vectorData            products_vector?
 
   @@index([isActive, totalSoldCount])
   @@index([deletedAt])
@@ -797,6 +800,19 @@ model voucher_targets {
   createdAt  DateTime   @default(now())
 
   voucher vouchers @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// VECTOR SEARCH TABLES (AI / RAG)
+// ==========================================
+
+model products_vector {
+  productId  String   @id @db.Uuid
+  content    String
+  embedding  Unsupported("vector(384)")?
+  updatedAt  DateTime @updatedAt
+
+  product    products @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 // CASCADE: voucher_user gắn với voucher và user

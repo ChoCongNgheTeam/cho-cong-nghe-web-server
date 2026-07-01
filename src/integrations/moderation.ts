@@ -1,8 +1,6 @@
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+import { executeWithGroqRotation } from "@/utils/groq.util";
 
 export interface ModerationResult {
   approved: boolean;
@@ -62,23 +60,21 @@ export const moderateContent = async (type: ContentType, content: string): Promi
   try {
     const prompt = buildPrompt(type, content);
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+    const response = await executeWithGroqRotation(client => client.chat.completions.create({
+      model: "llama-3.1-8b-instant",
       messages: [
         {
           role: "system",
-          content: "Bạn là AI kiểm duyệt nội dung, chỉ trả về JSON hợp lệ.",
+          content: "You are a content moderation assistant. Respond ONLY with a valid JSON object. No explanation, no markdown wrapping.",
         },
         {
           role: "user",
           content: prompt,
         },
       ],
-      temperature: 0,
       response_format: { type: "json_object" },
-    });
-
-    const text = response.choices[0].message.content?.trim() || "{}";
+      temperature: 0,
+    }));const text = response.choices[0].message.content?.trim() || "{}";
     const parsed = JSON.parse(text);
 
     return parsed as ModerationResult;

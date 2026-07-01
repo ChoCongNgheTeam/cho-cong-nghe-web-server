@@ -11,7 +11,7 @@ export const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "search_products",
       description: `Tìm kiếm sản phẩm. 
-      LƯU Ý NGÂN SÁCH VÀ TỪ KHÓA (BẮT BUỘC QUY ĐỔI RA VNĐ, 1 triệu = 1000000): 
+      LƯU Ý NGÂN SÁCH VÀ TỪ KHÓA (BẮT BUỘC QUY ĐỔI RA VNĐ, 1 triệu = 1000000, VÀ BẮT BUỘC PHẢI LÀ SỐ NGUYÊN NUMBER, KHÔNG BỌC TRONG NGOẶC KÉP): 
       - Khách nói "tầm/khoảng X triệu" -> BẮT BUỘC truyền CẢ 2 tham số: minPrice = X * 0.8 * 1000000 và maxPrice = X * 1.2 * 1000000. (VD: "tầm 300 triệu" -> minPrice = 240000000, maxPrice = 360000000).
       - "dưới X triệu" -> minPrice = 0, maxPrice = X * 1000000.
       - "từ X đến Y triệu" -> minPrice = X * 1000000, maxPrice = Y * 1000000.
@@ -24,53 +24,20 @@ export const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       parameters: {
         type: "object",
         properties: {
-          keyword: {
+          semanticQuery: {
             type: "string",
-            description: `Từ khóa tìm kiếm — CHỈ gồm THƯƠNG HIỆU và TÊN DÒNG SẢN PHẨM CHÍNH.
-
-QUY TẮC BẮT BUỘC — LOẠI BỎ HOÀN TOÀN các thành phần sau khỏi keyword:
-- Model code / mã sản phẩm: N9ZKH-8, YZ9WKH-8, QN65Q80C, FV1410S4W...
-- Công suất: 1 HP, 1.5 HP, 2 HP...
-- BTU: 9.000 BTU, 12.000 BTU... (kể cả trong dấu ngoặc)
-- Dung lượng: 128GB, 256GB, 8GB RAM...
-- Kích thước: 65 inch, 55"...
-- Ký tự đặc biệt: (~...), [...], dấu phẩy, dấu gạch ngang trong mã máy
-- Số chiều điều hòa: "1 chiều", "2 chiều"
-- Công nghệ đi kèm: Inverter, QLED, OLED (trừ khi là tên dòng thực sự)
-
-VÍ DỤ ĐÚNG:
-❌ SAI: "Máy lạnh Panasonic 2 chiều Inverter YZ9WKH-8 1 HP (~9.000 BTU)"
-✅ ĐÚNG: keyword="Máy lạnh Panasonic" + categorySlug="may-lanh-dieu-hoa"
-
-❌ SAI: "Tivi Samsung 65 inch QLED 4K QN65Q80C"
-✅ ĐÚNG: keyword="Tivi Samsung" + categorySlug="tivi"
-
-❌ SAI: "Máy giặt LG Inverter 10kg FV1410S4W"
-✅ ĐÚNG: keyword="Máy giặt LG" + categorySlug="may-giat"
-
-❌ SAI: "iPhone 15 Pro Max 256GB"
-✅ ĐÚNG: keyword="iPhone 15 Pro Max" + categorySlug="iphone-15-series"
-
-❌ SAI: "Laptop Lenovo IdeaPad 5 i5-1235U 8GB 512GB"
-✅ ĐÚNG: keyword="Laptop Lenovo IdeaPad 5" + categorySlug="lenovo-ideapad"
-
-❌ SAI: "Tai nghe Sony WH-1000XM5 chống ồn"
-✅ ĐÚNG: keyword="Sony WH-1000XM5" + categorySlug="tai-nghe-khong-day" + brandSlug="sony"
-
-BẮT BUỘC DÙNG KEYWORD CHUẨN NẾU KHÁCH HỎI CÁC MẶT HÀNG SAU:
-- Tai nghe bluetooth / TWS -> keyword: "tai nghe bluetooth"
-- Tai nghe ANC / chống ồn -> keyword: "tai nghe chống ồn"
-- Chuột gaming / chơi game -> keyword: "chuột gaming"
-- Chuột không/có dây văn phòng -> keyword: "chuột không dây" hoặc "chuột"
-- Bàn phím cơ / gaming -> keyword: "bàn phím cơ" hoặc "bàn phím gaming"
-- Bàn phím không/có dây văn phòng -> keyword: "bàn phím không dây" hoặc "bàn phím"
-
-Nếu khách chỉ hỏi danh mục chung chung ('có máy lạnh không', 'tìm điện thoại') -> ĐỂ TRỐNG TRƯỜNG NÀY.`,
+            description: `Nhu cầu hoặc ý định tìm kiếm của khách hàng, được viết bằng ngôn ngữ tự nhiên. 
+VD: "điện thoại chụp hình đẹp ban đêm", "laptop chơi game mượt mà không nóng", "dành cho người lớn tuổi", "pin trâu".
+NẾU khách hỏi đích danh tên máy (VD: "iPhone 15 Pro Max"), hãy truyền tên máy vào đây.
+QUAN TRỌNG VỚI CÁC TỪ CHỦ QUAN:
+- Nếu khách yêu cầu "chụp hình đẹp", "chơi game mượt", "cao cấp": HÃY KẾT HỢP với \`minPrice: 15000000\` để AI lọc ra máy xịn (Flagship).
+- Nếu khách yêu cầu "giá rẻ", "chữa cháy": KẾT HỢP với \`maxPrice: 5000000\`.
+Tuyệt đối không để giá cả, hãng vào chuỗi này, hãy dùng minPrice/maxPrice/brandSlug để lọc.`,
           },
            categorySlug: {
             type: "string",
-            description: `BẮT BUỘC ánh xạ theo bảng chi tiết sau:
-[ĐIỆN THOẠI]: smartphone chung(dien-thoai), iPhone(apple-iphone), Samsung(samsung), Xiaomi/Redmi/Poco(xiaomi), OPPO(oppo).
+            description: `BẮT BUỘC ánh xạ theo bảng chi tiết sau (Lưu ý: "dt", "đt" nghĩa là điện thoại; "lap" là laptop):
+[ĐIỆN THOẠI] (dt, đt, smartphone): smartphone chung(dien-thoai), iPhone(apple-iphone), Samsung(samsung), Xiaomi/Redmi/Poco(xiaomi), OPPO(oppo).
 [LAPTOP]: laptop chung(laptop), MacBook(apple-macbook), Gaming Asus(asus-tuf-gaming hoặc asus-rog), Văn phòng Asus(asus-zenbook hoặc asus-vivobook), Gaming Lenovo(lenovo-legion-gaming hoặc lenovo-gaming-loq), Lenovo thường(lenovo-ideapad hoặc lenovo-thinkbook), Gaming Acer(acer-nitro hoặc acer-predator), Gaming Dell(dell-gaming-g-series), Gaming HP(hp-victus hoặc hp-omen), HP mỏng nhẹ(hp-envy).
 [ĐIỆN MÁY]: Tivi(tivi), Máy giặt(may-giat), Máy lạnh/điều hòa(may-lanh-dieu-hoa), Tủ lạnh(tu-lanh), Máy sấy quần áo(may-say), Tủ đông(tu-dong).
 [TAI NGHE/LOA]: Bluetooth/Không dây/TWS/ANC(tai-nghe-khong-day), Nhét tai/earbud/in-ear(tai-nghe-nhet-tai), Chụp tai/over-ear(tai-nghe-chup-tai), Headset gaming(tai-nghe), Loa bluetooth/di động(loa-bluetooth), Loa karaoke(loa-karaoke), Loa vi/máy tính(loa-vi-tinh).
@@ -81,8 +48,8 @@ Nếu khách chỉ hỏi danh mục chung chung ('có máy lạnh không', 'tìm
           brandSlug: {
             type: "string"},
 
-          minPrice: { type: "number" },
-          maxPrice: { type: "number" },
+          minPrice: { type: "number", description: "Số nguyên (number), tuyệt đối không dùng string có ngoặc kép." },
+          maxPrice: { type: "number", description: "Số nguyên (number), tuyệt đối không dùng string có ngoặc kép." },
           sortBy: {
             type: "string",
             enum: ["PRICE_ASC", "PRICE_DESC", "BEST_SELLING"],
@@ -90,24 +57,22 @@ Nếu khách chỉ hỏi danh mục chung chung ('có máy lạnh không', 'tìm
           storage: { type: "string" },
           color: { type: "string" },
           specsFilter: {
-            type: "object",
+            type: "string",
             description: `Lọc thông số kỹ thuật. Chỉ dùng khi CHẮC CHẮN format đúng với DB.
 FORMAT CHUẨN theo từng danh mục:
 - Điện thoại / Laptop: RAM: "8 GB", Pin: "5000 mAh", Camera: "50.0 MP", Hz: "120Hz"
 - Máy lạnh: Công suất (HP): "1 HP", "1.5 HP", "2 HP"
 - Máy giặt: Khối lượng giặt (kg): "8 kg", "10 kg"
 - Tivi: Kích thước màn hình: "65 inch", "55 inch"
-KHÔNG chắc chắn format → KHÔNG dùng, tránh lọc sai.`,
-            additionalProperties: { type: "string" },
+KHÔNG dùng để đoán các tính từ chủ quan ("chụp đẹp", "pin trâu"). Tính từ chủ quan phải dùng semanticQuery + minPrice/maxPrice.
+Chỉ dùng specsFilter khi khách yêu cầu CON SỐ CỤ THỂ (VD: "RAM 8GB", "Camera 50MP"). KHÔNG CHẮC CHẮN → KHÔNG DÙNG.
+(QUAN TRỌNG: TRẢ VỀ DƯỚI DẠNG CHUỖI JSON, ví dụ: "{\\"RAM\\":\\"8 GB\\"}")`,
           },
           attrsFilter: {
-            type: "object",
-            description: "Lọc variant. VD: Khách hỏi 'iPhone 15 128GB' -> keyword='iPhone 15', attrsFilter={ 'storage': '128GB' }",
-            additionalProperties: {
-              oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
-            },
+            type: "string",
+            description: "Lọc variant. VD: Khách hỏi 'iPhone 15 128GB' -> keyword='iPhone 15', attrsFilter='{\"storage\":\"128GB\"}' (QUAN TRỌNG: TRẢ VỀ DƯỚI DẠNG CHUỖI JSON)",
           },
-          limit: { type: "number", description: "Số lượng kết quả, mặc định 5, tối đa 10." },
+          limit: { type: "number", description: "Số lượng kết quả (number), không dùng string. Mặc định 5, tối đa 10." },
         },
         required: [],
       },

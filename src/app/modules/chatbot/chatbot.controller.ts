@@ -10,13 +10,22 @@ import { chatbotService } from "./chatbot.service";
 const chat = asyncHandler(async (req: Request, res: Response) => {
   const { messages } = req.body;
 
+  const startTime = performance.now();
+  
   // FIX: Bỏ slice ở đây — việc giới hạn context đã được xử lý trong service
   // Tránh double-slice gây mất context không nhất quán
   const result = await chatbotService.getChatReply(messages);
 
+  const endTime = performance.now();
+  const responseTimeMs = endTime - startTime;
+  const responseTimeStr = `${(responseTimeMs / 1000).toFixed(2)}s`;
+
   res.status(200).json({
     success: true,
-    data: result,
+    data: {
+      ...result,
+      responseTime: responseTimeStr
+    }
   });
 });
 

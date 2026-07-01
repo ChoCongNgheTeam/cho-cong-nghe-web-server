@@ -13,20 +13,16 @@ import { parse as csvParse } from "csv-parse/sync";
 // AI CONTENT SERVICE
 // ============================================================
 
-const openai = new OpenAI({
-  apiKey: env.OPENAI_API_KEY || process.env.OPENAI_API_KEY,
-  timeout: 180_000,
-  maxRetries: 2,
-});
+import { executeWithGroqRotation } from "@/utils/groq.util";
 
 // ─── callOpenAI ─────────────────────────────────────────────
 const callOpenAI = async (prompt: string, maxTokens: number): Promise<string> => {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const response = await executeWithGroqRotation(client => client.chat.completions.create({
+    model: "llama-3.1-8b-instant",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.7,
     max_tokens: maxTokens,
-  });
+  }));
   return response.choices[0].message.content || "";
 };
 
