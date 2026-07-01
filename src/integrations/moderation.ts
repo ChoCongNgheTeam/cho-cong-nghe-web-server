@@ -74,7 +74,9 @@ export const moderateContent = async (type: ContentType, content: string): Promi
       ],
       response_format: { type: "json_object" },
       temperature: 0,
-    }));const text = response.choices[0].message.content?.trim() || "{}";
+    }));
+    
+    const text = response.choices[0].message.content?.trim() || "{}";
     const parsed = JSON.parse(text);
 
     return parsed as ModerationResult;
