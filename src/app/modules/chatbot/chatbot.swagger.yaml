@@ -1,0 +1,69 @@
+tags:
+  - name: Chatbot
+    description: "API giao tiếp với AI Chatbot (Groq/OpenAI)"
+
+paths:
+  /chatbot:
+    post:
+      tags:
+        - Chatbot
+      summary: "Gửi tin nhắn cho AI Chatbot và nhận phản hồi"
+      description: "Nhận danh sách tin nhắn (context), phân tích ý định, thực thi Tool (nếu cần), và trả về câu trả lời cùng thời gian phản hồi."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - messages
+              properties:
+                messages:
+                  type: array
+                  description: "Mảng tin nhắn (vai trò: user hoặc assistant)"
+                  items:
+                    type: object
+                    properties:
+                      role:
+                        type: string
+                        enum: [user, assistant]
+                        example: "user"
+                      content:
+                        type: string
+                        example: "Tìm cho tôi điện thoại chụp hình đẹp 1 tí"
+      responses:
+        "200":
+          description: "Chatbot phản hồi thành công"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      reply:
+                        type: string
+                        description: "Câu trả lời của AI"
+                        example: "Mình tìm được mấy model phù hợp nè bạn!"
+                      toolsUsed:
+                        type: array
+                        items:
+                          type: string
+                        example: ["search_products"]
+                      products:
+                        type: array
+                        description: "Danh sách sản phẩm nếu AI có gọi tool tìm kiếm"
+                        items:
+                          type: object
+                      responseTime:
+                        type: string
+                        description: "Thời gian xử lý của AI"
+                        example: "3.42s"
+        "400":
+          $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/schemas/ErrorResponse"
