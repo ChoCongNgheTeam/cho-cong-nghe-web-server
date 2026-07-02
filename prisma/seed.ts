@@ -57,6 +57,15 @@ async function main() {
 
   await seedPages(prisma);
 
+  console.log("Seeding vector embeddings...");
+  try {
+    const { syncAllProducts } = require("../src/app/modules/chatbot/sync/embedding.sync");
+    await syncAllProducts();
+    console.log("Vector embeddings synced successfully!");
+  } catch (error) {
+    console.warn("Could not sync vector embeddings during seed:", error);
+  }
+
   console.log("✅ Seeding completed successfully!");
 }
 
