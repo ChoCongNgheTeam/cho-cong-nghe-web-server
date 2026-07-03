@@ -8,55 +8,70 @@ import axios from "axios";
 
 const HF_API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/intfloat/multilingual-e5-small";
 
+let localExtractor: any = null;
+
 /**
- * Tạo vector embedding từ văn bản sử dụng Hugging Face Inference API (multilingual-e5-small).
+ * Tạo vector embedding từ văn bản.
+ * Ưu tiên gọi Hugging Face API để tiết kiệm RAM. Nếu mạng nội bộ (VN) chặn API (lỗi DNS/ENOTFOUND),
+ * sẽ tự động fallback sang chạy model Local (Xenova) bằng cách import động.
  */
 export async function generateEmbedding(text: string, type: 'query' | 'passage' = 'passage'): Promise<number[]> {
   const prefixedText = `${type}: ${text.replace(/\n/g, " ")}`;
   const token = env.HF_TOKEN || process.env.HF_TOKEN;
 
-  if (!token) {
-    throw new Error("Missing HF_TOKEN in environment variables");
-  }
+  if (token) {
+    let retries = 0;
+    const maxRetries = 3;
 
-  let retries = 0;
-  const maxRetries = 5;
-
-  while (retries < maxRetries) {
-    try {
-      const response = await axios.post(
-        HF_API_URL,
-        { inputs: prefixedText },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
+    while (retries < maxRetries) {
+      try {
+        const response = await axios.post(
+          HF_API_URL,
+          { inputs: prefixedText },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            timeout: 10000 // Chờ tối đa 10s để biết mạng có chặn không
+          }
+        );
+        
+        const data = response.data;
+        if (Array.isArray(data) && Array.isArray(data[0])) return data[0];
+        return data;
+        
+      } catch (error: any) {
+        if (error.code === 'ENOTFOUND' || error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
+          console.warn("[HF API] Bị chặn DNS / Mất mạng. Tự động chuyển sang chạy Local Model (Xenova)...");
+          break; // Thoát vòng lặp API, chuyển sang chạy Local ở dưới
         }
-      );
-      
-      // Tùy theo model, API có thể trả về array 1 chiều hoặc 2 chiều
-      const data = response.data;
-      if (Array.isArray(data) && Array.isArray(data[0])) {
-        return data[0];
-      }
-      return data;
-      
-    } catch (error: any) {
-      if (error.response?.status === 503) {
-        // Model is loading
-        const estimatedTime = error.response.data?.estimated_time || 10;
-        console.log(`[HF API] Model is loading. Waiting ${Math.ceil(estimatedTime)} seconds before retry...`);
-        await new Promise(resolve => setTimeout(resolve, estimatedTime * 1000 + 1000));
-        retries++;
-      } else {
-        console.error("[HF API] Error generating embedding:", error.response?.data || error.message);
-        throw error;
+        
+        if (error.response?.status === 503) {
+          const estimatedTime = error.response.data?.estimated_time || 10;
+          console.log(`[HF API] Model is loading. Waiting ${Math.ceil(estimatedTime)}s before retry...`);
+          await new Promise(resolve => setTimeout(resolve, estimatedTime * 1000 + 1000));
+          retries++;
+        } else {
+          console.warn("[HF API] Lỗi API:", error.message, ". Fallback sang Local Model...");
+          break; // Các lỗi khác cũng cho fallback sang Local
+        }
       }
     }
+  } else {
+    console.warn("[HF API] Không có HF_TOKEN. Tự động chuyển sang chạy Local Model (Xenova)...");
   }
 
-  throw new Error("Exceeded max retries waiting for HF model to load.");
+  // --- FALLBACK SANG CHẠY LOCAL KHI API BỊ CHẶN HOẶC LỖI ---
+  // Import động (dynamic require) để tránh việc Node.js nạp thư viện này vào RAM lúc khởi động Server
+  if (!localExtractor) {
+    console.log("Đang nạp Local Model (chỉ tốn RAM ở máy Local, lên Server không bị)...");
+    const { pipeline } = require('@xenova/transformers');
+    localExtractor = await pipeline('feature-extraction', 'Xenova/multilingual-e5-small');
+  }
+  
+  const result = await localExtractor(prefixedText, { pooling: 'mean', normalize: true });
+  return Array.from(result.data);
 }
 
 /**
