@@ -1,22 +1,62 @@
-import { pipeline } from '@xenova/transformers';
+
 import { PrismaClient } from "@prisma/client";
 import { env } from "@/config/env";
 
 const prisma = new PrismaClient();
 
-let extractor: any = null;
+import axios from "axios";
+
+const HF_API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/intfloat/multilingual-e5-small";
 
 /**
- * Tạo vector embedding từ văn bản sử dụng all-MiniLM-L6-v2 (Local).
+ * Tạo vector embedding từ văn bản sử dụng Hugging Face Inference API (multilingual-e5-small).
  */
 export async function generateEmbedding(text: string, type: 'query' | 'passage' = 'passage'): Promise<number[]> {
-  if (!extractor) {
-    extractor = await pipeline('feature-extraction', 'Xenova/multilingual-e5-small');
-  }
-  
   const prefixedText = `${type}: ${text.replace(/\n/g, " ")}`;
-  const result = await extractor(prefixedText, { pooling: 'mean', normalize: true });
-  return Array.from(result.data);
+  const token = env.HF_TOKEN || process.env.HF_TOKEN;
+
+  if (!token) {
+    throw new Error("Missing HF_TOKEN in environment variables");
+  }
+
+  let retries = 0;
+  const maxRetries = 5;
+
+  while (retries < maxRetries) {
+    try {
+      const response = await axios.post(
+        HF_API_URL,
+        { inputs: prefixedText },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      
+      // Tùy theo model, API có thể trả về array 1 chiều hoặc 2 chiều
+      const data = response.data;
+      if (Array.isArray(data) && Array.isArray(data[0])) {
+        return data[0];
+      }
+      return data;
+      
+    } catch (error: any) {
+      if (error.response?.status === 503) {
+        // Model is loading
+        const estimatedTime = error.response.data?.estimated_time || 10;
+        console.log(`[HF API] Model is loading. Waiting ${Math.ceil(estimatedTime)} seconds before retry...`);
+        await new Promise(resolve => setTimeout(resolve, estimatedTime * 1000 + 1000));
+        retries++;
+      } else {
+        console.error("[HF API] Error generating embedding:", error.response?.data || error.message);
+        throw error;
+      }
+    }
+  }
+
+  throw new Error("Exceeded max retries waiting for HF model to load.");
 }
 
 /**
