@@ -5,6 +5,7 @@
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
+  products?: any[];
 }
 
 export interface ChatRequest {
@@ -53,6 +54,7 @@ export interface SearchProductsArgs {
   attrsFilter?: Record<string, string | string[]>;
   limit?: number;
   sortBy?: "PRICE_ASC" | "PRICE_DESC" | "BEST_SELLING";
+  needsDetailedComparison?: boolean;
 }
 
 export interface GetProductDetailArgs {

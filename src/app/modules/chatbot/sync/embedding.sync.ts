@@ -8,18 +8,23 @@ import axios from "axios";
 
 const HF_API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/intfloat/multilingual-e5-small";
 
+// Biến môi trường tự định nghĩa để ép kiểu chạy. 
+// Đọc từ file .env, mặc định là 'production' nếu sếp quên cấu hình
+const EMBEDDING_ENV = process.env.EMBEDDING_ENV || 'production';
+
 let localExtractor: any = null;
 
 /**
  * Tạo vector embedding từ văn bản.
- * Ưu tiên gọi Hugging Face API để tiết kiệm RAM. Nếu mạng nội bộ (VN) chặn API (lỗi DNS/ENOTFOUND),
- * sẽ tự động fallback sang chạy model Local (Xenova) bằng cách import động.
  */
 export async function generateEmbedding(text: string, type: 'query' | 'passage' = 'passage'): Promise<number[]> {
   const prefixedText = `${type}: ${text.replace(/\n/g, " ")}`;
   const token = env.HF_TOKEN || process.env.HF_TOKEN;
 
-  if (token) {
+  // 1. NẾU CẤU HÌNH LÀ PRODUCTION -> GỌI API
+  if (EMBEDDING_ENV === 'production') {
+    if (!token) throw new Error("Chế độ Production bắt buộc phải có HF_TOKEN trong file .env");
+    
     let retries = 0;
     const maxRetries = 3;
 
@@ -33,7 +38,7 @@ export async function generateEmbedding(text: string, type: 'query' | 'passage' 
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
             },
-            timeout: 10000 // Chờ tối đa 10s để biết mạng có chặn không
+            timeout: 10000
           }
         );
         
@@ -42,36 +47,33 @@ export async function generateEmbedding(text: string, type: 'query' | 'passage' 
         return data;
         
       } catch (error: any) {
-        if (error.code === 'ENOTFOUND' || error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
-          console.warn("[HF API] Bị chặn DNS / Mất mạng. Tự động chuyển sang chạy Local Model (Xenova)...");
-          break; // Thoát vòng lặp API, chuyển sang chạy Local ở dưới
-        }
-        
         if (error.response?.status === 503) {
           const estimatedTime = error.response.data?.estimated_time || 10;
           console.log(`[HF API] Model is loading. Waiting ${Math.ceil(estimatedTime)}s before retry...`);
           await new Promise(resolve => setTimeout(resolve, estimatedTime * 1000 + 1000));
           retries++;
         } else {
-          console.warn("[HF API] Lỗi API:", error.message, ". Fallback sang Local Model...");
-          break; // Các lỗi khác cũng cho fallback sang Local
+          console.error("[HF API] Lỗi API:", error.message);
+          throw new Error("Lỗi gọi API Hugging Face (Production)");
         }
       }
     }
-  } else {
-    console.warn("[HF API] Không có HF_TOKEN. Tự động chuyển sang chạy Local Model (Xenova)...");
+    throw new Error("Hugging Face API Timeout / Quá tải");
   }
 
-  // --- FALLBACK SANG CHẠY LOCAL KHI API BỊ CHẶN HOẶC LỖI ---
-  // Import động (dynamic require) để tránh việc Node.js nạp thư viện này vào RAM lúc khởi động Server
-  if (!localExtractor) {
-    console.log("Đang nạp Local Model (chỉ tốn RAM ở máy Local, lên Server không bị)...");
-    const { pipeline } = require('@xenova/transformers');
-    localExtractor = await pipeline('feature-extraction', 'Xenova/multilingual-e5-small');
+  // 2. NẾU CẤU HÌNH LÀ LOCAL -> CHẠY OFFLINE
+  if (EMBEDDING_ENV === 'local') {
+    if (!localExtractor) {
+      console.log("Đang nạp Local Model (chỉ tốn RAM ở máy Local)...");
+      const { pipeline } = require('@xenova/transformers');
+      localExtractor = await pipeline('feature-extraction', 'Xenova/multilingual-e5-small');
+    }
+    
+    const result = await localExtractor(prefixedText, { pooling: 'mean', normalize: true });
+    return Array.from(result.data);
   }
-  
-  const result = await localExtractor(prefixedText, { pooling: 'mean', normalize: true });
-  return Array.from(result.data);
+
+  return [];
 }
 
 /**

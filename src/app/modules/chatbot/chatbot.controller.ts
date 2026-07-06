@@ -8,13 +8,12 @@ import { chatbotService } from "./chatbot.service";
 // ============================================================
 
 const chat = asyncHandler(async (req: Request, res: Response) => {
-  const { messages } = req.body;
+  const { messages, sessionId } = req.body;
+  const userId = (req as any).user?.id; // Lấy userId nếu khách đã login
 
   const startTime = performance.now();
   
-  // FIX: Bỏ slice ở đây — việc giới hạn context đã được xử lý trong service
-  // Tránh double-slice gây mất context không nhất quán
-  const result = await chatbotService.getChatReply(messages);
+  const result = await chatbotService.getChatReply(messages, sessionId, userId);
 
   const endTime = performance.now();
   const responseTimeMs = endTime - startTime;

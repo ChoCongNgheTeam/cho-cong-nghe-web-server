@@ -18,7 +18,7 @@ import { executeWithGroqRotation } from "@/utils/groq.util";
 // ─── callOpenAI ─────────────────────────────────────────────
 const callOpenAI = async (prompt: string, maxTokens: number): Promise<string> => {
   const response = await executeWithGroqRotation(client => client.chat.completions.create({
-    model: "llama-3.1-8b-instant",
+    model: "gemini-2.5-flash",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.7,
     max_tokens: maxTokens,
