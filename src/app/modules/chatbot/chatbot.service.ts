@@ -58,20 +58,7 @@ const dispatchTool = async (
       case "get_policy":
         result = await executeGetPolicy(args as any);
         break;
-      case "save_user_preference":
-        if (!userId) {
-          result = { success: false, message: "Yêu cầu đăng nhập để lưu sở thích" };
-        } else {
-          const { PrismaClient } = require("@prisma/client");
-          const prisma = new PrismaClient();
-          await prisma.user_preferences.upsert({
-            where: { userId_key: { userId, key: args.key } },
-            update: { value: args.value, updatedAt: new Date() },
-            create: { userId, key: args.key, value: args.value }
-          });
-          result = { success: true, message: "Đã lưu sở thích thành công" };
-        }
-        break;
+
       default:
         return JSON.stringify({ error: `Tool "${name}" không tồn tại` });
     }
@@ -122,9 +109,7 @@ export const getChatReply = async (
   // 2. Tích hợp Trí nhớ Dài hạn và Hồ sơ (Tầng 2 & 3)
   let extraContext = "";
   if (sessionId) {
-    const profileContext = await memoryService.getUserProfileContext(userId);
-    const vectorContext = await memoryService.getVectorContext(sessionId, userId, rawLastMessage);
-    extraContext = profileContext + "\n" + vectorContext;
+    extraContext = await memoryService.getVectorContext(sessionId, userId, rawLastMessage);
   }
 
   // Lấy 20 messages gần nhất (10 turn = 10 user + 10 assistant)
@@ -224,7 +209,7 @@ export const getChatReply = async (
     }
 
     // ─── HYBRID CACHE LOOKUP ──────────────────────────────────
-    const isAction = toolCalls.some(t => t.name === "save_user_preference");
+      const isAction = false;
     
     // Hash danh sách Tool Calls
     const toolSignatureString = JSON.stringify(toolCalls.map(t => ({ name: t.name, args: t.args || {} })));
@@ -419,7 +404,7 @@ Khi khách hàng hỏi về chính sách, bạn phải tuân thủ:
     }
 
     // Lưu vào Ngân hàng Câu hỏi
-    const isActionTool = toolsUsed.some(t => t === "save_user_preference");
+    const isActionTool = false;
     if (!isActionTool && currentEmbedding) {
       const isVolatile = toolsUsed.some(t => t === "get_product_detail" || t === "get_active_promotions");
       const ttlDays = isVolatile ? 1 : null;

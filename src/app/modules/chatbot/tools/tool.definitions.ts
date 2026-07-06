@@ -128,19 +128,5 @@ Chỉ dùng specsFilter khi khách yêu cầu CON SỐ CỤ THỂ (VD: "RAM 8GB"
       },
       required: ["policyType"],
     },
-  },
-  {
-    name: "save_user_preference",
-    description: `Lưu trữ sở thích, nhu cầu dài hạn của khách hàng.
-      Chỉ gọi tool này khi khách bày tỏ sở thích RÕ RÀNG (VD: "tôi chỉ xài iphone", "tôi không thích máy nặng", "mình làm đồ hoạ").
-      KHÔNG lưu các câu hỏi chung chung.`,
-    parameters: {
-      type: "object",
-      properties: {
-        key: { type: "string", description: "Từ khóa ngắn gọn (VD: 'brand_preference', 'usage_need', 'hated_specs')" },
-        value: { type: "string", description: "Nội dung sở thích (VD: 'Chỉ thích Apple', 'Làm đồ họa 3D', 'Ghét điện thoại màn hình nhỏ')" }
-      },
-      required: ["key", "value"]
-    }
   }
 ];
