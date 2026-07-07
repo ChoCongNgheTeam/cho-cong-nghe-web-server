@@ -61,7 +61,7 @@ export const moderateContent = async (type: ContentType, content: string): Promi
     const prompt = buildPrompt(type, content);
 
     const response = await executeWithGroqRotation(client => client.chat.completions.create({
-      model: "llama-3.1-8b-instant",
+      model: "gemini-2.5-flash",
       messages: [
         {
           role: "system",

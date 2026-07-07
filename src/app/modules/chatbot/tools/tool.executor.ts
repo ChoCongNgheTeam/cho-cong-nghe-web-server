@@ -1,4 +1,5 @@
 import prisma from "@/config/db";
+import { Prisma } from "@prisma/client";
 import { buildProductWhere } from "@/app/modules/product/product_filter.where-builder";
 import { generateEmbedding } from "../sync/embedding.sync";
 import {
@@ -132,7 +133,7 @@ const applyPromotion = (
 export const executeSearchProducts = async (
   args: SearchProductsArgs,
 ): Promise<ProductSearchResult[]> => {
-  const {
+  let {
     categorySlug,
     brandSlug,
     minPrice,
@@ -140,10 +141,16 @@ export const executeSearchProducts = async (
     storage,
     color,
     limit = 5,
-    sortBy = "BEST_SELLING",
+    sortBy,
+    specsFilter,
+    attrsFilter,
+    semanticQuery,
+    needsDetailedComparison,
   } = args;
-  
-  let { specsFilter, attrsFilter, semanticQuery } = args;
+
+  // Tự động fix lỗi LLM truyền số nhỏ thay vì triệu VNĐ
+  if (minPrice && minPrice < 100) minPrice = minPrice * 1000000;
+  if (maxPrice && maxPrice < 100) maxPrice = maxPrice * 1000000;
 
   const dynamicQuery: Record<string, any> = {};
 
@@ -184,21 +191,28 @@ export const executeSearchProducts = async (
   }
 
   const where = await buildProductWhere(dynamicQuery, true);
-  const takeCount = sortBy !== "BEST_SELLING" ? 20 : Math.min(limit, 10);
-
   let productIds: string[] = [];
 
   if (semanticQuery && semanticQuery.trim() !== "") {
-    // 1. Lọc thô lấy ID
-    const candidates = await prisma.products.findMany({ where, select: { id: true } });
+    // 1. Lọc thô lấy ID, limit 300 để chống tràn RAM
+    const candidates = await prisma.products.findMany({ 
+      where, 
+      select: { id: true },
+      orderBy: [{ totalSoldCount: "desc" }],
+      take: 300
+    });
+    
     if (candidates.length > 0) {
       const candidateIds = candidates.map((c) => `'${c.id}'`).join(',');
       
-      console.time('generateEmbedding');
+      const tid = Math.random().toString(36).slice(2, 6);
+      console.time(`generateEmbedding-${tid}`);
       const embedding = await generateEmbedding(semanticQuery.trim(), 'query');
-      console.timeEnd('generateEmbedding');
+      console.timeEnd(`generateEmbedding-${tid}`);
       
-      console.time('vectorQuery');
+      console.time(`vectorQuery-${tid}`);
+      // Lấy dư ra 50 kết quả để Sort sau
+      const takeCount = sortBy ? 50 : Math.min(limit, 10);
       const vectorQuery = `
         SELECT "productId" as id FROM products_vector
         WHERE "productId" IN (${candidateIds})
@@ -206,21 +220,39 @@ export const executeSearchProducts = async (
         LIMIT ${takeCount}
       `;
       const vectorRows: { id: string }[] = await prisma.$queryRawUnsafe(vectorQuery);
-      productIds = vectorRows.map(r => r.id);
-      console.timeEnd('vectorQuery');
+      console.timeEnd(`vectorQuery-${tid}`);
+
+      // Bổ sung Fuzzy Search (Trigram) nếu câu truy vấn ngắn (<= 5 từ) để sửa lỗi chính tả nặng
+      let fuzzyIds: string[] = [];
+      if (semanticQuery.split(' ').length <= 5) {
+        const fuzzyRows: { id: string }[] = await prisma.$queryRaw`
+          SELECT id FROM products 
+          WHERE "deletedAt" IS NULL AND id IN (${Prisma.join(candidates.map(c => Prisma.sql`${c.id}::uuid`))})
+          AND similarity(name, ${semanticQuery.trim()}) > 0.2
+          LIMIT 5
+        `;
+        fuzzyIds = fuzzyRows.map(r => r.id);
+      }
+
+      productIds = [...new Set([...vectorRows.map(r => r.id), ...fuzzyIds])].slice(0, takeCount);
     }
   } else {
     // Nếu không có semantic query thì fallback về SQL truyền thống
+    if (!sortBy) sortBy = "BEST_SELLING";
+    
     const candidates = await prisma.products.findMany({ 
       where, 
       select: { id: true },
       orderBy: [{ totalSoldCount: "desc" }, { ratingAverage: "desc" }],
-      take: takeCount
+      take: Math.min(limit, 10)
     });
     productIds = candidates.map(c => c.id);
   }
 
-  console.time('fetchProductsData');
+  if (productIds.length === 0) return [];
+
+  const tid2 = Math.random().toString(36).slice(2, 6);
+  console.time(`fetchProductsData-${tid2}`);
   const [products, promotions] = await Promise.all([
     prisma.products.findMany({
       where: { id: { in: productIds } },
@@ -231,6 +263,7 @@ export const executeSearchProducts = async (
         brand: { select: { name: true } },
         category: { select: { name: true } },
         ratingAverage: true,
+        totalSoldCount: true, // Lấy để sort best selling
         img: {
           select: { imageUrl: true },
           orderBy: { position: "asc" },
@@ -254,19 +287,19 @@ export const executeSearchProducts = async (
           take: 10,
         },
         productSpecifications: {
-          where: { isHighlight: true },
+          where: needsDetailedComparison ? undefined : { isHighlight: true },
           select: {
             value: true,
             specification: { select: { name: true, key: true } },
           },
           orderBy: { sortOrder: "asc" },
-          take: 4,
+          take: needsDetailedComparison ? undefined : 4,
         },
       },
     }),
     getActivePromotionsCache(),
   ]);
-  console.timeEnd('fetchProductsData');
+  console.timeEnd(`fetchProductsData-${tid2}`);
 
   // Sort products to match the productIds order (vector search order)
   products.sort((a, b) => productIds.indexOf(a.id) - productIds.indexOf(b.id));
@@ -299,6 +332,7 @@ export const executeSearchProducts = async (
       brand: p.brand.name,
       category: p.category.name,
       inStock,
+      totalSoldCount: p.totalSoldCount,
       rating: Number(p.ratingAverage),
       highlights: p.productSpecifications.map((ps) => ({
         key: ps.specification.key,
@@ -320,6 +354,8 @@ export const executeSearchProducts = async (
     mappedProducts.sort((a, b) => a.priceMin - b.priceMin);
   } else if (sortBy === "PRICE_DESC") {
     mappedProducts.sort((a, b) => b.priceMin - a.priceMin);
+  } else if (sortBy === "BEST_SELLING") {
+    mappedProducts.sort((a, b) => b.totalSoldCount - a.totalSoldCount);
   }
 
   return mappedProducts.slice(0, Math.min(limit, 10));
@@ -537,6 +573,72 @@ export const executeGetPolicy = async (
   console.log("============================");
 
   return { title: page.title, content: plainContent, exactNotes };
+};
+
+export const executeCompareProductsSpecs = async (
+  productNames: string[]
+): Promise<any[]> => {
+  if (!productNames || !Array.isArray(productNames) || productNames.length === 0) return [];
+
+  const results: any[] = [];
+  for (const name of productNames) {
+    if (typeof name !== 'string' || name.trim() === '') continue;
+    
+    // Fuzzy search by trigram
+    const rows: { id: string, sim: number }[] = await prisma.$queryRaw`
+      SELECT id, similarity(name, ${name.trim()}) as sim 
+      FROM products 
+      WHERE "deletedAt" IS NULL 
+        AND similarity(name, ${name.trim()}) > 0.35
+      ORDER BY sim DESC
+      LIMIT 1
+    `;
+    
+    if (rows.length === 0) {
+      results.push({ 
+        requestedName: name, 
+        notFound: true, 
+        message: "Không tìm thấy sản phẩm này trong hệ thống, vui lòng báo lại cho khách hàng." 
+      });
+      continue;
+    }
+    const productId = rows[0].id;
+    
+    const p = await prisma.products.findUnique({
+      where: { id: productId },
+      select: {
+        name: true,
+        variants: {
+          where: { isActive: true, deletedAt: null },
+          select: { price: true },
+          orderBy: { price: "asc" },
+          take: 1
+        },
+        productSpecifications: {
+          select: {
+            value: true,
+            specification: { select: { name: true } },
+          },
+          orderBy: { sortOrder: "asc" }
+        }
+      }
+    });
+    
+    if (p) {
+      results.push({
+        name: p.name,
+        price: p.variants.length > 0 ? p.variants[0].price : null,
+        specs: p.productSpecifications.reduce((acc, s) => {
+          acc[s.specification.name] = s.value;
+          return acc;
+        }, {} as Record<string, string>)
+      });
+    } else {
+      results.push({ requestedName: name, notFound: true });
+    }
+  }
+  
+  return results;
 };
 
 // ─── 5. EXTRACT PRODUCT CARDS ───────────────────────────────
