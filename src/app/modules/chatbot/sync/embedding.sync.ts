@@ -1,22 +1,79 @@
-import { pipeline } from '@xenova/transformers';
+
 import { PrismaClient } from "@prisma/client";
 import { env } from "@/config/env";
 
 const prisma = new PrismaClient();
 
-let extractor: any = null;
+import axios from "axios";
+
+const HF_API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/intfloat/multilingual-e5-small";
+
+// Biến môi trường tự định nghĩa để ép kiểu chạy. 
+// Đọc từ file .env, mặc định là 'production' nếu sếp quên cấu hình
+const EMBEDDING_ENV = process.env.EMBEDDING_ENV || 'production';
+
+let localExtractor: any = null;
 
 /**
- * Tạo vector embedding từ văn bản sử dụng all-MiniLM-L6-v2 (Local).
+ * Tạo vector embedding từ văn bản.
  */
 export async function generateEmbedding(text: string, type: 'query' | 'passage' = 'passage'): Promise<number[]> {
-  if (!extractor) {
-    extractor = await pipeline('feature-extraction', 'Xenova/multilingual-e5-small');
-  }
-  
   const prefixedText = `${type}: ${text.replace(/\n/g, " ")}`;
-  const result = await extractor(prefixedText, { pooling: 'mean', normalize: true });
-  return Array.from(result.data);
+  const token = env.HF_TOKEN || process.env.HF_TOKEN;
+
+  // 1. NẾU CẤU HÌNH LÀ PRODUCTION -> GỌI API
+  if (EMBEDDING_ENV === 'production') {
+    if (!token) throw new Error("Chế độ Production bắt buộc phải có HF_TOKEN trong file .env");
+    
+    let retries = 0;
+    const maxRetries = 3;
+
+    while (retries < maxRetries) {
+      try {
+        const response = await axios.post(
+          HF_API_URL,
+          { inputs: prefixedText },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            timeout: 10000
+          }
+        );
+        
+        const data = response.data;
+        if (Array.isArray(data) && Array.isArray(data[0])) return data[0];
+        return data;
+        
+      } catch (error: any) {
+        if (error.response?.status === 503) {
+          const estimatedTime = error.response.data?.estimated_time || 10;
+          console.log(`[HF API] Model is loading. Waiting ${Math.ceil(estimatedTime)}s before retry...`);
+          await new Promise(resolve => setTimeout(resolve, estimatedTime * 1000 + 1000));
+          retries++;
+        } else {
+          console.error("[HF API] Lỗi API:", error.message);
+          throw new Error("Lỗi gọi API Hugging Face (Production)");
+        }
+      }
+    }
+    throw new Error("Hugging Face API Timeout / Quá tải");
+  }
+
+  // 2. NẾU CẤU HÌNH LÀ LOCAL -> CHẠY OFFLINE
+  if (EMBEDDING_ENV === 'local') {
+    if (!localExtractor) {
+      console.log("Đang nạp Local Model (chỉ tốn RAM ở máy Local)...");
+      const { pipeline } = require('@xenova/transformers');
+      localExtractor = await pipeline('feature-extraction', 'Xenova/multilingual-e5-small');
+    }
+    
+    const result = await localExtractor(prefixedText, { pooling: 'mean', normalize: true });
+    return Array.from(result.data);
+  }
+
+  return [];
 }
 
 /**

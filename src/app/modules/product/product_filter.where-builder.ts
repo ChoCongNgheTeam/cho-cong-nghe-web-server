@@ -159,14 +159,16 @@ export const buildSearchCategoryAndBrandIds = async (
   keyword: string,
   prismaClient: any, // truyền prisma instance từ ngoài vào
 ): Promise<{ categoryIds: string[]; brandIds: string[] }> => {
-  // Tìm categories match keyword
-  const matchedCats = await prismaClient.categories.findMany({
-    where: {
-      deletedAt: null,
-      OR: [{ name: { contains: keyword, mode: "insensitive" } }, { slug: { contains: keyword, mode: "insensitive" } }],
-    },
-    select: { id: true },
-  });
+  // Tìm categories match keyword (Dùng Trigram Fuzzy Search)
+  const matchedCats: { id: string }[] = await prismaClient.$queryRaw`
+    SELECT id FROM categories 
+    WHERE "deletedAt" IS NULL 
+    AND (
+      name ILIKE ${'%' + keyword + '%'} 
+      OR similarity(name, ${keyword}) > 0.3
+      OR slug ILIKE ${'%' + keyword + '%'}
+    )
+  `;
 
   // Với mỗi category match → lấy toàn bộ descendants qua CTE
   const categoryIds: string[] = [];
@@ -184,14 +186,16 @@ export const buildSearchCategoryAndBrandIds = async (
     rows.forEach((r) => categoryIds.push(r.id));
   }
 
-  // Tìm brands match keyword
-  const matchedBrands = await prismaClient.brands.findMany({
-    where: {
-      deletedAt: null,
-      OR: [{ name: { contains: keyword, mode: "insensitive" } }, { slug: { contains: keyword, mode: "insensitive" } }],
-    },
-    select: { id: true },
-  });
+  // Tìm brands match keyword (Dùng Trigram Fuzzy Search)
+  const matchedBrands: { id: string }[] = await prismaClient.$queryRaw`
+    SELECT id FROM brands 
+    WHERE "deletedAt" IS NULL 
+    AND (
+      name ILIKE ${'%' + keyword + '%'} 
+      OR similarity(name, ${keyword}) > 0.3
+      OR slug ILIKE ${'%' + keyword + '%'}
+    )
+  `;
 
   return {
     categoryIds: [...new Set(categoryIds)],
