@@ -1,6 +1,8 @@
 import prisma from "@/config/db";
 import { Prisma, OrderStatus, PaymentStatus } from "@prisma/client";
 import { CheckoutSummary } from "./checkout.types";
+import { PaymentFields } from "./payment-info.builder";
+import { NotFoundError } from "@/errors";
 
 export const findCartItemsWithProduct = async (userId: string) => {
   return prisma.cart_items.findMany({
@@ -64,7 +66,7 @@ export const executeOrderTransaction = async (userId: string, checkoutSummary: C
       where: { id: checkoutSummary.shippingAddressId },
     });
 
-    if (!address) throw new Error("Không tìm thấy thông tin địa chỉ giao hàng");
+    if (!address) throw new NotFoundError("Không tìm thấy thông tin địa chỉ giao hàng");
 
     // 1. Tạo order mới
     const newOrder = await tx.orders.create({
@@ -188,6 +190,6 @@ export const updateOrderStatus = async (orderId: string, status: OrderStatus) =>
   return prisma.orders.update({ where: { id: orderId }, data: { orderStatus: status } });
 };
 
-export const updateOrderPaymentFields = async (orderId: string, data: Record<string, any>) => {
+export const updateOrderPaymentFields = async (orderId: string, data: Partial<PaymentFields> & { paymentStatus?: PaymentStatus }) => {
   return prisma.orders.update({ where: { id: orderId }, data });
 };

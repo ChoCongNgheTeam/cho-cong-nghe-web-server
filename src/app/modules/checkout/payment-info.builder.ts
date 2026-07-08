@@ -4,7 +4,7 @@ import { createVnpayPaymentUrl, getClientIp } from "../payment/providers/vnpay/v
 import { createZaloPayPaymentUrl } from "../payment/providers/zalopay/zalopay.service";
 import { createStripePaymentIntent } from "../payment/providers/stripe/stripe.service";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// Types
 
 /**
  * Các field thanh toán sẽ được ghi thẳng vào bảng orders khi tạo order.
@@ -39,12 +39,12 @@ export interface BuildPaymentInfoResult {
   paymentInfo: PaymentInfo | null;
 }
 
-// ─── TTL Constants ────────────────────────────────────────────────────────────
+// TTL constants
 
 const REDIRECT_TTL_MS = 15 * 60 * 1000; // 15 phút — Momo/VNPay/ZaloPay/Stripe
 const BANK_TTL_MS = 24 * 60 * 60 * 1000; // 24 giờ — Bank Transfer
 
-// ─── Builder ──────────────────────────────────────────────────────────────────
+// Builder
 
 /**
  * Build payment info TRƯỚC KHI tạo order.
@@ -69,7 +69,7 @@ export const buildPaymentInfo = async (req: Request, orderRef: string, methodCod
   const upper = methodCode.toUpperCase();
   const orderInfo = `Thanh toan don hang ${orderRef}`;
 
-  // ── Bank Transfer ──────────────────────────────────────────────────────────
+  // Bank Transfer
   if (upper.includes("BANK_TRANSFER") && bankTransferCode) {
     const qrUrl = [`https://img.vietqr.io/image`, `/${process.env.BANK_BIN}-${process.env.BANK_ACCOUNT}-compact2.png`, `?amount=${totalAmount}&addInfo=${bankTransferCode}`].join("");
 
@@ -94,7 +94,7 @@ export const buildPaymentInfo = async (req: Request, orderRef: string, methodCod
     };
   }
 
-  // ── MoMo ──────────────────────────────────────────────────────────────────
+  // MoMo
   if (upper.includes("MOMO")) {
     const momo = await createMomoPaymentUrl(orderRef, totalAmount, orderInfo);
     return {
@@ -107,7 +107,7 @@ export const buildPaymentInfo = async (req: Request, orderRef: string, methodCod
     };
   }
 
-  // ── VNPay ─────────────────────────────────────────────────────────────────
+  // VNPay
   if (upper.includes("VNPAY")) {
     const vnpay = await createVnpayPaymentUrl(orderRef, totalAmount, orderInfo, getClientIp(req));
     return {
@@ -120,7 +120,7 @@ export const buildPaymentInfo = async (req: Request, orderRef: string, methodCod
     };
   }
 
-  // ── ZaloPay ───────────────────────────────────────────────────────────────
+  // ZaloPay
   if (upper.includes("ZALOPAY")) {
     const zalopay = await createZaloPayPaymentUrl(orderRef, totalAmount, orderInfo);
     return {
@@ -133,7 +133,7 @@ export const buildPaymentInfo = async (req: Request, orderRef: string, methodCod
     };
   }
 
-  // ── Stripe / Credit Card ──────────────────────────────────────────────────
+  // Stripe / Credit Card
   if (upper.includes("STRIPE") || upper.includes("CREDIT_CARD")) {
     const stripe = await createStripePaymentIntent(orderRef, totalAmount);
     return {
@@ -145,7 +145,7 @@ export const buildPaymentInfo = async (req: Request, orderRef: string, methodCod
     };
   }
 
-  // ── COD hoặc không xác định ───────────────────────────────────────────────
+  // COD hoặc không xác định
   return {
     paymentFields: {},
     paymentInfo: null,
