@@ -337,81 +337,80 @@ export const assignToUsers = async (voucherId: string, userIds: string[], maxUse
 
 // FOR PRICING
 
-// TODO: chưa được service/controller nào gọi trong module này. Giữ lại vì dự tính
 // module order/pricing sẽ dùng để tính giá khi checkout áp voucher bằng code.
-// export const getVoucherByCode = async (code: string, userId?: string) => {
-//   const now = new Date();
-//
-//   const voucher = await prisma.vouchers.findFirst({
-//     where: {
-//       code,
-//       isActive: true,
-//       deletedAt: null,
-//       OR: [
-//         { AND: [{ startDate: { lte: now } }, { endDate: { gte: now } }] },
-//         { AND: [{ startDate: null }, { endDate: null }] },
-//         { AND: [{ startDate: { lte: now } }, { endDate: null }] },
-//         { AND: [{ startDate: null }, { endDate: { gte: now } }] },
-//       ],
-//     },
-//     select: {
-//       id: true,
-//       code: true,
-//       description: true,
-//       discountType: true,
-//       discountValue: true,
-//       minOrderValue: true,
-//       maxUses: true,
-//       maxUsesPerUser: true,
-//       maxDiscountValue: true,
-//       usesCount: true,
-//       startDate: true,
-//       endDate: true,
-//       priority: true,
-//       isActive: true,
-//       targets: { select: { id: true, targetType: true, targetId: true } },
-//     },
-//   });
-//
-//   if (!voucher) return null;
-//
-//   let userUsedCount = 0;
-//   let userMaxUses: number | undefined;
-//
-//   if (userId) {
-//     const voucherUser = await prisma.voucher_user.findUnique({
-//       where: { voucherId_userId: { voucherId: voucher.id, userId } },
-//       select: { maxUses: true, usedCount: true },
-//     });
-//
-//     if (voucherUser) {
-//       userMaxUses = voucherUser.maxUses;
-//       userUsedCount = voucherUser.usedCount;
-//     } else {
-//       userUsedCount = await prisma.voucher_usages.count({ where: { voucherId: voucher.id, userId } });
-//     }
-//   }
-//
-//   return {
-//     id: voucher.id,
-//     code: voucher.code,
-//     description: voucher.description,
-//     discountType: voucher.discountType,
-//     discountValue: Number(voucher.discountValue),
-//     minOrderValue: Number(voucher.minOrderValue),
-//     maxUses: voucher.maxUses,
-//     maxUsesPerUser: voucher.maxUsesPerUser,
-//     maxDiscountValue: voucher.maxDiscountValue ? Number(voucher.maxDiscountValue) : null,
-//     usesCount: voucher.usesCount,
-//     startDate: voucher.startDate,
-//     endDate: voucher.endDate,
-//     priority: voucher.priority,
-//     isActive: voucher.isActive,
-//     targets: voucher.targets.map((t) => ({ id: t.id, targetType: t.targetType, targetId: t.targetId })),
-//     userUsedCount,
-//     userMaxUses,
-//   };
-// };
+export const getVoucherByCode = async (code: string, userId?: string) => {
+  const now = new Date();
+
+  const voucher = await prisma.vouchers.findFirst({
+    where: {
+      code,
+      isActive: true,
+      deletedAt: null,
+      OR: [
+        { AND: [{ startDate: { lte: now } }, { endDate: { gte: now } }] },
+        { AND: [{ startDate: null }, { endDate: null }] },
+        { AND: [{ startDate: { lte: now } }, { endDate: null }] },
+        { AND: [{ startDate: null }, { endDate: { gte: now } }] },
+      ],
+    },
+    select: {
+      id: true,
+      code: true,
+      description: true,
+      discountType: true,
+      discountValue: true,
+      minOrderValue: true,
+      maxUses: true,
+      maxUsesPerUser: true,
+      maxDiscountValue: true,
+      usesCount: true,
+      startDate: true,
+      endDate: true,
+      priority: true,
+      isActive: true,
+      targets: { select: { id: true, targetType: true, targetId: true } },
+    },
+  });
+
+  if (!voucher) return null;
+
+  let userUsedCount = 0;
+  let userMaxUses: number | undefined;
+
+  if (userId) {
+    const voucherUser = await prisma.voucher_user.findUnique({
+      where: { voucherId_userId: { voucherId: voucher.id, userId } },
+      select: { maxUses: true, usedCount: true },
+    });
+
+    if (voucherUser) {
+      userMaxUses = voucherUser.maxUses;
+      userUsedCount = voucherUser.usedCount;
+    } else {
+      userUsedCount = await prisma.voucher_usages.count({ where: { voucherId: voucher.id, userId } });
+    }
+  }
+
+  return {
+    id: voucher.id,
+    code: voucher.code,
+    description: voucher.description,
+    discountType: voucher.discountType,
+    discountValue: Number(voucher.discountValue),
+    minOrderValue: Number(voucher.minOrderValue),
+    maxUses: voucher.maxUses,
+    maxUsesPerUser: voucher.maxUsesPerUser,
+    maxDiscountValue: voucher.maxDiscountValue ? Number(voucher.maxDiscountValue) : null,
+    usesCount: voucher.usesCount,
+    startDate: voucher.startDate,
+    endDate: voucher.endDate,
+    priority: voucher.priority,
+    isActive: voucher.isActive,
+    targets: voucher.targets.map((t) => ({ id: t.id, targetType: t.targetType, targetId: t.targetId })),
+    userUsedCount,
+    userMaxUses,
+  };
+};
 
 // USAGES
 
