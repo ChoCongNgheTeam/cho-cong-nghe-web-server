@@ -9,7 +9,7 @@
 
 import ExcelJS from "exceljs";
 
-// ─── Row type ─────────────────────────────────────────────────────────────────
+// ROW TYPE
 
 export interface ExportUserRow {
   id: string;
@@ -25,7 +25,7 @@ export interface ExportUserRow {
   totalSpent: number;
 }
 
-// ─── Mapping nhãn ─────────────────────────────────────────────────────────────
+// MAPPING NHÃN
 
 const ROLE_LABEL: Record<string, string> = {
   ADMIN: "Quản trị viên",
@@ -42,7 +42,7 @@ const GENDER_LABEL: Record<string, string> = {
   OTHER: "Khác",
 };
 
-// ─── Map raw DB user → export row ─────────────────────────────────────────────
+// MAP RAW DB USER → EXPORT ROW
 
 export function mapUsersToExportRows(users: any[], orderStatsMap: Map<string, { orderCount: number; totalSpent: number }> = new Map()): ExportUserRow[] {
   return users.map((u) => {
@@ -63,7 +63,7 @@ export function mapUsersToExportRows(users: any[], orderStatsMap: Map<string, { 
   });
 }
 
-// ─── CSV ──────────────────────────────────────────────────────────────────────
+// CSV
 
 export function buildUserCsvBuffer(rows: ExportUserRow[]): Buffer {
   const HEADERS = ["ID", "Họ tên", "Username", "Email", "Số điện thoại", "Vai trò", "Giới tính", "Trạng thái", "Ngày tạo", "Số đơn hàng", "Tổng chi tiêu (đ)"];
@@ -82,7 +82,7 @@ export function buildUserCsvBuffer(rows: ExportUserRow[]): Buffer {
   return Buffer.concat([Buffer.from("\uFEFF", "utf8"), Buffer.from(lines.join("\r\n"), "utf8")]);
 }
 
-// ─── Excel ────────────────────────────────────────────────────────────────────
+// EXCEL
 
 export async function buildUserExcelBuffer(rows: ExportUserRow[]): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
@@ -93,7 +93,7 @@ export async function buildUserExcelBuffer(rows: ExportUserRow[]): Promise<Buffe
     pageSetup: { paperSize: 9, orientation: "landscape" },
   });
 
-  // ── Tiêu đề chính ──────────────────────────────────────────────────────────
+  // TIÊU ĐỀ CHÍNH
   ws.mergeCells("A1:K1");
   const titleCell = ws.getCell("A1");
   titleCell.value = `BÁO CÁO NGƯỜI DÙNG — Xuất lúc ${new Date().toLocaleString("vi-VN")}`;
@@ -102,7 +102,7 @@ export async function buildUserExcelBuffer(rows: ExportUserRow[]): Promise<Buffe
   titleCell.alignment = { horizontal: "center", vertical: "middle" };
   ws.getRow(1).height = 28;
 
-  // ── Columns ────────────────────────────────────────────────────────────────
+  // COLUMNS
   type ColKey = keyof ExportUserRow;
   const COLUMNS: { header: string; key: ColKey; width: number; numFmt?: string }[] = [
     { header: "ID", key: "id", width: 38 },
@@ -118,7 +118,7 @@ export async function buildUserExcelBuffer(rows: ExportUserRow[]): Promise<Buffe
     { header: "Tổng chi tiêu (đ)", key: "totalSpent", width: 20, numFmt: "#,##0" },
   ];
 
-  // ── Header row ─────────────────────────────────────────────────────────────
+  // HEADER ROW
   const headerRow = ws.getRow(2);
   COLUMNS.forEach((col, i) => {
     const cell = headerRow.getCell(i + 1);
@@ -131,7 +131,7 @@ export async function buildUserExcelBuffer(rows: ExportUserRow[]): Promise<Buffe
   });
   headerRow.height = 22;
 
-  // ── Role colors ────────────────────────────────────────────────────────────
+  // ROLE COLORS
   const ROLE_COLOR: Record<string, string> = {
     "Quản trị viên": "FFE9D5FF", // purple
     "Nhân viên bán hàng": "FFDBEAFE", // blue
@@ -141,7 +141,7 @@ export async function buildUserExcelBuffer(rows: ExportUserRow[]): Promise<Buffe
     "Khách hàng": "FFF3F4F6", // gray
   };
 
-  // ── Data rows ──────────────────────────────────────────────────────────────
+  // DATA ROWS
   rows.forEach((row, idx) => {
     const values = COLUMNS.map((c) => {
       const v = row[c.key];
@@ -180,7 +180,7 @@ export async function buildUserExcelBuffer(rows: ExportUserRow[]): Promise<Buffe
     r.height = 18;
   });
 
-  // ── Summary ────────────────────────────────────────────────────────────────
+  // SUMMARY
   const totalOrders = rows.reduce((s, r) => s + r.orderCount, 0);
   const totalSpent = rows.reduce((s, r) => s + r.totalSpent, 0);
   const activeCount = rows.filter((r) => r.isActive).length;
@@ -191,7 +191,7 @@ export async function buildUserExcelBuffer(rows: ExportUserRow[]): Promise<Buffe
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
   });
 
-  // ── Freeze + Filter ────────────────────────────────────────────────────────
+  // FREEZE + FILTER
   ws.views = [{ state: "frozen", xSplit: 0, ySplit: 2 }];
   ws.autoFilter = { from: "A2", to: "K2" };
 
