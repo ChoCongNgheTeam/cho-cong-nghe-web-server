@@ -34,8 +34,12 @@ import {
   exportProductsAdminHandler,
   getImportTemplateHandler,
   importProductsAdminHandler,
+  getSearchTrendingHandler,
+  getSaleScheduleV2Handler,
+  getProductsByDateHandler,
+  compareProductsHandler,
+  getProductStatsHandler,
 } from "./product.controller";
-import { getSearchTrendingHandler, getSaleScheduleV2Handler, getProductsByDateHandler, compareProductsHandler, getProductStatsHandler } from "./product.controller";
 import {
   listProductsSchema,
   adminListProductsSchema,

@@ -1,7 +1,6 @@
 import { Prisma } from "@prisma/client";
-import { getDescendantCategoryIds } from "./product_filter.repository";
 import { resolveCategoryIds } from "@/utils/shared.category-resolver";
-import prisma from "prisma/client";
+import prisma from "@/config/db";
 // Normalize: ?attr_storage=256GB hoặc ?attr_storage=256GB&attr_storage=512GB
 const toArray = (value: string | string[]): string[] => (Array.isArray(value) ? value.filter(Boolean) : [value].filter(Boolean));
 // Parse dynamic keys ra 2 nhóm:
@@ -138,14 +137,11 @@ const buildAttrConditions = (attrFilters: Record<string, string | string[]>): Pr
 
   return conditions;
 };
-// Build orderBy
+// Build orderBy — LƯU Ý: "price" KHÔNG xử lý ở đây vì Prisma không hỗ trợ
+// orderBy theo _min/_avg của field quan hệ (chỉ hỗ trợ _count). Sort theo giá
+// được xử lý riêng ở product.repository.ts (xem findAllSortedByPrice).
 export const buildOrderBy = (sortBy?: string, sortOrder?: "asc" | "desc"): any => {
   const order = sortOrder ?? "desc";
-
-  if (sortBy === "price") {
-    // Sắp xếp theo giá của default variant
-    return [{ variants: { _count: order } }];
-  }
 
   if (sortBy && ["createdAt", "name", "viewsCount", "ratingAverage", "soldCount", "totalSoldCount"].includes(sortBy)) {
     return { [sortBy]: order };
@@ -168,12 +164,13 @@ export const buildSearchCategoryAndBrandIds = async (
     select: { id: true },
   });
 
-  // Với mỗi category match → lấy toàn bộ descendants qua CTE
-  const categoryIds: string[] = [];
-  for (const cat of matchedCats) {
+  // Lấy toàn bộ descendants cho tất cả category match trong 1 query (tránh N+1)
+  const matchedCatIds: string[] = matchedCats.map((c: { id: string }) => c.id);
+  let categoryIds: string[] = [];
+  if (matchedCatIds.length > 0) {
     const rows: { id: string }[] = await prismaClient.$queryRaw`
       WITH RECURSIVE descendants AS (
-        SELECT id FROM categories WHERE id = ${cat.id}::uuid AND "deletedAt" IS NULL
+        SELECT id FROM categories WHERE id = ANY(${matchedCatIds}::uuid[]) AND "deletedAt" IS NULL
         UNION ALL
         SELECT c.id FROM categories c
         JOIN descendants d ON c."parentId" = d.id
@@ -181,7 +178,7 @@ export const buildSearchCategoryAndBrandIds = async (
       )
       SELECT id FROM descendants
     `;
-    rows.forEach((r) => categoryIds.push(r.id));
+    categoryIds = rows.map((r) => r.id);
   }
 
   // Tìm brands match keyword
@@ -230,14 +227,7 @@ export const buildProductWhere = async (
     where.OR = orConditions;
   }
 
-  //  Category (slug → toàn bộ sub-category IDs)
-  // if (query.category) {
-  //   const tree = await getDescendantCategoryIds(query.category);
-  //   if (tree) {
-  //     where.categoryId = { in: tree.ids };
-  //   }
-  // }
-
+  // Category (slug → toàn bộ sub-category IDs)
   if (query.category) {
     const ids = await resolveCategoryIds(query.category, prisma);
     if (ids.length > 0) {

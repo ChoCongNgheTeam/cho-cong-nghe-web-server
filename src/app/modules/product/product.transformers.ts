@@ -292,8 +292,6 @@ const shouldUseBundleMode = (product: any, validVariants: RawVariant[]): boolean
 export const transformProductCard = (product: any): ProductCard | null => {
   const allVariants: any[] = product.variants ?? [];
 
-  // console.log(allVariants);
-
   if (allVariants.length === 0) {
     console.warn(`[transformProductCard] Product ${product.id} (${product.slug}) has no active variant — skipped`);
     return null;
@@ -313,6 +311,47 @@ export const transformProductCard = (product: any): ProductCard | null => {
     priceOrigin: Number(defaultVariant.price),
     slug: product.slug,
     variantId: defaultVariant.id,
+    thumbnail,
+    createdAt: product.createdAt ? new Date(product.createdAt) : null,
+    rating: {
+      average: Number(product.ratingAverage) || 0,
+      count: product.ratingCount || 0,
+    },
+    isFeatured: product.isFeatured,
+    isNew: product.createdAt ? Date.now() - new Date(product.createdAt).getTime() < 6 * 24 * 60 * 60 * 1000 : false,
+    highlights: product.productSpecifications.map((spec: any) => ({
+      key: spec.specification.key,
+      name: spec.specification.name,
+      icon: spec.specification.icon,
+      value: spec.value,
+    })),
+    inStock,
+    isActive: product.isActive,
+    category: product.category ?? null,
+  };
+};
+
+/**
+ * Admin card — không bao giờ trả null. Sản phẩm không có variant nào (hoặc
+ * toàn bộ variant đang tắt) vẫn phải hiển thị trong danh sách admin để quản lý,
+ * chỉ khác là giá/tồn kho sẽ hiển thị rỗng.
+ */
+export const transformProductCardAdmin = (product: any): Omit<ProductCard, "variantId"> & { variantId: string | null } => {
+  const allVariants: any[] = product.variants ?? [];
+  const defaultVariant = allVariants.find((v: any) => v.isDefault) ?? allVariants.find((v: any) => v.isActive) ?? allVariants[0];
+
+  const firstColorImage = product.img?.[0];
+  const thumbnail = firstColorImage?.imageUrl || "";
+  const inStock = defaultVariant ? defaultVariant.quantity > 0 : false;
+
+  const displayName = defaultVariant?.variantAttributes?.length ? buildVariantDisplayName(product.name, defaultVariant.variantAttributes) : product.name;
+
+  return {
+    id: product.id,
+    name: displayName,
+    priceOrigin: defaultVariant ? Number(defaultVariant.price) : 0,
+    slug: product.slug,
+    variantId: defaultVariant?.id ?? null,
     thumbnail,
     createdAt: product.createdAt ? new Date(product.createdAt) : null,
     rating: {

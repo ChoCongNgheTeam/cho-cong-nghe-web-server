@@ -177,8 +177,6 @@ export async function bulkImportVariants(rows: ImportRow[]): Promise<ImportResul
 
   for (const row of rows) {
     if (!isUUID(row.variantId)) {
-      console.log(row);
-
       result.errors.push({ row: row.rowIndex, variantId: row.variantId, reason: "Variant ID không hợp lệ (phải là UUID)" });
       continue;
     }
