@@ -17,8 +17,19 @@ import {
   restorePromotionHandler,
   hardDeletePromotionHandler,
   getDeletedPromotionsHandler,
+  bulkDeletePromotionHandler,
 } from "./promotion.controller";
-import { listPromotionsSchema, promotionParamsSchema, createPromotionSchema, updatePromotionSchema } from "./promotion.validation";
+import {
+  listPromotionsSchema,
+  promotionParamsSchema,
+  createPromotionSchema,
+  updatePromotionSchema,
+  productParamsSchema,
+  categoryParamsSchema,
+  brandParamsSchema,
+  bulkDeletePromotionSchema,
+  listDeletedPromotionsSchema,
+} from "./promotion.validation";
 import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
 
 const router = Router();
@@ -26,24 +37,17 @@ const router = Router();
 const staffAdminAuth = [authMiddleware(), requireRole(...STAFF_ROLES, "ADMIN")] as const;
 const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
 
-// ── Public ─────────────────────────────────────────────────────────────────────
+// PUBLIC
 router.get("/", validate(listPromotionsSchema, "query"), asyncHandler(getPromotionsPublicHandler));
 router.get("/active", asyncHandler(getActivePromotionsHandler));
-router.get("/product/:productId", asyncHandler(getPromotionsByProductHandler));
-router.get("/category/:categoryId", asyncHandler(getPromotionsByCategoryHandler));
-router.get("/brand/:brandId", asyncHandler(getPromotionsByBrandHandler));
+router.get("/product/:productId", validate(productParamsSchema, "params"), asyncHandler(getPromotionsByProductHandler));
+router.get("/category/:categoryId", validate(categoryParamsSchema, "params"), asyncHandler(getPromotionsByCategoryHandler));
+router.get("/brand/:brandId", validate(brandParamsSchema, "params"), asyncHandler(getPromotionsByBrandHandler));
 
-// ── Staff & Admin — MARKETING có canPromotions ────────────────────────────────
+// STAFF & ADMIN — MARKETING có canPromotions
 router.get("/admin/all", ...staffAdminAuth, requirePermission("canPromotions"), validate(listPromotionsSchema, "query"), asyncHandler(getPromotionsAdminHandler));
 router.post("/admin", ...staffAdminAuth, requirePermission("canPromotions"), validate(createPromotionSchema, "body"), asyncHandler(createPromotionHandler));
-router.delete(
-  "/admin/bulk",
-  ...staffAdminAuth,
-  requirePermission("canPromotions"),
-  asyncHandler(() => {
-    throw new Error("Not implemented");
-  }),
-);
+router.delete("/admin/bulk", ...staffAdminAuth, requirePermission("canPromotions"), validate(bulkDeletePromotionSchema, "body"), asyncHandler(bulkDeletePromotionHandler));
 router.get("/admin/:id", ...staffAdminAuth, requirePermission("canPromotions"), validate(promotionParamsSchema, "params"), asyncHandler(getPromotionDetailHandler));
 router.patch(
   "/admin/:id",
@@ -55,8 +59,8 @@ router.patch(
 );
 router.delete("/admin/:id", ...staffAdminAuth, requirePermission("canPromotions"), validate(promotionParamsSchema, "params"), asyncHandler(deletePromotionHandler));
 
-// ── Admin only — trash & restore ───────────────────────────────────────────────
-router.get("/admin/trash", ...adminAuth, asyncHandler(getDeletedPromotionsHandler));
+// ADMIN ONLY — trash & restore
+router.get("/admin/trash", ...adminAuth, validate(listDeletedPromotionsSchema, "query"), asyncHandler(getDeletedPromotionsHandler));
 router.post("/admin/:id/restore", ...adminAuth, validate(promotionParamsSchema, "params"), asyncHandler(restorePromotionHandler));
 router.delete("/admin/:id/permanent", ...adminAuth, validate(promotionParamsSchema, "params"), asyncHandler(hardDeletePromotionHandler));
 

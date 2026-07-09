@@ -1,13 +1,15 @@
 import { Request, Response } from "express";
 import * as promotionService from "./promotion.service";
-import { listPromotionsSchema } from "./promotion.validation";
+import { ListPromotionsQuery, ListDeletedPromotionsQuery, BulkDeletePromotionInput } from "./promotion.validation";
+import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
 
 // =====================
 // === PUBLIC ===
 // =====================
 
 export const getPromotionsPublicHandler = async (req: Request, res: Response) => {
-  const query = listPromotionsSchema.parse(req.query);
+  // Đã validate ở route middleware (validate(listPromotionsSchema, "query")) — chỉ cast type ở đây.
+  const query = req.query as unknown as ListPromotionsQuery;
   const result = await promotionService.getPromotionsPublic(query);
   res.json({
     data: result.data,
@@ -41,7 +43,8 @@ export const getPromotionsByBrandHandler = async (req: Request, res: Response) =
 // =====================
 
 export const getPromotionsAdminHandler = async (req: Request, res: Response) => {
-  const query = listPromotionsSchema.parse(req.query);
+  // Đã validate ở route middleware — chỉ cast type ở đây.
+  const query = req.query as unknown as ListPromotionsQuery;
   const result = await promotionService.getPromotionsAdmin(query);
   res.json({
     data: result.data,
@@ -57,7 +60,10 @@ export const getPromotionsAdminHandler = async (req: Request, res: Response) => 
 };
 
 export const getPromotionDetailHandler = async (req: Request, res: Response) => {
-  const isAdmin = req.user!.role === "ADMIN";
+  // Route /admin/:id đã gate bằng requireRole(...STAFF_ROLES, "ADMIN") + requirePermission("canPromotions"),
+  // nên staff thuộc STAFF_ROLES đã qua được middleware cũng cần nhận đủ field admin, không chỉ role === "ADMIN".
+  const role = req.user!.role;
+  const isAdmin = role === "ADMIN" || STAFF_ROLES.includes(role as (typeof STAFF_ROLES)[number]);
   const promotion = await promotionService.getPromotionDetail(req.params.id, { isAdmin });
   res.json({ data: promotion, message: "Lấy chi tiết khuyến mãi thành công" });
 };
@@ -96,9 +102,9 @@ export const hardDeletePromotionHandler = async (req: Request, res: Response) =>
 };
 
 export const getDeletedPromotionsHandler = async (req: Request, res: Response) => {
-  const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 20;
-  const result = await promotionService.getDeletedPromotions({ page, limit });
+  // Đã validate ở route middleware (validate(listDeletedPromotionsSchema, "query")) — chỉ cast type ở đây.
+  const query = req.query as unknown as ListDeletedPromotionsQuery;
+  const result = await promotionService.getDeletedPromotions(query);
   res.json({
     data: result.data,
     meta: {
@@ -109,4 +115,10 @@ export const getDeletedPromotionsHandler = async (req: Request, res: Response) =
     },
     message: "Lấy danh sách khuyến mãi đã xóa thành công",
   });
+};
+
+export const bulkDeletePromotionHandler = async (req: Request, res: Response) => {
+  const { ids } = req.body as BulkDeletePromotionInput;
+  const result = await promotionService.bulkSoftDeletePromotion(ids, req.user!.id);
+  res.json({ data: result, message: `Đã xóa ${result.deletedCount} khuyến mãi thành công` });
 };
