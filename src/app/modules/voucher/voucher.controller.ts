@@ -1,10 +1,19 @@
 import { Request, Response } from "express";
 import * as voucherService from "./voucher.service";
-import { ListVouchersQuery, ValidateVoucherInput, bulkDeleteVouchersSchema, listVoucherUsagesSchema, listVoucherUsersSchema } from "./voucher.validation";
+import {
+  ListVouchersQuery,
+  ValidateVoucherInput,
+  CreateVoucherInput,
+  UpdateVoucherInput,
+  AssignVoucherToUsersInput,
+  BulkDeleteVouchersInput,
+  ListVoucherUsagesQuery,
+  ListVoucherUsersQuery,
+} from "./voucher.validation";
 
 const getActorId = (req: Request): string => (req as any).user?.id ?? "system";
 
-// ── Public ────────────────────────────────────────────────────────────────────
+// Public
 
 export const getVouchersPublicHandler = async (req: Request, res: Response) => {
   const result = await voucherService.getVouchers(req.query as unknown as ListVouchersQuery);
@@ -39,7 +48,7 @@ export const getUserVouchersHandler = async (req: Request, res: Response) => {
   res.json({ data: vouchers, message: "Lấy danh sách voucher của bạn thành công" });
 };
 
-// ── Admin reads ───────────────────────────────────────────────────────────────
+// Admin reads
 
 export const getVouchersAdminHandler = async (req: Request, res: Response) => {
   const result = await voucherService.getVouchers(req.query as unknown as ListVouchersQuery);
@@ -66,15 +75,15 @@ export const getDeletedVouchersHandler = async (req: Request, res: Response) => 
   res.json({ data: vouchers, message: "Lấy danh sách voucher đã xoá thành công" });
 };
 
-// ── Admin mutates ─────────────────────────────────────────────────────────────
+// Admin mutates
 
 export const createVoucherHandler = async (req: Request, res: Response) => {
-  const voucher = await voucherService.createVoucher(req.body);
+  const voucher = await voucherService.createVoucher(req.body as CreateVoucherInput);
   res.status(201).json({ data: voucher, message: "Tạo voucher thành công" });
 };
 
 export const updateVoucherHandler = async (req: Request, res: Response) => {
-  const voucher = await voucherService.updateVoucher(req.params.id, req.body);
+  const voucher = await voucherService.updateVoucher(req.params.id, req.body as UpdateVoucherInput);
   res.json({ data: voucher, message: "Cập nhật voucher thành công" });
 };
 
@@ -85,7 +94,7 @@ export const deleteVoucherHandler = async (req: Request, res: Response) => {
 };
 
 export const bulkDeleteVouchersHandler = async (req: Request, res: Response) => {
-  const input = bulkDeleteVouchersSchema.parse(req.body);
+  const input = req.body as BulkDeleteVouchersInput;
   const deletedBy = getActorId(req);
   const result = await voucherService.bulkDeleteVouchers(input, deletedBy);
   res.json({ data: result, message: `Đã chuyển ${result.count} voucher vào thùng rác` });
@@ -102,12 +111,12 @@ export const hardDeleteVoucherHandler = async (req: Request, res: Response) => {
 };
 
 export const assignVoucherToUsersHandler = async (req: Request, res: Response) => {
-  const result = await voucherService.assignVoucherToUsers(req.body);
+  const result = await voucherService.assignVoucherToUsers(req.body as AssignVoucherToUsersInput);
   res.json({ data: result, message: `Gán voucher cho ${result.assigned} người dùng thành công` });
 };
 
 export const getVoucherUsagesHandler = async (req: Request, res: Response) => {
-  const query = listVoucherUsagesSchema.parse(req.query);
+  const query = req.query as unknown as ListVoucherUsagesQuery;
   const result = await voucherService.getVoucherUsages(query);
   res.json({
     data: result.data,
@@ -117,7 +126,7 @@ export const getVoucherUsagesHandler = async (req: Request, res: Response) => {
 };
 
 export const getVoucherUsersHandler = async (req: Request, res: Response) => {
-  const query = listVoucherUsersSchema.parse(req.query);
+  const query = req.query as unknown as ListVoucherUsersQuery;
   const result = await voucherService.getVoucherUsers(query);
   res.json({
     data: result.data,
