@@ -6,6 +6,7 @@ import { CreateCategoryInput, UpdateCategoryInput, ListCategoriesQuery } from ".
 import { generateUniqueSlug } from "@/utils/generate-unique-slug";
 import { NotFoundError, BadRequestError, ForbiddenError } from "@/errors";
 import buildCategoryTree from "@/utils/build-category-tree";
+import { buildKeywordVariants, normalizeVietnamese } from "@/app/modules/search/search.helpers";
 
 const assertCategoryExists = async (id: string) => {
   const category = await repo.findById(id);
@@ -32,8 +33,6 @@ export const getRootCategories = async () => {
 export const resolveCategory = async (keyword: string) => {
   const q = keyword.trim();
   if (!q) return null;
-
-  const { buildKeywordVariants, normalizeVietnamese } = await import("@/app/modules/search/search.helpers");
 
   const variants = buildKeywordVariants(q);
   const qNorm = normalizeVietnamese(q);
@@ -133,7 +132,7 @@ export const getRootCategoriesForAdmin = async () => {
  */
 export const getCategoryDetail = async (id: string, options: { isAdmin?: boolean } = {}) => {
   const category = await repo.findByIdWithRelations(id, {
-    includeDeleted: options.isAdmin ?? true,
+    includeDeleted: options.isAdmin ?? false,
   });
   if (!category) throw new NotFoundError("Danh mục");
   return category;
@@ -291,8 +290,9 @@ export const reorderCategory = async (categoryId: string, newPosition: number) =
 
 export const getCategoryTemplate = async (categoryId: string) => {
   const category = await assertCategoryExists(categoryId);
+  const categoryIds = await repo.getCategoryHierarchy(categoryId);
 
-  const [attributes, specifications] = await Promise.all([repo.getCategoryVariantAttributesWithOptions(categoryId), repo.getCategorySpecifications(categoryId)]);
+  const [attributes, specifications] = await Promise.all([repo.getCategoryVariantAttributesWithOptions(categoryIds), repo.getCategorySpecifications(categoryIds)]);
 
   return {
     category: {
@@ -307,10 +307,7 @@ export const getCategoryTemplate = async (categoryId: string) => {
 export const getAllAttributes = async () => repo.getAllAttributes();
 
 export const getAttributeOptions = async (attributeId: string) => {
-  const attribute = await prisma.attributes.findUnique({
-    where: { id: attributeId },
-    select: { id: true, code: true, name: true },
-  });
+  const attribute = await repo.getAttributeById(attributeId);
   if (!attribute) throw new NotFoundError("Attribute");
 
   const options = await repo.getAttributeOptions(attributeId);

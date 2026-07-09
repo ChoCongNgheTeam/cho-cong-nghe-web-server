@@ -2,19 +2,6 @@ import { Prisma } from "@prisma/client";
 import prisma from "@/config/db";
 import { uploadImage, deleteImage } from "@/integrations/cloudinary.service";
 
-type CategoryWithParent = { id: string; parent?: CategoryWithParent | null };
-
-export const buildCategoryPath = (category: CategoryWithParent | null): string[] => {
-  const path: string[] = [];
-
-  let current = category;
-  while (current) {
-    if (current.id) path.push(current.id);
-    current = current.parent ?? null;
-  }
-  return path;
-};
-
 export const parseMultipartData = (body: any): any => {
   let data = { ...body };
 
