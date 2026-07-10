@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import * as reviewService from "./review.service";
-import { listReviewsSchema } from "./review.validation";
+import { ListReviewsQuery } from "./review.validation";
 import { ReviewStatus } from "@prisma/client";
 
-// ── Public / User ──────────────────────────────────────────────────────────
+// PUBLIC / USER
 
 export const createReviewHandler = async (req: Request, res: Response) => {
   const result = await reviewService.createUserReview(req.user!.id, req.body);
@@ -25,10 +25,10 @@ export const getProductReviewsHandler = async (req: Request, res: Response) => {
   });
 };
 
-// ── Admin ──────────────────────────────────────────────────────────────────
+// ADMIN
 
 export const getAllReviewsAdminHandler = async (req: Request, res: Response) => {
-  const query = listReviewsSchema.parse(req.query);
+  const query = req.query as unknown as ListReviewsQuery;
   const result = await reviewService.getAllReviewsAdmin(query);
   res.json({
     data: result.data,
