@@ -20,13 +20,13 @@ export const listPromotionsSchema = z.object({
   search: z.string().optional(),
   isActive: queryBoolean,
 
-  // ← THÊM: filter theo status rõ ràng
+  // STATUS FILTER: lọc theo trạng thái tổng hợp (active/inactive/expired/upcoming)
   status: z.enum(["active", "inactive", "expired", "upcoming"]).optional(),
 
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),
-  sortBy: z.enum(["createdAt", "name", "priority", "startDate", "endDate"]).default("startDate"), // ← đổi default sang startDate
-  sortOrder: z.enum(["asc", "desc"]).default("asc"), // ← đổi default sang asc để sort theo ngày tăng dần
+  sortBy: z.enum(["createdAt", "name", "priority", "startDate", "endDate"]).default("startDate"),
+  sortOrder: z.enum(["asc", "desc"]).default("asc"), // Mặc định tăng dần theo ngày
   includeDeleted: queryBoolean.pipe(z.boolean().optional().default(false)),
 });
 

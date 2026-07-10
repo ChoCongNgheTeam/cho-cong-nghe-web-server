@@ -5,7 +5,9 @@ import { ListPromotionsQuery, CreatePromotionInput, UpdatePromotionInput } from 
 // =====================
 // === CACHE CONFIG ===
 // =====================
-let promotionsCache: any[] | null = null;
+type ActivePromotionForPricing = Awaited<ReturnType<typeof buildActivePromotionsForPricing>>;
+
+let promotionsCache: ActivePromotionForPricing | null = null;
 let promotionsCacheTime = 0;
 const PROMOTIONS_CACHE_TTL = 5 * 60 * 1000; // Cache 5 phút
 
@@ -86,7 +88,7 @@ const buildPromotionWhere = (query: ListPromotionsQuery, isAdmin: boolean): Pris
     where.OR = [{ name: { contains: query.search, mode: "insensitive" } }, { description: { contains: query.search, mode: "insensitive" } }];
   }
 
-  // ← THAY TOÀN BỘ status filter cũ bằng cái này
+  // STATUS FILTER
   if (query.status) {
     switch (query.status) {
       case "active":
@@ -331,25 +333,31 @@ export const create = async (data: CreatePromotionInput) => {
   return result;
 };
 
+// Xóa rules/targets cũ (nếu có thay đổi) + update trong 1 transaction, tránh trường hợp
+// deleteMany thành công nhưng update thất bại giữa chừng làm mất rules/targets cũ mà
+// chưa kịp tạo cái mới.
 export const update = async (id: string, data: UpdatePromotionInput) => {
   const { rules, targets, ...updateData } = data;
 
-  if (rules !== undefined) {
-    await prisma.promotion_rules.deleteMany({ where: { promotionId: id } });
-  }
-  if (targets !== undefined) {
-    await prisma.promotion_targets.deleteMany({ where: { promotionId: id } });
-  }
+  const result = await prisma.$transaction(async (tx) => {
+    if (rules !== undefined) {
+      await tx.promotion_rules.deleteMany({ where: { promotionId: id } });
+    }
+    if (targets !== undefined) {
+      await tx.promotion_targets.deleteMany({ where: { promotionId: id } });
+    }
 
-  const result = await prisma.promotions.update({
-    where: { id, deletedAt: null },
-    data: {
-      ...updateData,
-      ...(rules !== undefined && { rules: { create: rules } }),
-      ...(targets !== undefined && { targets: { create: targets } }),
-    },
-    select: selectPromotionFull,
+    return tx.promotions.update({
+      where: { id, deletedAt: null },
+      data: {
+        ...updateData,
+        ...(rules !== undefined && { rules: { create: rules } }),
+        ...(targets !== undefined && { targets: { create: targets } }),
+      },
+      select: selectPromotionFull,
+    });
   });
+
   clearPromotionsCache();
   return result;
 };
@@ -415,13 +423,9 @@ export const findAllDeleted = async (options: { page?: number; limit?: number } 
 // === ACTIVE PROMOTIONS (for pricing — raw with transform) ===
 // =====================
 
-export const getActivePromotions = async () => {
-  // Check cache trước
-  const now = Date.now();
-  if (promotionsCache && now - promotionsCacheTime < PROMOTIONS_CACHE_TTL) {
-    return promotionsCache;
-  }
-
+// Query DB + map raw Prisma rows sang shape phẳng dùng cho pricing engine.
+// Tách riêng khỏi getActivePromotions() để lấy type cụ thể cho promotionsCache (thay vì any[]).
+const buildActivePromotionsForPricing = async () => {
   const nowDate = new Date();
   const promotions = await prisma.promotions.findMany({
     where: {
@@ -438,7 +442,7 @@ export const getActivePromotions = async () => {
     orderBy: { priority: "asc" },
   });
 
-  const result = promotions.map((promo) => ({
+  return promotions.map((promo) => ({
     id: promo.id,
     name: promo.name,
     description: promo.description,
@@ -471,6 +475,16 @@ export const getActivePromotions = async () => {
       targetValue: t.targetValue,
     })),
   }));
+};
+
+export const getActivePromotions = async () => {
+  // Check cache trước
+  const now = Date.now();
+  if (promotionsCache && now - promotionsCacheTime < PROMOTIONS_CACHE_TTL) {
+    return promotionsCache;
+  }
+
+  const result = await buildActivePromotionsForPricing();
 
   // Lưu vào cache
   promotionsCache = result;

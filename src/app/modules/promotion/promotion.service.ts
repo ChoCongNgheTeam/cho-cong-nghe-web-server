@@ -117,7 +117,7 @@ export const restorePromotion = async (id: string) => {
 export const hardDeletePromotion = async (id: string) => {
   const promotion = await repo.findById(id, { includeDeleted: true, isAdmin: true });
   if (!promotion) throw new NotFoundError("Khuyến mãi");
-  if (!promotion.deletedAt) throw new ForbiddenError("Phải soft delete trước...");
+  if (!promotion.deletedAt) throw new ForbiddenError("Phải soft delete khuyến mãi trước khi xóa vĩnh viễn");
 
   // Nên thêm — cảnh báo nghiệp vụ dù DB không constraint:
   if (promotion.usedCount > 0) {

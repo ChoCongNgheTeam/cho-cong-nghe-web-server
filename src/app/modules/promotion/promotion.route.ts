@@ -48,6 +48,12 @@ router.get("/brand/:brandId", validate(brandParamsSchema, "params"), asyncHandle
 router.get("/admin/all", ...staffAdminAuth, requirePermission("canPromotions"), validate(listPromotionsSchema, "query"), asyncHandler(getPromotionsAdminHandler));
 router.post("/admin", ...staffAdminAuth, requirePermission("canPromotions"), validate(createPromotionSchema, "body"), asyncHandler(createPromotionHandler));
 router.delete("/admin/bulk", ...staffAdminAuth, requirePermission("canPromotions"), validate(bulkDeletePromotionSchema, "body"), asyncHandler(bulkDeletePromotionHandler));
+// ADMIN ONLY — trash & restore (đặt TRƯỚC /admin/:id vì Express match route theo thứ tự
+// đăng ký — nếu để sau, "/admin/trash" sẽ bị "/admin/:id" bắt nhầm với id="trash")
+router.get("/admin/trash", ...adminAuth, validate(listDeletedPromotionsSchema, "query"), asyncHandler(getDeletedPromotionsHandler));
+router.post("/admin/:id/restore", ...adminAuth, validate(promotionParamsSchema, "params"), asyncHandler(restorePromotionHandler));
+router.delete("/admin/:id/permanent", ...adminAuth, validate(promotionParamsSchema, "params"), asyncHandler(hardDeletePromotionHandler));
+
 router.get("/admin/:id", ...staffAdminAuth, requirePermission("canPromotions"), validate(promotionParamsSchema, "params"), asyncHandler(getPromotionDetailHandler));
 router.patch(
   "/admin/:id",
@@ -58,10 +64,5 @@ router.patch(
   asyncHandler(updatePromotionHandler),
 );
 router.delete("/admin/:id", ...staffAdminAuth, requirePermission("canPromotions"), validate(promotionParamsSchema, "params"), asyncHandler(deletePromotionHandler));
-
-// ADMIN ONLY — trash & restore
-router.get("/admin/trash", ...adminAuth, validate(listDeletedPromotionsSchema, "query"), asyncHandler(getDeletedPromotionsHandler));
-router.post("/admin/:id/restore", ...adminAuth, validate(promotionParamsSchema, "params"), asyncHandler(restorePromotionHandler));
-router.delete("/admin/:id/permanent", ...adminAuth, validate(promotionParamsSchema, "params"), asyncHandler(hardDeletePromotionHandler));
 
 export default router;
