@@ -4,9 +4,9 @@ import { mapOrderToExportRow, buildCsvBuffer, buildExcelBuffer } from "./order.e
 import { NotFoundError, BadRequestError, ForbiddenError } from "@/errors";
 import prisma from "@/config/db";
 import { sendOrderStatusNotification, sendOrderCreatedAdminNotification } from "../notification/notification.service";
-import { orderSelect, formatOrderResponse } from "./order.repository";
 import { Prisma } from "@prisma/client";
 import { buildKeywordVariants } from "../search/search.helpers";
+import crypto from "node:crypto";
 
 // Tách thành helper riêng để dễ test
 const triggerRefundIfEligible = async (orderId: string) => {
@@ -210,23 +210,16 @@ export const getAllOrdersAdmin = async (query: OrderQuery) => repo.findAllOrders
 export const updateOrderAdmin = async (orderId: string, input: UpdateOrderAdminInput) => {
   const order = await repo.findOrderById(orderId);
   if (!order) throw new NotFoundError("Đơn hàng");
-  const updatedOrder = await prisma.orders.update({
-    where: { id: orderId },
-    data: {
-      orderStatus: input.orderStatus,
-      paymentStatus: input.paymentStatus,
-      paymentMethodId: input.paymentMethodId, // ← thêm
-      shippingFee: input.shippingFee,
-      voucherDiscount: input.voucherDiscount,
-    },
-  });
-  // [THÊM MỚI] Gửi thông báo nếu trạng thái đơn hàng thay đổi
-  if (input.orderStatus && input.orderStatus !== order.orderStatus) {
+
+  const previousStatus = order.orderStatus;
+  const updatedOrder = await repo.updateOrder(orderId, input);
+
+  if (input.orderStatus && input.orderStatus !== previousStatus) {
     sendOrderStatusNotification(updatedOrder.userId, updatedOrder.orderCode, input.orderStatus).catch((err) => {
       console.error("[Notification Error] Lỗi gửi thông báo order status:", err);
     });
   }
-  return repo.updateOrder(orderId, input);
+  return updatedOrder;
 };
 
 // cancelOrderAdmin — tương tự
@@ -435,11 +428,11 @@ export const exportOrdersAdmin = async (query: ExportOrderQuery) => {
   const orders = await prisma.orders.findMany({
     where,
     take: limit,
-    select: orderSelect,
+    select: repo.orderSelect,
     orderBy: { orderDate: "desc" },
   });
 
-  const rows = orders.map(formatOrderResponse).map(mapOrderToExportRow);
+  const rows = orders.map(repo.formatOrderResponse).map(mapOrderToExportRow);
 
   if (format === "csv") {
     return {
