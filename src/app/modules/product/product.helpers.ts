@@ -11,8 +11,8 @@ export const cleanupTempFiles = (files: Express.Multer.File[]) => {
   });
 };
 
-export const parseMultipartData = (body: any): any => {
-  let data = { ...body };
+export const parseMultipartData = (body: Record<string, unknown>): Record<string, unknown> => {
+  let data: Record<string, unknown> = { ...body };
 
   // Parse JSON string if there's a 'data' field
   if (body.data && typeof body.data === "string") {
@@ -29,9 +29,10 @@ export const parseMultipartData = (body: any): any => {
   const fieldsToParse = ["variants", "highlights", "specifications", "colorImages"];
 
   fieldsToParse.forEach((field) => {
-    if (data[field] && typeof data[field] === "string") {
+    const value = data[field];
+    if (typeof value === "string") {
       try {
-        data[field] = JSON.parse(data[field]);
+        data[field] = JSON.parse(value);
       } catch (e) {
         throw new Error(`Invalid JSON format in field '${field}'`);
       }
@@ -42,27 +43,37 @@ export const parseMultipartData = (body: any): any => {
   const booleanFields = ["isFeatured", "isActive"];
 
   booleanFields.forEach((field) => {
-    if (data[field] !== undefined) {
-      if (typeof data[field] === "string") {
-        data[field] = data[field].toLowerCase() === "true";
-      } else if (typeof data[field] === "boolean") {
-        data[field] = data[field];
-      }
+    const value = data[field];
+    if (typeof value === "string") {
+      data[field] = value.toLowerCase() === "true";
     }
   });
 
   return data;
 };
 
+interface ColorImageConfig {
+  color: string;
+  altText?: string;
+}
+
+interface UploadedColorImage {
+  color: string;
+  imagePath: string;
+  imageUrl: string;
+  altText: string;
+  position: number;
+}
+
 /**
  * Upload color-based images
  * Expected format: colorImages = [{ color, altText }]
  * Files fieldname: `color_${color}_${index}`
  */
-export const uploadColorImages = async (colorImages: any[], files: Express.Multer.File[]): Promise<any[]> => {
+export const uploadColorImages = async (colorImages: ColorImageConfig[], files: Express.Multer.File[]): Promise<UploadedColorImage[]> => {
   if (!files || files.length === 0) return [];
 
-  const uploadedImages: any[] = [];
+  const uploadedImages: UploadedColorImage[] = [];
 
   // Group files by color
   const filesByColor = new Map<string, Express.Multer.File[]>();
@@ -130,10 +141,30 @@ export const extractPublicId = (url: string): string | null => {
   return matches?.[1] || null;
 };
 
-export const normalizeVariant = (variant: any): RawVariant => ({
+interface RawVariantAttributeInput {
+  attributeOption: {
+    id: string;
+    value: string;
+    label: string;
+    attribute: { id: string; code: string; name: string };
+  };
+}
+
+export interface RawVariantInput {
+  id: string;
+  code?: string | null;
+  price: RawVariant["price"];
+  quantity: number;
+  soldCount: number;
+  isDefault: boolean;
+  isActive: boolean;
+  variantAttributes: RawVariantAttributeInput[];
+}
+
+export const normalizeVariant = (variant: RawVariantInput): RawVariant => ({
   ...variant,
   code: variant.code ?? "",
-  variantAttributes: variant.variantAttributes.map((va: any) => ({
+  variantAttributes: variant.variantAttributes.map((va) => ({
     attributeOption: {
       id: va.attributeOption.id,
       value: va.attributeOption.value,

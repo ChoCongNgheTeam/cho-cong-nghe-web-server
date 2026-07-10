@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { getCategoryFilters } from "./product_filter.service";
-import { categoryFiltersQuerySchema } from "./product_filter.validation";
+import { CategoryFiltersQuery } from "./product_filter.validation";
 
 export const getCategoryFiltersHandler = async (req: Request, res: Response) => {
-  const { category } = categoryFiltersQuerySchema.parse(req.query);
+  const { category } = req.query as unknown as CategoryFiltersQuery;
 
   const filters = await getCategoryFilters(category);
 

@@ -2,15 +2,15 @@ import { Request, Response } from "express";
 import * as productService from "./product.service";
 import {
   ListProductsQuery,
-  reviewsQuerySchema,
-  searchSuggestSchema,
-  adminListProductsSchema,
-  bulkActionSchema,
-  compareProductsSchema,
-  searchSuggestTrendingSchema,
-  saleScheduleQuerySchema,
-  saleByDateQuerySchema,
-  exportProductsSchema,
+  ReviewsQuery,
+  SearchSuggestQuery,
+  AdminListProductsQuery,
+  BulkActionInput,
+  CompareProductsQuery,
+  SearchSuggestTrendingQuery,
+  SaleScheduleQuery,
+  SaleByDateQuery,
+  ExportProductsQuery,
 } from "./product.validation";
 import { cleanupTempFiles, parseMultipartData, uploadColorImages, deleteOldImages } from "./product.helpers";
 import { getProductsWithPricing } from "../pricing/use-cases/getProductsWithPricing.service";
@@ -24,7 +24,26 @@ import { getBestSellingProductsWithPricing } from "../pricing/use-cases/getBestS
 
 // HELPERS
 
-const paginatedResponse = (result: any, message: string) => ({
+interface RawMultipartColorImage {
+  color: string;
+  altText?: string;
+  deleteImageIds?: string[];
+}
+
+interface ParsedMultipartProductData {
+  colorImages?: RawMultipartColorImage[];
+  [key: string]: unknown;
+}
+
+interface PaginatedResult {
+  data: unknown[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+const paginatedResponse = (result: PaginatedResult, message: string) => ({
   data: result.data,
   meta: {
     page: result.page,
@@ -43,7 +62,7 @@ export const getProductsPublicHandler = async (req: Request, res: Response) => {
 };
 
 export const getSearchSuggestHandler = async (req: Request, res: Response) => {
-  const query = searchSuggestSchema.parse(req.query);
+  const query = req.query as unknown as SearchSuggestQuery;
   const suggestions = await productService.getSearchSuggestions(query);
   res.json({ data: suggestions, total: suggestions.length, message: "Gợi ý tìm kiếm thành công" });
 };
@@ -84,7 +103,7 @@ export const getRelatedProductsHandler = async (req: Request, res: Response) => 
 };
 
 export const getProductReviewsHandler = async (req: Request, res: Response) => {
-  const query = reviewsQuerySchema.parse(req.query);
+  const query = req.query as unknown as ReviewsQuery;
   const result = await productService.getProductReviews(req.params.slug, query);
   res.json(paginatedResponse(result, "Lấy đánh giá thành công"));
 };
@@ -145,7 +164,7 @@ export const getSaleScheduleHandler = async (req: Request, res: Response) => {
 // ADMIN — LIST
 
 export const getProductsAdminHandler = async (req: Request, res: Response) => {
-  const query = adminListProductsSchema.parse(req.query);
+  const query = req.query as unknown as AdminListProductsQuery;
   const result = await productService.getProductsAdmin(query);
   res.json({
     data: result.data,
@@ -188,7 +207,7 @@ export const createProductHandler = async (req: Request, res: Response) => {
   const files = (req.files as Express.Multer.File[]) || [];
 
   try {
-    const parsedBody = parseMultipartData(req.body);
+    const parsedBody = parseMultipartData(req.body) as ParsedMultipartProductData;
 
     const uploadedColorImages = files.length > 0 && parsedBody.colorImages?.length > 0 ? await uploadColorImages(parsedBody.colorImages, files) : [];
 
@@ -208,14 +227,23 @@ export const updateProductHandler = async (req: Request, res: Response) => {
   const { id } = req.params;
 
   try {
-    const parsedData = parseMultipartData(req.body);
+    const parsedData = parseMultipartData(req.body) as ParsedMultipartProductData;
 
     // Upload ảnh mới (chỉ những màu có files)
     const uploadedColorImages = files.length > 0 && parsedData.colorImages?.length > 0 ? await uploadColorImages(parsedData.colorImages, files) : [];
 
     // Build colorImages payload cho repository
     // Merge: uploaded images + deleteImageIds từ FE (mỗi color entry giữ nguyên)
-    let colorImagesPayload: any[] | undefined = undefined;
+    interface ColorImagesPayloadEntry {
+      color: string;
+      deleteImageIds?: string[];
+      imagePath?: string;
+      imageUrl?: string;
+      altText?: string;
+      position?: number;
+    }
+
+    let colorImagesPayload: ColorImagesPayloadEntry[] | undefined = undefined;
 
     if (parsedData.colorImages?.length > 0) {
       // Map deleteImageIds từ FE theo color
@@ -356,7 +384,7 @@ export const hardDeleteProductHandler = async (req: Request, res: Response) => {
  * Body: { action: "delete" | "restore" | "activate" | "deactivate" | "feature" | "unfeature", ids: string[] }
  */
 export const bulkActionHandler = async (req: Request, res: Response) => {
-  const { action, ids } = bulkActionSchema.parse(req.body);
+  const { action, ids } = req.body as BulkActionInput;
   const adminId = req.user!.id;
 
   let message = "";
@@ -433,7 +461,7 @@ export const restoreVariantHandler = async (req: Request, res: Response) => {
  * Response: [{ id, name, slug, thumbnail, viewsCount, priceOrigin, isTrending }]
  */
 export const getSearchTrendingHandler = async (req: Request, res: Response) => {
-  const { q, limit, category } = searchSuggestTrendingSchema.parse(req.query);
+  const { q, limit, category } = req.query as unknown as SearchSuggestTrendingQuery;
   const suggestions = await productService.getSearchSuggestionsTrending(q, { limit, category });
   res.json({
     data: suggestions,
@@ -466,7 +494,7 @@ export const getSearchTrendingHandler = async (req: Request, res: Response) => {
  * ]
  */
 export const getSaleScheduleV2Handler = async (req: Request, res: Response) => {
-  const { startDate, endDate } = saleScheduleQuerySchema.parse(req.query);
+  const { startDate, endDate } = req.query as unknown as SaleScheduleQuery;
   const schedule = await productService.getSaleScheduleV2(startDate ? new Date(startDate) : undefined, endDate ? new Date(endDate) : undefined);
   res.json({
     data: schedule,
@@ -492,7 +520,7 @@ export const getSaleScheduleV2Handler = async (req: Request, res: Response) => {
  * }
  */
 export const getProductsByDateHandler = async (req: Request, res: Response) => {
-  const { date, promotionId, page, limit, categoryId } = saleByDateQuerySchema.parse(req.query);
+  const { date, promotionId, page, limit, categoryId } = req.query as unknown as SaleByDateQuery;
   const result = await productService.getProductsOnSaleDate(new Date(date), {
     promotionId,
     page,
@@ -525,7 +553,7 @@ export const getProductsByDateHandler = async (req: Request, res: Response) => {
  * }
  */
 export const compareProductsHandler = async (req: Request, res: Response) => {
-  const { ids } = compareProductsSchema.parse(req.query);
+  const { ids } = req.query as unknown as CompareProductsQuery;
   const result = await productService.compareProducts(ids);
   res.json({ data: result, message: "So sánh sản phẩm thành công" });
 };
@@ -545,7 +573,7 @@ export const getProductStatsHandler = async (_req: Request, res: Response) => {
 
 // GET /products/admin/export
 export const exportProductsAdminHandler = async (req: Request, res: Response) => {
-  const query = exportProductsSchema.parse(req.query);
+  const query = req.query as unknown as ExportProductsQuery;
   const { buffer, contentType, filename, count } = await productService.exportProductsAdmin(query);
 
   res.setHeader("Content-Type", contentType);

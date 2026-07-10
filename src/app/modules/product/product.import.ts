@@ -12,6 +12,7 @@
 
 import ExcelJS from "exceljs";
 import prisma from "@/config/db";
+import { Prisma } from "@prisma/client";
 import { BadRequestError } from "@/errors";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -50,7 +51,7 @@ export async function parseExcelBuffer(buffer: Buffer): Promise<ImportRow[]> {
   ws.eachRow((row, rowNum) => {
     if (headerRowNum !== -1) return;
 
-    const values = (row.values as any[]).slice(1);
+    const values = (row.values as unknown[]).slice(1);
     const headers = values.map((v) =>
       String(v ?? "")
         .toLowerCase()
@@ -81,7 +82,7 @@ export async function parseExcelBuffer(buffer: Buffer): Promise<ImportRow[]> {
   ws.eachRow((row, rowNum) => {
     if (rowNum <= headerRowNum) return; // skip header và hướng dẫn
 
-    const vals = (row.values as any[]).slice(1);
+    const vals = (row.values as unknown[]).slice(1);
     const variantId = String(vals[colMap.variantId] ?? "").trim();
     if (!variantId || variantId === "undefined") return;
 
@@ -228,7 +229,7 @@ export async function bulkImportVariants(rows: ImportRow[]): Promise<ImportResul
           return;
         }
 
-        const data: any = {};
+        const data: Prisma.products_variantsUpdateInput = {};
         if (row.price !== undefined) data.price = row.price;
         if (row.stock !== undefined) data.quantity = row.stock;
 

@@ -1,6 +1,6 @@
-// =====================
-// === SHARED TYPES ===
-// =====================
+import { Prisma } from "@prisma/client";
+
+// SHARED TYPES
 
 export interface Brand {
   id: string;
@@ -48,9 +48,7 @@ export interface ProductGallery {
   position: number;
 }
 
-// =====================
-// === VARIANT TYPES ===
-// =====================
+// VARIANT TYPES
 
 export interface ProductVariant {
   id: string;
@@ -69,9 +67,7 @@ export interface ProductVariant {
   images: ColorImage[];
 }
 
-// =====================
-// === HIGHLIGHT/SPEC TYPES ===
-// =====================
+// HIGHLIGHT/SPEC TYPES
 
 export interface Specification {
   id: string;
@@ -93,9 +89,7 @@ export interface Highlight {
   value?: string;
 }
 
-// =====================
-// === REVIEW TYPES ===
-// =====================
+// REVIEW TYPES
 
 export interface Review {
   id: string;
@@ -122,9 +116,7 @@ export interface ReviewStats {
   };
 }
 
-// =====================
-// === PRODUCT LIST ===
-// =====================
+// PRODUCT LIST
 
 export interface ProductCardHighlight {
   key: string;
@@ -154,9 +146,7 @@ export interface ProductCard {
   isActive: boolean;
   category: Category | null;
 }
-// =====================
-// === PRODUCT DETAIL ===
-// =====================
+// PRODUCT DETAIL
 
 export interface ProductDetail {
   id: string;
@@ -206,9 +196,7 @@ export interface ProductSpecificationGroup {
   }[];
 }
 
-// =====================
-// === RESPONSE TYPES ===
-// =====================
+// RESPONSE TYPES
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -226,9 +214,7 @@ export interface ProductListResponse extends PaginatedResponse<ProductCard> {
   };
 }
 
-// =====================
-// === RAW DB TYPES ===
-// =====================
+// RAW DB TYPES
 
 export interface RawVariantAttribute {
   attributeOption: {
@@ -246,7 +232,7 @@ export interface RawVariantAttribute {
 export interface RawVariant {
   id: string;
   code: string | null;
-  price: any;
+  price: Prisma.Decimal | number;
   quantity: number;
   soldCount: number;
   isDefault: boolean;
@@ -254,9 +240,7 @@ export interface RawVariant {
   variantAttributes: RawVariantAttribute[];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN STATS / LOW STOCK
-// ─────────────────────────────────────────────────────────────────────────────
 
 export interface LowStockVariant {
   id: string;

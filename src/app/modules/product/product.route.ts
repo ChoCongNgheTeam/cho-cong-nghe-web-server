@@ -118,7 +118,7 @@ router.post("/admin/import", ...adminAuth, uploadMemory.single("file"), asyncHan
 router.post("/admin", ...adminAuth, upload.any(), parseJsonFields, asyncHandler(createProductHandler));
 
 // Bulk action — ADMIN only (có thể delete hàng loạt)
-router.post("/admin/bulk", ...adminAuth, asyncHandler(bulkActionHandler));
+router.post("/admin/bulk", ...adminAuth, validate(bulkActionSchema, "body"), asyncHandler(bulkActionHandler));
 
 // ── Admin — :id routes ────────────────────────────────────────────────────────
 // Xem chi tiết — SALES + MARKETING có canViewProducts

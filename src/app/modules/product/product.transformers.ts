@@ -1,11 +1,54 @@
 import { buildVariantDisplayName } from "@/utils/build-variant-display-name";
-import { normalizeVariant } from "./product.helpers";
-import { ProductCard, ProductDetail, ProductVariant, ReviewStats, PriceRange, AvailableOption, Highlight, ProductSpecificationGroup, RawVariant, ColorImage } from "./product.types";
+import { normalizeVariant, RawVariantInput } from "./product.helpers";
+import { ProductCard, ProductDetail, ProductVariant, ReviewStats, PriceRange, AvailableOption, Highlight, ProductSpecificationGroup, RawVariant, ColorImage, Brand, Category } from "./product.types";
 
 // Fix BigInt serialization
-(BigInt.prototype as any).toJSON = function () {
+(BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function (this: bigint) {
   return this.toString();
 };
+
+interface RawColorImage {
+  id: string;
+  color: string;
+  imageUrl: string | null;
+  altText?: string | null;
+  position: number;
+}
+
+interface RawProductSpecification {
+  specificationId?: string;
+  value: string | null;
+  isHighlight?: boolean;
+  highlightOrder?: number;
+  specification: {
+    id?: string;
+    key: string;
+    name: string;
+    icon?: string | null;
+    unit?: string | null;
+  };
+}
+
+/** Shape tối thiểu 1 product cần có để transform — union các field mà các hàm dưới đây cần tới. */
+interface RawProductRow {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  brand?: Brand | null;
+  category?: Category | null;
+  variants: RawVariant[];
+  img: RawColorImage[];
+  isFeatured: boolean;
+  isActive: boolean;
+  createdAt: Date | string | null;
+  updatedAt?: Date | string | null;
+  viewsCount?: unknown;
+  ratingAverage?: unknown;
+  ratingCount?: number | null;
+  productSpecifications: RawProductSpecification[];
+  variantDisplay?: string | null;
+}
 
 const getStockStatus = (quantity: number): "in_stock" | "low_stock" | "out_of_stock" => {
   if (quantity <= 0) return "out_of_stock";
@@ -21,7 +64,7 @@ const getVariantColor = (variant: RawVariant): string | undefined => {
 /**
  * Get images for a specific color from product's color images
  */
-const getImagesForColor = (colorImages: any[], color?: string): ColorImage[] => {
+const getImagesForColor = (colorImages: RawColorImage[], color?: string): ColorImage[] => {
   if (!color) return [];
 
   return colorImages
@@ -66,9 +109,17 @@ const isOptionEnabled = (variants: RawVariant[], testType: string, testValue: st
   });
 };
 
-const buildAvailableOptionsWithStatus = (variants: RawVariant[], colorImages: any[], selectedOptions: Record<string, string>): AvailableOption[] => {
+interface OptionEntry {
+  id: string;
+  value: string;
+  label: string;
+  enabled: boolean;
+  image: ColorImage | null;
+}
+
+const buildAvailableOptionsWithStatus = (variants: RawVariant[], colorImages: RawColorImage[], selectedOptions: Record<string, string>): AvailableOption[] => {
   // Map: attributeCode -> Map(value -> option info)
-  const typesMap = new Map<string, Map<string, any>>();
+  const typesMap = new Map<string, Map<string, OptionEntry>>();
 
   // Thu thập tất cả các options từ variants
   for (const variant of variants) {
@@ -130,7 +181,7 @@ const buildAvailableOptionsWithStatus = (variants: RawVariant[], colorImages: an
  *
  * Trả về AvailableOption[] với type = "bundle" để FE phân biệt mode.
  */
-const buildVariantBundles = (variants: RawVariant[], selectedVariantId: string, colorImages: any[]): AvailableOption[] => {
+const buildVariantBundles = (variants: RawVariant[], selectedVariantId: string, colorImages: RawColorImage[]): AvailableOption[] => {
   const BUNDLE_ATTR_ORDER = ["ram", "storage", "gpu", "capacity_cooling", "capacity_washing", "capacity_fridge", "connection"];
 
   // Color attr codes — những attr này KHÔNG đưa vào bundle label
@@ -192,13 +243,13 @@ const buildVariantBundles = (variants: RawVariant[], selectedVariantId: string, 
   const result: AvailableOption[] = [{ type: "bundle", values: bundleValues }];
 
   // Color selector — giữ nguyên logic cũ
-  const colorMap = new Map<string, any>();
+  const colorMap = new Map<string, OptionEntry>();
   for (const v of variants) {
     if (!v.isActive) continue;
     const colorAttr = v.variantAttributes.find((va) => va.attributeOption.attribute.code === "color");
     if (colorAttr && !colorMap.has(colorAttr.attributeOption.value)) {
       const colorVal = colorAttr.attributeOption.value;
-      const colorImg = colorImages.find((img: any) => img.color === colorVal) ?? null;
+      const colorImg = colorImages.find((img) => img.color === colorVal) ?? null;
       colorMap.set(colorVal, {
         id: colorAttr.attributeOption.id,
         value: colorVal,
@@ -268,11 +319,8 @@ export const calculateOverallStockStatus = (variants: RawVariant[]): "in_stock" 
  *   - Phụ kiện (ổ cứng, thẻ nhớ): chỉ có storage → không bundle, hiện individual
  */
 const BUNDLE_TRIGGER_ATTRS = new Set(["ram", "gpu", "capacity_cooling", "capacity_washing", "capacity_fridge", "connection", "screen_size_laptop"]);
-/**
- * Detect xem product có nên dùng bundle mode không.
- * Bundle khi: variantDisplay = CARD, HOẶC có attribute ngoài color (ram, gpu, capacity...)
- */
-const shouldUseBundleMode = (product: any, validVariants: RawVariant[]): boolean => {
+
+const shouldUseBundleMode = (product: Pick<RawProductRow, "variantDisplay">, validVariants: RawVariant[]): boolean => {
   // Rule 1: admin config tường minh
   if (product.variantDisplay === "CARD") return true;
 
@@ -289,15 +337,15 @@ const shouldUseBundleMode = (product: any, validVariants: RawVariant[]): boolean
   return false;
 };
 
-export const transformProductCard = (product: any): ProductCard | null => {
-  const allVariants: any[] = product.variants ?? [];
+export const transformProductCard = (product: RawProductRow): ProductCard | null => {
+  const allVariants: RawVariant[] = product.variants ?? [];
 
   if (allVariants.length === 0) {
     console.warn(`[transformProductCard] Product ${product.id} (${product.slug}) has no active variant — skipped`);
     return null;
   }
 
-  const defaultVariant = allVariants.find((v: any) => v.isDefault) ?? allVariants[0];
+  const defaultVariant = allVariants.find((v) => v.isDefault) ?? allVariants[0];
 
   const firstColorImage = product.img?.[0];
   const thumbnail = firstColorImage?.imageUrl || "";
@@ -319,7 +367,7 @@ export const transformProductCard = (product: any): ProductCard | null => {
     },
     isFeatured: product.isFeatured,
     isNew: product.createdAt ? Date.now() - new Date(product.createdAt).getTime() < 6 * 24 * 60 * 60 * 1000 : false,
-    highlights: product.productSpecifications.map((spec: any) => ({
+    highlights: product.productSpecifications.map((spec) => ({
       key: spec.specification.key,
       name: spec.specification.name,
       icon: spec.specification.icon,
@@ -336,9 +384,9 @@ export const transformProductCard = (product: any): ProductCard | null => {
  * toàn bộ variant đang tắt) vẫn phải hiển thị trong danh sách admin để quản lý,
  * chỉ khác là giá/tồn kho sẽ hiển thị rỗng.
  */
-export const transformProductCardAdmin = (product: any): Omit<ProductCard, "variantId"> & { variantId: string | null } => {
-  const allVariants: any[] = product.variants ?? [];
-  const defaultVariant = allVariants.find((v: any) => v.isDefault) ?? allVariants.find((v: any) => v.isActive) ?? allVariants[0];
+export const transformProductCardAdmin = (product: RawProductRow): Omit<ProductCard, "variantId"> & { variantId: string | null } => {
+  const allVariants: RawVariant[] = product.variants ?? [];
+  const defaultVariant = allVariants.find((v) => v.isDefault) ?? allVariants.find((v) => v.isActive) ?? allVariants[0];
 
   const firstColorImage = product.img?.[0];
   const thumbnail = firstColorImage?.imageUrl || "";
@@ -360,7 +408,7 @@ export const transformProductCardAdmin = (product: any): Omit<ProductCard, "vari
     },
     isFeatured: product.isFeatured,
     isNew: product.createdAt ? Date.now() - new Date(product.createdAt).getTime() < 6 * 24 * 60 * 60 * 1000 : false,
-    highlights: product.productSpecifications.map((spec: any) => ({
+    highlights: product.productSpecifications.map((spec) => ({
       key: spec.specification.key,
       name: spec.specification.name,
       icon: spec.specification.icon,
@@ -372,9 +420,17 @@ export const transformProductCardAdmin = (product: any): Omit<ProductCard, "vari
   };
 };
 
-export const transformProductDetail = (product: any, reviewStats?: ReviewStats): Omit<ProductDetail, "highlights" | "canReview" | "orderItemId"> => {
-  const validVariants = product.variants.filter((v: { isActive: boolean }) => v.isActive);
-  const currentVariant = validVariants.find((v: { isDefault: boolean }) => v.isDefault) ?? validVariants[0];
+/** Product detail luôn có đủ brand/category/createdAt/updatedAt (join bắt buộc ở repository). */
+interface RawProductDetailInput extends Omit<RawProductRow, "brand" | "category" | "createdAt" | "updatedAt"> {
+  brand: Brand;
+  category: Category;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const transformProductDetail = (product: RawProductDetailInput, reviewStats?: ReviewStats): Omit<ProductDetail, "highlights" | "canReview" | "orderItemId"> => {
+  const validVariants = product.variants.filter((v) => v.isActive);
+  const currentVariant = validVariants.find((v) => v.isDefault) ?? validVariants[0];
 
   // ← dùng helper mới thay vì chỉ check variantDisplay
   const isBundleMode = shouldUseBundleMode(product, validVariants);
@@ -400,7 +456,7 @@ export const transformProductDetail = (product: any, reviewStats?: ReviewStats):
     slug: product.slug,
     description: product.description,
     brand: product.brand,
-    category: product.category || [],
+    category: product.category,
     priceRange: calculatePriceRange(product.variants),
     currentVariant: transformVariant(currentVariant, product.img),
     availableOptions,
@@ -415,7 +471,7 @@ export const transformProductDetail = (product: any, reviewStats?: ReviewStats):
   };
 };
 
-export const transformVariant = (variant: RawVariant, colorImages: any[]): ProductVariant => {
+export const transformVariant = (variant: RawVariant, colorImages: RawColorImage[]): ProductVariant => {
   const quantity = variant.quantity ?? 0;
   const available = Math.max(0, quantity);
 
@@ -437,8 +493,8 @@ export const transformVariant = (variant: RawVariant, colorImages: any[]): Produ
   };
 };
 
-export const transformProductVariantResponse = (product: any, variant: RawVariant) => {
-  const validVariants: RawVariant[] = product.variants.filter((v: { isActive: boolean }) => v.isActive).map(normalizeVariant);
+export const transformProductVariantResponse = (product: Omit<RawProductRow, "variants"> & { variants: RawVariantInput[] }, variant: RawVariant) => {
+  const validVariants: RawVariant[] = product.variants.filter((v) => v.isActive).map(normalizeVariant);
 
   const isBundleMode = shouldUseBundleMode(product, validVariants); // ← dùng helper
 
@@ -517,18 +573,18 @@ export const transformProductSpecifications = (product: {
   };
 };
 
-export const transformProductHighlights = (product: any): Highlight[] => {
+export const transformProductHighlights = (product: Pick<RawProductRow, "productSpecifications">): Highlight[] => {
   return (
     product.productSpecifications
-      ?.filter((s: any) => s.isHighlight)
-      .map((s: any) => ({
+      ?.filter((s) => s.isHighlight)
+      .sort((a, b) => (a.highlightOrder || 0) - (b.highlightOrder || 0))
+      .map((s) => ({
         id: s.specification.id,
         key: s.specification.key,
         name: s.specification.name,
         icon: s.specification.icon,
         unit: s.specification.unit,
         value: s.value,
-      }))
-      .sort((a: any, b: any) => (a.highlightOrder || 0) - (b.highlightOrder || 0)) || []
+      })) || []
   );
 };
