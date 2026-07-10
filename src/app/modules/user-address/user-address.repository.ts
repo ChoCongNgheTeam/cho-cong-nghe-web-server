@@ -1,8 +1,9 @@
 import prisma from "@/config/db";
+import { Prisma } from "@prisma/client";
 import { CreateAddressInput, UpdateAddressInput } from "./user-address.types";
 import { ListAddressesQuery } from "./user-address.validation";
 
-// ==================== SELECT SHAPE ====================
+// SELECT SHAPE
 
 const selectAddress = {
   id: true,
@@ -19,9 +20,12 @@ const selectAddress = {
   createdAt: true,
   updatedAt: true,
   deletedAt: true,
-};
+} satisfies Prisma.user_addressesSelect;
 
-// ==================== USER ADDRESS REPOSITORY ====================
+// Type suy ra trực tiếp từ select — dùng thay cho `any` ở service
+export type AddressRecord = Prisma.user_addressesGetPayload<{ select: typeof selectAddress }>;
+
+// USER ADDRESS REPOSITORY
 
 export const findByUserId = async (userId: string) => {
   return prisma.user_addresses.findMany({
@@ -54,7 +58,7 @@ export const createAddress = async (
     userId: string;
     provinceName: string;
     wardName: string;
-  }
+  },
 ) => {
   return prisma.user_addresses.create({ data, select: selectAddress });
 };
@@ -62,7 +66,7 @@ export const createAddress = async (
 export const updateAddress = async (id: string, data: Partial<UpdateAddressInput & { provinceName?: string; wardName?: string; isDefault?: boolean }>) => {
   return prisma.user_addresses.update({
     where: { id },
-    data: data as any,
+    data: data as Prisma.user_addressesUpdateInput,
     select: selectAddress,
   });
 };
@@ -92,25 +96,22 @@ export const hardDeleteAddress = async (id: string) => {
   return prisma.user_addresses.delete({ where: { id } });
 };
 
-// ==================== ADMIN / STAFF REPOSITORY ====================
+// ADMIN / STAFF REPOSITORY
 
 export const findAllAddressesAdmin = async (query: ListAddressesQuery) => {
   const { search, userId, provinceCode, wardCode, includeDeleted, page = 1, perPage = 20 } = query;
-  const where: any = {};
+  const where: Prisma.user_addressesWhereInput = {};
 
   if (!includeDeleted) where.deletedAt = null;
   if (userId) where.userId = userId;
   if (provinceCode) where.provinceCode = provinceCode;
   if (wardCode) where.wardCode = wardCode;
   if (search) {
-    where.OR = [
-      { contactName: { contains: search, mode: "insensitive" } },
-      { phone: { contains: search } },
-    ];
+    where.OR = [{ contactName: { contains: search, mode: "insensitive" } }, { phone: { contains: search } }];
   }
 
   const skip = (page - 1) * perPage;
-  const [data, total] = await Promise.all([
+  const [data, total] = await prisma.$transaction([
     prisma.user_addresses.findMany({
       where,
       skip,
@@ -124,10 +125,20 @@ export const findAllAddressesAdmin = async (query: ListAddressesQuery) => {
   return { data, total, page, perPage };
 };
 
-export const findAllDeletedAddresses = async () => {
-  return prisma.user_addresses.findMany({
-    where: { deletedAt: { not: null } },
-    select: selectAddress,
-    orderBy: { deletedAt: "desc" },
-  });
+export const findAllDeletedAddresses = async (page = 1, perPage = 20) => {
+  const skip = (page - 1) * perPage;
+  const where: Prisma.user_addressesWhereInput = { deletedAt: { not: null } };
+
+  const [data, total] = await prisma.$transaction([
+    prisma.user_addresses.findMany({
+      where,
+      skip,
+      take: perPage,
+      select: selectAddress,
+      orderBy: { deletedAt: "desc" },
+    }),
+    prisma.user_addresses.count({ where }),
+  ]);
+
+  return { data, total, page, perPage };
 };

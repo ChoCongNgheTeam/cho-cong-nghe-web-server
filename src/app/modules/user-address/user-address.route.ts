@@ -5,12 +5,12 @@ import { requirePermission } from "@/app/middlewares/auth.middleware";
 import { validate } from "@/app/middlewares/validate.middleware";
 import { asyncHandler } from "@/utils/async-handler";
 import * as c from "./user-address.controller";
-import { createAddressSchema, updateAddressSchema, addressIdSchema, listAddressesQuerySchema } from "./user-address.validation";
+import { createAddressSchema, updateAddressSchema, addressIdSchema, listAddressesQuerySchema, getDeletedAddressesQuerySchema } from "./user-address.validation";
 import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
 
 const router = Router();
 
-// ==================== PROTECTED ROUTES ====================
+// PROTECTED ROUTES
 router.use(authMiddleware(true));
 
 // --- User ---
@@ -27,7 +27,7 @@ router.get("/admin/all", requireRole(...STAFF_ROLES, "ADMIN"), requirePermission
 router.delete("/admin/:addressId", requireRole(...STAFF_ROLES, "ADMIN"), requirePermission("canViewUsers"), validate(addressIdSchema, "params"), asyncHandler(c.softDeleteAddressAdminHandler));
 
 // --- Admin only (trash & hard delete) ---
-router.get("/admin/trash/addresses", requireRole("ADMIN"), asyncHandler(c.getDeletedAddressesHandler));
+router.get("/admin/trash/addresses", requireRole("ADMIN"), validate(getDeletedAddressesQuerySchema, "query"), asyncHandler(c.getDeletedAddressesHandler));
 router.post("/admin/:addressId/restore", requireRole("ADMIN"), validate(addressIdSchema, "params"), asyncHandler(c.restoreAddressHandler));
 router.delete("/admin/:addressId/permanent", requireRole("ADMIN"), validate(addressIdSchema, "params"), asyncHandler(c.hardDeleteAddressHandler));
 
