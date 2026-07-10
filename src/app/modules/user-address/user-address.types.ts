@@ -1,6 +1,6 @@
 import { AddressType } from "@prisma/client";
 
-// ==================== INTERFACES ====================
+// INTERFACES
 
 export interface UserAddress {
   id: string;
@@ -40,7 +40,7 @@ export interface UpdateAddressInput {
   isDefault?: boolean;
 }
 
-// ==================== RESPONSE TYPES ====================
+// RESPONSE TYPES
 
 export interface AddressResponse {
   id: string;

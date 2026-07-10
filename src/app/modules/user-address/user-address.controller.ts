@@ -1,8 +1,9 @@
 import { Request, Response } from "express";
 import * as service from "./user-address.service";
 import { CreateAddressInput, UpdateAddressInput } from "./user-address.types";
+import type { ListAddressesQuery, GetDeletedAddressesQuery } from "./user-address.validation";
 
-// ==================== USER ADDRESS CONTROLLERS ====================
+// USER ADDRESS CONTROLLERS
 
 export const getUserAddressesHandler = async (req: Request, res: Response) => {
   const userId = req.user!.id;
@@ -46,10 +47,11 @@ export const getDefaultAddressHandler = async (req: Request, res: Response) => {
   res.json({ success: true, data: address, message: "Lấy địa chỉ mặc định thành công" });
 };
 
-// ==================== ADMIN & STAFF CONTROLLERS ====================
+// ADMIN & STAFF CONTROLLERS
 
 export const getAllAddressesAdminHandler = async (req: Request, res: Response) => {
-  const result = await service.getAllAddressesAdmin(req.query);
+  const query = req.query as unknown as ListAddressesQuery;
+  const result = await service.getAllAddressesAdmin(query);
   res.json({
     success: true,
     data: result.data,
@@ -69,8 +71,19 @@ export const softDeleteAddressAdminHandler = async (req: Request, res: Response)
 };
 
 export const getDeletedAddressesHandler = async (req: Request, res: Response) => {
-  const result = await service.getDeletedAddresses();
-  res.json({ success: true, data: result, total: result.length, message: "Lấy danh sách địa chỉ đã xóa thành công" });
+  const query = req.query as unknown as GetDeletedAddressesQuery;
+  const result = await service.getDeletedAddresses(query);
+  res.json({
+    success: true,
+    data: result.data,
+    meta: {
+      total: result.total,
+      page: result.page,
+      perPage: result.perPage,
+      totalPages: Math.ceil(result.total / result.perPage),
+    },
+    message: "Lấy danh sách địa chỉ đã xóa thành công",
+  });
 };
 
 export const restoreAddressHandler = async (req: Request, res: Response) => {

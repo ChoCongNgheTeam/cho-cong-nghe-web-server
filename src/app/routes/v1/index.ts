@@ -57,6 +57,8 @@ import staffPermissionsRouter from "@/app/modules/staff-permissions/staff-permis
 import { auditMiddleware } from "@/app/middlewares/audit.middleware";
 import { initSettingsCache } from "@/app/modules/settings/settings.service";
 
+import healthRouter from "@/app/modules/health/health.router";
+
 const router = Router();
 
 // Audit middleware — tự động ghi log mọi mutation có xác thực
@@ -115,6 +117,8 @@ router.use("/analytics", analyticsRouter);
 router.use("/settings", settingsRouter);
 router.use("/audit", auditRouter);
 router.use("/admin/staff-permissions", staffPermissionsRouter);
+
+router.use("/health", healthRouter);
 
 // Warm cache khi app khởi động
 initSettingsCache().catch(console.error);
