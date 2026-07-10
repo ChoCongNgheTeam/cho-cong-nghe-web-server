@@ -53,9 +53,20 @@ export const upsertCategorySpec = async (categoryId: string, input: UpsertCatego
 export const bulkUpsertCategorySpecs = async (categoryId: string, input: BulkUpsertCategorySpecsInput) => {
   const cat = await repo.checkCategoryExists(categoryId);
   if (!cat) throw new NotFoundError("Danh mục");
+
+  const specIds = input.items.map((item) => item.specificationId);
+  const existing = await repo.findManyByIds(specIds);
+  const existingIds = new Set(existing.map((s) => s.id));
+  const missingIds = specIds.filter((id) => !existingIds.has(id));
+  if (missingIds.length > 0) {
+    throw new BadRequestError(`Thông số không tồn tại: ${missingIds.join(", ")}`);
+  }
+
   return repo.bulkUpsertCategorySpecs(categoryId, input.items);
 };
 
 export const removeCategorySpec = async (categoryId: string, specificationId: string) => {
+  const assignment = await repo.findCategorySpecAssignment(categoryId, specificationId);
+  if (!assignment) throw new NotFoundError("Thông số trong danh mục này");
   await repo.removeCategorySpec(categoryId, specificationId);
 };
