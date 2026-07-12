@@ -57,7 +57,7 @@ interface ColorImageConfig {
   altText?: string;
 }
 
-interface UploadedColorImage {
+export interface UploadedColorImage {
   color: string;
   imagePath: string;
   imageUrl: string;

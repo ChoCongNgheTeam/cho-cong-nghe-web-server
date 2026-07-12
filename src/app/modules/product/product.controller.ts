@@ -12,7 +12,9 @@ import {
   SaleByDateQuery,
   ExportProductsQuery,
 } from "./product.validation";
-import { cleanupTempFiles, parseMultipartData, uploadColorImages, deleteOldImages } from "./product.helpers";
+import { cleanupTempFiles, parseMultipartData, uploadColorImages, deleteOldImages, UploadedColorImage } from "./product.helpers";
+import { UpdateColorImagePayload } from "./product.service";
+import { createProductSchema, updateProductSchema } from "./product.validation";
 import { getProductsWithPricing } from "../pricing/use-cases/getProductsWithPricing.service";
 import { getProductDetailWithPricing } from "../pricing/use-cases/getProductDetailWithPricing.service";
 import { getProductVariantWithPricing } from "../pricing/use-cases/getProductVariantPricing.service";
@@ -23,17 +25,6 @@ import { getNewArrivalProductsWithPricing } from "../pricing/use-cases/getNewArr
 import { getBestSellingProductsWithPricing } from "../pricing/use-cases/getBestSellingProductsWithPricing.service";
 
 // HELPERS
-
-interface RawMultipartColorImage {
-  color: string;
-  altText?: string;
-  deleteImageIds?: string[];
-}
-
-interface ParsedMultipartProductData {
-  colorImages?: RawMultipartColorImage[];
-  [key: string]: unknown;
-}
 
 interface PaginatedResult {
   data: unknown[];
@@ -207,9 +198,10 @@ export const createProductHandler = async (req: Request, res: Response) => {
   const files = (req.files as Express.Multer.File[]) || [];
 
   try {
-    const parsedBody = parseMultipartData(req.body) as ParsedMultipartProductData;
+    const rawBody = parseMultipartData(req.body);
+    const parsedBody = createProductSchema.parse(rawBody);
 
-    const uploadedColorImages = files.length > 0 && parsedBody.colorImages?.length > 0 ? await uploadColorImages(parsedBody.colorImages, files) : [];
+    const uploadedColorImages = files.length > 0 && parsedBody.colorImages.length > 0 ? await uploadColorImages(parsedBody.colorImages, files) : [];
 
     const product = await productService.createProduct({
       ...parsedBody,
@@ -222,49 +214,41 @@ export const createProductHandler = async (req: Request, res: Response) => {
   }
 };
 
+interface ColorEntry {
+  color: string;
+  altText?: string;
+  deleteImageIds: string[];
+  newImages: UploadedColorImage[];
+}
+
 export const updateProductHandler = async (req: Request, res: Response) => {
   const files = (req.files as Express.Multer.File[]) || [];
   const { id } = req.params;
 
   try {
-    const parsedData = parseMultipartData(req.body) as ParsedMultipartProductData;
+    const rawData = parseMultipartData(req.body);
+    const parsedData = updateProductSchema.parse(rawData);
+    const colorImagesInput = parsedData.colorImages ?? [];
 
     // Upload ảnh mới (chỉ những màu có files)
-    const uploadedColorImages = files.length > 0 && parsedData.colorImages?.length > 0 ? await uploadColorImages(parsedData.colorImages, files) : [];
+    const uploadedColorImages = files.length > 0 && colorImagesInput.length > 0 ? await uploadColorImages(colorImagesInput, files) : [];
 
     // Build colorImages payload cho repository
     // Merge: uploaded images + deleteImageIds từ FE (mỗi color entry giữ nguyên)
-    interface ColorImagesPayloadEntry {
-      color: string;
-      deleteImageIds?: string[];
-      imagePath?: string;
-      imageUrl?: string;
-      altText?: string;
-      position?: number;
-    }
+    let colorImagesPayload: UpdateColorImagePayload[] | undefined = undefined;
 
-    let colorImagesPayload: ColorImagesPayloadEntry[] | undefined = undefined;
-
-    if (parsedData.colorImages?.length > 0) {
-      // Map deleteImageIds từ FE theo color
-      const deleteMap = new Map<string, string[]>();
-      for (const ci of parsedData.colorImages) {
-        if (ci.deleteImageIds?.length > 0) {
-          deleteMap.set(ci.color, ci.deleteImageIds);
-        }
-      }
-
+    if (colorImagesInput.length > 0) {
       // Mỗi uploaded image là 1 record cần tạo mới
       // Kết hợp với deleteImageIds để repository xử lý per-color
-      const colorEntries = new Map<string, any>();
+      const colorEntries = new Map<string, ColorEntry>();
 
       // Gom deleteImageIds từ FE
-      for (const ci of parsedData.colorImages) {
+      for (const ci of colorImagesInput) {
         if (!colorEntries.has(ci.color)) {
           colorEntries.set(ci.color, { color: ci.color, altText: ci.altText, deleteImageIds: [], newImages: [] });
         }
-        if (ci.deleteImageIds?.length > 0) {
-          colorEntries.get(ci.color).deleteImageIds.push(...ci.deleteImageIds);
+        if (ci.deleteImageIds && ci.deleteImageIds.length > 0) {
+          colorEntries.get(ci.color)!.deleteImageIds.push(...ci.deleteImageIds);
         }
       }
 
@@ -273,7 +257,7 @@ export const updateProductHandler = async (req: Request, res: Response) => {
         if (!colorEntries.has(img.color)) {
           colorEntries.set(img.color, { color: img.color, altText: img.altText ?? img.color, deleteImageIds: [], newImages: [] });
         }
-        colorEntries.get(img.color).newImages.push(img);
+        colorEntries.get(img.color)!.newImages.push(img);
       }
 
       // Flatten thành array cho repository
@@ -306,11 +290,9 @@ export const updateProductHandler = async (req: Request, res: Response) => {
     // Lấy imagePaths cần xóa khỏi Cloudinary
     // Chỉ xóa ảnh được đánh dấu deleteImageIds (không xóa toàn bộ như trước)
     const deleteImageIds: string[] = [];
-    if (parsedData.colorImages) {
-      for (const ci of parsedData.colorImages) {
-        if (ci.deleteImageIds?.length > 0) {
-          deleteImageIds.push(...ci.deleteImageIds);
-        }
+    for (const ci of colorImagesInput) {
+      if (ci.deleteImageIds && ci.deleteImageIds.length > 0) {
+        deleteImageIds.push(...ci.deleteImageIds);
       }
     }
 

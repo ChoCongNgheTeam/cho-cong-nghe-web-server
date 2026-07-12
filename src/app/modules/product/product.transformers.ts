@@ -1,6 +1,19 @@
 import { buildVariantDisplayName } from "@/utils/build-variant-display-name";
 import { normalizeVariant, RawVariantInput } from "./product.helpers";
-import { ProductCard, ProductDetail, ProductVariant, ReviewStats, PriceRange, AvailableOption, Highlight, ProductSpecificationGroup, RawVariant, ColorImage, Brand, Category } from "./product.types";
+import {
+  ProductCard,
+  ProductDetail,
+  ProductVariant,
+  ReviewStats,
+  PriceRange,
+  AvailableOption,
+  Highlight,
+  ProductSpecificationGroup,
+  RawVariant,
+  ColorImage,
+  Brand,
+  CategoryTreeNode,
+} from "./product.types";
 
 // Fix BigInt serialization
 (BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function (this: bigint) {
@@ -21,7 +34,7 @@ interface RawProductSpecification {
   isHighlight?: boolean;
   highlightOrder?: number;
   specification: {
-    id?: string;
+    id: string;
     key: string;
     name: string;
     icon?: string | null;
@@ -30,13 +43,13 @@ interface RawProductSpecification {
 }
 
 /** Shape tối thiểu 1 product cần có để transform — union các field mà các hàm dưới đây cần tới. */
-interface RawProductRow {
+export interface RawProductRow {
   id: string;
   name: string;
   slug: string;
   description?: string | null;
-  brand?: Brand | null;
-  category?: Category | null;
+  brand: Brand | null;
+  category: CategoryTreeNode | null;
   variants: RawVariant[];
   img: RawColorImage[];
   isFeatured: boolean;
@@ -371,7 +384,7 @@ export const transformProductCard = (product: RawProductRow): ProductCard | null
       key: spec.specification.key,
       name: spec.specification.name,
       icon: spec.specification.icon,
-      value: spec.value,
+      value: spec.value ?? undefined,
     })),
     inStock,
     isActive: product.isActive,
@@ -412,7 +425,7 @@ export const transformProductCardAdmin = (product: RawProductRow): Omit<ProductC
       key: spec.specification.key,
       name: spec.specification.name,
       icon: spec.specification.icon,
-      value: spec.value,
+      value: spec.value ?? undefined,
     })),
     inStock,
     isActive: product.isActive,
@@ -423,7 +436,7 @@ export const transformProductCardAdmin = (product: RawProductRow): Omit<ProductC
 /** Product detail luôn có đủ brand/category/createdAt/updatedAt (join bắt buộc ở repository). */
 interface RawProductDetailInput extends Omit<RawProductRow, "brand" | "category" | "createdAt" | "updatedAt"> {
   brand: Brand;
-  category: Category;
+  category: CategoryTreeNode;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -454,7 +467,7 @@ export const transformProductDetail = (product: RawProductDetailInput, reviewSta
     id: product.id,
     name: displayName,
     slug: product.slug,
-    description: product.description,
+    description: product.description ?? undefined,
     brand: product.brand,
     category: product.category,
     priceRange: calculatePriceRange(product.variants),
@@ -582,9 +595,9 @@ export const transformProductHighlights = (product: Pick<RawProductRow, "product
         id: s.specification.id,
         key: s.specification.key,
         name: s.specification.name,
-        icon: s.specification.icon,
-        unit: s.specification.unit,
-        value: s.value,
+        icon: s.specification.icon ?? undefined,
+        unit: s.specification.unit ?? undefined,
+        value: s.value ?? undefined,
       })) || []
   );
 };

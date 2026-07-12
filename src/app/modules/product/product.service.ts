@@ -1,6 +1,8 @@
 import { slugify } from "transliteration";
 import * as repo from "./product.repository";
-import { CreateProductInput, UpdateProductInput, ListProductsQuery, ReviewsQuery, SearchSuggestQuery, ExportProductsQuery } from "./product.validation";
+import { ListProductsQuery, ReviewsQuery, SearchSuggestQuery, ExportProductsQuery, UpdateProductInput } from "./product.validation";
+
+export type { UpdateColorImagePayload, UpdateProductRepoInput, CreateProductRepoInput } from "./product.repository";
 import {
   transformProductCard,
   transformProductCardAdmin,
@@ -8,7 +10,9 @@ import {
   transformProductSpecifications,
   transformProductHighlights,
   transformProductVariantResponse,
+  RawProductRow,
 } from "./product.transformers";
+import { RawVariant, ProductCard } from "./product.types";
 import { buildCategoryPath } from "../category/category.helpers";
 import prisma from "@/config/db";
 import { normalizeVariant } from "./product.helpers";
@@ -20,8 +24,22 @@ import { Prisma } from "@prisma/client";
 
 // INTERNAL HELPERS
 
-const getVariantsForCards = (product: any): any[] => {
-  const variants: any[] = product.variants ?? [];
+interface PricingContext {
+  productId: string;
+  variantId: string;
+  price: number;
+  brandId?: string;
+  categoryPath: string[] | undefined;
+  variantAttributes: { code: string; value: string }[];
+}
+
+interface CardEntry {
+  card: ProductCard;
+  pricingContext: PricingContext;
+}
+
+const getVariantsForCards = (product: RawProductRow): RawVariant[] => {
+  const variants: RawVariant[] = product.variants ?? [];
   if (variants.length === 0) return [];
 
   if (product.variantDisplay === "CARD") return variants;
@@ -30,7 +48,7 @@ const getVariantsForCards = (product: any): any[] => {
   return defaultVariant ? [defaultVariant] : [];
 };
 
-const buildCardEntry = (product: any, variant: any) => {
+const buildCardEntry = (product: RawProductRow, variant: RawVariant): CardEntry | null => {
   const card = transformProductCard({ ...product, variants: [variant] });
   if (!card) return null;
   return {
@@ -41,7 +59,7 @@ const buildCardEntry = (product: any, variant: any) => {
       price: Number(variant.price),
       brandId: product.brand?.id,
       categoryPath: buildCategoryPath(product.category),
-      variantAttributes: (variant.variantAttributes ?? []).map((va: any) => ({
+      variantAttributes: (variant.variantAttributes ?? []).map((va) => ({
         code: va.attributeOption.attribute.code,
         value: va.attributeOption.value,
       })),
@@ -83,8 +101,8 @@ export const getProductsPublic = async (query: ListProductsQuery) => {
 };
 
 // Helper interleave
-const interleaveBrands = (items: Array<{ card: any; pricingContext: any }>) => {
-  const groups = new Map<string, Array<{ card: any; pricingContext: any }>>();
+const interleaveBrands = (items: CardEntry[]): CardEntry[] => {
+  const groups = new Map<string, CardEntry[]>();
 
   for (const item of items) {
     // brandId từ pricingContext
@@ -93,7 +111,7 @@ const interleaveBrands = (items: Array<{ card: any; pricingContext: any }>) => {
     groups.get(brandId)!.push(item);
   }
 
-  const result: Array<{ card: any; pricingContext: any }> = [];
+  const result: CardEntry[] = [];
   const queues = Array.from(groups.values());
   let i = 0;
 
@@ -126,7 +144,7 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
   const productDetail = transformProductDetail(product, {
     average: Number(product.ratingAverage) || 0,
     total: reviewStats.total,
-    distribution: reviewStats.distribution as any,
+    distribution: reviewStats.distribution,
   });
 
   const highlights = transformProductHighlights(product);
@@ -143,13 +161,13 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
 
   // Extract variantAttributes từ default variant của raw product
   // để pricing use-cases có thể forward cho ATTRIBUTE promotion matching
-  const defaultVariant = product.variants?.find((v: any) => v.isDefault) ?? product.variants?.[0];
+  const defaultVariant = product.variants?.find((v) => v.isDefault) ?? product.variants?.[0];
   const defaultVariantAttributes = (defaultVariant?.variantAttributes ?? [])
-    .map((va: any) => ({
+    .map((va) => ({
       code: va.attributeOption?.attribute?.code,
       value: va.attributeOption?.value,
     }))
-    .filter((a: any) => a.code && a.value);
+    .filter((a): a is { code: string; value: string } => Boolean(a.code && a.value));
 
   return {
     ...productDetail,
@@ -188,7 +206,7 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
       price: Number(variant.price),
       brandId: product.brand?.id,
       categoryPath: buildCategoryPath(product.category),
-      variantAttributes: (variant.variantAttributes ?? []).map((va: any) => ({
+      variantAttributes: (variant.variantAttributes ?? []).map((va) => ({
         code: va.attributeOption.attribute.code,
         value: va.attributeOption.value,
       })),
@@ -211,14 +229,14 @@ export const getProductVariantOptions = async (slug: string, options?: Record<st
   }
 
   // Filter theo query params nếu có (ví dụ ?storage=128gb&color=black)
-  const filtered = allVariants.filter((v: any) => {
+  const filtered = allVariants.filter((v) => {
     return Object.entries(options ?? {}).every(([code, val]) => {
       if (!val) return true;
-      return v.variantAttributes.some((va: any) => va.attributeOption.attribute.code === code && va.attributeOption.value.toLowerCase() === val.toLowerCase());
+      return v.variantAttributes.some((va) => va.attributeOption.attribute.code === code && va.attributeOption.value.toLowerCase() === val.toLowerCase());
     });
   });
 
-  return filtered.map((v: any) => {
+  return filtered.map((v) => {
     // Map tất cả attributes động
     const attrMap: Record<string, { value: string; label: string }> = {};
     for (const va of v.variantAttributes) {
@@ -231,7 +249,7 @@ export const getProductVariantOptions = async (slug: string, options?: Record<st
 
     // Color image
     const colorValue = attrMap["color"]?.value;
-    const colorImage = colorValue ? product.img?.find((img: any) => img.color === colorValue) : null;
+    const colorImage = colorValue ? product.img?.find((img) => img.color === colorValue) : null;
 
     return {
       id: v.id,
@@ -260,7 +278,7 @@ export const getProductVariantOptions = async (slug: string, options?: Record<st
         price: Number(v.price),
         brandId: product.brand?.id,
         categoryPath: buildCategoryPath(product.category),
-        variantAttributes: (v.variantAttributes ?? []).map((va: any) => ({
+        variantAttributes: (v.variantAttributes ?? []).map((va) => ({
           code: va.attributeOption.attribute.code,
           value: va.attributeOption.value,
         })),
@@ -299,11 +317,11 @@ export const getProductGallery = async (slug: string) => {
 
   // Build colorVariantMap: color → variantId của default variant có màu đó
   // Dùng để FE tự động chọn variant khi user click ảnh thuộc màu khác
-  const activeVariants = product.variants.filter((v: any) => v.isActive);
+  const activeVariants = product.variants.filter((v) => v.isActive);
   const colorVariantMap: Record<string, string> = {};
 
   for (const variant of activeVariants) {
-    const colorAttr = variant.variantAttributes?.find((va: any) => va.attributeOption.attribute.code === "color");
+    const colorAttr = variant.variantAttributes?.find((va) => va.attributeOption.attribute.code === "color");
     if (colorAttr) {
       const colorVal = colorAttr.attributeOption.value;
       // Ưu tiên isDefault, sau đó first active
@@ -362,19 +380,6 @@ export const getDeletedProducts = async (query: Record<string, any> = {}) => {
   return { ...result, data: result.data.map(transformProductCardAdmin) };
 };
 
-// export const getProductById = async (id: string, options: { includeDeleted?: boolean } = {}) => {
-//   const product = await repo.findById(id, options);
-//   if (!product) throw new NotFoundError("Sản phẩm");
-
-//   const reviewStats = await repo.getReviewStats(product.id);
-//   const stats: ReviewStats = {
-//     average: Number(product.ratingAverage) || 0,
-//     total: reviewStats.total,
-//     distribution: reviewStats.distribution as any,
-//   };
-
-//   return transformProductDetail(product, stats);
-// };
 export const getProductById = async (id: string, options: { includeDeleted?: boolean } = {}) => {
   const product = await repo.findById(id, options);
   if (!product) throw new NotFoundError("Sản phẩm");
@@ -397,7 +402,7 @@ export const getProductById = async (id: string, options: { includeDeleted?: boo
 
 // ADMIN — CRUD
 
-export const createProduct = async (input: CreateProductInput) => {
+export const createProduct = async (input: Omit<repo.CreateProductRepoInput, "slug">) => {
   const defaultCount = input.variants.filter((v) => v.isDefault).length;
   if (defaultCount !== 1) throw new BadRequestError("Phải có đúng 1 biến thể mặc định");
 
@@ -415,12 +420,16 @@ export const createProduct = async (input: CreateProductInput) => {
   return transformProductDetail(product);
 };
 
-export const updateProduct = async (id: string, input: UpdateProductInput) => {
+export interface UpdateProductInputWithImages extends Omit<UpdateProductInput, "colorImages"> {
+  colorImages?: repo.UpdateColorImagePayload[];
+}
+
+export const updateProduct = async (id: string, input: UpdateProductInputWithImages) => {
   await assertProductExists(id);
 
   const { brandId, categoryId, ...rest } = input;
 
-  const updateData: any = {
+  const updateData: repo.UpdateProductRepoInput = {
     ...rest,
     ...(brandId && {
       brand: {
@@ -447,6 +456,11 @@ export const updateProduct = async (id: string, input: UpdateProductInput) => {
   if (input.variants) {
     const defaultCount = input.variants.filter((v) => v.isDefault).length;
     if (defaultCount > 1) throw new BadRequestError("Chỉ được có tối đa 1 biến thể mặc định");
+
+    const newVariantMissingPrice = input.variants.find((v) => !v.id && v.price === undefined);
+    if (newVariantMissingPrice) {
+      throw new BadRequestError(`Variant mới (code: ${newVariantMissingPrice.code}) thiếu giá — price là bắt buộc khi tạo variant mới`);
+    }
   }
 
   await repo.update(id, updateData);
@@ -541,7 +555,7 @@ export const bulkSoftDeleteProducts = async (ids: string[], deletedBy: string) =
 /**
  * Bulk update (isActive, isFeatured...)
  */
-export const bulkUpdateProducts = async (ids: string[], updates: any) => {
+export const bulkUpdateProducts = async (ids: string[], updates: Prisma.productsUpdateManyMutationInput) => {
   if (!ids.length) throw new BadRequestError("Danh sách ID không được rỗng");
   const result = await repo.bulkUpdate(ids, updates);
   invalidateFilterCache();
@@ -731,7 +745,18 @@ export const getSaleSchedule = async (startDate: Date, endDate: Date) => {
     orderBy: [{ priority: "desc" }, { startDate: "asc" }],
   });
 
-  const schedule = new Map<string, any[]>();
+  interface ScheduleEntry {
+    id: string;
+    name: string;
+    description: string | null;
+    startDate: Date | null;
+    endDate: Date | null;
+    priority: number;
+    targetsCount: number;
+    isActive: boolean;
+  }
+
+  const schedule = new Map<string, ScheduleEntry[]>();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -855,16 +880,15 @@ export const getProductsOnSaleDate = async (
 ) => {
   const result = await repo.findProductsOnSaleDate(date, options);
 
-  const cards: Array<{ card: any; pricingContext: any }> = [];
+  const cards: CardEntry[] = [];
 
   for (const product of result.products) {
-    const variants: any[] = product.variants ?? [];
+    const variants = product.variants ?? [];
     if (variants.length === 0) continue;
 
-    const variantsForCards =
-      product.variantDisplay === "CARD"
-        ? [variants.find((v: any) => v.isDefault) ?? variants[0]].filter(Boolean) // ← chỉ lấy default dù CARD
-        : [variants.find((v: any) => v.isDefault) ?? variants[0]].filter(Boolean);
+    // Luôn lấy default variant (kể cả khi variantDisplay = CARD) — flash-sale
+    // view chỉ hiển thị 1 card/sản phẩm, không expand theo từng variant.
+    const variantsForCards = [variants.find((v) => v.isDefault) ?? variants[0]].filter(Boolean);
 
     for (const variant of variantsForCards) {
       const card = transformProductCard({ ...product, variants: [variant] });
@@ -878,7 +902,7 @@ export const getProductsOnSaleDate = async (
           price: Number(variant.price),
           brandId: product.brand?.id,
           categoryPath: buildCategoryPath(product.category),
-          variantAttributes: (variant.variantAttributes ?? []).map((va: any) => ({
+          variantAttributes: (variant.variantAttributes ?? []).map((va) => ({
             code: va.attributeOption.attribute.code,
             value: va.attributeOption.value,
           })),
@@ -1100,12 +1124,12 @@ export const getProductVariantsBySelection = async (slug: string, selectedOption
   }
 
   // Filter images theo màu — nếu không có attribute color thì trả về tất cả ảnh
-  const filteredImages = relevantColors.size > 0 ? (product.img ?? []).filter((img: any) => relevantColors.has(img.color)) : (product.img ?? []);
+  const filteredImages = relevantColors.size > 0 ? (product.img ?? []).filter((img) => relevantColors.has(img.color)) : (product.img ?? []);
 
   return {
     productId: product.id,
-    brandId: (product as any).brand?.id,
-    categoryPath: buildCategoryPath((product as any).category),
+    brandId: product.brand?.id,
+    categoryPath: buildCategoryPath(product.category),
     selectedOptions,
     variants: normalizedVariants,
     images: filteredImages,

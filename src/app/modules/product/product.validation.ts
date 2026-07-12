@@ -116,6 +116,11 @@ const colorImageSchema = z.object({
   altText: z.string().trim().optional(),
 });
 
+// Update: cho phép kèm deleteImageIds (xoá ảnh cũ của màu này) — không áp dụng cho create
+const updateColorImageSchema = colorImageSchema.extend({
+  deleteImageIds: z.array(z.string().uuid()).optional(),
+});
+
 const variantAttributeSchema = z.object({
   attributeOptionId: z.string().uuid(),
 });
@@ -169,7 +174,7 @@ export const updateProductSchema = z.object({
   name: z.string().trim().min(3).optional(),
   description: z.string().trim().optional(),
   variants: z.array(updateVariantSchema).optional(),
-  colorImages: z.array(colorImageSchema).optional(),
+  colorImages: z.array(updateColorImageSchema).optional(),
   specifications: z
     .array(
       z.object({

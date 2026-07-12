@@ -14,6 +14,14 @@ export interface Category {
   slug: string;
 }
 
+/** Shape thực tế trả về bởi selectCategoryTree (repository) — category của product KHÔNG có `name` ở cấp gốc, chỉ có ở `parent`. */
+export interface CategoryTreeNode {
+  id: string;
+  slug: string;
+  name?: string;
+  parent?: CategoryTreeNode | null;
+}
+
 export interface ColorImage {
   id: string;
   color: string;
@@ -144,7 +152,7 @@ export interface ProductCard {
   highlights: ProductCardHighlight[];
   inStock: boolean;
   isActive: boolean;
-  category: Category | null;
+  category: CategoryTreeNode | null;
 }
 // PRODUCT DETAIL
 
@@ -154,7 +162,7 @@ export interface ProductDetail {
   slug: string;
   description?: string;
   brand: Brand;
-  category: Category;
+  category: CategoryTreeNode;
   availableOptions: AvailableOption[];
   // highlights: Highlight[];
   // highlightGroups: HighlightSpecificationGroup[];
