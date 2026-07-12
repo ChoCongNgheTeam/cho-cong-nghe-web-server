@@ -337,7 +337,7 @@ const findAllSortedByPrice = async <T extends Prisma.productsSelect>(where: Pris
   if (pageIds.length === 0) return [];
 
   const products: Prisma.productsGetPayload<{ select: T }>[] = await prisma.products.findMany({ where: { id: { in: pageIds } }, select });
-  const productMap = new Map(products.map((p) => [p.id, p]));
+  const productMap = new Map(products.map((p) => [(p as unknown as { id: string }).id, p]));
   return pageIds.map((id) => productMap.get(id)).filter((p): p is NonNullable<typeof p> => p !== undefined);
 };
 
