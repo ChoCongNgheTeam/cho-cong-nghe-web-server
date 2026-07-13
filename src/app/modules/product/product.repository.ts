@@ -424,6 +424,7 @@ export const findAllPublic = async (query: ListProductsQuery) => findAll(query, 
  * Admin product list — hỗ trợ search, filter, includeDeleted, dateFrom/dateTo
  */
 export const findAllAdmin = async (query: Record<string, any>) => {
+
   const { page = 1, limit = 20, sortBy = "createdAt", sortOrder = "desc" } = query;
   const skip = (page - 1) * limit;
 
@@ -439,9 +440,7 @@ export const findAllAdmin = async (query: Record<string, any>) => {
   });
 
   const [data, total, countAll, countActive, countInactive, countFeatured, countOutOfStock] = await Promise.all([
-    sortBy === "price"
-      ? findAllSortedByPrice(where, sortOrder ?? "desc", skip, limit, selectProductCardAdmin)
-      : prisma.products.findMany({ where, select: selectProductCardAdmin, orderBy, skip, take: limit }),
+    sortBy === "price" ? findAllSortedByPrice(where, sortOrder ?? "desc", skip, limit, selectProductCardAdmin) : prisma.products.findMany({ where, select: selectProductCardAdmin, orderBy, skip, take: limit }),
     prisma.products.count({ where }),
     prisma.products.count({ where: baseWhere }),
     prisma.products.count({ where: { ...baseWhere, isActive: true } }),
@@ -1463,6 +1462,35 @@ export const findBestSellingProducts = async (limit: number = 12) => {
     take: limit,
     select: { ...selectProductCard, totalSoldCount: true },
   });
+};
+
+/**
+ * Best-selling products theo từng root category — dùng cho các tab loại sản phẩm ở trang chủ.
+ * 1 query resolve root categories theo slug, sau đó Promise.all mỗi category 1 query
+ * (đã tránh N+1 lồng bên trong nhờ getAllDescendantCategoryIds dùng CTE 1-query).
+ */
+export const findBestSellingProductsByCategories = async (categorySlugs: string[], limitPerCategory: number = 8) => {
+  const rootCategories = await prisma.categories.findMany({
+    where: { slug: { in: categorySlugs }, parentId: null, isActive: true },
+    select: { id: true, name: true, slug: true },
+  });
+
+  const results = await Promise.all(
+    rootCategories.map(async (category) => {
+      const categoryIds = await getAllDescendantCategoryIds(category.id);
+      const products = await prisma.products.findMany({
+        where: { categoryId: { in: categoryIds }, isActive: true, deletedAt: null, variants: { some: { isActive: true } } },
+        select: selectProductCard,
+        orderBy: [{ totalSoldCount: "desc" }, { ratingAverage: "desc" }],
+        take: limitPerCategory,
+      });
+      return { category, products };
+    }),
+  );
+
+  // Giữ đúng thứ tự categorySlugs truyền vào (không theo thứ tự DB trả về)
+  const bySlug = new Map(results.map((r) => [r.category.slug, r]));
+  return categorySlugs.map((slug) => bySlug.get(slug)).filter((r): r is NonNullable<typeof r> => r !== undefined);
 };
 
 export const findProductsByIds = async (ids: string[]) => {

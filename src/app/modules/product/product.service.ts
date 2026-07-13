@@ -701,6 +701,25 @@ export const getBestSellingProducts = async (limit = 12) => {
   });
 };
 
+/**
+ * Best-selling products theo từng root category (dùng cho tab loại sản phẩm ở trang chủ).
+ * Trả về [{ category, products: CardEntry[] }] — pricing enrichment xử lý ở pricing use-case.
+ */
+export const getBestSellingProductsByCategories = async (categorySlugs: string[], limitPerCategory = 8) => {
+  const results = await repo.findBestSellingProductsByCategories(categorySlugs, limitPerCategory);
+
+  return results.map(({ category, products }) => ({
+    category,
+    products: products.flatMap((product) => {
+      const variantsForCards = getVariantsForCards(product);
+      return variantsForCards.flatMap((variant) => {
+        const entry = buildCardEntry(product, variant);
+        return entry ? [entry] : [];
+      });
+    }),
+  }));
+};
+
 export const getRecentlyViewedProducts = async (productIds: string[]) => {
   const products = await repo.findProductsByIds(productIds);
   return products.flatMap((product) => {

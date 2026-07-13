@@ -4,15 +4,18 @@ import { getAllActiveMedia } from "../image-media/media.service";
 import { getFeaturedCategories } from "../category/category.service";
 import { getFeaturedProductsWithPricing } from "../pricing/use-cases/getFeaturedProductsWithPricing.service";
 import { getBestSellingProductsWithPricing } from "../pricing/use-cases/getBestSellingProductsWithPricing.service";
+import { getCategoryBestSellingProductsWithPricing } from "../pricing/use-cases/getCategoryBestSellingProductsWithPricing.service";
 import { getBlogsPublic } from "../blog/blog.service";
 import { getProductsOnSaleDate, getSaleScheduleV2 } from "../product/product.service";
 import { campaignService } from "../campaign/campaign.service";
 import { enrichProductsWithPricing } from "../pricing/pricing.helpers";
 
-import { GetProductsByDateOptions, HomeCampaign, HomeProductsResponse, HomeSaleScheduleOnlyResponse, HomeStaticResponse } from "./home.types";
+import { GetProductsByDateOptions, HomeCampaign, HomeProductsResponse, HomeCategoryProductsResponse, HomeSaleScheduleOnlyResponse, HomeStaticResponse } from "./home.types";
 import {
   HOME_BEST_SELLING_PRODUCT_LIMIT,
   HOME_BLOG_CONFIG,
+  HOME_CATEGORY_PRODUCT_LIMIT,
+  HOME_CATEGORY_PRODUCT_TABS,
   HOME_FEATURED_CATEGORY_LIMIT,
   HOME_FEATURED_PRODUCT_LIMIT,
   HOME_SALE_BY_DATE_DEFAULT_LIMIT,
@@ -148,6 +151,18 @@ export const getHomeSaleScheduleData = async (userId?: string): Promise<HomeSale
       promotions: todayResult.promotions,
     },
   };
+};
+
+/**
+ * GET /home/category-products
+ * Best-selling products theo từng tab category (điện thoại/laptop/điện máy/phụ kiện).
+ * FE cache với revalidate trung bình (300s) + tag "home-category-products".
+ * userId optional để personalize giá cho user đã login.
+ */
+export const getHomeCategoryProductsData = async (userId?: string): Promise<HomeCategoryProductsResponse> => {
+  const groups = await getCategoryBestSellingProductsWithPricing([...HOME_CATEGORY_PRODUCT_TABS], HOME_CATEGORY_PRODUCT_LIMIT, userId);
+
+  return { groups };
 };
 
 /**
