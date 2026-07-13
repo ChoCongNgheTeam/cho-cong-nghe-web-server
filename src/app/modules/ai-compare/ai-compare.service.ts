@@ -54,7 +54,7 @@ async function callOpenAI(payloads: ReturnType<typeof transformProductSpecs>[]):
   const userPrompt = buildCompareUserPrompt(aiPayloads);
 
   const response = await executeWithGroqRotation(client => client.chat.completions.create({
-    model: "llama-3.1-8b-instant",
+    model: "gemini-2.5-flash",
     temperature: 0.3,       // thấp để output nhất quán
     response_format: { type: "json_object" }, // force JSON mode — không bao giờ trả markdown
     messages: [

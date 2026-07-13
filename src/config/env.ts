@@ -14,7 +14,7 @@ export const env = {
   // GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
 
-  // 🔥 THÊM MỚI: URL base cho client và server (thay thế hardcode localhost)
   CLIENT_BASE_URL: process.env.CLIENT_BASE_URL || "http://localhost:4200",
   SERVER_BASE_URL: process.env.SERVER_BASE_URL || "http://localhost:5000",
+  HF_TOKEN: process.env.HF_TOKEN || "",
 };

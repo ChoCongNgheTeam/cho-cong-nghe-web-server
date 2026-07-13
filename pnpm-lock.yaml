@@ -92,6 +92,9 @@ importers:
       qs:
         specifier: ^6.15.0
         version: 6.15.3
+      sharp:
+        specifier: 0.32.6
+        version: 0.32.6
       slugify:
         specifier: ^1.6.6
         version: 1.6.9
