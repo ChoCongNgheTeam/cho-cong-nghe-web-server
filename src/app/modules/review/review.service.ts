@@ -7,7 +7,7 @@ import { moderateContent } from "@/integrations/moderation";
 import { sendReviewNewAdminNotification } from "@/app/modules/notification/notification.service";
 import { isSettingEnabled } from "../settings/settings.service";
 
-// ── Helper ─────────────────────────────────────────────────────────────────
+// HELPER
 
 const assertReviewExists = async (id: string, options: { includeDeleted?: boolean } = {}) => {
   const review = await repo.findReviewById(id, options);
@@ -53,7 +53,7 @@ const getProductIdFromReview = async (reviewId: string): Promise<string | null> 
   return review?.orderItem.productVariant.productId ?? null;
 };
 
-// ── User ───────────────────────────────────────────────────────────────────
+// USER
 
 export const createUserReview = async (userId: string, input: CreateReviewInput) => {
   const { orderItemId, rating, comment } = input;
@@ -150,7 +150,7 @@ export const createUserReview = async (userId: string, input: CreateReviewInput)
   return { review: await repo.findReviewById(review.id), autoApproved: true };
 };
 
-// ── Public ─────────────────────────────────────────────────────────────────
+// PUBLIC
 
 export const getReviewsByProduct = async (productId: string) => {
   const reviews = await repo.findReviewsByProductId(productId, true);
@@ -172,7 +172,7 @@ export const getReviewsByProduct = async (productId: string) => {
   };
 };
 
-// ── Admin ──────────────────────────────────────────────────────────────────
+// ADMIN
 
 export const getAllReviewsAdmin = async (query: ListReviewsQuery) => {
   return repo.findAllReviewsAdmin(query);
@@ -236,7 +236,7 @@ export const bulkSoftDeleteReviews = async (ids: string[], deletedById: string) 
 export const restoreReview = async (id: string) => {
   const review = await repo.findReviewById(id, { includeDeleted: true });
   if (!review) throw new NotFoundError("Đánh giá");
-  if (!(review as any).deletedAt) throw new BadRequestError("Đánh giá này chưa bị xóa");
+  if (!review.deletedAt) throw new BadRequestError("Đánh giá này chưa bị xóa");
   const restored = await repo.restore(id);
   const productId = await getProductIdFromReview(id);
   if (productId) await recalculateProductRating(productId);
@@ -258,7 +258,7 @@ export const bulkRestoreReviews = async (ids: string[]) => {
 export const hardDeleteReview = async (id: string) => {
   const review = await repo.findReviewById(id, { includeDeleted: true });
   if (!review) throw new NotFoundError("Đánh giá");
-  if (!(review as any).deletedAt) throw new ForbiddenError("Phải soft delete trước khi xóa vĩnh viễn");
+  if (!review.deletedAt) throw new ForbiddenError("Phải soft delete trước khi xóa vĩnh viễn");
   const productId = await getProductIdFromReview(id);
   await repo.hardDelete(id);
   if (productId) await recalculateProductRating(productId);

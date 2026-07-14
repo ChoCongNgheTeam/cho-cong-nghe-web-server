@@ -1,8 +1,9 @@
 import { Request, Response } from "express";
 import * as notificationService from "./notification.service";
 import { UnauthorizedError } from "@/errors";
+import { SaveFcmTokenInput, DeleteFcmTokenInput, SendCampaignInput } from "./notification.validation";
 
-// ── User ──────────────────────────────────────────────────────────────────────
+// User
 
 export const getMyNotificationsHandler = async (req: Request, res: Response) => {
   const userId = req.user?.id;
@@ -45,42 +46,36 @@ export const saveFcmTokenHandler = async (req: Request, res: Response) => {
   const userId = req.user?.id;
   if (!userId) throw new UnauthorizedError();
 
-  const { token, device } = req.body;
+  const { token, device } = req.body as unknown as SaveFcmTokenInput;
   await notificationService.saveFcmToken(userId, token, device);
   res.json({ message: "Lưu FCM token thành công" });
 };
 
 export const deleteFcmTokenHandler = async (req: Request, res: Response) => {
-  const { token } = req.body;
-  await notificationService.deleteFcmToken(token);
+  const userId = req.user?.id;
+  if (!userId) throw new UnauthorizedError();
+
+  const { token } = req.body as unknown as DeleteFcmTokenInput;
+  await notificationService.deleteFcmToken(token, userId);
   res.json({ message: "Xóa FCM token thành công" });
 };
 
-// ── Admin ─────────────────────────────────────────────────────────────────────
+// Admin
 
 export const sendCampaignHandler = async (req: Request, res: Response) => {
-  const { title, body, data, targetAll } = req.body;
+  const { title, body, data, targetAll, userIds } = req.body as unknown as SendCampaignInput;
 
-  let userIds: string[] = req.body.userIds ?? [];
+  const targetIds = await notificationService.resolveCampaignTargetIds(!!targetAll, userIds ?? []);
 
-  if (targetAll) {
-    const { default: prisma } = await import("@/config/db");
-    const users = await prisma.users.findMany({
-      where: { isActive: true, deletedAt: null, role: "CUSTOMER" },
-      select: { id: true },
-    });
-    userIds = users.map((u) => u.id);
-  }
-
-  if (userIds.length === 0) {
+  if (targetIds.length === 0) {
     return res.status(400).json({ message: "Không có user nào để gửi" });
   }
 
-  await notificationService.sendCampaignNotification(userIds, title, body, data);
+  await notificationService.sendCampaignNotification(targetIds, title, body, data);
 
   res.json({
-    message: `Đã gửi thông báo campaign đến ${userIds.length} người dùng`,
-    data: { sentTo: userIds.length },
+    message: `Đã gửi thông báo campaign đến ${targetIds.length} người dùng`,
+    data: { sentTo: targetIds.length },
   });
 };
 

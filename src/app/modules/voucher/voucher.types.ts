@@ -1,20 +1,11 @@
-// =====================
-// === ENUMS ===
-// =====================
+// ENUMS
 
 import { Decimal } from "@prisma/client/runtime/library";
-import { DiscountType } from "@prisma/client";
+import { DiscountType, TargetType } from "@prisma/client";
 
-export enum TargetType {
-  PRODUCT = "PRODUCT",
-  CATEGORY = "CATEGORY",
-  BRAND = "BRAND",
-  ALL = "ALL",
-}
+export { TargetType };
 
-// =====================
-// === BASIC TYPES ===
-// =====================
+// BASIC TYPES
 
 export interface VoucherTarget {
   id: string;
@@ -38,9 +29,7 @@ export interface VoucherUsage {
   usedAt: Date;
 }
 
-// =====================
-// === VOUCHER CARD (For Listing) ===
-// =====================
+// VOUCHER CARD (For Listing)
 
 export interface VoucherCard {
   id: string;
@@ -59,9 +48,7 @@ export interface VoucherCard {
   isAvailable: boolean;
 }
 
-// =====================
-// === VOUCHER DETAIL ===
-// =====================
+// VOUCHER DETAIL
 
 export interface VoucherDetail {
   id: string;
@@ -85,9 +72,7 @@ export interface VoucherDetail {
   targets: VoucherTarget[];
 }
 
-// =====================
-// === USER VOUCHER ===
-// =====================
+// USER VOUCHER
 
 export interface UserVoucher {
   id: string;
@@ -105,9 +90,7 @@ export interface UserVoucher {
   canUse: boolean;
 }
 
-// =====================
-// === VOUCHER VALIDATION RESULT ===
-// =====================
+// VOUCHER VALIDATION RESULT
 
 export interface VoucherValidationResult {
   isValid: boolean;
@@ -118,9 +101,7 @@ export interface VoucherValidationResult {
   eligibleTotal?: number;
 }
 
-// =====================
-// === RESPONSE TYPES ===
-// =====================
+// RESPONSE TYPES
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -133,18 +114,16 @@ export interface PaginatedResponse<T> {
 export interface VoucherListResponse extends PaginatedResponse<VoucherCard> {}
 export interface UserVoucherListResponse extends PaginatedResponse<UserVoucher> {}
 
-// =====================
-// === RAW DB TYPES ===
-// =====================
+// RAW DB TYPES
 
 export interface RawVoucher {
   id: string;
   code: string;
   description: string | null;
-  discountType: any;
-  discountValue: any;
-  maxDiscountValue: any;
-  minOrderValue: any;
+  discountType: DiscountType;
+  discountValue: Decimal;
+  maxDiscountValue: Decimal | null;
+  minOrderValue: Decimal;
   maxUses: number | null;
   maxUsesPerUser: number | null;
   usesCount: number;
@@ -154,8 +133,8 @@ export interface RawVoucher {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
-  targets?: any[];
-  voucherUsers?: any[];
+  targets?: { id: string; targetType: TargetType; targetId: string | null; targetName?: string }[];
+  voucherUsers?: { id: string }[];
 }
 
 export interface VoucherListItem {

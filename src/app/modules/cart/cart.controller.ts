@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
 import * as cartService from "./cart.service";
-import { addToCartSchema, updateCartItemSchema, changeVariantSchema } from "./cart.validation";
+import { AddToCartInput, UpdateCartItemInput, ChangeVariantInput } from "./cart.validation";
 import { UnauthorizedError } from "@/errors";
-// 👇 Import Orchestrator Use-case thay vì Service
+// Import Orchestrator Use-case thay vì Service
 import { getCartWithPricing } from "../pricing/use-cases/getCartWithPricing.service";
 
 export const validateItemHandler = async (req: Request, res: Response) => {
@@ -24,7 +24,7 @@ export const getCartHandler = async (req: Request, res: Response) => {
   const userId = req.user?.id;
   if (!userId) throw new UnauthorizedError("Vui lòng đăng nhập");
 
-  // 👇 Chuyển sang gọi thẳng Orchestrator
+  // Chuyển sang gọi thẳng Orchestrator
   const cart = await getCartWithPricing(userId);
   res.json({ data: cart, message: "Lấy giỏ hàng thành công" });
 };
@@ -46,7 +46,7 @@ export const addToCartHandler = async (req: Request, res: Response) => {
   const userId = req.user?.id;
   if (!userId) throw new UnauthorizedError("Vui lòng đăng nhập");
 
-  const input = addToCartSchema.parse(req.body);
+  const input = req.body as AddToCartInput;
   const data = await cartService.addToCart(userId, input);
   res.status(201).json({ data, message: "Đã thêm vào giỏ hàng" });
 };
@@ -56,7 +56,7 @@ export const updateCartItemHandler = async (req: Request, res: Response) => {
   const { cartItemId } = req.params;
   if (!userId) throw new UnauthorizedError("Vui lòng đăng nhập");
 
-  const input = updateCartItemSchema.parse(req.body);
+  const input = req.body as UpdateCartItemInput;
   const data = await cartService.updateCartItem(userId, cartItemId, input);
   res.json({ data, message: "Cập nhật thành công" });
 };
@@ -66,7 +66,7 @@ export const changeCartItemVariantHandler = async (req: Request, res: Response) 
   const { cartItemId } = req.params;
   if (!userId) throw new UnauthorizedError("Vui lòng đăng nhập");
 
-  const input = changeVariantSchema.parse(req.body);
+  const input = req.body as ChangeVariantInput;
   const data = await cartService.changeCartItemVariant(userId, cartItemId, input);
   res.json({
     success: true,

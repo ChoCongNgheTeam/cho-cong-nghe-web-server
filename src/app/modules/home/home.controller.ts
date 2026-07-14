@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 
-import { getHomeStaticData, getHomeProductsData, getHomeSaleScheduleData, getProductsByDateSection } from "./home.service";
+import { getHomeStaticData, getHomeProductsData, getHomeSaleScheduleData, getHomeCategoryProductsData, getProductsByDateSection } from "./home.service";
 import { GetSaleByDateQuery } from "./home.validation";
 
 /**
@@ -19,6 +19,15 @@ export const getHomeStaticHandler = async (_req: Request, res: Response): Promis
 export const getHomeProductsHandler = async (req: Request, res: Response): Promise<void> => {
   const data = await getHomeProductsData(req.user?.id);
   res.json({ data, message: "Lấy sản phẩm trang chủ thành công" });
+};
+
+/**
+ * GET /home/category-products
+ * Optional auth — userId để personalize giá.
+ */
+export const getHomeCategoryProductsHandler = async (req: Request, res: Response): Promise<void> => {
+  const data = await getHomeCategoryProductsData(req.user?.id);
+  res.json({ data, message: "Lấy sản phẩm theo category thành công" });
 };
 
 /**

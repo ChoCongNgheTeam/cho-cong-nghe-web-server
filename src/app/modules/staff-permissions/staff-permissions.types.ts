@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 
-// ── Select ─────────────────────────────────────────────────────────────────
+// SELECT
 
 export const staffPermissionsSelect = {
   userId: true,
@@ -36,11 +36,14 @@ export type StaffPermissionsData = Prisma.staff_permissionsGetPayload<{
 
 export type PermissionKey = keyof Omit<StaffPermissionsData, "userId" | "updatedAt">;
 
-// ── Default presets theo role ──────────────────────────────────────────────
+// DEFAULT PRESETS THEO ROLE
+
+export const STAFF_ROLES = ["SALES", "MARKETING", "SUPPORT", "ACCOUNTING"] as const;
+export type StaffRole = (typeof STAFF_ROLES)[number];
 
 type PermissionPreset = Omit<StaffPermissionsData, "userId" | "updatedAt">;
 
-export const DEFAULT_PERMISSIONS: Record<string, PermissionPreset> = {
+export const DEFAULT_PERMISSIONS: Record<StaffRole, PermissionPreset> = {
   SALES: {
     canViewOrders: true,
     canCreateOrder: true,
@@ -118,6 +121,3 @@ export const DEFAULT_PERMISSIONS: Record<string, PermissionPreset> = {
     canPaymentView: true,
   },
 };
-
-export const STAFF_ROLES = ["SALES", "MARKETING", "SUPPORT", "ACCOUNTING"] as const;
-export type StaffRole = (typeof STAFF_ROLES)[number];

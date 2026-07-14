@@ -53,11 +53,10 @@ import analyticsRouter from "@/app/modules/analytics/analytics.route";
 import settingsRouter from "@/app/modules/settings/settings.route";
 import auditRouter from "@/app/modules/audit/audit.route";
 import staffPermissionsRouter from "@/app/modules/staff-permissions/staff-permissions.route";
+import healthRouter from "@/app/modules/health/health.router";
 
 import { auditMiddleware } from "@/app/middlewares/audit.middleware";
 import { initSettingsCache } from "@/app/modules/settings/settings.service";
-
-import healthRouter from "@/app/modules/health/health.router";
 
 const router = Router();
 

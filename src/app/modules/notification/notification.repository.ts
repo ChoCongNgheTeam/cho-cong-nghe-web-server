@@ -1,13 +1,8 @@
 import prisma from "@/config/db";
 import { CreateNotificationInput, ADMIN_NOTIFICATION_TYPES } from "./notification.types";
+import { STAFF_ROLES } from "../staff-permissions/staff-permissions.types";
 
-export const create = async (input: CreateNotificationInput) => {
-  return prisma.notifications.create({ data: input });
-};
-
-export const createMany = async (inputs: CreateNotificationInput[]) => {
-  return prisma.notifications.createMany({ data: inputs });
-};
+// FINDS
 
 export const findByUserId = async (userId: string, page = 1, limit = 20) => {
   const skip = (page - 1) * limit;
@@ -49,6 +44,46 @@ export const findAdminNotifications = async (userId: string, page = 1, limit = 2
   ]);
 
   return { data, total, page, limit, totalPages: Math.ceil(total / limit), unreadCount };
+};
+
+export const getFcmTokensByUserId = async (userId: string) => {
+  return prisma.fcm_tokens.findMany({ where: { userId } });
+};
+
+/** Danh sách id customer đang active — dùng cho campaign targetAll */
+export const findActiveCustomerIds = async () => {
+  const users = await prisma.users.findMany({
+    where: { isActive: true, deletedAt: null, role: "CUSTOMER" },
+    select: { id: true },
+  });
+  return users.map((u) => u.id);
+};
+
+/**
+ * Danh sách id admin/staff đang active.
+ * @param extraWhere điều kiện lọc thêm (vd: notifReviewNew: true)
+ */
+export const findActiveAdminAndStaffIds = async (extraWhere: Record<string, any> = {}) => {
+  const users = await prisma.users.findMany({
+    where: {
+      role: { in: ["ADMIN", ...STAFF_ROLES] },
+      isActive: true,
+      deletedAt: null,
+      ...extraWhere,
+    },
+    select: { id: true },
+  });
+  return users.map((u) => u.id);
+};
+
+// MUTATIONS
+
+export const create = async (input: CreateNotificationInput) => {
+  return prisma.notifications.create({ data: input });
+};
+
+export const createMany = async (inputs: CreateNotificationInput[]) => {
+  return prisma.notifications.createMany({ data: inputs });
 };
 
 export const markAsRead = async (id: string, userId: string) => {
@@ -96,10 +131,9 @@ export const saveFcmToken = async (userId: string, token: string, device?: strin
   });
 };
 
-export const getFcmTokensByUserId = async (userId: string) => {
-  return prisma.fcm_tokens.findMany({ where: { userId } });
-};
+// CHECKS
 
-export const deleteFcmToken = async (token: string) => {
-  return prisma.fcm_tokens.deleteMany({ where: { token } });
+/** Xóa FCM token — chỉ xóa nếu token thuộc đúng userId truyền vào */
+export const deleteFcmToken = async (token: string, userId: string) => {
+  return prisma.fcm_tokens.deleteMany({ where: { token, userId } });
 };

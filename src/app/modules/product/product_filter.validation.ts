@@ -1,20 +1,16 @@
 import { z } from "zod";
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Query schema để lấy filter config của một category
 // GET /products/filters?category=dien-thoai
-// ─────────────────────────────────────────────────────────────────────────────
 export const categoryFiltersQuerySchema = z.object({
-  category: z.string().min(1, "Category slug không được để trống"),
+  category: z.string().trim().min(1, "Category slug không được để trống"),
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Query schema khi user apply filter (mở rộng từ listProductsSchema hiện tại)
 // GET /products?category=dien-thoai&brandId=xxx&attr_storage=256GB&spec_os=Android
 //
 // NOTE: Schema này dùng .passthrough() để cho phép dynamic keys như spec_xxx và attr_xxx
 // Validation ở tầng service sẽ xử lý các key động này
-// ─────────────────────────────────────────────────────────────────────────────
 export const listProductsWithFiltersSchema = z
   .object({
     // Pagination
@@ -22,10 +18,10 @@ export const listProductsWithFiltersSchema = z
     limit: z.coerce.number().positive().max(50).default(12),
 
     // Search
-    search: z.string().optional(),
+    search: z.string().trim().optional(),
 
     // Category
-    category: z.string().optional(),
+    category: z.string().trim().optional(),
     categoryId: z.string().uuid().optional(),
 
     // Built-in filters

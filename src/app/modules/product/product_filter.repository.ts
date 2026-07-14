@@ -1,8 +1,6 @@
 import prisma from "@/config/db";
 
-//
 // Helper: Lấy tất cả descendant category IDs từ một slug (dùng recursive CTE)
-//
 export const getDescendantCategoryIds = async (slug: string): Promise<{ ids: string[]; rootId: string; rootName: string; rootSlug: string } | null> => {
   const result = await prisma.$queryRaw<{ id: string; name: string; slug: string }[]>`
     WITH RECURSIVE subcategories AS (
@@ -204,7 +202,6 @@ export const getBatchActiveAttributeOptions = async (attributeCodes: string[], c
   return output;
 };
 
-//
 // Lấy distinct attribute option values thực sự có trong products của category
 // (tránh show option không có sản phẩm nào)
 export const getActiveAttributeOptionValues = async (attributeCode: string, categoryIds: string[]): Promise<{ value: string; label: string; optionId: string }[]> => {

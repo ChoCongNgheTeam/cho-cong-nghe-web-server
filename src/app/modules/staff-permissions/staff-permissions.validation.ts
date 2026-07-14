@@ -25,7 +25,15 @@ export const updatePermissionsSchema = z
     canAnalytics: z.boolean().optional(),
     canPaymentView: z.boolean().optional(),
   })
-  .strict();
+  .strict()
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "Cần ít nhất 1 permission để cập nhật",
+  });
+
+export const listStaffPermissionsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
 
 export const resetPermissionsSchema = z.object({
   role: z.enum(STAFF_ROLES, {
@@ -33,5 +41,7 @@ export const resetPermissionsSchema = z.object({
   }),
 });
 
+export type UserIdParams = z.infer<typeof userIdParamsSchema>;
 export type UpdatePermissionsInput = z.infer<typeof updatePermissionsSchema>;
 export type ResetPermissionsInput = z.infer<typeof resetPermissionsSchema>;
+export type ListStaffPermissionsQuery = z.infer<typeof listStaffPermissionsQuerySchema>;

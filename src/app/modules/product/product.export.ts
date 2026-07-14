@@ -10,8 +10,7 @@
 
 import ExcelJS from "exceljs";
 
-// ─── Row type ─────────────────────────────────────────────────────────────────
-
+// Row type
 export interface ExportProductRow {
   productId: string;
   productName: string;
@@ -28,16 +27,44 @@ export interface ExportProductRow {
   createdAt: string;
 }
 
-// ─── Map raw DB product → export rows (1 product → N variant rows) ────────────
+interface ExportableVariantAttribute {
+  attributeOption?: {
+    value?: string;
+    label?: string;
+    attribute?: { name?: string; code?: string };
+  };
+}
 
-export function mapProductsToExportRows(products: any[]): ExportProductRow[] {
+interface ExportableVariant {
+  id: string;
+  code: string | null;
+  price: unknown;
+  quantity: number | null;
+  soldCount: number | null;
+  isActive: boolean;
+  isDefault: boolean;
+  variantAttributes?: ExportableVariantAttribute[];
+}
+
+interface ExportableProduct {
+  id: string;
+  name: string;
+  isActive: boolean;
+  createdAt: Date | string;
+  brand?: { name: string } | null;
+  category?: { name: string } | null;
+  variants?: ExportableVariant[];
+}
+
+// Map raw DB product → export rows (1 product → N variant rows)
+export function mapProductsToExportRows(products: ExportableProduct[]): ExportProductRow[] {
   const rows: ExportProductRow[] = [];
 
   for (const p of products) {
     const brand = p.brand?.name ?? "—";
     const category = p.category?.name ?? "—";
 
-    const variants: any[] = p.variants ?? [];
+    const variants: ExportableVariant[] = p.variants ?? [];
     if (variants.length === 0) {
       // Product không có variant → 1 dòng trống
       rows.push({
@@ -60,7 +87,7 @@ export function mapProductsToExportRows(products: any[]): ExportProductRow[] {
 
     for (const v of variants) {
       const attrs = (v.variantAttributes ?? [])
-        .map((va: any) => {
+        .map((va: ExportableVariantAttribute) => {
           const attrName = va.attributeOption?.attribute?.name ?? va.attributeOption?.attribute?.code ?? "";
           const val = va.attributeOption?.label ?? va.attributeOption?.value ?? "";
           return attrName ? `${attrName}: ${val}` : val;
@@ -89,8 +116,7 @@ export function mapProductsToExportRows(products: any[]): ExportProductRow[] {
   return rows;
 }
 
-// ─── CSV ──────────────────────────────────────────────────────────────────────
-
+// CSV
 export function buildProductCsvBuffer(rows: ExportProductRow[]): Buffer {
   const HEADERS = ["Product ID", "Tên sản phẩm", "Variant ID", "SKU", "Thương hiệu", "Danh mục", "Thuộc tính", "Giá (đ)", "Tồn kho", "Đã bán", "Hoạt động", "Mặc định", "Ngày tạo"];
 
@@ -112,8 +138,7 @@ export function buildProductCsvBuffer(rows: ExportProductRow[]): Buffer {
   return Buffer.concat([Buffer.from("\uFEFF", "utf8"), Buffer.from(lines.join("\r\n"), "utf8")]);
 }
 
-// ─── Excel ────────────────────────────────────────────────────────────────────
-
+// Excel
 export async function buildProductExcelBuffer(rows: ExportProductRow[]): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Admin Panel";
@@ -123,7 +148,7 @@ export async function buildProductExcelBuffer(rows: ExportProductRow[]): Promise
     pageSetup: { paperSize: 9, orientation: "landscape" },
   });
 
-  // ── Tiêu đề chính ──────────────────────────────────────────────────────────
+  // Tiêu đề chính
   ws.mergeCells("A1:M1");
   const titleCell = ws.getCell("A1");
   titleCell.value = `BÁO CÁO SẢN PHẨM — Xuất lúc ${new Date().toLocaleString("vi-VN")}`;
@@ -132,7 +157,7 @@ export async function buildProductExcelBuffer(rows: ExportProductRow[]): Promise
   titleCell.alignment = { horizontal: "center", vertical: "middle" };
   ws.getRow(1).height = 28;
 
-  // ── Columns config ─────────────────────────────────────────────────────────
+  // Columns config
   type ColKey = keyof ExportProductRow;
   const COLUMNS: { header: string; key: ColKey; width: number; numFmt?: string }[] = [
     { header: "Product ID", key: "productId", width: 38 },
@@ -150,7 +175,7 @@ export async function buildProductExcelBuffer(rows: ExportProductRow[]): Promise
     { header: "Ngày tạo", key: "createdAt", width: 16 },
   ];
 
-  // ── Header row ─────────────────────────────────────────────────────────────
+  // Header row
   const headerRow = ws.getRow(2);
   COLUMNS.forEach((col, i) => {
     const cell = headerRow.getCell(i + 1);
@@ -163,7 +188,7 @@ export async function buildProductExcelBuffer(rows: ExportProductRow[]): Promise
   });
   headerRow.height = 22;
 
-  // ── Data rows ──────────────────────────────────────────────────────────────
+  // Data rows
   let prevProductId = "";
 
   rows.forEach((row, idx) => {
@@ -213,7 +238,7 @@ export async function buildProductExcelBuffer(rows: ExportProductRow[]): Promise
     r.height = 18;
   });
 
-  // ── Summary ────────────────────────────────────────────────────────────────
+  // Summary
   const totalStock = rows.reduce((s, r) => s + r.stock, 0);
   const totalSold = rows.reduce((s, r) => s + r.soldCount, 0);
   const outOfStock = rows.filter((r) => r.stock === 0).length;
@@ -224,7 +249,7 @@ export async function buildProductExcelBuffer(rows: ExportProductRow[]): Promise
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
   });
 
-  // ── Freeze + Filter ────────────────────────────────────────────────────────
+  // Freeze + Filter
   ws.views = [{ state: "frozen", xSplit: 0, ySplit: 2 }];
   ws.autoFilter = { from: "A2", to: "M2" };
 
@@ -232,8 +257,7 @@ export async function buildProductExcelBuffer(rows: ExportProductRow[]): Promise
   return Buffer.from(buf);
 }
 
-// ─── Import template (file mẫu để user điền rồi upload lại) ──────────────────
-
+// Import template (file mẫu để user điền rồi upload lại)
 export async function buildImportTemplateBuffer(): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Import Template");

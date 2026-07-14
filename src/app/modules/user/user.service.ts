@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import prisma from "@/config/db";
 import * as userRepository from "./user.repository";
+import type { PublicUser, AdminUser } from "./user.repository";
 import { NotFoundError, ForbiddenError, BadRequestError } from "@/errors";
 import { handlePrismaError } from "@/utils/handle-prisma-error";
 import { deleteOldAvatarImage } from "./user.helpers";
@@ -25,7 +26,7 @@ export const getMe = async (userId: string) => {
   if (!user) throw new NotFoundError("Người dùng");
 
   // Flatten staffPermissions ra ngoài, bỏ field nested
-  const { staffPermissions, ...rest } = user as any;
+  const { staffPermissions, ...rest } = user;
 
   return {
     ...rest,
@@ -35,21 +36,22 @@ export const getMe = async (userId: string) => {
 };
 
 export const updateMe = async (userId: string, input: UpdateProfileInput) => {
-  const user = (await assertUserExists(userId)) as any;
+  const user = (await assertUserExists(userId)) as PublicUser;
 
   // Xóa ảnh cũ khi upload ảnh mới
   if (input.avatarPath && user.avatarPath) {
     await deleteOldAvatarImage(user.avatarPath);
   }
 
-  // Xóa ảnh khi removeAvatar=true
-  if (input.removeAvatar && user.avatarPath) {
-    await deleteOldAvatarImage(user.avatarPath);
-    (input as any).avatarPath = null;
-    (input as any).avatarImage = null;
-  }
+  const { removeAvatar, ...rest } = input;
+  const data: Record<string, unknown> = { ...rest };
 
-  const { removeAvatar, ...data } = input as any;
+  // Xóa ảnh khi removeAvatar=true
+  if (removeAvatar && user.avatarPath) {
+    await deleteOldAvatarImage(user.avatarPath);
+    data.avatarPath = null;
+    data.avatarImage = null;
+  }
 
   return userRepository.update(userId, data).catch(handlePrismaError);
 };
@@ -87,18 +89,18 @@ export const getUserById = async (id: string, options: { includeDeleted?: boolea
 export const createUser = async (input: CreateUserInput) => {
   const { password, ...rest } = input;
   const passwordHash = await bcrypt.hash(password, 10);
-  const newUser = await userRepository.create({ ...rest, passwordHash }).catch(handlePrismaError);
+  const newUser = (await userRepository.create({ ...rest, passwordHash }).catch(handlePrismaError)) as PublicUser;
 
   // Tự động tạo permissions mặc định nếu là staff role
-  if (STAFF_ROLES.includes((newUser as any).role)) {
-    await seedDefaultPermissions((newUser as any).id, (newUser as any).role);
+  if ((STAFF_ROLES as readonly string[]).includes(newUser.role)) {
+    await seedDefaultPermissions(newUser.id, newUser.role);
   }
 
   return newUser;
 };
 
 export const updateUser = async (id: string, input: UpdateUserInput) => {
-  const user = (await assertUserExists(id)) as any;
+  const user = (await assertUserExists(id)) as PublicUser;
 
   const data: Record<string, unknown> = { ...input };
 
@@ -127,7 +129,7 @@ export const updateUser = async (id: string, input: UpdateUserInput) => {
   // Nếu admin đổi role → re-seed permissions theo role mới
   if (data.role && data.role !== user.role) {
     const newRole = data.role as string;
-    if (STAFF_ROLES.includes(newRole as any)) {
+    if ((STAFF_ROLES as readonly string[]).includes(newRole)) {
       // Đổi sang staff role → reset permissions về preset của role mới
       await seedDefaultPermissions(id, newRole);
     }
@@ -151,7 +153,7 @@ export const softDeleteUser = async (targetId: string, requesterId: string) => {
 // Admin: restore, hard delete, trash
 
 export const restoreUser = async (id: string) => {
-  const user = (await userRepository.findById(id, { includeDeleted: true, isAdmin: true })) as any;
+  const user = (await userRepository.findById(id, { includeDeleted: true, isAdmin: true })) as AdminUser | null;
   if (!user) throw new NotFoundError("Người dùng");
   if (!user.deletedAt) throw new BadRequestError("Người dùng này chưa bị xóa");
   return userRepository.restore(id).catch(handlePrismaError);
@@ -162,7 +164,7 @@ export const hardDeleteUser = async (id: string) => {
   if (orderCount > 0) {
     throw new BadRequestError(`Không thể xóa: người dùng có ${orderCount} đơn hàng trong lịch sử`);
   }
-  const user = (await userRepository.findById(id, { includeDeleted: true, isAdmin: true })) as any;
+  const user = (await userRepository.findById(id, { includeDeleted: true, isAdmin: true })) as AdminUser | null;
   if (!user) throw new NotFoundError("Người dùng");
 
   if (!user.deletedAt) {

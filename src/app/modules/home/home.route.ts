@@ -3,7 +3,7 @@ import { Router } from "express";
 import { validate } from "@/app/middlewares/validate.middleware";
 import { authMiddleware } from "@/app/middlewares/auth.middleware";
 import { asyncHandler } from "@/utils/async-handler";
-import { getHomeStaticHandler, getHomeProductsHandler, getHomeSaleScheduleHandler, getProductsByDateSectionHandler } from "./home.controller";
+import { getHomeStaticHandler, getHomeProductsHandler, getHomeSaleScheduleHandler, getHomeCategoryProductsHandler, getProductsByDateSectionHandler } from "./home.controller";
 import { getSaleByDateSchema } from "./home.validation";
 
 const router = Router();
@@ -21,6 +21,13 @@ router.get("/static", asyncHandler(getHomeStaticHandler));
  * Optional auth để personalize giá, FE cache 5 phút.
  */
 router.get("/products", authMiddleware(false), asyncHandler(getHomeProductsHandler));
+
+/**
+ * GET /home/category-products
+ * Best-selling products theo từng tab category (điện thoại/laptop/điện máy/phụ kiện).
+ * Optional auth để personalize giá, FE cache 5 phút.
+ */
+router.get("/category-products", authMiddleware(false), asyncHandler(getHomeCategoryProductsHandler));
 
 /**
  * GET /home/sale-schedule

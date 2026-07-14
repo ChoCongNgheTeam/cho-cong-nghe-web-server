@@ -1,15 +1,821 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
   extensions = [vector]
 }
 
-// --------------------- ENUMS ---------------------
+model users {
+  id                         String                  @id @default(uuid()) @db.Uuid
+  userName                   String?                 @unique
+  email                      String                  @unique
+  passwordHash               String?
+  fullName                   String?
+  phone                      String?
+  gender                     Gender?
+  dateOfBirth                DateTime?
+  role                       UserRole                @default(CUSTOMER)
+  isActive                   Boolean                 @default(true)
+  avatarImage                String?
+  createdAt                  DateTime                @default(now())
+  updatedAt                  DateTime                @updatedAt
+  deletedAt                  DateTime?
+  deletedBy                  String?                 @db.Uuid
+  avatarPath                 String?
+  notifEmail                 Boolean                 @default(true)
+  notifOrderStatus           Boolean                 @default(true)
+  notifPush                  Boolean                 @default(true)
+  notifReviewNew             Boolean                 @default(true)
+  notifUserInactive          Boolean                 @default(true)
+  notifWeeklyReport          Boolean                 @default(false)
+  isVerified                 Boolean                 @default(false)
+  verificationToken          String?                 @unique
+  verificationTokenExpiresAt DateTime?
+  blogs                      blogs[]
+  cartItems                  cart_items[]
+  comments                   comments[]
+  fcmTokens                  fcm_tokens[]
+  notifications              notifications[]
+  oauthAccounts              oauth_accounts[]
+  orders                     orders[]
+  passwordResetTokens        password_reset_tokens[]
+  refreshTokens              refresh_tokens[]
+  reviews                    reviews[]
+  staffPermissions           staff_permissions?
+  userAddresses              user_addresses[]
+  voucherUsages              voucher_usages[]
+  voucherUsers               voucher_user[]
+  wishlist                   wishlist[]
+
+  @@index([deletedAt])
+}
+
+model staff_permissions {
+  userId           String   @id @db.Uuid
+  canViewOrders    Boolean  @default(false)
+  canCreateOrder   Boolean  @default(false)
+  canUpdateOrder   Boolean  @default(false)
+  canViewProducts  Boolean  @default(false)
+  canUpdateStock   Boolean  @default(false)
+  canBlogs         Boolean  @default(false)
+  canMedia         Boolean  @default(false)
+  canCampaigns     Boolean  @default(false)
+  canVouchers      Boolean  @default(false)
+  canPromotions    Boolean  @default(false)
+  canAiContent     Boolean  @default(false)
+  canReviews       Boolean  @default(false)
+  canComments      Boolean  @default(false)
+  canNotifications Boolean  @default(false)
+  canViewUsers     Boolean  @default(false)
+  canAnalytics     Boolean  @default(false)
+  canPaymentView   Boolean  @default(false)
+  updatedAt        DateTime @updatedAt
+  user             users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model oauth_accounts {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @db.Uuid
+  provider          String
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+  createdAt         DateTime  @default(now())
+  user              users     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model password_reset_tokens {
+  id        String   @id @default(uuid()) @db.Uuid
+  token     String   @unique
+  userId    String   @db.Uuid
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model refresh_tokens {
+  id                String              @id @default(uuid()) @db.Uuid
+  userId            String              @db.Uuid
+  token             String              @unique
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  createdAt         DateTime            @default(now())
+  deviceId          String?
+  userAgent         String?
+  ip                String?
+  ttlType           RefreshTokenTTLType
+  absoluteExpiresAt DateTime
+  browser           String?
+  deviceName        String?
+  lastUsedAt        DateTime?
+  location          String?
+  user              users               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model user_addresses {
+  id            String       @id @default(uuid()) @db.Uuid
+  userId        String       @db.Uuid
+  contactName   String
+  phone         String
+  detailAddress String
+  type          AddressType?
+  isDefault     Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  deletedAt     DateTime?
+  deletedBy     String?      @db.Uuid
+  provinceCode  Int
+  provinceName  String
+  wardCode      Int
+  wardName      String
+  user          users        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, detailAddress, phone])
+  @@index([userId])
+  @@index([deletedAt])
+}
+
+model brands {
+  id          String     @id @default(uuid()) @db.Uuid
+  name        String     @unique
+  description String?
+  imagePath   String?
+  imageUrl    String?
+  slug        String     @unique
+  isFeatured  Boolean    @default(false)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt   DateTime?
+  deletedBy   String?    @db.Uuid
+  products    products[]
+
+  @@index([deletedAt])
+}
+
+model categories {
+  id                     String                        @id @default(uuid()) @db.Uuid
+  name                   String
+  parentId               String?                       @db.Uuid
+  description            String?
+  imagePath              String?
+  imageUrl               String?
+  slug                   String                        @unique
+  position               Int                           @default(0)
+  isFeatured             Boolean                       @default(false)
+  isActive               Boolean                       @default(true)
+  createdAt              DateTime                      @default(now())
+  updatedAt              DateTime                      @updatedAt
+  deletedAt              DateTime?
+  deletedBy              String?                       @db.Uuid
+  campaignCategories     campaign_categories[]
+  parent                 categories?                   @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children               categories[]                  @relation("CategoryHierarchy")
+  categorySpecifications category_specifications[]
+  variantAttributes      category_variant_attributes[]
+  products               products[]
+
+  @@unique([parentId, position])
+  @@unique([name, parentId])
+  @@index([deletedAt])
+}
+
+model campaigns {
+  id          String                @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String                @unique
+  type        CampaignType
+  description String?
+  startDate   DateTime?             @db.Timestamptz(6)
+  endDate     DateTime?             @db.Timestamptz(6)
+  isActive    Boolean               @default(true)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  deletedAt   DateTime?
+  deletedBy   String?               @db.Uuid
+  categories  campaign_categories[]
+
+  @@index([deletedAt])
+}
+
+model campaign_categories {
+  id          String     @id @default(uuid()) @db.Uuid
+  campaignId  String     @db.Uuid
+  categoryId  String     @db.Uuid
+  position    Int
+  imageUrl    String?
+  title       String?
+  description String?
+  imagePath   String
+  campaign    campaigns  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  category    categories @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, categoryId])
+  @@index([campaignId])
+  @@index([categoryId])
+}
+
+model products {
+  id                    String                   @id @default(uuid()) @db.Uuid
+  brandId               String                   @db.Uuid
+  categoryId            String                   @db.Uuid
+  name                  String
+  description           String?
+  slug                  String                   @unique
+  viewsCount            BigInt                   @default(0)
+  ratingAverage         Decimal                  @default(0.00) @db.Decimal(3, 2)
+  ratingCount           Int                      @default(0)
+  isActive              Boolean                  @default(true)
+  isFeatured            Boolean                  @default(false)
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  totalSoldCount        Int                      @default(0)
+  deletedAt             DateTime?
+  deletedBy             String?                  @db.Uuid
+  variantDisplay        VariantDisplayType       @default(SELECTOR)
+  img                   product_color_images[]
+  productSpecifications product_specifications[]
+  brand                 brands                   @relation(fields: [brandId], references: [id])
+  category              categories               @relation(fields: [categoryId], references: [id])
+  variants              products_variants[]
+  vectorData            products_vector?
+  wishlist              wishlist[]
+
+  @@index([isActive, totalSoldCount])
+  @@index([deletedAt])
+}
+
+model attributes {
+  id         String                        @id @default(uuid())
+  code       String                        @unique
+  name       String
+  createdAt  DateTime                      @default(now())
+  isActive   Boolean                       @default(true)
+  options    attributes_options[]
+  categories category_variant_attributes[]
+}
+
+model attributes_options {
+  id                String                @id @default(uuid()) @db.Uuid
+  attributeId       String
+  value             String
+  label             String
+  isActive          Boolean               @default(true)
+  attribute         attributes            @relation(fields: [attributeId], references: [id])
+  variantAttributes variants_attributes[]
+
+  @@unique([attributeId, value])
+}
+
+model category_variant_attributes {
+  categoryId  String     @db.Uuid
+  attributeId String
+  attribute   attributes @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  category    categories @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([categoryId, attributeId])
+}
+
+model products_variants {
+  id                String                @id @default(uuid()) @db.Uuid
+  productId         String                @db.Uuid
+  code              String?               @unique
+  price             Decimal               @db.Decimal(12, 2)
+  quantity          Int                   @default(10)
+  soldCount         Int                   @default(0)
+  isDefault         Boolean               @default(false)
+  isActive          Boolean               @default(true)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  deletedAt         DateTime?
+  deletedBy         String?               @db.Uuid
+  cartItems         cart_items[]
+  orderItems        order_items[]
+  product           products              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantAttributes variants_attributes[]
+
+  @@index([deletedAt])
+}
+
+model product_color_images {
+  id        String   @id @default(uuid()) @db.Uuid
+  productId String   @db.Uuid
+  color     String
+  imagePath String
+  imageUrl  String?
+  altText   String?
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   products @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, color, imagePath])
+  @@index([productId, color])
+}
+
+model variants_attributes {
+  id                String             @id @default(uuid()) @db.Uuid
+  productVariantId  String             @db.Uuid
+  attributeOptionId String             @db.Uuid
+  createdAt         DateTime           @default(now())
+  attributeOption   attributes_options @relation(fields: [attributeOptionId], references: [id])
+  productVariant    products_variants  @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+
+  @@unique([productVariantId, attributeOptionId])
+}
+
+model category_specifications {
+  categoryId      String         @db.Uuid
+  specificationId String         @db.Uuid
+  groupName       String
+  isRequired      Boolean        @default(false)
+  sortOrder       Int            @default(0)
+  category        categories     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  specification   specifications @relation(fields: [specificationId], references: [id], onDelete: Cascade)
+
+  @@id([categoryId, specificationId])
+}
+
+model specifications {
+  id                    String                    @id @default(uuid()) @db.Uuid
+  key                   String                    @unique
+  name                  String
+  group                 String                    @default("Thông số khác")
+  unit                  String?
+  icon                  String?
+  createdAt             DateTime                  @default(now())
+  isFilterable          Boolean                   @default(false)
+  isRequired            Boolean                   @default(false)
+  sortOrder             Int                       @default(0)
+  filterType            FilterType?
+  isActive              Boolean                   @default(true)
+  allowedInCategories   category_specifications[]
+  productSpecifications product_specifications[]
+}
+
+model product_specifications {
+  productId       String         @db.Uuid
+  specificationId String         @db.Uuid
+  value           String
+  sortOrder       Int            @default(0)
+  isHighlight     Boolean
+  product         products       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  specification   specifications @relation(fields: [specificationId], references: [id])
+
+  @@id([productId, specificationId])
+}
+
+model wishlist {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+  productId String   @db.Uuid
+  product   products @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+}
+
+model cart_items {
+  id               String            @id @default(uuid()) @db.Uuid
+  userId           String            @db.Uuid
+  productVariantId String            @db.Uuid
+  quantity         Int               @default(1)
+  unitPrice        Decimal           @db.Decimal(10, 2)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  productVariant   products_variants @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+  user             users             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model orders {
+  id                     String                 @id @default(uuid()) @db.Uuid
+  userId                 String                 @db.Uuid
+  paymentMethodId        String                 @db.Uuid
+  voucherId              String?                @db.Uuid
+  shippingAddressId      String?                @db.Uuid
+  subtotalAmount         Decimal                @db.Decimal(10, 2)
+  shippingFee            Decimal                @default(0.00) @db.Decimal(10, 2)
+  voucherDiscount        Decimal                @default(0.00) @db.Decimal(10, 2)
+  totalAmount            Decimal                @db.Decimal(10, 2)
+  orderStatus            OrderStatus            @default(PENDING)
+  paymentStatus          PaymentStatus          @default(UNPAID)
+  orderDate              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  orderCode              String                 @unique
+  bankTransferCode       String?                @unique
+  momoOrderId            String?                @unique
+  vnpayTxnRef            String?                @unique
+  zaloPayTransId         String?                @unique
+  stripePaymentIntentId  String?
+  shippingContactName    String
+  shippingDetail         String
+  shippingPhone          String
+  shippingProvince       String
+  shippingWard           String
+  bankTransferContent    String?
+  bankTransferExpiredAt  DateTime?
+  bankTransferQrUrl      String?
+  paymentExpiredAt       DateTime?
+  paymentRedirectUrl     String?
+  isChatbotRequest       Boolean                @default(false)
+  requestAcknowledgedAt  DateTime?
+  requestRejectionReason String?
+  refundNote             String?
+  refundedAt             DateTime?
+  refundedBy             String?                @db.Uuid
+  orderItems             order_items[]
+  paymentMethod          payment_methods        @relation(fields: [paymentMethodId], references: [id])
+  user                   users                  @relation(fields: [userId], references: [id])
+  voucher                vouchers?              @relation(fields: [voucherId], references: [id])
+  transactions           payment_transactions[]
+  voucherUsages          voucher_usages[]
+
+  @@index([userId])
+  @@index([orderStatus])
+  @@index([orderDate])
+}
+
+model order_items {
+  id               String            @id @default(uuid()) @db.Uuid
+  orderId          String            @db.Uuid
+  productVariantId String            @db.Uuid
+  quantity         Int
+  unitPrice        Decimal           @db.Decimal(10, 2)
+  createdAt        DateTime          @default(now())
+  order            orders            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productVariant   products_variants @relation(fields: [productVariantId], references: [id])
+  review           reviews?
+}
+
+model reviews {
+  id          String       @id @default(uuid()) @db.Uuid
+  userId      String       @db.Uuid
+  orderItemId String       @unique @db.Uuid
+  rating      Int
+  comment     String?
+  isApproved  ReviewStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+  deletedBy   String?      @db.Uuid
+  orderItem   order_items  @relation(fields: [orderItemId], references: [id])
+  user        users        @relation(fields: [userId], references: [id])
+
+  @@index([deletedAt])
+}
+
+model payment_methods {
+  id                   String                 @id @default(uuid()) @db.Uuid
+  name                 String                 @unique
+  description          String?
+  isActive             Boolean                @default(true)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  code                 String                 @unique
+  orders               orders[]
+  payment_transactions payment_transactions[]
+}
+
+model payment_transactions {
+  id              String                   @id @default(uuid()) @db.Uuid
+  orderId         String                   @db.Uuid
+  paymentMethodId String                   @db.Uuid
+  amount          Decimal                  @db.Decimal(10, 2)
+  transactionRef  String?
+  status          PaymentTransactionStatus
+  payload         Json?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  order           orders                   @relation(fields: [orderId], references: [id])
+  paymentMethod   payment_methods          @relation(fields: [paymentMethodId], references: [id])
+}
+
+model vouchers {
+  id               String            @id @default(uuid()) @db.Uuid
+  code             String            @unique
+  description      String?
+  discountType     DiscountType
+  discountValue    Decimal           @db.Decimal(10, 2)
+  minOrderValue    Decimal           @default(0.00) @db.Decimal(10, 2)
+  maxDiscountValue Decimal?          @db.Decimal(10, 2)
+  maxUses          Int?
+  maxUsesPerUser   Int?
+  usesCount        Int               @default(0)
+  startDate        DateTime?         @db.Timestamptz(6)
+  endDate          DateTime?         @db.Timestamptz(6)
+  priority         Int               @default(0)
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime?
+  deletedBy        String?           @db.Uuid
+  orders           orders[]
+  targets          voucher_targets[]
+  voucherUsages    voucher_usages[]
+  voucherUsers     voucher_user[]
+
+  @@index([deletedAt])
+}
+
+model voucher_targets {
+  id         String     @id @default(uuid()) @db.Uuid
+  voucherId  String     @db.Uuid
+  targetType TargetType
+  targetId   String?
+  createdAt  DateTime   @default(now())
+  voucher    vouchers   @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+}
+
+model products_vector {
+  productId String                 @id @db.Uuid
+  content   String
+  embedding Unsupported("vector")?
+  updatedAt DateTime               @updatedAt
+  product   products               @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model voucher_user {
+  id        String   @id @default(uuid()) @db.Uuid
+  voucherId String   @db.Uuid
+  userId    String   @db.Uuid
+  maxUses   Int      @default(1)
+  usedCount Int      @default(0)
+  createdAt DateTime @default(now())
+  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  voucher   vouchers @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  @@unique([voucherId, userId])
+}
+
+model voucher_usages {
+  id        String   @id @default(uuid()) @db.Uuid
+  voucherId String   @db.Uuid
+  userId    String   @db.Uuid
+  orderId   String   @db.Uuid
+  usedAt    DateTime @default(now())
+  order     orders   @relation(fields: [orderId], references: [id])
+  user      users    @relation(fields: [userId], references: [id])
+  voucher   vouchers @relation(fields: [voucherId], references: [id])
+}
+
+model promotions {
+  id               String              @id @default(uuid()) @db.Uuid
+  name             String              @unique
+  description      String?
+  priority         Int                 @default(0)
+  isActive         Boolean             @default(true)
+  startDate        DateTime?           @db.Timestamptz(6)
+  endDate          DateTime?           @db.Timestamptz(6)
+  minOrderValue    Decimal?            @db.Decimal(12, 2)
+  maxDiscountValue Decimal?            @db.Decimal(12, 2)
+  usageLimit       Int?
+  usedCount        Int                 @default(0)
+  createdAt        DateTime            @default(now())
+  deletedAt        DateTime?
+  deletedBy        String?             @db.Uuid
+  applyType        ApplyType           @default(EXCLUSIVE)
+  stackingGroup    StackingGroup       @default(PERCENT)
+  stopProcessing   Boolean             @default(false)
+  rules            promotion_rules[]
+  targets          promotion_targets[]
+
+  @@index([deletedAt])
+}
+
+model promotion_rules {
+  id                   String              @id @default(uuid()) @db.Uuid
+  promotionId          String              @db.Uuid
+  actionType           PromotionActionType
+  discountValue        Decimal?            @db.Decimal(10, 2)
+  buyQuantity          Int?
+  getQuantity          Int?
+  giftProductVariantId String?             @db.Uuid
+  createdAt            DateTime            @default(now())
+  promotion            promotions          @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+}
+
+model promotion_targets {
+  id          String     @id @default(uuid()) @db.Uuid
+  promotionId String     @db.Uuid
+  targetType  TargetType
+  targetId    String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  targetCode  String?
+  targetValue String?
+  promotion   promotions @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+}
+
+model blogs {
+  id          String     @id @default(uuid()) @db.Uuid
+  authorId    String     @db.Uuid
+  title       String
+  slug        String     @unique
+  content     String
+  imagePath   String?
+  imageUrl    String?
+  viewCount   Int        @default(0)
+  status      BlogStatus @default(DRAFT)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  publishedAt DateTime?
+  deletedAt   DateTime?
+  deletedBy   String?    @db.Uuid
+  type        BlogType   @default(TIN_MOI)
+  author      users      @relation(fields: [authorId], references: [id])
+  comments    comments[] @relation("blogsTocomments")
+
+  @@index([deletedAt])
+}
+
+model comments {
+  id         String            @id @default(uuid()) @db.Uuid
+  userId     String?           @db.Uuid
+  content    String
+  targetType CommentTargetType
+  targetId   String
+  parentId   String?           @db.Uuid
+  isApproved Boolean           @default(false)
+  createdAt  DateTime          @default(now())
+  deletedAt  DateTime?
+  deletedBy  String?           @db.Uuid
+  parent     comments?         @relation("CommentParent", fields: [parentId], references: [id])
+  replies    comments[]        @relation("CommentParent")
+  user       users?            @relation(fields: [userId], references: [id])
+  blogs      blogs[]           @relation("blogsTocomments")
+
+  @@index([targetType, targetId])
+  @@index([deletedAt])
+}
+
+model pages {
+  id          String      @id @default(uuid()) @db.Uuid
+  type        PageType
+  policyType  PolicyType?
+  title       String
+  slug        String      @unique
+  content     String
+  isPublished Boolean     @default(true)
+  priority    Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
+  deletedBy   String?     @db.Uuid
+
+  @@index([deletedAt])
+}
+
+model image_media {
+  id        String        @id @default(uuid()) @db.Uuid
+  type      MediaType
+  position  MediaPosition
+  title     String?
+  imagePath String?
+  imageUrl  String?
+  linkUrl   String?
+  order     Int           @default(0)
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  deletedAt DateTime?
+  deletedBy String?       @db.Uuid
+  subTitle  String?
+
+  @@index([type, position])
+  @@index([isActive])
+  @@index([deletedAt])
+}
+
+model notifications {
+  id        String              @id @default(uuid()) @db.Uuid
+  userId    String              @db.Uuid
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  isRead    Boolean             @default(false)
+  readAt    DateTime?
+  channel   NotificationChannel
+  status    NotificationStatus  @default(PENDING)
+  sentAt    DateTime?
+  createdAt DateTime            @default(now())
+  user      users               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+model fcm_tokens {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  token     String   @unique
+  device    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ai_contents {
+  id            String        @id @default(uuid()) @db.Uuid
+  type          AiContentType
+  referenceId   String?       @db.Uuid
+  focusKeyword  String
+  inputData     Json
+  outputContent String
+  seoScore      Int
+  seoDetails    Json
+  createdBy     String        @db.Uuid
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([type, referenceId])
+  @@index([createdBy])
+  @@index([createdAt])
+}
+
+model chat_sessions {
+  id         String   @id @default(uuid()) @db.Uuid
+  sessionKey String   @unique
+  messages   Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  expiresAt  DateTime
+
+  @@index([sessionKey])
+  @@index([expiresAt])
+}
+
+model system_settings {
+  id        String          @id @default(uuid()) @db.Uuid
+  group     String
+  key       String
+  value     String
+  dataType  SettingDataType @default(STRING)
+  updatedBy String?         @db.Uuid
+  updatedAt DateTime        @updatedAt
+
+  @@unique([group, key])
+  @@index([group])
+}
+
+model audit_logs {
+  id          String        @id @default(uuid()) @db.Uuid
+  userId      String?       @db.Uuid
+  userName    String?
+  userRole    String?
+  action      AuditAction
+  module      String
+  targetId    String?
+  targetType  String?
+  description String
+  diff        Json?
+  ip          String?
+  userAgent   String?
+  location    String?
+  severity    AuditSeverity @default(INFO)
+  isSuccess   Boolean       @default(true)
+  errorMsg    String?
+  createdAt   DateTime      @default(now())
+
+  @@index([userId])
+  @@index([module])
+  @@index([severity])
+  @@index([createdAt])
+  @@index([ip, createdAt])
+}
+
+model login_history {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @db.Uuid
+  email      String?
+  isSuccess  Boolean
+  ip         String?
+  userAgent  String?
+  location   String?
+  failReason String?
+  createdAt  DateTime @default(now())
+  browser    String?
+
+  @@index([userId])
+  @@index([ip, createdAt])
+  @@index([createdAt])
+}
+
 enum CampaignType {
   RANKING
   CAMPAIGN
@@ -27,11 +833,12 @@ enum Gender {
 enum UserRole {
   CUSTOMER
   ADMIN
-  SALES       // Nhân viên bán hàng tại quầy
-  MARKETING   // Marketing / content
-  SUPPORT     // CSKH / xử lý khiếu nại
-  ACCOUNTING  // Kế toán / báo cáo
+  SALES
+  MARKETING
+  SUPPORT
+  ACCOUNTING
 }
+
 enum AddressType {
   HOME
   OFFICE
@@ -39,7 +846,7 @@ enum AddressType {
 }
 
 enum OrderStatus {
-  PENDING            // Đơn thật đã được staff confirm / Chờ xử lý
+  PENDING
   PROCESSING
   SHIPPED
   DELIVERED
@@ -49,17 +856,17 @@ enum OrderStatus {
 enum PaymentStatus {
   UNPAID
   PAID
-  REFUND_PENDING
   REFUNDED
+  REFUND_PENDING
 }
 
 enum PaymentTransactionStatus {
   PENDING
   COMPLETED
-  UNDERPAID
-  OVERPAID
   FAILED
   REFUNDED
+  UNDERPAID
+  OVERPAID
 }
 
 enum DiscountType {
@@ -88,7 +895,6 @@ enum ApplyType {
   STACKABLE
   EXCLUSIVE
 }
-
 
 enum PromotionActionType {
   DISCOUNT_PERCENT
@@ -122,17 +928,17 @@ enum PageType {
 }
 
 enum PolicyType {
-  DATA_PRIVACY          // Cho DataPrivacy
-  DELIVERY              // Cho Delivery
-  DELIVERY_INSTALLATION // Cho DeliveryInstallation
-  INSTALLMENT           // Cho Installment
-  LOYALTY               // Cho Loyalty
-  MOBILE_NETWORK        // Cho MobileNetwork
-  PRIVACY               // Cho Privacy
-  RETURN                // Cho Return
-  TECHNICAL_SUPPORT     // Cho Technical-support
-  UNBOXING              // Cho unboxing
-  WARRANTY              // Cho warranty-policy
+  DATA_PRIVACY
+  DELIVERY
+  DELIVERY_INSTALLATION
+  INSTALLMENT
+  LOYALTY
+  MOBILE_NETWORK
+  PRIVACY
+  RETURN
+  TECHNICAL_SUPPORT
+  UNBOXING
+  WARRANTY
 }
 
 enum FilterType {
@@ -154,820 +960,9 @@ enum BlogType {
   NOI_BAT
 }
 
-
-// SOFT DELETE: users là entity chính, staff/admin cần trash
-// deletedBy tham chiếu chính nó (self-ref) — dùng String thay vì Uuid relation để tránh circular
-model users {
-  id           String    @id @default(uuid()) @db.Uuid
-  userName     String?   @unique
-  email        String    @unique
-  passwordHash String?
-  fullName     String?
-  phone        String?
-  gender       Gender?
-  dateOfBirth  DateTime?
-  role         UserRole  @default(CUSTOMER)
-  isActive     Boolean   @default(true)
-  notifications notifications[]
-  fcmTokens     fcm_tokens[]
-  avatarPath   String?
-  avatarImage  String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  notifEmail        Boolean @default(true)
-  notifPush         Boolean @default(true)
-  notifWeeklyReport Boolean @default(false)
-  notifOrderStatus  Boolean @default(true)
-  notifUserInactive Boolean @default(true)
-  notifReviewNew    Boolean @default(true)
-
-  isVerified                  Boolean   @default(false)
-  verificationToken           String?   @unique
-  verificationTokenExpiresAt  DateTime?
-    
-
-  // --- Soft Delete ---
-  deletedAt    DateTime?
-  deletedBy    String?   @db.Uuid  // ID của admin/staff thực hiện xóa
-
-  orders        orders[]
-  userAddresses user_addresses[]
-  cartItems     cart_items[]
-  wishlist      wishlist[]
-  reviews       reviews[]
-  voucherUsers  voucher_user[]
-  voucherUsages voucher_usages[]
-  blogs         blogs[]
-  comments      comments[]
-
-  passwordResetTokens password_reset_tokens[]
-  refreshTokens       refresh_tokens[]
-  oauthAccounts       oauth_accounts[]
-
-  staffPermissions staff_permissions?
-  @@index([deletedAt]) // để query isDeleted nhanh hơn
-}
-
-model staff_permissions {
-  userId String @id @db.Uuid
-
-  // Đơn hàng
-  canViewOrders    Boolean @default(false)
-  canCreateOrder   Boolean @default(false)
-  canUpdateOrder   Boolean @default(false)
-
-  // Sản phẩm / kho
-  canViewProducts  Boolean @default(false)
-  canUpdateStock   Boolean @default(false)
-
-  // Marketing
-  canBlogs         Boolean @default(false)
-  canMedia         Boolean @default(false)
-  canCampaigns     Boolean @default(false)
-  canVouchers      Boolean @default(false)
-  canPromotions    Boolean @default(false)
-  canAiContent     Boolean @default(false)
-
-  // CSKH
-  canReviews       Boolean @default(false)
-  canComments      Boolean @default(false)
-  canNotifications Boolean @default(false)
-  canViewUsers     Boolean @default(false)
-
-  // Báo cáo
-  canAnalytics     Boolean @default(false)
-  canPaymentView   Boolean @default(false)
-
-  updatedAt DateTime @updatedAt
-
-  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-// CASCADE: oauth_accounts gắn chặt với user, xóa user thì xóa luôn
-model oauth_accounts {
-  id                String    @id @default(uuid()) @db.Uuid
-  userId            String    @db.Uuid
-  provider          String    // "google" | "facebook" | "apple"
-  providerAccountId String
-  accessToken       String?
-  refreshToken      String?
-  expiresAt         DateTime?
-  createdAt         DateTime  @default(now())
-
-  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-}
-
-// CASCADE: token gắn chặt với user
-model password_reset_tokens {
-  id        String   @id @default(uuid()) @db.Uuid
-  token     String   @unique
-  userId    String   @db.Uuid
-  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-}
-
 enum RefreshTokenTTLType {
   short
   long
-}
-
-// CASCADE: refresh token gắn chặt với user
-model refresh_tokens {
-  id                String              @id @default(uuid()) @db.Uuid
-  userId            String              @db.Uuid
-  token             String              @unique
-  expiresAt         DateTime
-  absoluteExpiresAt DateTime
-  ttlType           RefreshTokenTTLType
-  revokedAt         DateTime?
-  createdAt         DateTime            @default(now())
-
-  deviceId  String?
-  userAgent String?
-  ip        String?
-
-  deviceName  String?
-  browser     String?
-  location    String?
-  lastUsedAt  DateTime?
-
-  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-model user_addresses {
-  id            String      @id @default(uuid()) @db.Uuid
-  userId        String      @db.Uuid
-  contactName   String
-  phone         String
-  
-  // Thay provinceId/wardId bằng code từ external API
-  provinceCode  Int         // VD: 79 (TP.HCM)
-  provinceName  String      // Snapshot tên, tránh phụ thuộc external API lúc đọc
-  wardCode      Int         // VD: 26560
-  wardName      String      // Snapshot tên
-  
-  detailAddress String
-  type          AddressType?
-  isDefault     Boolean     @default(false)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-
-  deletedAt     DateTime?
-  deletedBy     String?     @db.Uuid
-
-  user          users       @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, detailAddress, phone])
-  @@index([userId])
-  @@index([deletedAt])
-}
-
-// SOFT DELETE: brands là entity chính của catalog
-model brands {
-  id          String    @id @default(uuid()) @db.Uuid
-  name        String    @unique
-  description String?
-  imagePath   String?
-  imageUrl    String?
-  slug        String    @unique
-  isFeatured  Boolean   @default(false)
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  // --- Soft Delete ---
-  deletedAt   DateTime?
-  deletedBy   String?   @db.Uuid
-
-  products products[]
-
-  @@index([deletedAt])
-}
-
-// SOFT DELETE: categories là entity chính của catalog
-model categories {
-  id          String    @id @default(uuid()) @db.Uuid
-  name        String
-  parentId    String?   @db.Uuid
-  description String?
-  imagePath   String?
-  imageUrl    String?
-  slug        String    @unique
-  position    Int       @default(0)
-  isFeatured  Boolean   @default(false)
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  // --- Soft Delete ---
-  deletedAt   DateTime?
-  deletedBy   String?   @db.Uuid
-
-  parent                 categories?               @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children               categories[]              @relation("CategoryHierarchy")
-  products               products[]
-  categorySpecifications category_specifications[]
-  variantAttributes      category_variant_attributes[]
-  campaignCategories     campaign_categories[]
-
-  @@unique([parentId, position])
-  @@unique([name, parentId])
-  @@index([deletedAt])
-}
-
-// SOFT DELETE: campaigns là entity marketing, cần archive/restore
-model campaigns {
-  id          String       @id @default(uuid()) @db.Uuid
-  name        String
-  slug        String       @unique
-  type        CampaignType
-  description String?
-  startDate  DateTime? @db.Timestamptz
-  endDate    DateTime? @db.Timestamptz
-  isActive    Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  // --- Soft Delete ---
-  deletedAt   DateTime?
-  deletedBy   String?      @db.Uuid
-
-  categories campaign_categories[]
-
-  @@index([deletedAt])
-}
-
-// CASCADE: campaign_categories là bảng join, xóa campaign → xóa luôn
-model campaign_categories {
-  id          String  @id @default(uuid()) @db.Uuid
-  campaignId  String  @db.Uuid
-  categoryId  String  @db.Uuid
-  position    Int
-  imagePath   String
-  imageUrl    String?
-  title       String?
-  description String?
-
-  campaign campaigns  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  category categories @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-
-  @@unique([campaignId, categoryId])
-  @@index([campaignId])
-  @@index([categoryId])
-}
-
-// SOFT DELETE: products là entity chính của catalog
-model products {
-  id             String    @id @default(uuid()) @db.Uuid
-  brandId        String    @db.Uuid
-  categoryId     String    @db.Uuid
-  name           String
-  description    String?
-  slug           String    @unique
-  viewsCount     BigInt    @default(0)
-  totalSoldCount Int       @default(0)
-  ratingAverage  Decimal   @default("0.00") @db.Decimal(3, 2)
-  ratingCount    Int       @default(0)
-  isActive       Boolean   @default(true)
-  isFeatured     Boolean   @default(false)
-  variantDisplay VariantDisplayType @default(SELECTOR)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  // --- Soft Delete ---
-  deletedAt      DateTime?
-  deletedBy      String?   @db.Uuid
-
-  brand                 brands                   @relation(fields: [brandId], references: [id])
-  category              categories               @relation(fields: [categoryId], references: [id])
-  img                   product_color_images[]
-  variants              products_variants[]
-  productSpecifications product_specifications[]
-  wishlist              wishlist[]
-  vectorData            products_vector?
-
-  @@index([isActive, totalSoldCount])
-  @@index([deletedAt])
-}
-
-model attributes {
-  id        String   @id @default(uuid())
-  code      String   @unique // color, storage, inch
-  name      String           // Màu sắc, Bộ nhớ, Kích thước
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-
-  options    attributes_options[]
-  categories category_variant_attributes[]
-}
-
-model attributes_options {
-  id          String   @id @default(uuid()) @db.Uuid
-  attributeId String
-  value       String
-  label       String
-   isActive    Boolean  @default(true) 
-
-  attribute         attributes          @relation(fields: [attributeId], references: [id])
-  variantAttributes variants_attributes[]
-
-  @@unique([attributeId, value])
-}
-
-model category_variant_attributes {
-  categoryId  String @db.Uuid
-  attributeId String
-
-  category  categories @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  attribute attributes @relation(fields: [attributeId], references: [id], onDelete: Cascade)
-
-  @@id([categoryId, attributeId])
-}
-
-// SOFT DELETE: product variant — cần soft delete riêng vì có thể restore
-// Khi product bị soft delete thì variant vẫn giữ nguyên (không cascade soft delete)
-// Hard delete product → cascade hard delete variants
-model products_variants {
-  id        String    @id @default(uuid()) @db.Uuid
-  productId String    @db.Uuid
-  code      String?   @unique // SKU
-  price     Decimal   @db.Decimal(12, 2)
-  quantity  Int       @default(10)
-  soldCount Int       @default(0)
-  isDefault Boolean   @default(false)
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  // --- Soft Delete ---
-  deletedAt DateTime?
-  deletedBy String?   @db.Uuid
-
-  product           products             @relation(fields: [productId], references: [id], onDelete: Cascade)
-  variantAttributes variants_attributes[]
-  cartItems         cart_items[]
-  orderItems        order_items[]
-  
-
-  @@index([deletedAt])
-}
-
-// CASCADE: ảnh gắn chặt với product
-model product_color_images {
-  id        String   @id @default(uuid()) @db.Uuid
-  productId String   @db.Uuid
-  color     String
-  imagePath String
-  imageUrl  String?
-  altText   String?
-  position  Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  product products @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@unique([productId, color, imagePath])
-  @@index([productId, color])
-}
-
-// CASCADE: variant attributes gắn chặt với variant
-model variants_attributes {
-  id                String   @id @default(uuid()) @db.Uuid
-  productVariantId  String   @db.Uuid
-  attributeOptionId String   @db.Uuid
-  createdAt         DateTime @default(now())
-
-  productVariant  products_variants  @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
-  attributeOption attributes_options @relation(fields: [attributeOptionId], references: [id])
-
-  @@unique([productVariantId, attributeOptionId])
-}
-
-model category_specifications {
-  categoryId      String @db.Uuid
-  specificationId String @db.Uuid
-  groupName       String
-  isRequired      Boolean @default(false)
-  sortOrder       Int     @default(0)
-
-  category      categories     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  specification specifications @relation(fields: [specificationId], references: [id], onDelete: Cascade)
-
-  @@id([categoryId, specificationId])
-}
-
-model specifications {
-  id           String    @id @default(uuid()) @db.Uuid
-  key          String    @unique
-  name         String
-  group        String    @default("Thông số khác")
-  unit         String?
-  icon         String?
-  isActive     Boolean    @default(true)
-  isFilterable Boolean   @default(false)
-  filterType   FilterType?
-  isRequired   Boolean   @default(false)
-  sortOrder    Int       @default(0)
-  createdAt    DateTime  @default(now())
-
-  productSpecifications product_specifications[]
-  allowedInCategories   category_specifications[]
-}
-
-// CASCADE: specs gắn với product
-model product_specifications {
-  productId       String  @db.Uuid
-  specificationId String  @db.Uuid
-  value           String
-  sortOrder       Int     @default(0)
-  isHighlight     Boolean
-
-  product       products       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  specification specifications @relation(fields: [specificationId], references: [id])
-
-  @@id([productId, specificationId])
-}
-
-// CASCADE: wishlist gắn với user, SET NULL nếu variant bị soft delete thì giữ nguyên
-// Nếu user bị hard delete → xóa wishlist; nếu variant bị hard delete → xóa wishlist
-model wishlist {
-  id               String   @id @default(uuid()) @db.Uuid
-  userId           String   @db.Uuid
-  productId String   @db.Uuid
-  createdAt        DateTime @default(now())
-
-  user           users             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product        products          @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, productId])
-}
-
-// CASCADE theo user; giỏ hàng không cần soft delete
-model cart_items {
-  id               String   @id @default(uuid()) @db.Uuid
-  userId           String   @db.Uuid
-  productVariantId String   @db.Uuid
-  quantity         Int      @default(1)
-  unitPrice        Decimal  @db.Decimal(10, 2)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  user           users             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  productVariant products_variants @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
-}
-
-// SOFT DELETE: orders — không được hard delete, cần audit trail
-// cancelledAt riêng để track lý do hủy; deletedAt để ẩn khỏi danh sách
-model orders {
-  id                String        @id @default(uuid()) @db.Uuid
-  orderCode         String        @unique
-
-  userId            String        @db.Uuid
-  paymentMethodId   String        @db.Uuid
-  voucherId         String?       @db.Uuid
-
-  // ===== ADDRESS SNAPSHOT =====
-  shippingAddressId String?       @db.Uuid // chỉ để trace (NO FK)
-
-  shippingContactName String
-  shippingPhone       String
-  shippingProvince    String
-  shippingWard        String
-  shippingDetail      String
-
-  // ===== MONEY =====
-  subtotalAmount    Decimal       @db.Decimal(10, 2)
-  shippingFee       Decimal       @default("0.00") @db.Decimal(10, 2)
-  voucherDiscount   Decimal       @default("0.00") @db.Decimal(10, 2)
-  totalAmount       Decimal       @db.Decimal(10, 2)
-
-  // ===== STATUS =====
-  orderStatus       OrderStatus   @default(PENDING)
-  paymentStatus     PaymentStatus @default(UNPAID)
-
-  // ===== PAYMENT IDS =====
-  bankTransferCode      String?   @unique
-  momoOrderId           String?   @unique
-  vnpayTxnRef           String?   @unique
-  zaloPayTransId        String?   @unique
-  stripePaymentIntentId String?
-
-  orderDate         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-
-  bankTransferQrUrl     String?
-  bankTransferContent   String?
-  bankTransferExpiredAt DateTime?
-  paymentExpiredAt      DateTime?
-  paymentRedirectUrl    String?
-
-  // ===== CHATBOT REQUEST TRACKING =====
-  isChatbotRequest        Boolean       @default(false)        // true = request từ chatbot
-  requestAcknowledgedAt   DateTime?                            // Khi staff confirm
-  requestRejectionReason  String?                              // Nếu staff từ chối
-
-   // ===== REFUND AUDIT =====
-  refundedAt     DateTime?
-  refundedBy     String?   @db.Uuid  // userId của staff xác nhận
-  refundNote     String?             // ghi chú hoàn tiền (tuỳ chọn)
-
-  // ===== RELATIONS =====
-  user            users                  @relation(fields: [userId], references: [id])
-  paymentMethod   payment_methods        @relation(fields: [paymentMethodId], references: [id])
-  voucher         vouchers?              @relation(fields: [voucherId], references: [id])
-
-  orderItems      order_items[]
-  voucherUsages   voucher_usages[]
-  transactions    payment_transactions[]
-
-  @@index([userId])
-  @@index([orderStatus])
-  @@index([orderDate])
-}
-
-// CASCADE theo order; order_items là dữ liệu giao dịch, không soft delete độc lập
-model order_items {
-  id               String   @id @default(uuid()) @db.Uuid
-  orderId          String   @db.Uuid
-  productVariantId String   @db.Uuid
-  quantity         Int
-  unitPrice        Decimal  @db.Decimal(10, 2)
-  createdAt        DateTime @default(now())
-
-  order          orders            @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  // Restrict vì cần giữ lịch sử mua hàng dù variant bị xóa
-  productVariant products_variants @relation(fields: [productVariantId], references: [id])
-  review         reviews?
-}
-
-// SOFT DELETE: reviews — admin có thể ẩn/restore review
-model reviews {
-  id          String       @id @default(uuid()) @db.Uuid
-  userId      String       @db.Uuid
-  orderItemId String       @unique @db.Uuid
-  rating      Int
-  comment     String?
-  isApproved  ReviewStatus @default(PENDING)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  // --- Soft Delete ---
-  deletedAt   DateTime?
-  deletedBy   String?      @db.Uuid
-
-  user      users       @relation(fields: [userId], references: [id])
-  orderItem order_items @relation(fields: [orderItemId], references: [id])
-
-  @@index([deletedAt])
-}
-
-// Không soft delete: payment_methods là config hệ thống, dùng isActive để disable
-model payment_methods {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String   @unique
-  code        String   @unique
-  description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  orders               orders[]
-  payment_transactions payment_transactions[]
-}
-
-// Không soft delete: transaction là audit log tài chính, không được xóa
-model payment_transactions {
-  id              String                   @id @default(uuid()) @db.Uuid
-  orderId         String                   @db.Uuid
-  paymentMethodId String                   @db.Uuid
-  amount          Decimal                  @db.Decimal(10, 2)
-  transactionRef  String?
-  status          PaymentTransactionStatus
-  payload         Json?
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
-
-  order         orders          @relation(fields: [orderId], references: [id])
-  paymentMethod payment_methods @relation(fields: [paymentMethodId], references: [id])
-}
-
-// SOFT DELETE: vouchers — cần archive/restore, không xóa thật vì ảnh hưởng lịch sử order
-model vouchers {
-  id               String       @id @default(uuid()) @db.Uuid
-  code             String       @unique
-  description      String?
-  discountType     DiscountType
-  discountValue    Decimal      @db.Decimal(10, 2)
-  minOrderValue    Decimal      @default("0.00") @db.Decimal(10, 2)
-  maxDiscountValue Decimal?     @db.Decimal(10, 2)
-  maxUses          Int?
-  maxUsesPerUser   Int?
-  usesCount        Int          @default(0)
-  startDate  DateTime? @db.Timestamptz
-  endDate    DateTime? @db.Timestamptz
-  priority         Int          @default(0)
-  isActive         Boolean      @default(true)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-
-  // --- Soft Delete ---
-  deletedAt        DateTime?
-  deletedBy        String?      @db.Uuid
-
-  orders        orders[]
-  targets       voucher_targets[]
-  voucherUsers  voucher_user[]
-  voucherUsages voucher_usages[]
-
-  @@index([deletedAt])
-}
-
-// CASCADE: targets gắn với voucher
-model voucher_targets {
-  id         String     @id @default(uuid()) @db.Uuid
-  voucherId  String     @db.Uuid
-  targetType TargetType
-  targetId   String?
-  createdAt  DateTime   @default(now())
-
-  voucher vouchers @relation(fields: [voucherId], references: [id], onDelete: Cascade)
-}
-
-// ==========================================
-// VECTOR SEARCH TABLES (AI / RAG)
-// ==========================================
-
-model products_vector {
-  productId  String   @id @db.Uuid
-  content    String
-  embedding  Unsupported("vector(384)")?
-  updatedAt  DateTime @updatedAt
-
-  product    products @relation(fields: [productId], references: [id], onDelete: Cascade)
-}
-
-// CASCADE: voucher_user gắn với voucher và user
-model voucher_user {
-  id        String   @id @default(uuid()) @db.Uuid
-  voucherId String   @db.Uuid
-  userId    String   @db.Uuid
-  maxUses   Int      @default(1)
-  usedCount Int      @default(0)
-  createdAt DateTime @default(now())
-
-  voucher vouchers @relation(fields: [voucherId], references: [id], onDelete: Cascade)
-  user    users    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([voucherId, userId])
-}
-
-// Không xóa: voucher_usages là audit log giao dịch
-model voucher_usages {
-  id        String   @id @default(uuid()) @db.Uuid
-  voucherId String   @db.Uuid
-  userId    String   @db.Uuid
-  orderId   String   @db.Uuid
-  usedAt    DateTime @default(now())
-
-  voucher vouchers @relation(fields: [voucherId], references: [id])
-  user    users    @relation(fields: [userId], references: [id])
-  order   orders   @relation(fields: [orderId], references: [id])
-}
-
-// SOFT DELETE: promotions — cần archive/restore
-model promotions {
-  id               String    @id @default(uuid()) @db.Uuid
-  name             String    @unique
-  description      String?
-  priority         Int       @default(0)
-  isActive         Boolean   @default(true)
-  startDate  DateTime? @db.Timestamptz
-  endDate    DateTime? @db.Timestamptz
-  minOrderValue    Decimal?  @db.Decimal(12, 2)
-  maxDiscountValue Decimal?  @db.Decimal(12, 2)
-  usageLimit       Int?
-  usedCount        Int       @default(0)
-  createdAt        DateTime  @default(now())
-
-  applyType      ApplyType     @default(EXCLUSIVE)
-  stackingGroup  StackingGroup @default(PERCENT)
-  stopProcessing Boolean       @default(false)
-
-  // --- Soft Delete ---
-  deletedAt        DateTime?
-  deletedBy        String?   @db.Uuid
-
-  rules   promotion_rules[]
-  targets promotion_targets[]
-
-  @@index([deletedAt])
-}
-
-// CASCADE: rules gắn chặt với promotion
-model promotion_rules {
-  id                   String              @id @default(uuid()) @db.Uuid
-  promotionId          String              @db.Uuid
-  actionType           PromotionActionType
-  discountValue        Decimal?            @db.Decimal(10, 2)
-  buyQuantity          Int?
-  getQuantity          Int?
-  giftProductVariantId String?             @db.Uuid
-  createdAt            DateTime            @default(now())
-
-  promotion promotions @relation(fields: [promotionId], references: [id], onDelete: Cascade)
-}
-
-// CASCADE: targets gắn chặt với promotion
-model promotion_targets {
-  id          String     @id @default(uuid()) @db.Uuid
-  promotionId String     @db.Uuid
-  targetType  TargetType
-  targetId    String?
-  targetCode  String?    // "storage"
-  targetValue String?    // "128GB"
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  promotion promotions @relation(fields: [promotionId], references: [id], onDelete: Cascade)
-}
-
-// SOFT DELETE: blogs — admin/staff cần trash, restore
-model blogs {
-  id          String     @id @default(uuid()) @db.Uuid
-  authorId    String     @db.Uuid
-  title       String
-  slug        String     @unique
-  content     String
-  imagePath   String?
-  imageUrl    String?
-  viewCount   Int        @default(0)
-  type        BlogType   @default(TIN_MOI)
-  status      BlogStatus @default(DRAFT)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  publishedAt DateTime?
-
-  // --- Soft Delete ---
-  deletedAt   DateTime?
-  deletedBy   String?    @db.Uuid
-
-  author   users      @relation(fields: [authorId], references: [id])
-  comments comments[]
-
-  @@index([deletedAt])
-}
-
-// SOFT DELETE: comments — admin có thể ẩn/restore comment
-model comments {
-  id         String            @id @default(uuid()) @db.Uuid
-  userId     String?           @db.Uuid
-  content    String
-  targetType CommentTargetType
-  targetId   String
-  parentId   String?           @db.Uuid
-  isApproved Boolean           @default(false)
-  createdAt  DateTime          @default(now())
-
-  // --- Soft Delete ---
-  deletedAt  DateTime?
-  deletedBy  String?           @db.Uuid
-
-  user    users?      @relation(fields: [userId], references: [id], onDelete: SetNull)
-  parent  comments?  @relation("CommentParent", fields: [parentId], references: [id])
-  replies comments[] @relation("CommentParent")
-  blogs   blogs[]
-
-  @@index([targetType, targetId])
-  @@index([deletedAt])
-}
-
-// SOFT DELETE: pages/policies — cần unpublish thay vì xóa thật
-model pages {
-  id          String      @id @default(uuid()) @db.Uuid
-  type        PageType
-  policyType  PolicyType?
-  title       String
-  slug        String      @unique
-  content     String
-  isPublished Boolean     @default(true)
-  priority    Int         @default(0)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-
-  // --- Soft Delete ---
-  deletedAt   DateTime?
-  deletedBy   String?     @db.Uuid
-
-  @@index([deletedAt])
 }
 
 enum MediaType {
@@ -980,63 +975,6 @@ enum MediaPosition {
   BELOW_SLIDER
   HOME_SECTION_1
   HOME_SECTION_2
-}
-
-// SOFT DELETE: image_media — banner/slider cần trash, restore
-model image_media {
-  id        String        @id @default(uuid()) @db.Uuid
-  type      MediaType
-  position  MediaPosition
-  title     String?
-  subTitle  String?
-  imagePath String?
-  imageUrl  String?
-  linkUrl   String?
-  order     Int           @default(0)
-  isActive  Boolean       @default(true)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-
-  // --- Soft Delete ---
-  deletedAt DateTime?
-  deletedBy String?       @db.Uuid
-
-  @@index([type, position])
-  @@index([isActive])
-  @@index([deletedAt])
-}
-
-model notifications {
-  id        String              @id @default(uuid()) @db.Uuid
-  userId    String              @db.Uuid
-  type      NotificationType
-  title     String
-  body      String
-  data      Json?
-  isRead    Boolean             @default(false)
-  readAt    DateTime?
-  channel   NotificationChannel
-  status    NotificationStatus  @default(PENDING)
-  sentAt    DateTime?
-  createdAt DateTime            @default(now())
-
-  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, isRead])
-  @@index([createdAt])
-}
-
-model fcm_tokens {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  token     String   @unique
-  device    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
 }
 
 enum NotificationType {
@@ -1067,64 +1005,12 @@ enum AiContentType {
   BLOG_POST
 }
 
-model ai_contents {
-  id          String        @id @default(uuid()) @db.Uuid
-  type        AiContentType
-  referenceId String?       @db.Uuid  // productId nếu type = PRODUCT_DESCRIPTION
-  focusKeyword String
-  inputData   Json          // Raw input để regenerate nếu cần
-  outputContent String      @db.Text
-  seoScore    Int           // 0-100
-  seoDetails  Json          // Chi tiết SEO score
-  createdBy   String        @db.Uuid  // userId của admin/staff
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
- 
-  @@index([type, referenceId])
-  @@index([createdBy])
-  @@index([createdAt])
-}
-
-model chat_sessions {
-  id        String   @id @default(uuid()) @db.Uuid
-  sessionKey String  @unique  // UUID từ FE localStorage
-  messages  Json    // Array of {role, content}
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  expiresAt DateTime // Tự động xóa sau 24h
- 
-  @@index([sessionKey])
-  @@index([expiresAt])
-}
-
-
-// ─────────────────────────────────────────
-// SETTINGS
-// ─────────────────────────────────────────
-
-model system_settings {
-  id        String   @id @default(uuid()) @db.Uuid
-  group     String
-  key       String
-  value     String   @db.Text
-  dataType  SettingDataType @default(STRING)
-  updatedBy String?  @db.Uuid
-  updatedAt DateTime @updatedAt
-
-  @@unique([group, key])
-  @@index([group])
-}
-
 enum SettingDataType {
   STRING
   BOOLEAN
   NUMBER
   JSON
 }
-
-// ─────────────────────────────────────────
-// AUDIT
-// ─────────────────────────────────────────
 
 enum AuditSeverity {
   INFO
@@ -1144,57 +1030,4 @@ enum AuditAction {
   SETTINGS_CHANGE
   PERMISSION_CHANGE
   EXPORT
-}
-
-model audit_logs {
-  id          String        @id @default(uuid()) @db.Uuid
-
-  // WHO
-  userId      String?       @db.Uuid
-  userName    String?
-  userRole    String?
-
-  // WHAT
-  action      AuditAction
-  module      String
-  targetId    String?
-  targetType  String?
-  description String
-  diff        Json?
-
-  // WHERE
-  ip          String?
-  userAgent   String?
-  location    String?
-
-  // META
-  severity    AuditSeverity @default(INFO)
-  isSuccess   Boolean       @default(true)
-  errorMsg    String?
-
-  createdAt   DateTime      @default(now())
-
-  @@index([userId])
-  @@index([module])
-  @@index([severity])
-  @@index([createdAt])
-  @@index([ip, createdAt])
-}
-
-model login_history {
-  id         String   @id @default(uuid()) @db.Uuid
-  userId     String?  @db.Uuid
-  email      String?
-  isSuccess  Boolean
-  ip         String?
-  userAgent  String?
-  location   String?
-  browser   String?
-  failReason String?
-
-  createdAt  DateTime @default(now())
-
-  @@index([userId])
-  @@index([ip, createdAt])
-  @@index([createdAt])
 }

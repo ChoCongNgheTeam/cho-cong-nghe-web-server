@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import * as service from "./order.service";
-import { orderQuerySchema, exportOrderSchema } from "./order.validation";
-import { exportOrdersAdmin } from "./order.service";
+import { OrderQuery, ExportOrderQuery } from "./order.validation";
 
 // ================== PUBLIC (USER) ==================
 
@@ -39,7 +38,7 @@ export const reorderUserHandler = async (req: Request, res: Response) => {
 // ================== STAFF & ADMIN ==================
 
 export const getAllOrdersAdminHandler = async (req: Request, res: Response) => {
-  const query = orderQuerySchema.parse(req.query);
+  const query = req.query as unknown as OrderQuery;
   const result = await service.getAllOrdersAdmin(query);
   res.json({
     data: result.data,
@@ -83,8 +82,8 @@ export const confirmManualRefundHandler = async (req: Request, res: Response) =>
 };
 
 export const exportOrdersAdminHandler = async (req: Request, res: Response) => {
-  const query = exportOrderSchema.parse(req.query);
-  const { buffer, contentType, filename, count } = await exportOrdersAdmin(query);
+  const query = req.query as unknown as ExportOrderQuery;
+  const { buffer, contentType, filename, count } = await service.exportOrdersAdmin(query);
 
   res.setHeader("Content-Type", contentType);
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);

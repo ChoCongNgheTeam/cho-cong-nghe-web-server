@@ -143,11 +143,25 @@ export const bulkUpsertCategorySpecs = async (categoryId: string, items: UpsertC
   );
 };
 
+export const findCategorySpecAssignment = async (categoryId: string, specificationId: string) => {
+  return prisma.category_specifications.findUnique({
+    where: { categoryId_specificationId: { categoryId, specificationId } },
+    select: { categoryId: true, specificationId: true },
+  });
+};
+
 export const removeCategorySpec = async (categoryId: string, specificationId: string) => {
   return prisma.category_specifications.delete({
     where: {
       categoryId_specificationId: { categoryId, specificationId },
     },
+  });
+};
+
+export const findManyByIds = async (ids: string[]) => {
+  return prisma.specifications.findMany({
+    where: { id: { in: ids } },
+    select: { id: true },
   });
 };
 

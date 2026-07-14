@@ -1,9 +1,8 @@
 import * as repo from "./notification.repository";
-import { sendPushNotification } from "@/integrations/firebase.service";
+import { sendPushNotification, sendMulticastNotification } from "@/integrations/firebase.service";
 import { sendNotificationEmail } from "@/integrations/email.service";
-import { CreateNotificationInput, NotificationPayload } from "./notification.types";
+import { NotificationPayload } from "./notification.types";
 import prisma from "@/config/db";
-import { STAFF_ROLES } from "../staff-permissions/staff-permissions.types";
 
 /**
  * Core function — tạo notification trong DB + gửi push/email nếu cần
@@ -41,12 +40,16 @@ export const createAndSend = async (payload: NotificationPayload, channels: Arra
         await repo.updateStatus(notif.id, "SENT", new Date());
       } else if (channel === "PUSH") {
         const tokens = await repo.getFcmTokensByUserId(payload.userId);
-        let sent = false;
-        for (const t of tokens) {
-          const ok = await sendPushNotification(t.token, payload.title, payload.body, payload.data as any);
-          if (!ok) await repo.deleteFcmToken(t.token);
-          else sent = true;
-        }
+
+        // Các lần gửi push độc lập với nhau — chạy song song thay vì tuần tự
+        const sendResults = await Promise.allSettled(
+          tokens.map(async (t) => {
+            const ok = await sendPushNotification(t.token, payload.title, payload.body, payload.data as any);
+            if (!ok) await repo.deleteFcmToken(t.token, payload.userId);
+            return ok;
+          }),
+        );
+        const sent = sendResults.some((r) => r.status === "fulfilled" && r.value);
         await repo.updateStatus(notif.id, sent ? "SENT" : "FAILED");
       }
 
@@ -60,7 +63,28 @@ export const createAndSend = async (payload: NotificationPayload, channels: Arra
   return results;
 };
 
-// ── Case 1: WELCOME_VOUCHER ───────────────────────────────────────────────────
+/**
+ * Gửi notification IN_APP cho toàn bộ admin/staff đang active.
+ * Dùng chung cho các case thông báo hệ thống → admin (đơn hàng mới, comment mới, review mới).
+ * Lỗi từng user không làm hỏng các user còn lại (Promise.allSettled).
+ *
+ * @param buildPayload callback tạo payload theo từng userId
+ * @param extraWhere   điều kiện lọc thêm cho danh sách admin/staff (vd: notifReviewNew: true)
+ */
+const sendToAdminsAndStaff = async (buildPayload: (userId: string) => NotificationPayload, extraWhere: Record<string, any> = {}) => {
+  const targetIds = await repo.findActiveAdminAndStaffIds(extraWhere);
+  if (targetIds.length === 0) return;
+
+  const results = await Promise.allSettled(targetIds.map((userId) => createAndSend(buildPayload(userId), ["IN_APP"])));
+
+  results.forEach((r, i) => {
+    if (r.status === "rejected") {
+      console.error(`[Notification Error] Gửi thất bại cho user ${targetIds[i]}:`, r.reason);
+    }
+  });
+};
+
+// Case 1: WELCOME_VOUCHER
 
 export const sendWelcomeVoucherNotification = async (userId: string, voucherCode: string, discountValue: number) => {
   return createAndSend(
@@ -75,7 +99,7 @@ export const sendWelcomeVoucherNotification = async (userId: string, voucherCode
   );
 };
 
-// ── Case 2: VOUCHER_EXPIRING ──────────────────────────────────────────────────
+// Case 2: VOUCHER_EXPIRING
 
 export const sendVoucherExpiringNotification = async (userId: string, voucherCode: string, hoursLeft: number) => {
   return createAndSend(
@@ -90,7 +114,13 @@ export const sendVoucherExpiringNotification = async (userId: string, voucherCod
   );
 };
 
-// ── Case 3: CAMPAIGN_PROMOTION ────────────────────────────────────────────────
+// Case 3: CAMPAIGN_PROMOTION
+
+/** Xác định danh sách userId nhận campaign: toàn bộ customer active nếu targetAll, ngược lại dùng danh sách truyền vào */
+export const resolveCampaignTargetIds = async (targetAll: boolean, userIds: string[]) => {
+  if (targetAll) return repo.findActiveCustomerIds();
+  return userIds;
+};
 
 export const sendCampaignNotification = async (userIds: string[], title: string, body: string, data?: Record<string, any>) => {
   await repo.createMany(
@@ -109,12 +139,11 @@ export const sendCampaignNotification = async (userIds: string[], title: string,
   const flatTokens = allTokens.flat().map((t) => t.token);
 
   if (flatTokens.length > 0) {
-    const { sendMulticastNotification } = await import("@/integrations/firebase.service");
     await sendMulticastNotification(flatTokens, title, body, data as any);
   }
 };
 
-// ── Case 4: USER_INACTIVE ─────────────────────────────────────────────────────
+// Case 4: USER_INACTIVE
 
 export const sendInactiveUserNotification = async (userId: string, voucherCode: string) => {
   return createAndSend(
@@ -129,7 +158,7 @@ export const sendInactiveUserNotification = async (userId: string, voucherCode: 
   );
 };
 
-// ── User reads ────────────────────────────────────────────────────────────────
+// User reads
 
 export const getMyNotifications = async (userId: string, page: number, limit: number) => {
   return repo.findByUserId(userId, page, limit);
@@ -147,11 +176,11 @@ export const saveFcmToken = async (userId: string, token: string, device?: strin
   return repo.saveFcmToken(userId, token, device);
 };
 
-export const deleteFcmToken = async (token: string) => {
-  return repo.deleteFcmToken(token);
+export const deleteFcmToken = async (token: string, userId: string) => {
+  return repo.deleteFcmToken(token, userId);
 };
 
-// ── Admin reads ───────────────────────────────────────────────────────────────
+// Admin reads
 
 /** Lấy thông báo dành cho admin/staff (chỉ ORDER_STATUS, COMMENT_NEW, REVIEW_NEW) */
 export const getAdminNotifications = async (userId: string, page: number, limit: number) => {
@@ -163,7 +192,7 @@ export const markAllAdminAsRead = async (userId: string) => {
   return repo.markAllAdminAsRead(userId);
 };
 
-// ── Case 5: ORDER_STATUS ──────────────────────────────────────────────────────
+// Case 5: ORDER_STATUS
 
 const orderStatusMap: Record<string, string> = {
   PENDING: "Chờ xác nhận",
@@ -202,43 +231,23 @@ export const sendOrderStatusNotification = async (userId: string, orderCode: str
   );
 };
 
-// ── Case 6: ORDER_CREATED_ADMIN ───────────────────────────────────────────────
+// Case 6: ORDER_CREATED_ADMIN
 
 export const sendOrderCreatedAdminNotification = async (orderCode: string) => {
   try {
-    const adminsAndStaffs = await prisma.users.findMany({
-      where: {
-        role: {
-          in: ["ADMIN", ...STAFF_ROLES],
-        },
-        isActive: true,
-        deletedAt: null,
-      },
-      select: { id: true },
-    });
-
-    if (adminsAndStaffs.length === 0) return;
-
-    const notificationPromises = adminsAndStaffs.map((user) =>
-      createAndSend(
-        {
-          userId: user.id,
-          type: "ORDER_STATUS",
-          title: "🛒 Có đơn hàng mới!",
-          body: `Đơn hàng #${orderCode} vừa được khách hàng đặt và đang chờ xử lý.`,
-          data: { orderCode, status: "PENDING" },
-        },
-        ["IN_APP"],
-      ),
-    );
-
-    await Promise.all(notificationPromises);
+    await sendToAdminsAndStaff((userId) => ({
+      userId,
+      type: "ORDER_STATUS",
+      title: "🛒 Có đơn hàng mới!",
+      body: `Đơn hàng #${orderCode} vừa được khách hàng đặt và đang chờ xử lý.`,
+      data: { orderCode, status: "PENDING" },
+    }));
   } catch (error) {
     console.error("[Notification Error] Lỗi khi gửi thông báo Admin:", error);
   }
 };
 
-// ── Case 7: COMMENT_NEW ───────────────────────────────────────────────────────
+// Case 7: COMMENT_NEW
 
 /**
  * Gửi thông báo cho tất cả ADMIN + STAFF khi có bình luận mới từ khách hàng.
@@ -251,39 +260,19 @@ export const sendOrderCreatedAdminNotification = async (orderCode: string) => {
  */
 export const sendCommentNewAdminNotification = async (customerName: string, productName: string, commentId: string, productId: string) => {
   try {
-    const adminsAndStaffs = await prisma.users.findMany({
-      where: {
-        role: {
-          in: ["ADMIN", ...STAFF_ROLES],
-        },
-        isActive: true,
-        deletedAt: null,
-      },
-      select: { id: true },
-    });
-
-    if (adminsAndStaffs.length === 0) return;
-
-    const notificationPromises = adminsAndStaffs.map((user) =>
-      createAndSend(
-        {
-          userId: user.id,
-          type: "COMMENT_NEW",
-          title: "💬 Bình luận mới!",
-          body: `${customerName} vừa bình luận về sản phẩm "${productName}".`,
-          data: { commentId, productId, productName, customerName },
-        },
-        ["IN_APP"],
-      ),
-    );
-
-    await Promise.all(notificationPromises);
+    await sendToAdminsAndStaff((userId) => ({
+      userId,
+      type: "COMMENT_NEW",
+      title: "💬 Bình luận mới!",
+      body: `${customerName} vừa bình luận về sản phẩm "${productName}".`,
+      data: { commentId, productId, productName, customerName },
+    }));
   } catch (error) {
     console.error("[Notification Error] Lỗi khi gửi thông báo comment mới:", error);
   }
 };
 
-// ── Case 8: REVIEW_NEW ────────────────────────────────────────────────────────
+// Case 8: REVIEW_NEW
 
 /**
  * Gửi thông báo cho tất cả ADMIN + STAFF khi có đánh giá mới từ khách hàng.
@@ -297,35 +286,17 @@ export const sendCommentNewAdminNotification = async (customerName: string, prod
  */
 export const sendReviewNewAdminNotification = async (customerName: string, productName: string, rating: number, reviewId: string, productId: string) => {
   try {
-    const adminsAndStaffs = await prisma.users.findMany({
-      where: {
-        role: {
-          in: ["ADMIN", ...STAFF_ROLES],
-        },
-        isActive: true,
-        deletedAt: null,
-        notifReviewNew: true,
-      },
-      select: { id: true },
-    });
-
-    if (adminsAndStaffs.length === 0) return;
-
     const stars = "⭐".repeat(Math.min(rating, 5));
-    const notificationPromises = adminsAndStaffs.map((user) =>
-      createAndSend(
-        {
-          userId: user.id,
-          type: "REVIEW_NEW",
-          title: `${stars} Đánh giá mới!`,
-          body: `${customerName} vừa đánh giá ${rating}/5 sao cho sản phẩm "${productName}".`,
-          data: { reviewId, productId, productName, customerName, rating: String(rating) },
-        },
-        ["IN_APP"],
-      ),
+    await sendToAdminsAndStaff(
+      (userId) => ({
+        userId,
+        type: "REVIEW_NEW",
+        title: `${stars} Đánh giá mới!`,
+        body: `${customerName} vừa đánh giá ${rating}/5 sao cho sản phẩm "${productName}".`,
+        data: { reviewId, productId, productName, customerName, rating: String(rating) },
+      }),
+      { notifReviewNew: true },
     );
-
-    await Promise.all(notificationPromises);
   } catch (error) {
     console.error("[Notification Error] Lỗi khi gửi thông báo review mới:", error);
   }

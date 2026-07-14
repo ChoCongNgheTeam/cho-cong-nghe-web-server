@@ -23,7 +23,7 @@ const phoneRule = z
 
 export const createUserSchema = z.object({
   userName: userNameRule,
-  email: z.string().email("Email không hợp lệ"),
+  email: z.string().trim().email("Email không hợp lệ"),
   password: passwordRule,
   fullName: fullNameRule,
   phone: phoneRule,
@@ -39,7 +39,7 @@ export const createUserSchema = z.object({
 export const updateUserSchema = z
   .object({
     userName: userNameRule.optional(),
-    email: z.string().email("Email không hợp lệ").optional(),
+    email: z.string().trim().email("Email không hợp lệ").optional(),
     password: passwordRule.optional(),
     fullName: fullNameRule.optional(),
     phone: phoneRule,
@@ -117,6 +117,9 @@ export const exportUsersSchema = z.object({
   limit: z.coerce.number().min(1).max(5000).default(5000).optional(),
 });
 
+// GET /users/admin/trash — chỉ cần page/limit, tái dùng cận trên từ getUsersQuerySchema
+export const getDeletedUsersQuerySchema = getUsersQuerySchema.pick({ page: true, limit: true });
+
 export const updateNotifPreferencesSchema = z
   .object({
     notifEmail: z.boolean().optional(),
@@ -139,3 +142,4 @@ export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type GetUsersQuery = z.infer<typeof getUsersQuerySchema>;
+export type GetDeletedUsersQuery = z.infer<typeof getDeletedUsersQuerySchema>;

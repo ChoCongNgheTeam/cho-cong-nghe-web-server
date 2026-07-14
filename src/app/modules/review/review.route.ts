@@ -26,11 +26,11 @@ const router = Router();
 const staffAdminAuth = [authMiddleware(), requireRole(...STAFF_ROLES, "ADMIN")] as const;
 const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
 
-// ── Public / User ──────────────────────────────────────────────────────────────
+// PUBLIC / USER
 router.get("/product/:productId", asyncHandler(getProductReviewsHandler));
 router.post("/", authMiddleware(), validate(createReviewSchema), asyncHandler(createReviewHandler));
 
-// ── Staff & Admin ──────────────────────────────────────────────────────────────
+// STAFF & ADMIN
 // MARKETING + SUPPORT có canReviews
 router.get("/admin/all", ...staffAdminAuth, requirePermission("canReviews"), validate(listReviewsSchema, "query"), asyncHandler(getAllReviewsAdminHandler));
 

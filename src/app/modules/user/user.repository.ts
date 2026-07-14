@@ -39,6 +39,39 @@ export const selectAdminUser = {
 type CreateUserData = Prisma.usersCreateInput;
 type UpdateUserData = Prisma.usersUpdateInput;
 
+// Type suy ra trực tiếp từ select — dùng thay cho `as any` ở service/controller
+export type PublicUser = Prisma.usersGetPayload<{ select: typeof selectPublicUser }>;
+export type AdminUser = Prisma.usersGetPayload<{ select: typeof selectAdminUser }>;
+export type UserWithNotifPrefs = Prisma.usersGetPayload<{ select: typeof selectNotifPreferences }>;
+
+// Select cho GET /me — public fields + staffPermissions (chỉ có data nếu user là staff role)
+export const selectMeUser = {
+  ...selectPublicUser,
+  staffPermissions: {
+    select: {
+      canViewOrders: true,
+      canCreateOrder: true,
+      canUpdateOrder: true,
+      canViewProducts: true,
+      canUpdateStock: true,
+      canBlogs: true,
+      canMedia: true,
+      canCampaigns: true,
+      canVouchers: true,
+      canPromotions: true,
+      canAiContent: true,
+      canReviews: true,
+      canComments: true,
+      canNotifications: true,
+      canViewUsers: true,
+      canAnalytics: true,
+      canPaymentView: true,
+    },
+  },
+} satisfies Prisma.usersSelect;
+
+export type UserWithPermissions = Prisma.usersGetPayload<{ select: typeof selectMeUser }>;
+
 export interface FindAllOptions extends GetUsersQuery {
   isAdmin?: boolean;
 }
@@ -73,7 +106,7 @@ export const findAll = async (options: FindAllOptions) => {
     ...(gender !== undefined && { gender }),
   };
 
-  // ── Special sorts: orderCount / totalSpent require aggregation
+  // Special sorts: orderCount / totalSpent require aggregation
   const isAggregateSort = sortBy === "orderCount" || sortBy === "totalSpent";
 
   if (isAggregateSort) {
@@ -94,7 +127,7 @@ export const findAll = async (options: FindAllOptions) => {
     return { users, total, page, limit };
   }
 
-  // ── Standard sorts
+  // Standard sorts
   const [users, total] = await prisma.$transaction([
     prisma.users.findMany({
       where,
@@ -218,30 +251,6 @@ export const updateNotifPreferences = async (id: string, data: UpdateNotifPrefer
 export const findMeById = async (id: string) => {
   return prisma.users.findFirst({
     where: { id, deletedAt: null },
-    select: {
-      ...selectPublicUser,
-      // Include permissions nếu là staff
-      staffPermissions: {
-        select: {
-          canViewOrders: true,
-          canCreateOrder: true,
-          canUpdateOrder: true,
-          canViewProducts: true,
-          canUpdateStock: true,
-          canBlogs: true,
-          canMedia: true,
-          canCampaigns: true,
-          canVouchers: true,
-          canPromotions: true,
-          canAiContent: true,
-          canReviews: true,
-          canComments: true,
-          canNotifications: true,
-          canViewUsers: true,
-          canAnalytics: true,
-          canPaymentView: true,
-        },
-      },
-    },
+    select: selectMeUser,
   });
 };

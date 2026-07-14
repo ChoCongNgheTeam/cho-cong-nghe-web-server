@@ -1,6 +1,6 @@
-// =====================
-// === SHARED TYPES ===
-// =====================
+import { Prisma } from "@prisma/client";
+
+// SHARED TYPES
 
 export interface Brand {
   id: string;
@@ -12,6 +12,14 @@ export interface Category {
   id: string;
   name: string;
   slug: string;
+}
+
+/** Shape thực tế trả về bởi selectCategoryTree (repository) — category của product KHÔNG có `name` ở cấp gốc, chỉ có ở `parent`. */
+export interface CategoryTreeNode {
+  id: string;
+  slug: string;
+  name?: string;
+  parent?: CategoryTreeNode | null;
 }
 
 export interface ColorImage {
@@ -48,9 +56,7 @@ export interface ProductGallery {
   position: number;
 }
 
-// =====================
-// === VARIANT TYPES ===
-// =====================
+// VARIANT TYPES
 
 export interface ProductVariant {
   id: string;
@@ -69,9 +75,7 @@ export interface ProductVariant {
   images: ColorImage[];
 }
 
-// =====================
-// === HIGHLIGHT/SPEC TYPES ===
-// =====================
+// HIGHLIGHT/SPEC TYPES
 
 export interface Specification {
   id: string;
@@ -93,9 +97,7 @@ export interface Highlight {
   value?: string;
 }
 
-// =====================
-// === REVIEW TYPES ===
-// =====================
+// REVIEW TYPES
 
 export interface Review {
   id: string;
@@ -122,9 +124,7 @@ export interface ReviewStats {
   };
 }
 
-// =====================
-// === PRODUCT LIST ===
-// =====================
+// PRODUCT LIST
 
 export interface ProductCardHighlight {
   key: string;
@@ -152,11 +152,9 @@ export interface ProductCard {
   highlights: ProductCardHighlight[];
   inStock: boolean;
   isActive: boolean;
-  category: Category | null;
+  category: CategoryTreeNode | null;
 }
-// =====================
-// === PRODUCT DETAIL ===
-// =====================
+// PRODUCT DETAIL
 
 export interface ProductDetail {
   id: string;
@@ -164,7 +162,7 @@ export interface ProductDetail {
   slug: string;
   description?: string;
   brand: Brand;
-  category: Category;
+  category: CategoryTreeNode;
   availableOptions: AvailableOption[];
   // highlights: Highlight[];
   // highlightGroups: HighlightSpecificationGroup[];
@@ -206,9 +204,7 @@ export interface ProductSpecificationGroup {
   }[];
 }
 
-// =====================
-// === RESPONSE TYPES ===
-// =====================
+// RESPONSE TYPES
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -226,9 +222,7 @@ export interface ProductListResponse extends PaginatedResponse<ProductCard> {
   };
 }
 
-// =====================
-// === RAW DB TYPES ===
-// =====================
+// RAW DB TYPES
 
 export interface RawVariantAttribute {
   attributeOption: {
@@ -246,7 +240,7 @@ export interface RawVariantAttribute {
 export interface RawVariant {
   id: string;
   code: string | null;
-  price: any;
+  price: Prisma.Decimal | number;
   quantity: number;
   soldCount: number;
   isDefault: boolean;
@@ -254,9 +248,7 @@ export interface RawVariant {
   variantAttributes: RawVariantAttribute[];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN STATS / LOW STOCK
-// ─────────────────────────────────────────────────────────────────────────────
 
 export interface LowStockVariant {
   id: string;

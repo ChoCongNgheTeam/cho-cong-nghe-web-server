@@ -207,7 +207,7 @@ export const findOrderPaymentInfoByCode = async (orderCode: string, userId: stri
   return formatOrderResponse(order);
 };
 
-export const updateOrder = async (id: string, data: any) => {
+export const updateOrder = async (id: string, data: Partial<Prisma.ordersUpdateInput>) => {
   const order = await prisma.orders.update({ where: { id }, data, select: orderSelect });
   return formatOrderResponse(order);
 };

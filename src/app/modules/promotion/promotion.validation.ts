@@ -1,12 +1,11 @@
 import { z } from "zod";
-import { ta } from "zod/v4/locales";
 
 // =====================
 // === ENUMS ===
 // =====================
 
 export const TargetTypeEnum = z.enum(["ALL", "PRODUCT", "CATEGORY", "BRAND"]);
-export const PromotionActionTypeEnum = z.enum(["DISCOUNT_PERCENT", "DISCOUNT_FIXED", "BUY_X_GET_Y", "GIFT_PRODUCT"]);
+export const PromotionActionTypeEnum = z.enum(["DISCOUNT_PERCENT", "DISCOUNT_FIXED", "BUY_X_GET_Y", "GIFT_PRODUCT", "FREE_SHIPPING"]);
 
 // =====================
 // === QUERY SCHEMAS ===
@@ -21,13 +20,13 @@ export const listPromotionsSchema = z.object({
   search: z.string().optional(),
   isActive: queryBoolean,
 
-  // ← THÊM: filter theo status rõ ràng
+  // STATUS FILTER: lọc theo trạng thái tổng hợp (active/inactive/expired/upcoming)
   status: z.enum(["active", "inactive", "expired", "upcoming"]).optional(),
 
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),
-  sortBy: z.enum(["createdAt", "name", "priority", "startDate", "endDate"]).default("startDate"), // ← đổi default sang startDate
-  sortOrder: z.enum(["asc", "desc"]).default("asc"), // ← đổi default sang asc để sort theo ngày tăng dần
+  sortBy: z.enum(["createdAt", "name", "priority", "startDate", "endDate"]).default("startDate"),
+  sortOrder: z.enum(["asc", "desc"]).default("asc"), // Mặc định tăng dần theo ngày
   includeDeleted: queryBoolean.pipe(z.boolean().optional().default(false)),
 });
 
@@ -37,6 +36,26 @@ export const listPromotionsSchema = z.object({
 
 export const promotionParamsSchema = z.object({
   id: z.string().uuid({ message: "ID promotion không hợp lệ" }),
+});
+
+export const productParamsSchema = z.object({
+  productId: z.string().uuid({ message: "productId không hợp lệ" }),
+});
+
+export const categoryParamsSchema = z.object({
+  categoryId: z.string().uuid({ message: "categoryId không hợp lệ" }),
+});
+
+export const brandParamsSchema = z.object({
+  brandId: z.string().uuid({ message: "brandId không hợp lệ" }),
+});
+
+// =====================
+// === BULK DELETE SCHEMA ===
+// =====================
+
+export const bulkDeletePromotionSchema = z.object({
+  ids: z.array(z.string().uuid({ message: "ID promotion không hợp lệ" })).min(1, "Cần ít nhất 1 ID để xóa"),
 });
 
 // =====================
@@ -98,7 +117,12 @@ const promotionTargetSchema = z
   .object({
     targetType: TargetTypeEnum,
     targetId: z.string().uuid().optional(),
-    targetName: z.string().optional(),
+    // targetCode/targetValue: cột thật trong DB (promotion_targets.targetCode/targetValue).
+    // targetName KHÔNG lưu DB — chỉ được resolve (tên brand/category/product) lúc đọc ở
+    // repository.findById(), nên không khai ở input schema để tránh lỗi "field không tồn tại"
+    // khi tạo/update.
+    targetCode: z.string().trim().optional(),
+    targetValue: z.string().trim().optional(),
   })
   .refine(
     (data) => {
@@ -112,8 +136,8 @@ const promotionTargetSchema = z
 
 export const createPromotionSchema = z
   .object({
-    name: z.string().min(3, "Tên khuyến mãi phải có ít nhất 3 ký tự"),
-    description: z.string().optional(),
+    name: z.string().trim().min(3, "Tên khuyến mãi phải có ít nhất 3 ký tự"),
+    description: z.string().trim().optional(),
     priority: z.coerce.number().int().default(0),
     isActive: z.boolean().default(true),
     startDate: z.coerce.date().optional(),
@@ -136,8 +160,8 @@ export const createPromotionSchema = z
 
 export const updatePromotionSchema = z
   .object({
-    name: z.string().min(3).optional(),
-    description: z.string().optional(),
+    name: z.string().trim().min(3).optional(),
+    description: z.string().trim().optional(),
     priority: z.coerce.number().int().optional(),
     isActive: z.boolean().optional(),
     startDate: z.coerce.date().optional(),
@@ -158,6 +182,11 @@ export const updatePromotionSchema = z
     { message: "Ngày bắt đầu phải trước ngày kết thúc", path: ["endDate"] },
   );
 
+export const listDeletedPromotionsSchema = z.object({
+  page: z.coerce.number().positive().default(1),
+  limit: z.coerce.number().positive().max(100).default(20),
+});
+
 // =====================
 // === TYPE EXPORTS ===
 // =====================
@@ -165,3 +194,5 @@ export const updatePromotionSchema = z
 export type ListPromotionsQuery = z.infer<typeof listPromotionsSchema>;
 export type CreatePromotionInput = z.infer<typeof createPromotionSchema>;
 export type UpdatePromotionInput = z.infer<typeof updatePromotionSchema>;
+export type BulkDeletePromotionInput = z.infer<typeof bulkDeletePromotionSchema>;
+export type ListDeletedPromotionsQuery = z.infer<typeof listDeletedPromotionsSchema>;
