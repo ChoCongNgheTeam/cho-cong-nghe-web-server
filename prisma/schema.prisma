@@ -204,6 +204,9 @@ model users {
   passwordResetTokens password_reset_tokens[]
   refreshTokens       refresh_tokens[]
   oauthAccounts       oauth_accounts[]
+  chatSessions        chat_sessions[]
+  userPreferences     user_preferences[]
+  chatMemoryVectors   chat_memory_vectors[]
 
   staffPermissions staff_permissions?
   @@index([deletedAt]) // để query isDeleted nhanh hơn
@@ -1088,13 +1091,45 @@ model ai_contents {
 model chat_sessions {
   id        String   @id @default(uuid()) @db.Uuid
   sessionKey String  @unique  // UUID từ FE localStorage
+  userId    String?  @db.Uuid // Lưu userId nếu khách đã login
   messages  Json    // Array of {role, content}
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   expiresAt DateTime // Tự động xóa sau 24h
  
+  user      users?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([sessionKey])
+  @@index([userId])
   @@index([expiresAt])
+}
+
+model user_preferences {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  key       String
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@index([userId])
+}
+
+model chat_memory_vectors {
+  id        String   @id @default(uuid()) @db.Uuid
+  sessionId String   // sessionKey từ chat_sessions
+  userId    String?  @db.Uuid
+  content   String   @db.Text
+  embedding Unsupported("vector(384)")?
+  createdAt DateTime @default(now())
+
+  user      users?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([userId])
 }
 
 
@@ -1197,4 +1232,18 @@ model login_history {
   @@index([userId])
   @@index([ip, createdAt])
   @@index([createdAt])
+}
+
+model chatbot_semantic_cache {
+  id                String   @id @default(uuid()) @db.Uuid
+  query             String   @db.Text
+  embedding         Unsupported("vector(384)")?
+  toolSignatureHash String   @db.VarChar(255)
+  ttlDays           Int?
+  response          Json
+  hitCount          Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([toolSignatureHash])
 }
