@@ -2,16 +2,6 @@ import { Decimal } from "@prisma/client/runtime/library";
 import { PaymentFields } from "./payment-info.builder";
 
 /**
- * Checkout request
- */
-export interface CheckoutInput {
-  paymentMethodId: string;
-  shippingAddressId: string;
-  voucherId?: string;
-  cartItemIds?: string[];
-}
-
-/**
  * Cart item validation result
  */
 export interface CartItemValidation {

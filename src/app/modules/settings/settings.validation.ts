@@ -4,9 +4,18 @@ export const SETTING_GROUPS = ["general", "ecommerce", "checkout", "customer", "
 
 export type SettingGroup = (typeof SETTING_GROUPS)[number];
 
+/**
+ * Các group được phép đọc công khai (không cần đăng nhập) — dùng cho client site
+ * để render logo, favicon, maintenance_mode, SEO meta tags...
+ * Các group còn lại (wallet, tax, invoice, notification_admin...) có thể chứa cấu hình
+ * nhạy cảm nên bắt buộc phải là admin mới đọc được.
+ */
+export const PUBLIC_SETTING_GROUPS: SettingGroup[] = ["general", "seo"];
+
 export const groupParamSchema = z.object({
   group: z.enum(SETTING_GROUPS),
 });
+export type GroupParamInput = z.infer<typeof groupParamSchema>;
 
 // FIX: hỗ trợ cả JSON body { settings: {...} } lẫn FormData
 // Khi FormData: field "settings" là JSON string → parse trước khi validate

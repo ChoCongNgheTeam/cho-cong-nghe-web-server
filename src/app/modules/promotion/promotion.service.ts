@@ -1,6 +1,6 @@
 import * as repo from "./promotion.repository";
-import { CreatePromotionInput, UpdatePromotionInput, ListPromotionsQuery } from "./promotion.validation";
-import { transformPromotionCard, transformPromotionDetail, transformPromotionDetailWithExisting } from "./promotion.transformers";
+import { CreatePromotionInput, UpdatePromotionInput, ListPromotionsQuery, ListDeletedPromotionsQuery } from "./promotion.validation";
+import { transformPromotionCard, transformPromotionDetail } from "./promotion.transformers";
 import { NotFoundError, BadRequestError, ForbiddenError } from "@/errors";
 
 // Helper — đảm bảo promotion tồn tại
@@ -50,7 +50,7 @@ export const getPromotionsAdmin = async (query: ListPromotionsQuery) => {
 
 export const getPromotionDetail = async (id: string, options: { includeDeleted?: boolean; isAdmin?: boolean } = {}) => {
   const promotion = await assertPromotionExists(id, options);
-  return transformPromotionDetail(promotion as any);
+  return transformPromotionDetail(promotion);
 };
 
 // =====================
@@ -62,13 +62,13 @@ export const createPromotion = async (input: CreatePromotionInput) => {
   if (exists) throw new BadRequestError("Tên khuyến mãi đã tồn tại");
 
   const promotion = await repo.create(input);
-  return transformPromotionDetail(promotion as any);
+  return transformPromotionDetail(promotion);
 };
 
 export const updatePromotion = async (id: string, input: UpdatePromotionInput) => {
   const existing = await assertPromotionExists(id, { isAdmin: true });
 
-  if (input.name && input.name !== (existing as any).name) {
+  if (input.name && input.name !== existing.name) {
     const nameExists = await repo.checkPromotionName(input.name, id);
     if (nameExists) throw new BadRequestError("Tên khuyến mãi đã tồn tại");
   }
@@ -77,7 +77,7 @@ export const updatePromotion = async (id: string, input: UpdatePromotionInput) =
 
   // Fetch lại với targetName đầy đủ (như findById đã làm lookup brand/category/product)
   const updated = await repo.findById(id, { isAdmin: true });
-  return transformPromotionDetail(updated as any);
+  return transformPromotionDetail(updated!);
 };
 // =====================
 // === ADMIN: soft delete, restore, hard delete, trash ===
@@ -88,11 +88,21 @@ export const softDeletePromotion = async (id: string, deletedById: string) => {
   return repo.softDelete(id, deletedById);
 };
 
+// Bulk soft delete — dùng updateMany 1 query, so count ids đầu vào để phát hiện
+// id không tồn tại / đã bị xóa trước đó, tránh loop findById (N+1).
+export const bulkSoftDeletePromotion = async (ids: string[], deletedById: string) => {
+  const result = await repo.softDeleteMany(ids, deletedById);
+  if (result.count < ids.length) {
+    throw new NotFoundError(`Khuyến mãi (chỉ xóa được ${result.count}/${ids.length} ID — một số ID không tồn tại hoặc đã bị xóa)`);
+  }
+  return { deletedCount: result.count };
+};
+
 export const restorePromotion = async (id: string) => {
-  const promotion = (await repo.findById(id, {
+  const promotion = await repo.findById(id, {
     includeDeleted: true,
     isAdmin: true,
-  })) as any;
+  });
   if (!promotion) throw new NotFoundError("Khuyến mãi");
   if (!promotion.deletedAt) throw new BadRequestError("Khuyến mãi này chưa bị xóa");
 
@@ -105,9 +115,9 @@ export const restorePromotion = async (id: string) => {
 };
 
 export const hardDeletePromotion = async (id: string) => {
-  const promotion = (await repo.findById(id, { includeDeleted: true, isAdmin: true })) as any;
+  const promotion = await repo.findById(id, { includeDeleted: true, isAdmin: true });
   if (!promotion) throw new NotFoundError("Khuyến mãi");
-  if (!promotion.deletedAt) throw new ForbiddenError("Phải soft delete trước...");
+  if (!promotion.deletedAt) throw new ForbiddenError("Phải soft delete khuyến mãi trước khi xóa vĩnh viễn");
 
   // Nên thêm — cảnh báo nghiệp vụ dù DB không constraint:
   if (promotion.usedCount > 0) {
@@ -117,7 +127,7 @@ export const hardDeletePromotion = async (id: string) => {
   return repo.hardDelete(id);
 };
 
-export const getDeletedPromotions = async (options: { page?: number; limit?: number } = {}) => {
+export const getDeletedPromotions = async (options: ListDeletedPromotionsQuery) => {
   return repo.findAllDeleted(options);
 };
 

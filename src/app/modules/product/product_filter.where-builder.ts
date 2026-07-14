@@ -1,7 +1,6 @@
 import { Prisma } from "@prisma/client";
-import { getDescendantCategoryIds } from "./product_filter.repository";
 import { resolveCategoryIds } from "@/utils/shared.category-resolver";
-import prisma from "prisma/client";
+import prisma from "@/config/db";
 // Normalize: ?attr_storage=256GB hoặc ?attr_storage=256GB&attr_storage=512GB
 const toArray = (value: string | string[]): string[] => (Array.isArray(value) ? value.filter(Boolean) : [value].filter(Boolean));
 // Parse dynamic keys ra 2 nhóm:
@@ -12,11 +11,25 @@ interface ParsedDynamicFilters {
   attrFilters: Record<string, string | string[]>;
 }
 
-const parseDynamicFilters = (query: Record<string, any>): ParsedDynamicFilters => {
+/** Query đã qua Zod validate (listProductsSchema/listProductsWithFiltersSchema) — field cố định có type rõ, dynamic spec_xxx/attr_xxx qua index signature. */
+interface ProductQueryFilters {
+  search?: string;
+  category?: string;
+  brandId?: string | string[];
+  isFeatured?: boolean;
+  minPrice?: number;
+  maxPrice?: number;
+  inStock?: boolean;
+  minRating?: number;
+  [key: string]: unknown;
+}
+
+const parseDynamicFilters = (query: ProductQueryFilters): ParsedDynamicFilters => {
   const specFilters: Record<string, string | string[]> = {};
   const attrFilters: Record<string, string | string[]> = {};
 
   for (const [key, value] of Object.entries(query)) {
+    if (typeof value !== "string" && !Array.isArray(value)) continue;
     if (key.startsWith("spec_")) specFilters[key.slice(5)] = value;
     else if (key.startsWith("attr_")) attrFilters[key.slice(5)] = value;
   }
@@ -75,7 +88,7 @@ const buildSpecConditions = (specFilters: Record<string, string | string[]>): Pr
 
   // Xử lý BOOLEAN và ENUM specs
   for (const [specKey, filterValue] of Object.entries(regularFilters)) {
-    const values = toArray(filterValue as string | string[]);
+    const values = toArray(filterValue);
     if (values.length === 0) continue;
 
     const isBooleanTrue = values.length === 1 && values[0].toLowerCase() === "true";
@@ -115,7 +128,7 @@ const buildAttrConditions = (attrFilters: Record<string, string | string[]>): Pr
   const conditions: Prisma.productsWhereInput[] = [];
 
   for (const [attrCode, filterValue] of Object.entries(attrFilters)) {
-    const values = toArray(filterValue as string | string[]);
+    const values = toArray(filterValue);
     if (values.length === 0) continue;
 
     // Product phải có ít nhất 1 active variant match attribute này
@@ -138,14 +151,11 @@ const buildAttrConditions = (attrFilters: Record<string, string | string[]>): Pr
 
   return conditions;
 };
-// Build orderBy
-export const buildOrderBy = (sortBy?: string, sortOrder?: "asc" | "desc"): any => {
+// Build orderBy — LƯU Ý: "price" KHÔNG xử lý ở đây vì Prisma không hỗ trợ
+// orderBy theo _min/_avg của field quan hệ (chỉ hỗ trợ _count). Sort theo giá
+// được xử lý riêng ở product.repository.ts (xem findAllSortedByPrice).
+export const buildOrderBy = (sortBy?: string, sortOrder?: "asc" | "desc"): Prisma.productsOrderByWithRelationInput | Prisma.productsOrderByWithRelationInput[] => {
   const order = sortOrder ?? "desc";
-
-  if (sortBy === "price") {
-    // Sắp xếp theo giá của default variant
-    return [{ variants: { _count: order } }];
-  }
 
   if (sortBy && ["createdAt", "name", "viewsCount", "ratingAverage", "soldCount", "totalSoldCount"].includes(sortBy)) {
     return { [sortBy]: order };
@@ -155,27 +165,23 @@ export const buildOrderBy = (sortBy?: string, sortOrder?: "asc" | "desc"): any =
   return [{ totalSoldCount: "desc" }, { ratingAverage: "desc" }, { createdAt: "desc" }, { id: "asc" }];
 };
 
-export const buildSearchCategoryAndBrandIds = async (
-  keyword: string,
-  prismaClient: any, // truyền prisma instance từ ngoài vào
-): Promise<{ categoryIds: string[]; brandIds: string[] }> => {
-  // Tìm categories match keyword (Dùng Trigram Fuzzy Search)
-  const matchedCats: { id: string }[] = await prismaClient.$queryRaw`
-    SELECT id FROM categories 
-    WHERE "deletedAt" IS NULL 
-    AND (
-      name ILIKE ${'%' + keyword + '%'} 
-      OR similarity(name, ${keyword}) > 0.3
-      OR slug ILIKE ${'%' + keyword + '%'}
-    )
-  `;
+export const buildSearchCategoryAndBrandIds = async (keyword: string): Promise<{ categoryIds: string[]; brandIds: string[] }> => {
+  // Tìm categories match keyword
+  const matchedCats = await prisma.categories.findMany({
+    where: {
+      deletedAt: null,
+      OR: [{ name: { contains: keyword, mode: "insensitive" } }, { slug: { contains: keyword, mode: "insensitive" } }],
+    },
+    select: { id: true },
+  });
 
-  // Với mỗi category match → lấy toàn bộ descendants qua CTE
-  const categoryIds: string[] = [];
-  for (const cat of matchedCats) {
-    const rows: { id: string }[] = await prismaClient.$queryRaw`
+  // Lấy toàn bộ descendants cho tất cả category match trong 1 query (tránh N+1)
+  const matchedCatIds: string[] = matchedCats.map((c) => c.id);
+  let categoryIds: string[] = [];
+  if (matchedCatIds.length > 0) {
+    const rows: { id: string }[] = await prisma.$queryRaw`
       WITH RECURSIVE descendants AS (
-        SELECT id FROM categories WHERE id = ${cat.id}::uuid AND "deletedAt" IS NULL
+        SELECT id FROM categories WHERE id = ANY(${matchedCatIds}::uuid[]) AND "deletedAt" IS NULL
         UNION ALL
         SELECT c.id FROM categories c
         JOIN descendants d ON c."parentId" = d.id
@@ -183,23 +189,21 @@ export const buildSearchCategoryAndBrandIds = async (
       )
       SELECT id FROM descendants
     `;
-    rows.forEach((r) => categoryIds.push(r.id));
+    categoryIds = rows.map((r) => r.id);
   }
 
-  // Tìm brands match keyword (Dùng Trigram Fuzzy Search)
-  const matchedBrands: { id: string }[] = await prismaClient.$queryRaw`
-    SELECT id FROM brands 
-    WHERE "deletedAt" IS NULL 
-    AND (
-      name ILIKE ${'%' + keyword + '%'} 
-      OR similarity(name, ${keyword}) > 0.3
-      OR slug ILIKE ${'%' + keyword + '%'}
-    )
-  `;
+  // Tìm brands match keyword
+  const matchedBrands = await prisma.brands.findMany({
+    where: {
+      deletedAt: null,
+      OR: [{ name: { contains: keyword, mode: "insensitive" } }, { slug: { contains: keyword, mode: "insensitive" } }],
+    },
+    select: { id: true },
+  });
 
   return {
     categoryIds: [...new Set(categoryIds)],
-    brandIds: matchedBrands.map((b: any) => b.id),
+    brandIds: matchedBrands.map((b) => b.id),
   };
 };
 
@@ -208,7 +212,7 @@ export const buildSearchCategoryAndBrandIds = async (
 // Nhận TOÀN BỘ query object (bao gồm cả dynamic spec_xxx và attr_xxx)
 // Type: Record<string, any> để tương thích với passthrough() schema
 export const buildProductWhere = async (
-  query: Record<string, any>,
+  query: ProductQueryFilters,
   onlyActive: boolean,
   // NEW: pre-fetched search IDs (truyền từ product.repository.ts)
   searchMeta?: { categoryIds: string[]; brandIds: string[] },
@@ -234,14 +238,7 @@ export const buildProductWhere = async (
     where.OR = orConditions;
   }
 
-  //  Category (slug → toàn bộ sub-category IDs)
-  // if (query.category) {
-  //   const tree = await getDescendantCategoryIds(query.category);
-  //   if (tree) {
-  //     where.categoryId = { in: tree.ids };
-  //   }
-  // }
-
+  // Category (slug → toàn bộ sub-category IDs)
   if (query.category) {
     const ids = await resolveCategoryIds(query.category, prisma);
     if (ids.length > 0) {
@@ -250,7 +247,7 @@ export const buildProductWhere = async (
   }
 
   if (query.brandId) {
-    const brandIds = toArray(query.brandId as string | string[]);
+    const brandIds = toArray(query.brandId);
     if (brandIds.length === 1) {
       where.brandId = brandIds[0];
     } else if (brandIds.length > 1) {

@@ -28,8 +28,6 @@ const selectCategoryAdmin = {
 type CreateCategoryData = Prisma.categoriesCreateInput;
 type UpdateCategoryData = Prisma.categoriesUpdateInput;
 
-type CategoryNode = { id: string; parentId: string | null };
-
 // where
 
 const buildCategoryWhere = (query: ListCategoriesQuery, onlyActive: boolean, isAdmin: boolean): Prisma.categoriesWhereInput => {
@@ -93,7 +91,7 @@ export const findAllAdmin = async (query: ListCategoriesQuery) => {
   const orderBy = buildCategoryOrderBy(query);
   const baseWhere = buildCategoryWhere({ ...query, isActive: undefined, isFeatured: undefined }, false, true);
 
-  const [data, total, countAll, countActive, countInactive, countFeatured] = await Promise.all([
+  const [data, total, countAll, countActive, countInactive, countFeatured] = await prisma.$transaction([
     prisma.categories.findMany({
       where,
       orderBy,
@@ -381,28 +379,34 @@ export const existsByNameInParent = async (name: string, parentId: string | null
   return !!category;
 };
 
-async function getCategoryHierarchy(categoryId: string): Promise<string[]> {
+/**
+ * getCategoryHierarchy
+ *
+ * Trả về danh sách id từ categoryId leo dần lên root. Trước đây leo từng cấp
+ * bằng findFirst bên trong while loop (N+1 query theo độ sâu cây). Giờ chỉ
+ * query 1 lần toàn bộ id+parentId rồi walk trong memory.
+ */
+export const getCategoryHierarchy = async (categoryId: string): Promise<string[]> => {
+  const all = await prisma.categories.findMany({
+    where: { deletedAt: null },
+    select: { id: true, parentId: true },
+  });
+
+  const parentMap = new Map(all.map((c) => [c.id, c.parentId]));
+
   const result: string[] = [];
   let currentId: string | null = categoryId;
-
-  while (currentId) {
-    const category: CategoryNode | null = await prisma.categories.findFirst({
-      where: { id: currentId, deletedAt: null },
-      select: { id: true, parentId: true },
-    });
-    if (!category) break;
-    result.push(category.id);
-    currentId = category.parentId;
+  while (currentId && parentMap.has(currentId)) {
+    result.push(currentId);
+    currentId = parentMap.get(currentId) ?? null;
   }
 
   return result;
-}
+};
 
 // TEMPLATE / ATTRIBUTES / SPECIFICATIONS
 
-export const getCategoryVariantAttributesWithOptions = async (categoryId: string) => {
-  const categoryIds = await getCategoryHierarchy(categoryId);
-
+export const getCategoryVariantAttributesWithOptions = async (categoryIds: string[]) => {
   const categoryAttributes = await prisma.category_variant_attributes.findMany({
     where: { categoryId: { in: categoryIds } },
     include: {
@@ -438,6 +442,13 @@ export const getCategoryVariantAttributesWithOptions = async (categoryId: string
   return Array.from(attributesMap.values());
 };
 
+export const getAttributeById = async (attributeId: string) => {
+  return prisma.attributes.findUnique({
+    where: { id: attributeId },
+    select: { id: true, code: true, name: true },
+  });
+};
+
 export const getAttributeOptions = async (attributeId: string) => {
   return prisma.attributes_options.findMany({
     where: { attributeId },
@@ -446,9 +457,7 @@ export const getAttributeOptions = async (attributeId: string) => {
   });
 };
 
-export const getCategorySpecifications = async (categoryId: string) => {
-  const categoryIds = await getCategoryHierarchy(categoryId);
-
+export const getCategorySpecifications = async (categoryIds: string[]) => {
   const categorySpecs = await prisma.category_specifications.findMany({
     where: { categoryId: { in: categoryIds } },
     include: {

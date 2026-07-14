@@ -53,6 +53,7 @@ import analyticsRouter from "@/app/modules/analytics/analytics.route";
 import settingsRouter from "@/app/modules/settings/settings.route";
 import auditRouter from "@/app/modules/audit/audit.route";
 import staffPermissionsRouter from "@/app/modules/staff-permissions/staff-permissions.route";
+import healthRouter from "@/app/modules/health/health.router";
 
 import { auditMiddleware } from "@/app/middlewares/audit.middleware";
 import { initSettingsCache } from "@/app/modules/settings/settings.service";
@@ -115,6 +116,8 @@ router.use("/analytics", analyticsRouter);
 router.use("/settings", settingsRouter);
 router.use("/audit", auditRouter);
 router.use("/admin/staff-permissions", staffPermissionsRouter);
+
+router.use("/health", healthRouter);
 
 // Warm cache khi app khởi động
 initSettingsCache().catch(console.error);

@@ -142,6 +142,16 @@ export interface HomeProductsResponse {
   bestSellingProducts: unknown[];
 }
 
+/** GET /home/category-products — best selling theo từng category (tab), cache trung bình */
+export interface HomeCategoryProductGroup {
+  category: { id: string; name: string; slug: string };
+  products: unknown[];
+}
+
+export interface HomeCategoryProductsResponse {
+  groups: HomeCategoryProductGroup[];
+}
+
 /** GET /home/sale-schedule — real-time, cache ngắn */
 export type HomeSaleScheduleOnlyResponse = HomeSaleScheduleResponse;
 

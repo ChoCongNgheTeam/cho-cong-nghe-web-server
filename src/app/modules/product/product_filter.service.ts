@@ -9,13 +9,11 @@ import {
   getVariantAttributesByCategories,
   getPriceRangeByCategories,
   getActiveBrandsByCategories,
-  getBatchActiveAttributeOptions, // ← import hàm mới
+  getBatchActiveAttributeOptions,
 } from "./product_filter.repository";
 import { CategoryFiltersResponse, FilterGroup } from "./product_filter.types";
 
-// ─────────────────────────────────────────────────────────────────────────────
 // CACHE
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface CacheEntry<T> {
   value: T;
@@ -59,9 +57,7 @@ export const invalidateFilterCache = (categorySlug?: string) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HELPERS (giữ nguyên từ file cũ)
-// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
 
 const detectFilterTypeFallback = (values: string[]): FilterType => {
   if (values.length === 0) return FilterType.ENUM;
@@ -105,9 +101,7 @@ const sortEnumValues = (values: string[], key: string): string[] => {
 
 const SKIP_ATTRIBUTES = new Set(["color"]);
 
-// ─────────────────────────────────────────────────────────────────────────────
 // MAIN
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const getCategoryFilters = async (categorySlug: string): Promise<CategoryFiltersResponse> => {
   const cacheKey = `filters:${categorySlug}`;
@@ -156,9 +150,7 @@ export const getCategoryFilters = async (categorySlug: string): Promise<Category
     range: priceRange,
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // FIX #3: Batch query thay vì N queries
-  // ─────────────────────────────────────────────────────────────────────────
+  // Batch 1 query duy nhất thay vì N queries riêng lẻ theo từng attribute
   const filteredAttrs = variantAttributes.filter((attr) => !SKIP_ATTRIBUTES.has(attr.code));
 
   // 1 query duy nhất lấy tất cả attribute options
@@ -191,9 +183,8 @@ export const getCategoryFilters = async (categorySlug: string): Promise<Category
       } satisfies FilterGroup;
     })
     .filter((f): f is NonNullable<typeof f> => f !== null);
-  // ─────────────────────────────────────────────────────────────────────────
-  // Spec filters (giữ nguyên logic cũ)
-  // ─────────────────────────────────────────────────────────────────────────
+
+  // Spec filters
   const seenSpecIds = new Set<string>();
   const uniqueSpecs = filterableSpecs.filter((cs) => {
     if (seenSpecIds.has(cs.specification.id)) return false;

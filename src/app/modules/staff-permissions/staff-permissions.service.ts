@@ -1,20 +1,16 @@
 import * as repo from "./staff-permissions.repository";
-import { UpdatePermissionsInput, ResetPermissionsInput } from "./staff-permissions.validation";
+import { UpdatePermissionsInput, ResetPermissionsInput, ListStaffPermissionsQuery } from "./staff-permissions.validation";
 import { DEFAULT_PERMISSIONS, STAFF_ROLES, StaffRole } from "./staff-permissions.types";
 import { NotFoundError, BadRequestError } from "@/errors";
-import prisma from "@/config/db";
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// HELPERS
 
 /**
  * Đảm bảo user tồn tại và là staff role.
  * Dùng chung cho các operations cần validate trước khi xử lý.
  */
 const assertStaffUser = async (userId: string) => {
-  const user = await prisma.users.findUnique({
-    where: { id: userId, deletedAt: null },
-    select: { id: true, role: true, fullName: true, email: true },
-  });
+  const user = await repo.findStaffCandidateById(userId);
 
   if (!user) throw new NotFoundError("Người dùng");
 
@@ -25,11 +21,15 @@ const assertStaffUser = async (userId: string) => {
   return user;
 };
 
-// ── Admin ──────────────────────────────────────────────────────────────────
+// ADMIN
 
-/** Lấy danh sách tất cả staff kèm permissions — dùng cho trang quản lý admin */
-export const getAllStaffPermissions = async () => {
-  return repo.findAllWithUser();
+/** Lấy danh sách tất cả staff kèm permissions (có phân trang) — dùng cho trang quản lý admin */
+export const getAllStaffPermissions = async (query: ListStaffPermissionsQuery) => {
+  const { page, limit } = query;
+  const skip = (page - 1) * limit;
+
+  const { data, total } = await repo.findAllWithUser({ skip, take: limit });
+  return { data, total, page, limit };
 };
 
 /** Lấy permissions của 1 staff */
@@ -64,16 +64,16 @@ export const resetPermissionsToDefault = async (userId: string, input: ResetPerm
   return repo.upsertPermissions(userId, preset);
 };
 
-// ── Internal — dùng từ module khác ────────────────────────────────────────
+// INTERNAL — dùng từ module khác
 
 /**
  * Tự động tạo permissions khi tạo user staff mới.
  * Gọi từ user.service.ts sau khi createUser thành công.
  */
 export const seedDefaultPermissions = async (userId: string, role: string) => {
-  const preset = DEFAULT_PERMISSIONS[role];
-  if (!preset) return; // CUSTOMER / ADMIN không cần
+  if (!STAFF_ROLES.includes(role as StaffRole)) return; // CUSTOMER / ADMIN không cần
 
+  const preset = DEFAULT_PERMISSIONS[role as StaffRole];
   // upsert để idempotent — không lỗi nếu gọi lại
   return repo.upsertPermissions(userId, preset);
 };

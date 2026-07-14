@@ -1,4 +1,5 @@
 import { uploadImage, deleteImage } from "@/integrations/cloudinary.service";
+import { BadRequestError } from "@/errors";
 
 /**
  * parseMultipartData
@@ -18,7 +19,7 @@ export const parseMultipartData = (body: any): any => {
       data = { ...data, ...parsedData };
       delete data.data;
     } catch {
-      throw new Error("Invalid JSON format in 'data' field");
+      throw new BadRequestError("Invalid JSON format in 'data' field");
     }
   }
 

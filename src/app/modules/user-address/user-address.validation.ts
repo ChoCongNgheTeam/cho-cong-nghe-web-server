@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { AddressType } from "@prisma/client";
 
-// ==================== ADDRESS VALIDATION ====================
+// ADDRESS VALIDATION
 
 export const createAddressSchema = z.object({
   contactName: z.string().trim().min(1, "Tên liên hệ không được để trống").max(100, "Tên liên hệ không quá 100 ký tự"),
@@ -36,7 +36,7 @@ export const addressIdSchema = z.object({
   addressId: z.string().uuid("Address ID không hợp lệ"),
 });
 
-// ==================== ADMIN QUERIES ====================
+// ADMIN QUERIES
 
 export const listAddressesQuerySchema = z.object({
   search: z.string().optional(),
@@ -49,3 +49,7 @@ export const listAddressesQuerySchema = z.object({
 });
 
 export type ListAddressesQuery = z.infer<typeof listAddressesQuerySchema>;
+
+// GET /admin/trash/addresses — chỉ cần page/perPage
+export const getDeletedAddressesQuerySchema = listAddressesQuerySchema.pick({ page: true, perPage: true });
+export type GetDeletedAddressesQuery = z.infer<typeof getDeletedAddressesQuerySchema>;

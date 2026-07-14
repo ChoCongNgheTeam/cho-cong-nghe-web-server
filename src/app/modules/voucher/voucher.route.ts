@@ -33,6 +33,7 @@ import {
   bulkDeleteVouchersSchema,
   listVoucherUsagesSchema,
   listVoucherUsersSchema,
+  revokeVoucherUserSchema,
 } from "./voucher.validation";
 import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
 
@@ -41,13 +42,13 @@ const router = Router();
 const staffAdminAuth = [authMiddleware(), requireRole(...STAFF_ROLES, "ADMIN")] as const;
 const adminAuth = [authMiddleware(), requireRole("ADMIN")] as const;
 
-// ── Public ─────────────────────────────────────────────────────────────────────
+// Public
 router.get("/", validate(listVouchersSchema, "query"), asyncHandler(getVouchersPublicHandler));
 router.get("/my-vouchers", authMiddleware(), asyncHandler(getUserVouchersHandler));
 router.get("/code/:code", validate(voucherCodeParamsSchema, "params"), asyncHandler(getVoucherByCodeHandler));
 router.post("/validate", authMiddleware(), validate(validateVoucherSchema, "body"), asyncHandler(validateVoucherHandler));
 
-// ── Admin — static routes (trước /:id) ────────────────────────────────────────
+// Admin — static routes (trước /:id)
 // MARKETING có canVouchers — xem, tạo, sửa, xóa mềm
 router.get("/admin/all", ...staffAdminAuth, requirePermission("canVouchers"), validate(listVouchersSchema, "query"), asyncHandler(getVouchersAdminHandler));
 
@@ -55,7 +56,7 @@ router.get("/admin/trash", ...adminAuth, asyncHandler(getDeletedVouchersHandler)
 
 router.get("/admin/usages", ...staffAdminAuth, requirePermission("canVouchers"), validate(listVoucherUsagesSchema, "query"), asyncHandler(getVoucherUsagesHandler));
 router.get("/admin/private-users", ...staffAdminAuth, requirePermission("canVouchers"), validate(listVoucherUsersSchema, "query"), asyncHandler(getVoucherUsersHandler));
-router.delete("/admin/:voucherId/users/:userId", ...adminAuth, asyncHandler(revokeVoucherUserHandler));
+router.delete("/admin/:voucherId/users/:userId", ...adminAuth, validate(revokeVoucherUserSchema, "params"), asyncHandler(revokeVoucherUserHandler));
 
 router.post("/admin/assign", ...staffAdminAuth, requirePermission("canVouchers"), validate(assignVoucherToUsersSchema, "body"), asyncHandler(assignVoucherToUsersHandler));
 
@@ -63,7 +64,7 @@ router.delete("/admin/bulk", ...staffAdminAuth, requirePermission("canVouchers")
 
 router.post("/admin", ...staffAdminAuth, requirePermission("canVouchers"), validate(createVoucherSchema, "body"), asyncHandler(createVoucherHandler));
 
-// ── Admin — dynamic /:id ───────────────────────────────────────────────────────
+// Admin — dynamic /:id
 router.get("/admin/:id", ...staffAdminAuth, requirePermission("canVouchers"), validate(voucherParamsSchema, "params"), asyncHandler(getVoucherByIdHandler));
 router.patch("/admin/:id", ...staffAdminAuth, requirePermission("canVouchers"), validate(voucherParamsSchema, "params"), validate(updateVoucherSchema, "body"), asyncHandler(updateVoucherHandler));
 

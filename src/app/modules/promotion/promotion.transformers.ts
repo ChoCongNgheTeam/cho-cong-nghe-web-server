@@ -1,9 +1,5 @@
-import { PromotionCard, PromotionDetail, RawPromotion, TargetType, PromotionActionType } from "./promotion.types";
-
-// Fix BigInt serialization
-(BigInt.prototype as any).toJSON = function () {
-  return this.toString();
-};
+import "./promotion.helpers";
+import { PromotionCard, PromotionDetail, RawPromotion, RawPromotionRuleRow, RawPromotionTargetRow, PromotionActionType } from "./promotion.types";
 
 /**
  * Check if promotion is expired
@@ -49,8 +45,8 @@ export type PromotionCardSource = {
   isActive: boolean;
   startDate: Date | null;
   endDate: Date | null;
-  rules?: any[];
-  targets?: any[];
+  rules?: Array<{ id: string }>;
+  targets?: Array<{ id: string }>;
 };
 /**
  * Transform promotion card data (for listing)
@@ -97,36 +93,20 @@ export const transformPromotionDetail = (promotion: RawPromotion): PromotionDeta
     isAvailable: isPromotionAvailable(promotion),
     createdAt: promotion.createdAt,
     rules:
-      promotion.rules?.map((rule) => ({
+      promotion.rules?.map((rule: RawPromotionRuleRow) => ({
         id: rule.id,
-        actionType: rule.actionType as PromotionActionType,
+        actionType: rule.actionType,
         discountValue: rule.discountValue ? Number(rule.discountValue) : undefined,
         buyQuantity: rule.buyQuantity ?? undefined,
         getQuantity: rule.getQuantity ?? undefined,
         giftProductVariantId: rule.giftProductVariantId ?? undefined,
       })) || [],
     targets:
-      promotion.targets?.map((target) => ({
+      promotion.targets?.map((target: RawPromotionTargetRow) => ({
         id: target.id,
-        targetType: target.targetType as TargetType,
+        targetType: target.targetType,
         targetId: target.targetId ?? undefined,
         targetName: target.targetName ?? undefined,
-      })) || [],
-  };
-};
-
-export const transformPromotionDetailWithExisting = (promotion: RawPromotion, existingTargets?: RawPromotion["targets"]): PromotionDetail => {
-  const targetMap = new Map(existingTargets?.map((t) => [t.targetId, t.targetName]));
-
-  return {
-    ...transformPromotionDetail(promotion),
-
-    targets:
-      promotion.targets?.map((target) => ({
-        id: target.id,
-        targetType: target.targetType as TargetType,
-        targetId: target.targetId ?? undefined,
-        targetName: target.targetName ?? targetMap.get(target.targetId) ?? undefined,
       })) || [],
   };
 };

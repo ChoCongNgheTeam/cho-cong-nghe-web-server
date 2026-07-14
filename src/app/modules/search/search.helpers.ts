@@ -1,15 +1,13 @@
 /**
  * search.helpers.ts
  *
- * Utilities cho module search:
+ * Utility THUẦN cho module search — không import Prisma/DB.
  *  - normalize tiếng Việt (bỏ dấu, chuẩn hóa space/hyphen)
  *  - build keyword variants để tăng recall
- *  - fetch category & brand IDs + detect intent chính xác
+ *  - word-boundary intent check (dùng bởi search.service.ts để phân loại strong/weak intent)
  */
 
-import { PrismaClient } from "@prisma/client";
-
-// ── Bảng map dấu tiếng Việt → Latin ──────────────────────────────────────────
+// BẢNG MAP DẤU TIẾNG VIỆT → LATIN
 
 const VIETNAMESE_MAP: Record<string, string> = {
   à: "a",
@@ -179,7 +177,7 @@ export const buildKeywordVariants = (q: string): string[] => {
   return [...new Set([raw, normalized, slug].filter(Boolean))];
 };
 
-// ── Word-boundary intent check ────────────────────────────────────────────────
+// WORD-BOUNDARY INTENT CHECK
 
 /**
  * Kiểm tra keyword có phải là "word" trong text không.
@@ -188,152 +186,27 @@ export const buildKeywordVariants = (q: string): string[] => {
  *   "ip" trong "iPhone 14 Series" → "ip" là PREFIX của word "iphone" → false positive
  *   "iphone" trong "Apple (iPhone)" → toàn bộ word → TRUE
  *   "samsung" trong "Samsung" → TRUE
- *   "laptop" trong "Laptop" → TRUE
- *   "dien thoai" trong "Điện Thoại" (normalized) → TRUE
  *
- * Rule: keyword match nếu:
- *   - keyword là toàn bộ một "token" trong text (split by space/paren/dash)
- *   - HOẶC text sau khi normalize bắt đầu bằng keyword + space/end
- *   - HOẶC keyword = normalized text hoàn toàn
- *
- * Minimum length: keyword < 3 ký tự (sau normalize) sẽ không được coi là intent
- * dù có match, vì quá ngắn để xác định intent ("ip", "hp" gây false positive).
- * Ngoại lệ: keyword chính xác bằng tên brand/category (vd brand slug "hp" = "hp" exact).
+ * Keyword < 3 ký tự (sau normalize) không được coi là intent dù có match,
+ * trừ khi match chính xác toàn bộ candidate name.
  */
-const isWordIntent = (keyword: string, candidateName: string): boolean => {
+export const isWordIntent = (keyword: string, candidateName: string): boolean => {
   const kNorm = normalizeVietnamese(keyword);
   const cNorm = normalizeVietnamese(candidateName);
 
-  // Exact match → luôn là intent
   if (cNorm === kNorm) return true;
-
-  // Keyword quá ngắn (< 3 ký tự) → chỉ accept nếu exact match ở trên
-  // "ip" (2 chars) không thể là intent của "iPhone Series" dù contains
   if (kNorm.length < 3) return false;
 
-  // Word-boundary check: keyword phải là một "word" đầy đủ trong candidate name
-  // Split theo space, dấu ngoặc, gạch ngang
   const words = cNorm.split(/[\s()\[\],\/\\-]+/).filter(Boolean);
-
-  // Keyword match toàn bộ một word → TRUE
   if (words.includes(kNorm)) return true;
 
-  // Keyword là prefix của toàn bộ chuỗi (user đang gõ dở tên brand/category)
-  // Minimum 3 ký tự + phải cover ít nhất 50% độ dài candidate word ngắn nhất
-  // VD: "sam" → "samsung" → prefix, 3/7 = 43% < 50% → FALSE (quá ngắn)
-  //     "sams" → "samsung" → 4/7 = 57% → TRUE
-  //     "lapt" → "laptop"  → 4/6 = 67% → TRUE
-  //     "dien" → "dien thoai" → first word match prefix → TRUE
   const firstWord = words[0];
   if (firstWord && kNorm.length >= 4 && firstWord.startsWith(kNorm)) {
     const coverage = kNorm.length / firstWord.length;
     return coverage >= 0.5;
   }
 
-  // Multi-word keyword: "dien thoai" → check nếu cNorm starts với kNorm
   if (kNorm.includes(" ") && cNorm.startsWith(kNorm)) return true;
 
   return false;
-};
-
-// ── SearchIntent ──────────────────────────────────────────────────────────────
-
-export interface SearchIntent {
-  categoryIds: string[];
-  brandIds: string[];
-  /**
-   * true = keyword thực sự match TÊN category/brand theo word-boundary
-   * false = chỉ match slug substring hoặc keyword quá ngắn
-   */
-  hasStrongIntent: boolean;
-}
-
-export const buildSearchCategoryAndBrandIdsV2 = async (q: string, prismaClient: PrismaClient): Promise<SearchIntent> => {
-  const variants = buildKeywordVariants(q);
-
-  // ── Condition sets ──────────────────────────────────────────────────────────
-
-  // Name-only conditions để fetch candidates (rộng, dùng contains)
-  const nameOnlyConditions = variants.map((v) => ({
-    name: { contains: v, mode: "insensitive" as const },
-  }));
-
-  // Name + slug conditions để mở rộng categoryIds cho scopeWhere
-  const nameOrSlugConditions = variants.flatMap((v) => [{ name: { contains: v, mode: "insensitive" as const } }, { slug: { contains: v, mode: "insensitive" as const } }]);
-
-  // ── Query song song ─────────────────────────────────────────────────────────
-  const [
-    nameMatchedCats, // candidates cho intent check
-    allMatchedCats, // candidates cho expand scope
-    nameMatchedBrands, // candidates cho intent check
-    allMatchedBrands, // candidates cho expand scope
-  ] = await Promise.all([
-    prismaClient.categories.findMany({
-      where: { deletedAt: null, OR: nameOnlyConditions },
-      select: { id: true, name: true }, // cần name để word-boundary check
-    }),
-    prismaClient.categories.findMany({
-      where: { deletedAt: null, OR: nameOrSlugConditions },
-      select: { id: true },
-    }),
-    prismaClient.brands.findMany({
-      where: { deletedAt: null, OR: nameOnlyConditions },
-      select: { id: true, name: true },
-    }),
-    prismaClient.brands.findMany({
-      where: { deletedAt: null, OR: nameOrSlugConditions },
-      select: { id: true },
-    }),
-  ]);
-
-  // ── Expand descendants cho allMatchedCats ───────────────────────────────────
-  const categoryIds: string[] = [];
-  for (const cat of allMatchedCats) {
-    const rows: { id: string }[] = await prismaClient.$queryRaw`
-      WITH RECURSIVE descendants AS (
-        SELECT id FROM categories WHERE id = ${cat.id}::uuid AND "deletedAt" IS NULL
-        UNION ALL
-        SELECT c.id FROM categories c
-        JOIN descendants d ON c."parentId" = d.id
-        WHERE c."deletedAt" IS NULL
-      )
-      SELECT id FROM descendants
-    `;
-    rows.forEach((r) => categoryIds.push(r.id));
-  }
-
-  // ── Word-boundary intent check ──────────────────────────────────────────────
-  // Dùng isWordIntent thay vì chỉ check .length > 0
-  // "ip" → nameMatchedCats = ["iPhone 14 Series", "Apple (iPhone)"...]
-  //       → isWordIntent("ip", "iPhone 14 Series") → false (quá ngắn, < 3 chars)
-  //       → isWordIntent("ip", "Apple (iPhone)") → false
-  //       → hasStrongIntent = false ✓
-  //
-  // "iphone" → isWordIntent("iphone", "Apple (iPhone)") → "iphone" in words ["apple","iphone"] → TRUE ✓
-  // "samsung" → isWordIntent("samsung", "Samsung") → exact → TRUE ✓
-  // "laptop"  → isWordIntent("laptop", "Laptop") → exact → TRUE ✓
-  // "dien thoai" → multi-word, cNorm "dien thoai" startsWith "dien thoai" → TRUE ✓
-  // "sam"  (3 chars) → isWordIntent("sam", "Samsung") → length=3 < 4 for prefix → FALSE ✓
-  // "sams" (4 chars) → isWordIntent("sams", "Samsung") → 4/7=57% ≥ 50% → TRUE ✓
-
-  const hasCatIntent = nameMatchedCats.some((cat: any) => variants.some((v) => isWordIntent(v, cat.name)));
-  const hasBrandIntent = nameMatchedBrands.some((brand: any) => variants.some((v) => isWordIntent(v, brand.name)));
-
-  const hasStrongIntent = hasCatIntent || hasBrandIntent;
-
-  console.log("[search] word-boundary intent check:", {
-    q,
-    variants,
-    nameMatchedCats: nameMatchedCats.map((c: any) => c.name),
-    nameMatchedBrands: nameMatchedBrands.map((b: any) => b.name),
-    hasCatIntent,
-    hasBrandIntent,
-    hasStrongIntent,
-  });
-
-  return {
-    categoryIds: [...new Set(categoryIds)],
-    brandIds: allMatchedBrands.map((b: any) => b.id),
-    hasStrongIntent,
-  };
 };

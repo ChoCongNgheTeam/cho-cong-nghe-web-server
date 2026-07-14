@@ -1,5 +1,6 @@
 import * as repo from "./checkout.repository";
-import { CheckoutInput, CartValidationResult, CartItemValidation, CheckoutSummary } from "./checkout.types";
+import { CartValidationResult, CartItemValidation, CheckoutSummary } from "./checkout.types";
+import { CheckoutInput } from "./checkout.validation";
 import { BadRequestError, NotFoundError } from "@/errors";
 import { handlePrismaError } from "@/utils/handle-prisma-error";
 import prisma from "@/config/db";
@@ -8,9 +9,7 @@ import { getCartWithPricing } from "../pricing/use-cases/getCartWithPricing.serv
 import { sendOrderConfirmationEmail } from "../../../integrations/email.service";
 import { sendOrderCreatedAdminNotification } from "../notification/notification.service";
 
-// =======================================================
 // 1. Cart validation (ĐÃ SỬA ĐỂ GHI NHẬN GIÁ PROMOTION)
-// =======================================================
 
 export const validateCartItems = async (userId: string, cartItemIds?: string[]): Promise<CartValidationResult> => {
   // Gọi hàm tính giá chung từ module Pricing thay vì gọi trực tiếp DB
@@ -35,14 +34,14 @@ export const validateCartItems = async (userId: string, cartItemIds?: string[]):
   }
 
   for (const item of cartPricing.items) {
-    // 🔥 LẤY GIÁ ĐÃ GIẢM TỪ PROMOTION
+    // LẤY GIÁ ĐÃ GIẢM TỪ PROMOTION
     // Công thức: Dùng giá final nếu có, hoặc dùng (Tổng giá cuối / số lượng) cho an toàn tuyệt đối
     const finalUnitPrice = item.price?.hasPromotion && item.price?.final ? item.price.final : item.totalFinalPrice ? item.totalFinalPrice / item.quantity : item.unitPrice;
 
     validatedItems.push({
       productVariantId: item.productVariantId as string,
       quantity: item.quantity,
-      unitPrice: finalUnitPrice, // 🔥 Ghi nhận giá đã giảm vào đây để lưu xuống Bảng Order Items
+      unitPrice: finalUnitPrice, // Ghi nhận giá đã giảm vào đây để lưu xuống Bảng Order Items
       isValid: true,
       errors: [],
       productName: item.productName,
@@ -60,9 +59,7 @@ export const validateCartItems = async (userId: string, cartItemIds?: string[]):
   };
 };
 
-// =======================================================
 // 2. Tính phí vận chuyển (Đã nâng cấp theo vùng miền)
-// =======================================================
 
 // Helper: Phân loại tỉnh thành theo khu vực (Có thể đưa ra file config riêng sau này)
 const REGION_MAP = {
@@ -146,7 +143,7 @@ const getRegionCategory = (provinceName: string): string => {
   return "MIEN_NAM";
 };
 
-// 🔥 Đã xóa logic query DB. Bây giờ hàm này tính toán tức thì (Synchronous)
+// Đã xóa logic query DB. Bây giờ hàm này tính toán tức thì (Synchronous)
 export const calculateShippingFee = (subtotal: number, provinceName: string): number => {
   const region = getRegionCategory(provinceName);
 
@@ -181,9 +178,7 @@ export const calculateShippingFee = (subtotal: number, provinceName: string): nu
   return 40000;
 };
 
-// =======================================================
 // 3. Tính Voucher
-// =======================================================
 export const validateAndApplyVoucher = async (voucherId: string | undefined, subtotal: number, userId: string): Promise<{ discount: number; id: string | null }> => {
   if (!voucherId) return { discount: 0, id: null };
 
@@ -223,13 +218,11 @@ export const validateAndApplyVoucher = async (voucherId: string | undefined, sub
   return { discount, id: voucher.id };
 };
 
-// =======================================================
 // 5. Chuẩn bị dữ liệu Checkout (Gom tất cả lại)
-// =======================================================
 export const prepareCheckoutData = async (userId: string, input: CheckoutInput): Promise<CheckoutSummary> => {
   const { paymentMethodId, shippingAddressId, voucherId, cartItemIds } = input;
 
-  // 🔥 TỐI ƯU PERFORMANCE: Bắn đồng loạt 3 Query Validation + Payment + Address cùng một lúc
+  // TỐI ƯU PERFORMANCE: Bắn đồng loạt 3 Query Validation + Payment + Address cùng một lúc
   const [validation, paymentMethod, address] = await Promise.all([
     validateCartItems(userId, cartItemIds),
     repo.findPaymentMethodById(paymentMethodId).catch(handlePrismaError),
@@ -252,10 +245,10 @@ export const prepareCheckoutData = async (userId: string, input: CheckoutInput):
   }));
   const subtotalAmount = items.reduce((sum, i) => sum + i.subtotal, 0);
 
-  // 🔥 Lấy thêm tổng tiền giảm giá khuyến mãi từ hàm validate
+  // Lấy thêm tổng tiền giảm giá khuyến mãi từ hàm validate
   const totalPromotionDiscount = validation.totalPromotionDiscount || 0;
 
-  // 🔥 TÍNH PHÍ SHIP CỰC NHANH: Dùng Pure Function, truyền thẳng tên Tỉnh/Thành
+  // TÍNH PHÍ SHIP CỰC NHANH: Dùng Pure Function, truyền thẳng tên Tỉnh/Thành
   const shippingFee = calculateShippingFee(subtotalAmount, address.provinceName);
 
   // Validate Voucher (Cần có subtotalAmount nên phải chạy sau)
@@ -282,80 +275,84 @@ export const prepareCheckoutData = async (userId: string, input: CheckoutInput):
   };
 };
 
-// =======================================================
 // 6. DB Transactions
-// =======================================================
 export const createOrderFromCheckout = async (userId: string, checkoutSummary: CheckoutSummary) => {
+  let order;
   try {
-    // Gọi sang hàm lưu Database của Checkout Repository (Đã có Address Snapshot)
-    const order = await repo.executeOrderTransaction(userId, checkoutSummary);
-
-    // 🎉 GỬI EMAIL XÁC NHẬN ĐẶT HÀNG (ASYNC — không chặn response)
-    // Chạy ở background, không cần await
-    (async () => {
-      try {
-        const [user, paymentMethod] = await Promise.all([
-          prisma.users.findUnique({
-            where: { id: userId },
-            select: { email: true, fullName: true },
-          }),
-          prisma.payment_methods.findUnique({
-            where: { id: checkoutSummary.paymentMethodId },
-            select: { name: true, code: true },
-          }),
-        ]);
-
-        if (user?.email) {
-          const firstItem = order.orderItems[0];
-          const productName = firstItem?.productVariant?.product?.name || "Sản phẩm";
-          const variantName = firstItem?.productVariant?.code || "Phiên bản";
-
-          const { paymentRedirectUrl, bankTransferQrUrl } = checkoutSummary.paymentFields || {};
-          const fullShippingAddress = `${order.shippingContactName} - ${order.shippingPhone} | ${order.shippingDetail}, ${order.shippingWard}, ${order.shippingProvince}`;
-
-          await sendOrderConfirmationEmail(
-            user.email,
-            user.fullName || order.shippingContactName,
-            order.orderCode,
-            {
-              productName,
-              variantName,
-              quantity: order.orderItems.reduce((sum, item) => sum + item.quantity, 0),
-              unitPrice: Number(order.orderItems[0]?.unitPrice || 0),
-              totalAmount: Number(order.totalAmount),
-              shippingAddress: fullShippingAddress,
-              paymentMethod: paymentMethod?.name || "Chưa xác định",
-            },
-            {
-              paymentMethodCode: paymentMethod?.code || "",
-              paymentLink: paymentRedirectUrl || bankTransferQrUrl || undefined,
-            },
-          );
-        }
-      } catch (emailError) {
-        console.warn(`⚠️ Lỗi gửi email xác nhận:`, emailError);
-      }
-    })(); // Fire and forget
-
-    // 🔔 GỬI THÔNG BÁO CHO ADMIN/STAFF (ASYNC — không chặn response)
-    (async () => {
-      try {
-        await sendOrderCreatedAdminNotification(order.orderCode);
-      } catch (adminNotifError) {
-        console.warn(`⚠️ Lỗi gửi thông báo admin:`, adminNotifError);
-      }
-    })(); // Fire and forget
-
-    return order;
-  } catch (error: any) {
-    throw new BadRequestError(`Order creation failed: ${error.message}`);
+    order = await repo.executeOrderTransaction(userId, checkoutSummary);
+  } catch (error) {
+    // Lỗi nghiệp vụ đã biết (NotFoundError/BadRequestError throw thủ công trong
+    // repository) → message an toàn, hiển thị được cho client.
+    // Lỗi khác (Prisma/Postgres nội bộ, ví dụ numeric overflow) → KHÔNG lộ chi
+    // tiết ra ngoài, chỉ log server-side.
+    if (error instanceof NotFoundError || error instanceof BadRequestError) throw error;
+    console.error("[checkout.service] createOrderFromCheckout failed:", error);
+    throw new BadRequestError("Không thể tạo đơn hàng, vui lòng thử lại sau.");
   }
+
+  // Chạy ở background, không cần await
+  (async () => {
+    try {
+      const [user, paymentMethod] = await Promise.all([
+        prisma.users.findUnique({
+          where: { id: userId },
+          select: { email: true, fullName: true },
+        }),
+        prisma.payment_methods.findUnique({
+          where: { id: checkoutSummary.paymentMethodId },
+          select: { name: true, code: true },
+        }),
+      ]);
+
+      if (user?.email) {
+        const firstItem = order.orderItems[0];
+        const productName = firstItem?.productVariant?.product?.name || "Sản phẩm";
+        const variantName = firstItem?.productVariant?.code || "Phiên bản";
+
+        const { paymentRedirectUrl, bankTransferQrUrl } = checkoutSummary.paymentFields || {};
+        const fullShippingAddress = `${order.shippingContactName} - ${order.shippingPhone} | ${order.shippingDetail}, ${order.shippingWard}, ${order.shippingProvince}`;
+
+        await sendOrderConfirmationEmail(
+          user.email,
+          user.fullName || order.shippingContactName,
+          order.orderCode,
+          {
+            productName,
+            variantName,
+            quantity: order.orderItems.reduce((sum, item) => sum + item.quantity, 0),
+            unitPrice: Number(order.orderItems[0]?.unitPrice || 0),
+            totalAmount: Number(order.totalAmount),
+            shippingAddress: fullShippingAddress,
+            paymentMethod: paymentMethod?.name || "Chưa xác định",
+          },
+          {
+            paymentMethodCode: paymentMethod?.code || "",
+            paymentLink: paymentRedirectUrl || bankTransferQrUrl || undefined,
+          },
+        );
+      }
+    } catch (emailError) {
+      console.warn(`⚠️ Lỗi gửi email xác nhận:`, emailError);
+    }
+  })(); // Fire and forget
+
+  // Gửi thông báo cho admin/staff (async — không chặn response)
+  (async () => {
+    try {
+      await sendOrderCreatedAdminNotification(order.orderCode);
+    } catch (adminNotifError) {
+      console.warn(`⚠️ Lỗi gửi thông báo admin:`, adminNotifError);
+    }
+  })(); // Fire and forget
+
+  return order;
 };
 
 export const releaseOrderInventory = async (orderId: string) => {
   try {
     await repo.cancelOrderAndRestoreInventory(orderId);
-  } catch (error: any) {
-    throw new BadRequestError(`Failed to restore inventory: ${error.message}`);
+  } catch (error) {
+    console.error("[checkout.service] releaseOrderInventory failed:", error, { orderId });
+    throw new BadRequestError("Không thể hoàn trả tồn kho, vui lòng thử lại sau.");
   }
 };

@@ -1,15 +1,11 @@
 import { z } from "zod";
 
-// ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
 
 /** Chuyển "true"/"false" string → boolean (dùng cho query params) */
 const queryBoolean = z.preprocess((v) => (v === "true" ? true : v === "false" ? false : v), z.boolean().optional());
 
-// ─────────────────────────────────────────────────────────────────────────────
 // PUBLIC SCHEMAS
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * listProductsSchema — public product listing.
@@ -19,8 +15,8 @@ export const listProductsSchema = z
   .object({
     page: z.coerce.number().positive().default(1),
     limit: z.coerce.number().positive().max(50).default(12),
-    search: z.string().optional(),
-    category: z.string().optional(),
+    search: z.string().trim().optional(),
+    category: z.string().trim().optional(),
     categoryId: z.string().uuid().optional(),
     brandId: z.union([z.string().uuid(), z.array(z.string().uuid())]).optional(),
     isFeatured: z.coerce.boolean().optional(),
@@ -44,7 +40,7 @@ export const reviewsQuerySchema = z.object({
 });
 
 export const variantQuerySchema = z
-  .object({ code: z.string().optional() })
+  .object({ code: z.string().trim().optional() })
   .passthrough()
   .refine(
     (data) => {
@@ -53,8 +49,6 @@ export const variantQuerySchema = z
     },
     { message: "Phải cung cấp code hoặc ít nhất một thuộc tính sản phẩm" },
   );
-
-export type CompareProductsQuery = z.infer<typeof compareProductsSchema>;
 
 /**
  * GET /products/admin/export
@@ -67,7 +61,7 @@ export const exportProductsSchema = z.object({
   categoryId: z.string().uuid().optional(),
   isActive: z.preprocess((v) => (v === "true" ? true : v === "false" ? false : v), z.boolean().optional()),
   inStock: z.preprocess((v) => (v === "true" ? true : v === "false" ? false : v), z.boolean().optional()),
-  search: z.string().optional(),
+  search: z.string().trim().optional(),
   limit: z.coerce.number().min(1).max(5000).default(5000).optional(),
 });
 
@@ -76,18 +70,16 @@ export const productParamsSchema = z.object({
 });
 
 export const productBySlugParamsSchema = z.object({
-  slug: z.string().min(1, { message: "Slug không được để trống" }),
+  slug: z.string().trim().min(1, { message: "Slug không được để trống" }),
 });
 
 export const searchSuggestSchema = z.object({
-  q: z.string().min(1, "Từ khóa không được để trống"),
+  q: z.string().trim().min(1, "Từ khóa không được để trống"),
   limit: z.coerce.number().positive().max(20).default(8),
-  category: z.string().optional(),
+  category: z.string().trim().optional(),
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN SCHEMAS
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * adminListProductsSchema — admin product listing.
@@ -96,7 +88,7 @@ export const searchSuggestSchema = z.object({
 export const adminListProductsSchema = z.object({
   page: z.coerce.number().positive().default(1),
   limit: z.coerce.number().positive().max(500).default(20),
-  search: z.string().optional(),
+  search: z.string().trim().optional(),
   brandId: z.union([z.string().uuid(), z.array(z.string().uuid())]).optional(),
   categoryId: z.string().uuid().optional(),
   isActive: queryBoolean,
@@ -117,13 +109,16 @@ export const bulkActionSchema = z.object({
   ids: z.array(z.string().uuid()).min(1, "Cần ít nhất 1 sản phẩm"),
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 // CREATE / UPDATE SCHEMAS
-// ─────────────────────────────────────────────────────────────────────────────
 
 const colorImageSchema = z.object({
-  color: z.string().min(1, "Màu sắc không được để trống"),
-  altText: z.string().optional(),
+  color: z.string().trim().min(1, "Màu sắc không được để trống"),
+  altText: z.string().trim().optional(),
+});
+
+// Update: cho phép kèm deleteImageIds (xoá ảnh cũ của màu này) — không áp dụng cho create
+const updateColorImageSchema = colorImageSchema.extend({
+  deleteImageIds: z.array(z.string().uuid()).optional(),
 });
 
 const variantAttributeSchema = z.object({
@@ -131,7 +126,7 @@ const variantAttributeSchema = z.object({
 });
 
 const createVariantSchema = z.object({
-  code: z.string().min(1, "Mã SKU không được để trống"),
+  code: z.string().trim().min(1, "Mã SKU không được để trống"),
   price: z.coerce.number().positive("Giá phải lớn hơn 0"),
   isDefault: z.coerce.boolean().default(false),
   isActive: z.coerce.boolean().default(true),
@@ -143,15 +138,15 @@ export const createProductSchema = z
   .object({
     brandId: z.uuid("Brand ID không hợp lệ"),
     categoryId: z.uuid("Category ID không hợp lệ"),
-    name: z.string().min(3, "Tên sản phẩm phải có ít nhất 3 ký tự"),
-    description: z.string().optional(),
+    name: z.string().trim().min(3, "Tên sản phẩm phải có ít nhất 3 ký tự"),
+    description: z.string().trim().optional(),
     variants: z.array(createVariantSchema).min(1, "Sản phẩm phải có ít nhất 1 biến thể"),
     colorImages: z.array(colorImageSchema).min(1, "Sản phẩm phải có ít nhất 1 màu với ảnh"),
     specifications: z
       .array(
         z.object({
           specificationId: z.uuid(),
-          value: z.string().min(1, "Giá trị thông số không được để trống"),
+          value: z.string().trim().min(1, "Giá trị thông số không được để trống"),
           isHighlight: z.boolean().optional().default(false),
         }),
       )
@@ -164,7 +159,7 @@ export const createProductSchema = z
 
 const updateVariantSchema = z.object({
   id: z.string().uuid().optional(),
-  code: z.string().optional(),
+  code: z.string().trim().optional(),
   price: z.coerce.number().positive().optional(),
   isDefault: z.coerce.boolean().optional(),
   isActive: z.coerce.boolean().optional(),
@@ -176,15 +171,15 @@ const updateVariantSchema = z.object({
 export const updateProductSchema = z.object({
   brandId: z.string().uuid().optional(),
   categoryId: z.string().uuid().optional(),
-  name: z.string().min(3).optional(),
-  description: z.string().optional(),
+  name: z.string().trim().min(3).optional(),
+  description: z.string().trim().optional(),
   variants: z.array(updateVariantSchema).optional(),
-  colorImages: z.array(colorImageSchema).optional(),
+  colorImages: z.array(updateColorImageSchema).optional(),
   specifications: z
     .array(
       z.object({
         specificationId: z.string().uuid(),
-        value: z.string().min(1),
+        value: z.string().trim().min(1),
         isHighlight: z.boolean().optional(),
       }),
     )
@@ -195,9 +190,7 @@ export const updateProductSchema = z.object({
 
 export const variantOptionsQuerySchema = z.object({});
 
-// ─────────────────────────────────────────────────────────────────────────────
 // SEARCH TRENDING
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * GET /products/search-trending
@@ -205,16 +198,14 @@ export const variantOptionsQuerySchema = z.object({});
  * q là optional (rỗng = show trending, có nội dung = filter + sort trending)
  */
 export const searchSuggestTrendingSchema = z.object({
-  q: z.string().default(""),
+  q: z.string().trim().default(""),
   limit: z.coerce.number().positive().max(20).default(8),
-  category: z.string().optional(),
+  category: z.string().trim().optional(),
 });
 
 export type SearchSuggestTrendingQuery = z.infer<typeof searchSuggestTrendingSchema>;
 
-// ─────────────────────────────────────────────────────────────────────────────
 // SALE SCHEDULE V2
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * GET /products/sale-schedule-v2
@@ -232,9 +223,7 @@ export const saleScheduleQuerySchema = z.object({
 
 export type SaleScheduleQuery = z.infer<typeof saleScheduleQuerySchema>;
 
-// ─────────────────────────────────────────────────────────────────────────────
 // PRODUCTS ON SALE BY DATE
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * GET /products/sale-by-date?date=2026-03-19&promotionId=xxx&page=1&limit=20
@@ -251,9 +240,7 @@ export const saleByDateQuerySchema = z.object({
 
 export type SaleByDateQuery = z.infer<typeof saleByDateQuerySchema>;
 
-// ─────────────────────────────────────────────────────────────────────────────
 // PRODUCT COMPARISON
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * GET /products/compare?ids=id1,id2,id3
@@ -276,9 +263,7 @@ export const compareProductsSchema = z.object({
 
 export type ExportProductsQuery = z.infer<typeof exportProductsSchema>;
 
-// ─────────────────────────────────────────────────────────────────────────────
 // INFERRED TYPES
-// ─────────────────────────────────────────────────────────────────────────────
 
 export type ListProductsQuery = z.infer<typeof listProductsSchema>;
 export type AdminListProductsQuery = z.infer<typeof adminListProductsSchema>;
@@ -288,3 +273,4 @@ export type UpdateProductInput = z.infer<typeof updateProductSchema>;
 export type VariantQuery = z.infer<typeof variantQuerySchema>;
 export type SearchSuggestQuery = z.infer<typeof searchSuggestSchema>;
 export type BulkActionInput = z.infer<typeof bulkActionSchema>;
+export type CompareProductsQuery = z.infer<typeof compareProductsSchema>;

@@ -1,13 +1,14 @@
 import { Request, Response } from "express";
 import * as userService from "./user.service";
-import { exportUsersSchema, getUsersQuerySchema, updateNotifPreferencesSchema, updateProfileSchema, updateUserSchema } from "./user.validation";
+import type { PublicUser } from "./user.repository";
+import { updateProfileSchema, updateUserSchema } from "./user.validation";
+import type { GetUsersQuery, ExportUsersQuery, UpdateNotifPreferencesInput, GetDeletedUsersQuery } from "./user.validation";
 import { parseMultipartData, uploadAvatarImage } from "./user.helpers";
 import { cleanupFile } from "@/integrations/file-cleanup.service";
 import { ForbiddenError } from "@/errors";
-import { exportUsersAdmin } from "./user.service";
 import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
 
-// ─── Self ─────────────────────────────────────────────────────────────────────
+// SELF
 
 export const getMeHandler = async (req: Request, res: Response) => {
   const user = await userService.getMe(req.user!.id);
@@ -50,15 +51,15 @@ export const getMyNotifPreferencesHandler = async (req: Request, res: Response) 
 };
 
 export const updateMyNotifPreferencesHandler = async (req: Request, res: Response) => {
-  const validatedBody = updateNotifPreferencesSchema.parse(req.body);
-  const prefs = await userService.updateMyNotifPreferences(req.user!.id, validatedBody);
+  const body = req.body as UpdateNotifPreferencesInput;
+  const prefs = await userService.updateMyNotifPreferences(req.user!.id, body);
   res.json({ data: prefs, message: "Cập nhật tùy chọn thông báo thành công" });
 };
 
-// ─── Staff & Admin ────────────────────────────────────────────────────────────
+// STAFF & ADMIN
 
 export const getUsersHandler = async (req: Request, res: Response) => {
-  const query = getUsersQuerySchema.parse(req.query);
+  const query = req.query as unknown as GetUsersQuery;
   const isAdmin = req.user!.role === "ADMIN";
   const result = await userService.getUsers(query, isAdmin);
 
@@ -84,10 +85,10 @@ export const getUserByIdHandler = async (req: Request, res: Response) => {
 // Admin: xóa mọi role (trừ chính mình — guard trong service)
 export const deleteUserHandler = async (req: Request, res: Response) => {
   const requester = req.user!;
-  const target = await userService.getUserById(req.params.id);
+  const target = (await userService.getUserById(req.params.id)) as PublicUser;
 
   // Mọi staff role (SALES/MARKETING/SUPPORT/ACCOUNTING) chỉ được xóa CUSTOMER
-  if (STAFF_ROLES.includes(requester.role as any) && (target as any).role !== "CUSTOMER") {
+  if ((STAFF_ROLES as readonly string[]).includes(requester.role) && target.role !== "CUSTOMER") {
     throw new ForbiddenError("Staff chỉ được phép xóa tài khoản khách hàng");
   }
 
@@ -95,7 +96,7 @@ export const deleteUserHandler = async (req: Request, res: Response) => {
   res.json({ message: "Xóa người dùng thành công" });
 };
 
-// ─── Admin only ───────────────────────────────────────────────────────────────
+// ADMIN ONLY
 
 export const createUserHandler = async (req: Request, res: Response) => {
   const user = await userService.createUser(req.body);
@@ -137,8 +138,7 @@ export const hardDeleteUserHandler = async (req: Request, res: Response) => {
 };
 
 export const getDeletedUsersHandler = async (req: Request, res: Response) => {
-  const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 20;
+  const { page, limit } = req.query as unknown as GetDeletedUsersQuery;
   const result = await userService.getDeletedUsers({ page, limit });
 
   res.json({
@@ -154,8 +154,8 @@ export const getDeletedUsersHandler = async (req: Request, res: Response) => {
 };
 
 export const exportUsersAdminHandler = async (req: Request, res: Response) => {
-  const query = exportUsersSchema.parse(req.query);
-  const { buffer, contentType, filename, count } = await exportUsersAdmin(query);
+  const query = req.query as unknown as ExportUsersQuery;
+  const { buffer, contentType, filename, count } = await userService.exportUsersAdmin(query);
 
   res.setHeader("Content-Type", contentType);
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);

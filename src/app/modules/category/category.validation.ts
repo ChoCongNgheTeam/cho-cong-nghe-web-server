@@ -39,7 +39,7 @@ export const deletedCategoriesQuerySchema = z.object({
 export const listCategoriesQuerySchema = z.object({
   page: z.coerce.number().positive().default(1),
   limit: z.coerce.number().positive().max(200).default(20),
-  search: z.string().optional(),
+  search: z.string().trim().optional(),
   parentId: z.string().optional(), // "root" | UUID | undefined
   isFeatured: booleanQuery,
   isActive: booleanQuery,

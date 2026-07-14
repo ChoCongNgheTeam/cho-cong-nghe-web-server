@@ -1,10 +1,16 @@
 import { DiscountType } from "@prisma/client";
-import { VoucherCard, VoucherDetail, UserVoucher, RawVoucher, TargetType, VoucherListItem, VoucherAvailabilityInput } from "./voucher.types";
+import { VoucherCard, VoucherDetail, UserVoucher, RawVoucher, VoucherListItem, VoucherAvailabilityInput } from "./voucher.types";
 
-// Fix BigInt serialization
-(BigInt.prototype as any).toJSON = function () {
-  return this.toString();
-};
+// Fix BigInt serialization.
+// NOTE: đây là side-effect toàn cục (monkey-patch prototype), về lâu dài nên dời
+// lên file bootstrap chung của app (chạy 1 lần khi start server) thay vì đặt
+// trong transformers.ts của riêng module voucher — hiện để nguyên vị trí vì
+// chưa rõ entrypoint bootstrap của dự án, chỉ thêm guard để tránh gán lại nhiều lần.
+if (!(BigInt.prototype as any).toJSON) {
+  (BigInt.prototype as any).toJSON = function () {
+    return this.toString();
+  };
+}
 
 /**
  * Check if voucher is expired
@@ -81,7 +87,7 @@ export const transformVoucherDetail = (voucher: RawVoucher): VoucherDetail => {
     targets:
       voucher.targets?.map((target) => ({
         id: target.id,
-        targetType: target.targetType as TargetType,
+        targetType: target.targetType,
         targetId: target.targetId ?? undefined,
         targetName: target.targetName ?? undefined,
       })) || [],

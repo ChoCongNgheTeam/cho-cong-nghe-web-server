@@ -2,7 +2,7 @@ import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
 import { staffPermissionsSelect, StaffPermissionsData } from "./staff-permissions.types";
 
-// ── Queries ────────────────────────────────────────────────────────────────
+// QUERIES
 
 export const findByUserId = async (userId: string) => {
   return prisma.staff_permissions.findUnique({
@@ -11,27 +11,42 @@ export const findByUserId = async (userId: string) => {
   });
 };
 
-// Lấy permissions kèm thông tin user — dùng cho admin list
-export const findAllWithUser = async () => {
-  return prisma.staff_permissions.findMany({
-    select: {
-      ...staffPermissionsSelect,
-      user: {
-        select: {
-          id: true,
-          fullName: true,
-          email: true,
-          role: true,
-          avatarImage: true,
-          isActive: true,
-        },
-      },
-    },
-    orderBy: { user: { role: "asc" } },
+// Lấy 1 user để kiểm tra tồn tại + role — dùng cho assertStaffUser ở service
+export const findStaffCandidateById = async (userId: string) => {
+  return prisma.users.findUnique({
+    where: { id: userId, deletedAt: null },
+    select: { id: true, role: true, fullName: true, email: true },
   });
 };
 
-// ── Mutations ──────────────────────────────────────────────────────────────
+// Lấy permissions kèm thông tin user — dùng cho admin list, có phân trang
+export const findAllWithUser = async (params: { skip: number; take: number }) => {
+  const [data, total] = await prisma.$transaction([
+    prisma.staff_permissions.findMany({
+      select: {
+        ...staffPermissionsSelect,
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            role: true,
+            avatarImage: true,
+            isActive: true,
+          },
+        },
+      },
+      orderBy: { user: { role: "asc" } },
+      skip: params.skip,
+      take: params.take,
+    }),
+    prisma.staff_permissions.count(),
+  ]);
+
+  return { data, total };
+};
+
+// MUTATIONS
 
 export const createPermissions = async (userId: string, data: Omit<StaffPermissionsData, "userId" | "updatedAt">) => {
   return prisma.staff_permissions.create({

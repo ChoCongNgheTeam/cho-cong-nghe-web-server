@@ -1,4 +1,5 @@
 import prisma from "@/config/db";
+import { Prisma } from "@prisma/client";
 import { CartResponse } from "./cart.types";
 
 export const cartItemSelect = {
@@ -36,7 +37,7 @@ export const cartItemSelect = {
               },
             },
           },
-          img: { select: { id: true, imageUrl: true, altText: true, color: true }, orderBy: { position: "asc" as any } },
+          img: { select: { id: true, imageUrl: true, altText: true, color: true }, orderBy: { position: "asc" as const } },
         },
       },
       variantAttributes: {
@@ -54,6 +55,10 @@ export const cartItemSelect = {
   },
 };
 
+// Type suy ra trực tiếp từ cartItemSelect — luôn khớp 100% với query thật,
+// không thể lệch khi select đổi (khác với việc tự khai tay 1 interface riêng).
+export type CartItemWithProduct = Prisma.cart_itemsGetPayload<{ select: typeof cartItemSelect }>;
+
 export const findVariantWithProductById = async (variantId: string) => {
   return prisma.products_variants.findUnique({
     where: { id: variantId },
@@ -63,10 +68,10 @@ export const findVariantWithProductById = async (variantId: string) => {
 
 export const findByUserId = async (userId: string, cartItemIds?: string[]) => {
   return prisma.cart_items.findMany({
-    where: { 
+    where: {
       userId,
       // Nếu có mảng ID thì thêm điều kiện IN, nếu không thì lấy tất cả (Fallback)
-      ...(cartItemIds && cartItemIds.length > 0 ? { id: { in: cartItemIds } } : {})
+      ...(cartItemIds && cartItemIds.length > 0 ? { id: { in: cartItemIds } } : {}),
     },
     select: cartItemSelect,
     orderBy: { createdAt: "desc" },
@@ -110,20 +115,20 @@ export const clearCart = async (userId: string) => {
   return prisma.cart_items.deleteMany({ where: { userId } });
 };
 
-export const transformToCartResponse = (item: any): CartResponse => {
-  const colorAttr = item.productVariant.variantAttributes.find((attr: any) => {
+export const transformToCartResponse = (item: CartItemWithProduct): CartResponse => {
+  const colorAttr = item.productVariant.variantAttributes.find((attr) => {
     const code = (attr.attributeOption.attribute?.code || "").toLowerCase();
     return ["color", "màu", "màu sắc"].includes(code);
   });
 
-  const storageAttr = item.productVariant.variantAttributes.find((attr: any) => {
+  const storageAttr = item.productVariant.variantAttributes.find((attr) => {
     const code = (attr.attributeOption.attribute?.code || "").toLowerCase();
     return ["storage", "dung lượng", "rom", "rom_capacity"].includes(code);
   });
 
   const colorValue = colorAttr?.attributeOption.value;
-  const matchingImage = item.productVariant.product.img.find((img: any) => img.color === colorValue);
-  const finalImageUrl = matchingImage?.imageUrl || item.productVariant.product.img[0]?.imageUrl;
+  const matchingImage = item.productVariant.product.img.find((img) => img.color === colorValue);
+  const finalImageUrl = matchingImage?.imageUrl ?? item.productVariant.product.img[0]?.imageUrl ?? undefined;
 
   const category = item.productVariant.product.category;
   const categoryPath: string[] = [];
@@ -138,7 +143,7 @@ export const transformToCartResponse = (item: any): CartResponse => {
   }
 
   // ← THÊM: expose variantAttributes đã normalize
-  const variantAttributes = item.productVariant.variantAttributes.map((va: any) => ({
+  const variantAttributes = item.productVariant.variantAttributes.map((va) => ({
     code: va.attributeOption.attribute?.code ?? "",
     value: va.attributeOption.value ?? "",
   }));

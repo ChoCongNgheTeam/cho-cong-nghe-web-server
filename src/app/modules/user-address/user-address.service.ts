@@ -1,15 +1,17 @@
 import * as repo from "./user-address.repository";
+import type { AddressRecord } from "./user-address.repository";
 import { CreateAddressInput, UpdateAddressInput, AddressResponse, ExternalProvinceResponse, ExternalWardResponse } from "./user-address.types";
+import type { ListAddressesQuery, GetDeletedAddressesQuery } from "./user-address.validation";
 import { NotFoundError, BadRequestError } from "@/errors";
 import { handlePrismaError } from "@/utils/handle-prisma-error";
 
-// ==================== EXTERNAL API CONFIG ====================
+// EXTERNAL API CONFIG
 
 const VIETNAM_API_BASE = "https://provinces.open-api.vn/api/v2";
 
-// ==================== HELPERS ====================
+// HELPERS
 
-const formatAddressResponse = (address: any): AddressResponse => {
+const formatAddressResponse = (address: AddressRecord): AddressResponse => {
   return {
     id: address.id,
     contactName: address.contactName,
@@ -38,15 +40,14 @@ const formatAddressResponse = (address: any): AddressResponse => {
  */
 const validateAndFetchLocationNames = async (provinceCode: number, wardCode: number): Promise<{ provinceName: string; wardName: string }> => {
   let provinceData: ExternalProvinceResponse;
-  console.log(provinceCode, wardCode);
 
   try {
     const res = await fetch(`${VIETNAM_API_BASE}/p/${provinceCode}?depth=2`);
     if (!res.ok) throw new NotFoundError("Tỉnh/Thành phố");
     provinceData = await res.json();
-  } catch (err: any) {
-    if (err?.statusCode === 404 || err?.name === "NotFoundError") {
-      throw new NotFoundError("Tỉnh/Thành phố");
+  } catch (err: unknown) {
+    if (err instanceof NotFoundError) {
+      throw err;
     }
     throw new BadRequestError("Không thể kết nối tới dịch vụ địa chỉ, vui lòng thử lại");
   }
@@ -62,7 +63,7 @@ const validateAndFetchLocationNames = async (provinceCode: number, wardCode: num
   };
 };
 
-// ==================== USER SERVICES ====================
+// USER SERVICES
 
 export const getUserAddresses = async (userId: string) => {
   const addresses = await repo.findByUserId(userId);
@@ -159,9 +160,9 @@ export const setDefaultAddress = async (addressId: string, userId: string) => {
   return formatAddressResponse(updatedAddress);
 };
 
-// ==================== ADMIN / STAFF SERVICES ====================
+// ADMIN / STAFF SERVICES
 
-export const getAllAddressesAdmin = async (query: any) => {
+export const getAllAddressesAdmin = async (query: ListAddressesQuery) => {
   return repo.findAllAddressesAdmin(query);
 };
 
@@ -171,8 +172,8 @@ export const softDeleteAddressAdmin = async (addressId: string, adminId: string)
   await repo.softDeleteAddress(addressId, adminId);
 };
 
-export const getDeletedAddresses = async () => {
-  return repo.findAllDeletedAddresses();
+export const getDeletedAddresses = async (query: GetDeletedAddressesQuery) => {
+  return repo.findAllDeletedAddresses(query.page, query.perPage);
 };
 
 export const restoreAddress = async (addressId: string) => {

@@ -1,23 +1,26 @@
 import { Request, Response } from "express";
 import * as service from "./settings.service";
-import { groupParamSchema, updateSettingsSchema } from "./settings.validation";
+import * as validator from "./settings.validation";
 import { uploadSettingImage } from "./settings.image";
 import { cleanupFile } from "@/integrations/file-cleanup.service";
 import { SETTINGS_IMAGE_FIELDS, SettingsImageField } from "@/app/middlewares/upload/upload.config";
 
 export const getGroupHandler = async (req: Request, res: Response) => {
-  const { group } = groupParamSchema.parse(req.params);
+  // group đã được validate ở middleware route — chỉ cast type, không parse lại
+  const { group } = req.params as unknown as validator.GroupParamInput;
   const data = await service.getGroup(group);
   res.json({ data, message: `Lấy cài đặt nhóm "${group}" thành công` });
 };
 
 export const getAllHandler = async (_req: Request, res: Response) => {
-  const data = await service.getAll();
-  res.json({ data, message: "Lấy tất cả cài đặt thành công" });
+  // Endpoint public — chỉ trả về group không nhạy cảm (xem PUBLIC_SETTING_GROUPS)
+  const data = await service.getPublicSettings();
+  res.json({ data, message: "Lấy cài đặt công khai thành công" });
 };
 
 export const updateGroupHandler = async (req: Request, res: Response) => {
-  const { group } = groupParamSchema.parse(req.params);
+  // group đã được validate ở middleware route — chỉ cast type, không parse lại
+  const { group } = req.params as unknown as validator.GroupParamInput;
 
   // req.files tồn tại khi dùng multer fields()
   const files = req.files as Record<string, Express.Multer.File[]> | undefined;
@@ -31,7 +34,7 @@ export const updateGroupHandler = async (req: Request, res: Response) => {
   }
 
   try {
-    // ── 1. Parse body (hỗ trợ cả JSON body & FormData) ────────────────────
+    // 1. Parse body (hỗ trợ cả JSON body & FormData)
     let rawSettings: Record<string, unknown> = {};
 
     if (req.body?.settings) {
@@ -42,7 +45,7 @@ export const updateGroupHandler = async (req: Request, res: Response) => {
       rawSettings = { ...req.body };
     }
 
-    // ── 2. Upload ảnh lên Cloudinary & ghi đè vào settings ───────────────
+    // 2. Upload ảnh lên Cloudinary & ghi đè vào settings
     if (files) {
       for (const field of SETTINGS_IMAGE_FIELDS) {
         const file = files[field.name]?.[0];
@@ -53,15 +56,16 @@ export const updateGroupHandler = async (req: Request, res: Response) => {
       }
     }
 
-    // ── 3. Validate toàn bộ settings sau khi đã merge URL ảnh ─────────────
-    const input = updateSettingsSchema.parse({ settings: rawSettings });
+    // 3. Validate toàn bộ settings sau khi đã merge URL ảnh
+    // Ngoại lệ layering hợp lệ: multipart body, middleware route không xử lý được JSON string trong FormData
+    const input = validator.updateSettingsSchema.parse({ settings: rawSettings });
 
-    // ── 4. Lưu vào DB ─────────────────────────────────────────────────────
+    // 4. Lưu vào DB
     const data = await service.updateGroup(group, input, req.user!.id);
 
     res.json({ data, message: `Cập nhật cài đặt nhóm "${group}" thành công` });
   } finally {
-    // Luôn xoá file temp dù thành công hay lỗi
-    allFiles.forEach(cleanupFile);
+    // Luôn xoá file temp dù thành công hay lỗi — chạy song song, 1 file lỗi cleanup không chặn các file khác
+    await Promise.allSettled(allFiles.map(cleanupFile));
   }
 };

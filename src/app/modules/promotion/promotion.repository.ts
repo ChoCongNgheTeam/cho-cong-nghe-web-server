@@ -5,7 +5,9 @@ import { ListPromotionsQuery, CreatePromotionInput, UpdatePromotionInput } from 
 // =====================
 // === CACHE CONFIG ===
 // =====================
-let promotionsCache: any[] | null = null;
+type ActivePromotionForPricing = Awaited<ReturnType<typeof buildActivePromotionsForPricing>>;
+
+let promotionsCache: ActivePromotionForPricing | null = null;
 let promotionsCacheTime = 0;
 const PROMOTIONS_CACHE_TTL = 5 * 60 * 1000; // Cache 5 phút
 
@@ -26,43 +28,12 @@ const selectPromotionCard = {
   targets: { select: { id: true } },
 } satisfies Prisma.promotionsSelect;
 
-const selectPromotionAdmin = {
-  id: true,
-  name: true,
-  description: true,
-  priority: true,
-  isActive: true,
-  startDate: true,
-  endDate: true,
-  minOrderValue: true,
-  maxDiscountValue: true,
-  usageLimit: true,
-  usedCount: true,
-  createdAt: true,
-  deletedAt: true,
-  deletedBy: true,
-  rules: {
-    select: {
-      id: true,
-      actionType: true,
-      discountValue: true,
-      buyQuantity: true,
-      getQuantity: true,
-      giftProductVariantId: true,
-    },
-  },
-  targets: {
-    select: {
-      id: true,
-      targetType: true,
-      targetId: true,
-      targetCode: true,
-      targetValue: true,
-    },
-  },
-} satisfies Prisma.promotionsSelect;
-
-const selectPromotionDetail = {
+// Gộp làm 1 select duy nhất (superset field của Admin + Detail cũ) thay vì 2 select
+// khác nhau chọn theo `isAdmin` (boolean runtime, không phải literal type) — ternary đó
+// khiến TS suy ra kiểu trả về là UNION giữa 2 shape khác nhau, gây lỗi truy cập field
+// (vd `deletedAt` không tồn tại ở nhánh Detail). Việc ẩn field nhạy cảm với người dùng
+// không-admin vẫn được đảm bảo ở tầng transformer (PromotionDetail DTO không có deletedAt/deletedBy).
+const selectPromotionFull = {
   id: true,
   name: true,
   description: true,
@@ -78,6 +49,8 @@ const selectPromotionDetail = {
   usageLimit: true,
   usedCount: true,
   createdAt: true,
+  deletedAt: true,
+  deletedBy: true,
   rules: {
     select: {
       id: true,
@@ -115,7 +88,7 @@ const buildPromotionWhere = (query: ListPromotionsQuery, isAdmin: boolean): Pris
     where.OR = [{ name: { contains: query.search, mode: "insensitive" } }, { description: { contains: query.search, mode: "insensitive" } }];
   }
 
-  // ← THAY TOÀN BỘ status filter cũ bằng cái này
+  // STATUS FILTER
   if (query.status) {
     switch (query.status) {
       case "active":
@@ -182,7 +155,7 @@ export const findAllAdmin = async (query: ListPromotionsQuery) => {
   const base: Prisma.promotionsWhereInput = { deletedAt: null };
 
   const [data, total, activeCount, inactiveCount, expiredCount, upcomingCount] = await prisma.$transaction([
-    prisma.promotions.findMany({ where, orderBy, select: selectPromotionAdmin, skip, take: limit }),
+    prisma.promotions.findMany({ where, orderBy, select: selectPromotionFull, skip, take: limit }),
     prisma.promotions.count({ where }),
 
     // active: isActive=true + đã bắt đầu + chưa hết hạn
@@ -237,44 +210,40 @@ export const findById = async (id: string, options: { includeDeleted?: boolean; 
       id,
       ...(!isAdmin || !includeDeleted ? { deletedAt: null } : {}),
     },
-    select: isAdmin ? selectPromotionAdmin : selectPromotionDetail,
+    select: selectPromotionFull,
   });
   if (!promotion) return null;
-  const targetsWithName = await Promise.all(
-    promotion.targets.map(async (target) => {
-      if (!target.targetId) return { ...target, targetName: undefined };
-      let targetName: string | undefined;
-      switch (target.targetType) {
-        case "BRAND":
-          targetName = (
-            await prisma.brands.findUnique({
-              where: { id: target.targetId },
-              select: { name: true },
-            })
-          )?.name;
-          break;
-        case "CATEGORY":
-          targetName = (
-            await prisma.categories.findUnique({
-              where: { id: target.targetId },
-              select: { name: true },
-            })
-          )?.name;
-          break;
-        case "PRODUCT":
-          targetName = (
-            await prisma.products.findUnique({
-              where: { id: target.targetId },
-              select: { name: true },
-            })
-          )?.name;
-          break;
-      }
-
-      return { ...target, targetName };
-    }),
-  );
+  const targetsWithName = await resolveTargetNames(promotion.targets);
   return { ...promotion, targets: targetsWithName };
+};
+
+// Gộp lookup tên brand/category/product theo targetType thành tối đa 3 query
+// (findMany + Map by id) thay vì 1 query riêng cho từng target (N+1).
+const resolveTargetNames = async <T extends { targetId: string | null; targetType: string }>(targets: T[]): Promise<(T & { targetName?: string })[]> => {
+  const idsByType = { BRAND: new Set<string>(), CATEGORY: new Set<string>(), PRODUCT: new Set<string>() } as const;
+
+  for (const target of targets) {
+    if (!target.targetId) continue;
+    if (target.targetType === "BRAND") idsByType.BRAND.add(target.targetId);
+    else if (target.targetType === "CATEGORY") idsByType.CATEGORY.add(target.targetId);
+    else if (target.targetType === "PRODUCT") idsByType.PRODUCT.add(target.targetId);
+  }
+
+  const [brands, categories, products] = await Promise.all([
+    idsByType.BRAND.size ? prisma.brands.findMany({ where: { id: { in: [...idsByType.BRAND] } }, select: { id: true, name: true } }) : Promise.resolve([]),
+    idsByType.CATEGORY.size ? prisma.categories.findMany({ where: { id: { in: [...idsByType.CATEGORY] } }, select: { id: true, name: true } }) : Promise.resolve([]),
+    idsByType.PRODUCT.size ? prisma.products.findMany({ where: { id: { in: [...idsByType.PRODUCT] } }, select: { id: true, name: true } }) : Promise.resolve([]),
+  ]);
+
+  const nameById = new Map<string, string>();
+  for (const b of brands) nameById.set(b.id, b.name);
+  for (const c of categories) nameById.set(c.id, c.name);
+  for (const p of products) nameById.set(p.id, p.name);
+
+  return targets.map((target) => ({
+    ...target,
+    targetName: target.targetId ? nameById.get(target.targetId) : undefined,
+  }));
 };
 
 export const checkPromotionName = async (name: string, excludeId?: string): Promise<boolean> => {
@@ -299,7 +268,7 @@ export const findActivePromotions = async () => {
       deletedAt: null,
       AND: [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }],
     },
-    select: selectPromotionDetail,
+    select: selectPromotionFull,
     orderBy: { priority: "asc" },
   });
 };
@@ -313,7 +282,7 @@ export const findActivePromotionsForProduct = async (productId: string) => {
       AND: [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }],
       targets: { some: { OR: [{ targetType: "ALL" }, { targetType: "PRODUCT", targetId: productId }] } },
     },
-    select: selectPromotionDetail,
+    select: selectPromotionFull,
     orderBy: { priority: "asc" },
   });
 };
@@ -327,7 +296,7 @@ export const findActivePromotionsForCategory = async (categoryId: string) => {
       AND: [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }],
       targets: { some: { OR: [{ targetType: "ALL" }, { targetType: "CATEGORY", targetId: categoryId }] } },
     },
-    select: selectPromotionDetail,
+    select: selectPromotionFull,
     orderBy: { priority: "asc" },
   });
 };
@@ -341,7 +310,7 @@ export const findActivePromotionsForBrand = async (brandId: string) => {
       AND: [{ OR: [{ startDate: null }, { startDate: { lte: now } }] }, { OR: [{ endDate: null }, { endDate: { gte: now } }] }],
       targets: { some: { OR: [{ targetType: "ALL" }, { targetType: "BRAND", targetId: brandId }] } },
     },
-    select: selectPromotionDetail,
+    select: selectPromotionFull,
     orderBy: { priority: "asc" },
   });
 };
@@ -358,35 +327,37 @@ export const create = async (data: CreatePromotionInput) => {
       rules: { create: rules ?? [] },
       targets: { create: targets ?? [] },
     },
-    select: selectPromotionAdmin,
+    select: selectPromotionFull,
   });
   clearPromotionsCache();
   return result;
 };
 
+// Xóa rules/targets cũ (nếu có thay đổi) + update trong 1 transaction, tránh trường hợp
+// deleteMany thành công nhưng update thất bại giữa chừng làm mất rules/targets cũ mà
+// chưa kịp tạo cái mới.
 export const update = async (id: string, data: UpdatePromotionInput) => {
-  // console.log(data);
-
-  // console.log(data);
-
   const { rules, targets, ...updateData } = data;
 
-  if (rules !== undefined) {
-    await prisma.promotion_rules.deleteMany({ where: { promotionId: id } });
-  }
-  if (targets !== undefined) {
-    await prisma.promotion_targets.deleteMany({ where: { promotionId: id } });
-  }
+  const result = await prisma.$transaction(async (tx) => {
+    if (rules !== undefined) {
+      await tx.promotion_rules.deleteMany({ where: { promotionId: id } });
+    }
+    if (targets !== undefined) {
+      await tx.promotion_targets.deleteMany({ where: { promotionId: id } });
+    }
 
-  const result = await prisma.promotions.update({
-    where: { id, deletedAt: null },
-    data: {
-      ...updateData,
-      ...(rules !== undefined && { rules: { create: rules } }),
-      ...(targets !== undefined && { targets: { create: targets } }),
-    },
-    select: selectPromotionAdmin,
+    return tx.promotions.update({
+      where: { id, deletedAt: null },
+      data: {
+        ...updateData,
+        ...(rules !== undefined && { rules: { create: rules } }),
+        ...(targets !== undefined && { targets: { create: targets } }),
+      },
+      select: selectPromotionFull,
+    });
   });
+
   clearPromotionsCache();
   return result;
 };
@@ -404,16 +375,30 @@ export const softDelete = async (id: string, deletedById: string) => {
   return result;
 };
 
+// Bulk soft delete — dùng cho route DELETE /admin/bulk
+export const softDeleteMany = async (ids: string[], deletedById: string) => {
+  const result = await prisma.promotions.updateMany({
+    where: { id: { in: ids }, deletedAt: null },
+    data: { deletedAt: new Date(), deletedBy: deletedById, isActive: false },
+  });
+  clearPromotionsCache();
+  return result;
+};
+
 export const restore = async (id: string) => {
-  return prisma.promotions.update({
+  const result = await prisma.promotions.update({
     where: { id },
     data: { deletedAt: null, deletedBy: null },
-    select: selectPromotionAdmin,
+    select: selectPromotionFull,
   });
+  clearPromotionsCache();
+  return result;
 };
 
 export const hardDelete = async (id: string) => {
-  return prisma.promotions.delete({ where: { id } });
+  const result = await prisma.promotions.delete({ where: { id } });
+  clearPromotionsCache();
+  return result;
 };
 
 export const findAllDeleted = async (options: { page?: number; limit?: number } = {}) => {
@@ -423,7 +408,7 @@ export const findAllDeleted = async (options: { page?: number; limit?: number } 
   const [data, total] = await prisma.$transaction([
     prisma.promotions.findMany({
       where: { deletedAt: { not: null } },
-      select: selectPromotionAdmin,
+      select: selectPromotionFull,
       orderBy: { deletedAt: "desc" },
       skip,
       take: limit,
@@ -438,14 +423,9 @@ export const findAllDeleted = async (options: { page?: number; limit?: number } 
 // === ACTIVE PROMOTIONS (for pricing — raw with transform) ===
 // =====================
 
-export const getActivePromotions = async () => {
-  // Check cache trước
-  const now = Date.now();
-  if (promotionsCache && now - promotionsCacheTime < PROMOTIONS_CACHE_TTL) {
-    // console.log("[Cache] Sử dụng cached promotions");
-    return promotionsCache;
-  }
-
+// Query DB + map raw Prisma rows sang shape phẳng dùng cho pricing engine.
+// Tách riêng khỏi getActivePromotions() để lấy type cụ thể cho promotionsCache (thay vì any[]).
+const buildActivePromotionsForPricing = async () => {
   const nowDate = new Date();
   const promotions = await prisma.promotions.findMany({
     where: {
@@ -458,11 +438,11 @@ export const getActivePromotions = async () => {
         { AND: [{ startDate: null }, { endDate: { gte: nowDate } }] },
       ],
     },
-    select: selectPromotionDetail,
+    select: selectPromotionFull,
     orderBy: { priority: "asc" },
   });
 
-  const result = promotions.map((promo) => ({
+  return promotions.map((promo) => ({
     id: promo.id,
     name: promo.name,
     description: promo.description,
@@ -495,17 +475,27 @@ export const getActivePromotions = async () => {
       targetValue: t.targetValue,
     })),
   }));
+};
 
-  // ✅ Lưu vào cache
+export const getActivePromotions = async () => {
+  // Check cache trước
+  const now = Date.now();
+  if (promotionsCache && now - promotionsCacheTime < PROMOTIONS_CACHE_TTL) {
+    return promotionsCache;
+  }
+
+  const result = await buildActivePromotionsForPricing();
+
+  // Lưu vào cache
   promotionsCache = result;
   promotionsCacheTime = Date.now();
 
   return result;
 };
 
-// ✅ Hàm clear cache khi update promotion
+// Clear cache — gọi sau mọi mutation ảnh hưởng danh sách active promotions
+// (create/update/softDelete/softDeleteMany/restore/hardDelete)
 export const clearPromotionsCache = () => {
   promotionsCache = null;
   promotionsCacheTime = 0;
-  // console.log("[Cache] Cleared promotions cache");
 };

@@ -2,7 +2,7 @@ import prisma from "@/config/db";
 import { Prisma, ReviewStatus } from "@prisma/client";
 import { ListReviewsQuery } from "./review.validation";
 
-// ── Select Fields ──────────────────────────────────────────────────────────
+// SELECT FIELDS
 
 const selectColorImage = {
   id: true,
@@ -60,7 +60,7 @@ const reviewSelectAdmin = {
   deletedBy: true,
 } satisfies Prisma.reviewsSelect;
 
-// ── Query Builder ──────────────────────────────────────────────────────────
+// QUERY BUILDER
 
 const buildReviewWhere = (query: ListReviewsQuery, isAdmin: boolean): Prisma.reviewsWhereInput => {
   const where: Prisma.reviewsWhereInput = {};
@@ -90,7 +90,7 @@ const buildReviewWhere = (query: ListReviewsQuery, isAdmin: boolean): Prisma.rev
   return where;
 };
 
-// ── Queries ────────────────────────────────────────────────────────────────
+// QUERIES
 
 export const findAllReviewsAdmin = async (query: ListReviewsQuery) => {
   const { page, limit, sortOrder } = query;

@@ -62,5 +62,5 @@ export interface FilterQuery {
   inStock?: boolean;
   minRating?: number;
   // Dynamic: spec_os=Android, attr_storage=256GB...
-  [key: string]: any;
+  [key: string]: string | string[] | number | boolean | undefined;
 }

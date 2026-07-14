@@ -1,10 +1,20 @@
 import { slugify } from "transliteration";
 import * as repo from "./product.repository";
-import { CreateProductInput, UpdateProductInput, ListProductsQuery, ReviewsQuery, SearchSuggestQuery, ExportProductsQuery } from "./product.validation";
-import { transformProductCard, transformProductDetail, transformProductSpecifications, transformProductHighlights, transformProductVariantResponse } from "./product.transformers";
+import { ListProductsQuery, ReviewsQuery, SearchSuggestQuery, ExportProductsQuery, UpdateProductInput } from "./product.validation";
+
+export type { UpdateColorImagePayload, UpdateProductRepoInput, CreateProductRepoInput } from "./product.repository";
+import {
+  transformProductCard,
+  transformProductCardAdmin,
+  transformProductDetail,
+  transformProductSpecifications,
+  transformProductHighlights,
+  transformProductVariantResponse,
+  RawProductRow,
+} from "./product.transformers";
+import { RawVariant, ProductCard } from "./product.types";
 import { buildCategoryPath } from "../category/category.helpers";
-import prisma from "prisma/client";
-import { findProductsForComparison, findProductsOnSaleDate, findSaleScheduleDays, findTrendingSearchSuggestions, getAdminProductStats, getProductIdsFromPromotions } from "./product.repository";
+import prisma from "@/config/db";
 import { normalizeVariant } from "./product.helpers";
 import { NotFoundError, BadRequestError, ConflictError } from "@/errors";
 import { invalidateFilterCache } from "./product_filter.service";
@@ -12,14 +22,24 @@ import { mapProductsToExportRows, buildProductCsvBuffer, buildProductExcelBuffer
 import { parseExcelBuffer, parseCsvBuffer, bulkImportVariants, ImportResult } from "./product.import";
 import { Prisma } from "@prisma/client";
 
-invalidateFilterCache();
-
-// ─────────────────────────────────────────────────────────────────────────────
 // INTERNAL HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
 
-const getVariantsForCards = (product: any): any[] => {
-  const variants: any[] = product.variants ?? [];
+interface PricingContext {
+  productId: string;
+  variantId: string;
+  price: number;
+  brandId?: string;
+  categoryPath: string[] | undefined;
+  variantAttributes: { code: string; value: string }[];
+}
+
+interface CardEntry {
+  card: ProductCard;
+  pricingContext: PricingContext;
+}
+
+const getVariantsForCards = (product: RawProductRow): RawVariant[] => {
+  const variants: RawVariant[] = product.variants ?? [];
   if (variants.length === 0) return [];
 
   if (product.variantDisplay === "CARD") return variants;
@@ -28,7 +48,7 @@ const getVariantsForCards = (product: any): any[] => {
   return defaultVariant ? [defaultVariant] : [];
 };
 
-const buildCardEntry = (product: any, variant: any) => {
+const buildCardEntry = (product: RawProductRow, variant: RawVariant): CardEntry | null => {
   const card = transformProductCard({ ...product, variants: [variant] });
   if (!card) return null;
   return {
@@ -39,7 +59,7 @@ const buildCardEntry = (product: any, variant: any) => {
       price: Number(variant.price),
       brandId: product.brand?.id,
       categoryPath: buildCategoryPath(product.category),
-      variantAttributes: (variant.variantAttributes ?? []).map((va: any) => ({
+      variantAttributes: (variant.variantAttributes ?? []).map((va) => ({
         code: va.attributeOption.attribute.code,
         value: va.attributeOption.value,
       })),
@@ -57,9 +77,7 @@ const assertProductExists = async (id: string, options: { includeDeleted?: boole
   return product;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // PUBLIC
-// ─────────────────────────────────────────────────────────────────────────────
 
 // Thêm interleave khi search
 export const getProductsPublic = async (query: ListProductsQuery) => {
@@ -83,8 +101,8 @@ export const getProductsPublic = async (query: ListProductsQuery) => {
 };
 
 // Helper interleave
-const interleaveBrands = (items: Array<{ card: any; pricingContext: any }>) => {
-  const groups = new Map<string, Array<{ card: any; pricingContext: any }>>();
+const interleaveBrands = (items: CardEntry[]): CardEntry[] => {
+  const groups = new Map<string, CardEntry[]>();
 
   for (const item of items) {
     // brandId từ pricingContext
@@ -93,7 +111,7 @@ const interleaveBrands = (items: Array<{ card: any; pricingContext: any }>) => {
     groups.get(brandId)!.push(item);
   }
 
-  const result: Array<{ card: any; pricingContext: any }> = [];
+  const result: CardEntry[] = [];
   const queues = Array.from(groups.values());
   let i = 0;
 
@@ -126,7 +144,7 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
   const productDetail = transformProductDetail(product, {
     average: Number(product.ratingAverage) || 0,
     total: reviewStats.total,
-    distribution: reviewStats.distribution as any,
+    distribution: reviewStats.distribution,
   });
 
   const highlights = transformProductHighlights(product);
@@ -143,13 +161,13 @@ export const getProductBySlug = async (slug: string, userId?: string) => {
 
   // Extract variantAttributes từ default variant của raw product
   // để pricing use-cases có thể forward cho ATTRIBUTE promotion matching
-  const defaultVariant = product.variants?.find((v: any) => v.isDefault) ?? product.variants?.[0];
+  const defaultVariant = product.variants?.find((v) => v.isDefault) ?? product.variants?.[0];
   const defaultVariantAttributes = (defaultVariant?.variantAttributes ?? [])
-    .map((va: any) => ({
+    .map((va) => ({
       code: va.attributeOption?.attribute?.code,
       value: va.attributeOption?.value,
     }))
-    .filter((a: any) => a.code && a.value);
+    .filter((a): a is { code: string; value: string } => Boolean(a.code && a.value));
 
   return {
     ...productDetail,
@@ -167,7 +185,6 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
   if (!product || !product.isActive) throw new NotFoundError("Sản phẩm");
 
   let variant;
-  // console.log(options?.bundle);
 
   // NEW: nếu có bundle param → tìm theo variantId trực tiếp
   if (options?.bundle) {
@@ -189,7 +206,7 @@ export const getProductVariant = async (slug: string, options?: Record<string, s
       price: Number(variant.price),
       brandId: product.brand?.id,
       categoryPath: buildCategoryPath(product.category),
-      variantAttributes: (variant.variantAttributes ?? []).map((va: any) => ({
+      variantAttributes: (variant.variantAttributes ?? []).map((va) => ({
         code: va.attributeOption.attribute.code,
         value: va.attributeOption.value,
       })),
@@ -212,14 +229,14 @@ export const getProductVariantOptions = async (slug: string, options?: Record<st
   }
 
   // Filter theo query params nếu có (ví dụ ?storage=128gb&color=black)
-  const filtered = allVariants.filter((v: any) => {
+  const filtered = allVariants.filter((v) => {
     return Object.entries(options ?? {}).every(([code, val]) => {
       if (!val) return true;
-      return v.variantAttributes.some((va: any) => va.attributeOption.attribute.code === code && va.attributeOption.value.toLowerCase() === val.toLowerCase());
+      return v.variantAttributes.some((va) => va.attributeOption.attribute.code === code && va.attributeOption.value.toLowerCase() === val.toLowerCase());
     });
   });
 
-  return filtered.map((v: any) => {
+  return filtered.map((v) => {
     // Map tất cả attributes động
     const attrMap: Record<string, { value: string; label: string }> = {};
     for (const va of v.variantAttributes) {
@@ -232,7 +249,7 @@ export const getProductVariantOptions = async (slug: string, options?: Record<st
 
     // Color image
     const colorValue = attrMap["color"]?.value;
-    const colorImage = colorValue ? product.img?.find((img: any) => img.color === colorValue) : null;
+    const colorImage = colorValue ? product.img?.find((img) => img.color === colorValue) : null;
 
     return {
       id: v.id,
@@ -261,7 +278,7 @@ export const getProductVariantOptions = async (slug: string, options?: Record<st
         price: Number(v.price),
         brandId: product.brand?.id,
         categoryPath: buildCategoryPath(product.category),
-        variantAttributes: (v.variantAttributes ?? []).map((va: any) => ({
+        variantAttributes: (v.variantAttributes ?? []).map((va) => ({
           code: va.attributeOption.attribute.code,
           value: va.attributeOption.value,
         })),
@@ -300,11 +317,11 @@ export const getProductGallery = async (slug: string) => {
 
   // Build colorVariantMap: color → variantId của default variant có màu đó
   // Dùng để FE tự động chọn variant khi user click ảnh thuộc màu khác
-  const activeVariants = product.variants.filter((v: any) => v.isActive);
+  const activeVariants = product.variants.filter((v) => v.isActive);
   const colorVariantMap: Record<string, string> = {};
 
   for (const variant of activeVariants) {
-    const colorAttr = variant.variantAttributes?.find((va: any) => va.attributeOption.attribute.code === "color");
+    const colorAttr = variant.variantAttributes?.find((va) => va.attributeOption.attribute.code === "color");
     if (colorAttr) {
       const colorVal = colorAttr.attributeOption.value;
       // Ưu tiên isDefault, sau đó first active
@@ -351,33 +368,18 @@ export const getProductReviews = async (slug: string, query: ReviewsQuery) => {
   return repo.findProductReviews(product.id, query);
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN — LIST & DETAIL
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const getProductsAdmin = async (query: Record<string, any>) => {
   const result = await repo.findAllAdmin(query);
-  return { ...result, data: result.data.map(transformProductCard).filter(Boolean) };
+  return { ...result, data: result.data.map(transformProductCardAdmin) };
 };
 
 export const getDeletedProducts = async (query: Record<string, any> = {}) => {
   const result = await repo.findAllDeleted(query);
-  return { ...result, data: result.data.map(transformProductCard).filter(Boolean) };
+  return { ...result, data: result.data.map(transformProductCardAdmin) };
 };
 
-// export const getProductById = async (id: string, options: { includeDeleted?: boolean } = {}) => {
-//   const product = await repo.findById(id, options);
-//   if (!product) throw new NotFoundError("Sản phẩm");
-
-//   const reviewStats = await repo.getReviewStats(product.id);
-//   const stats: ReviewStats = {
-//     average: Number(product.ratingAverage) || 0,
-//     total: reviewStats.total,
-//     distribution: reviewStats.distribution as any,
-//   };
-
-//   return transformProductDetail(product, stats);
-// };
 export const getProductById = async (id: string, options: { includeDeleted?: boolean } = {}) => {
   const product = await repo.findById(id, options);
   if (!product) throw new NotFoundError("Sản phẩm");
@@ -398,11 +400,9 @@ export const getProductById = async (id: string, options: { includeDeleted?: boo
   };
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN — CRUD
-// ─────────────────────────────────────────────────────────────────────────────
 
-export const createProduct = async (input: CreateProductInput) => {
+export const createProduct = async (input: Omit<repo.CreateProductRepoInput, "slug">) => {
   const defaultCount = input.variants.filter((v) => v.isDefault).length;
   if (defaultCount !== 1) throw new BadRequestError("Phải có đúng 1 biến thể mặc định");
 
@@ -416,15 +416,20 @@ export const createProduct = async (input: CreateProductInput) => {
   }
 
   const product = await repo.create({ ...input, slug });
+  invalidateFilterCache();
   return transformProductDetail(product);
 };
 
-export const updateProduct = async (id: string, input: UpdateProductInput) => {
+export interface UpdateProductInputWithImages extends Omit<UpdateProductInput, "colorImages"> {
+  colorImages?: repo.UpdateColorImagePayload[];
+}
+
+export const updateProduct = async (id: string, input: UpdateProductInputWithImages) => {
   await assertProductExists(id);
 
   const { brandId, categoryId, ...rest } = input;
 
-  const updateData: any = {
+  const updateData: repo.UpdateProductRepoInput = {
     ...rest,
     ...(brandId && {
       brand: {
@@ -451,9 +456,15 @@ export const updateProduct = async (id: string, input: UpdateProductInput) => {
   if (input.variants) {
     const defaultCount = input.variants.filter((v) => v.isDefault).length;
     if (defaultCount > 1) throw new BadRequestError("Chỉ được có tối đa 1 biến thể mặc định");
+
+    const newVariantMissingPrice = input.variants.find((v) => !v.id && v.price === undefined);
+    if (newVariantMissingPrice) {
+      throw new BadRequestError(`Variant mới (code: ${newVariantMissingPrice.code}) thiếu giá — price là bắt buộc khi tạo variant mới`);
+    }
   }
 
   await repo.update(id, updateData);
+  invalidateFilterCache();
 
   // Fetch lại raw data để FE admin dùng (giống getProductById)
   const updated = await repo.findById(id);
@@ -471,9 +482,7 @@ export const updateProduct = async (id: string, input: UpdateProductInput) => {
   };
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN — SOFT DELETE LIFECYCLE
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Soft delete — set deletedAt/deletedBy + isActive = false.
@@ -499,7 +508,9 @@ export const restoreProduct = async (id: string) => {
     throw new ConflictError(`Không thể khôi phục: slug "${product.slug}" đã được dùng bởi sản phẩm khác. Vui lòng đổi tên sản phẩm kia trước.`);
   }
 
-  return repo.restore(id);
+  const result = await repo.restore(id);
+  invalidateFilterCache();
+  return result;
 };
 
 /**
@@ -510,7 +521,25 @@ export const restoreProduct = async (id: string) => {
 export const hardDeleteProduct = async (id: string) => {
   const product = await assertProductExists(id, { includeDeleted: true });
   if (!product.deletedAt) throw new BadRequestError("Phải soft-delete trước khi xóa vĩnh viễn");
-  return repo.hardDelete(id);
+  const result = await repo.hardDelete(id);
+  invalidateFilterCache();
+  return result;
+};
+
+/**
+ * Lấy color images theo danh sách id — dùng khi controller cần imageUrl
+ * để xóa file trên Cloudinary trước/sau khi update DB.
+ */
+export const getColorImagesByIds = async (ids: string[]) => {
+  return repo.getColorImagesByIds(ids);
+};
+
+/**
+ * Lấy toàn bộ color images của 1 sản phẩm — dùng trước khi hard-delete
+ * để biết cần xóa những ảnh nào trên Cloudinary.
+ */
+export const getColorImagesByProductId = async (productId: string) => {
+  return repo.getColorImagesByProductId(productId);
 };
 
 /**
@@ -518,20 +547,22 @@ export const hardDeleteProduct = async (id: string) => {
  */
 export const bulkSoftDeleteProducts = async (ids: string[], deletedBy: string) => {
   if (!ids.length) throw new BadRequestError("Danh sách ID không được rỗng");
-  return repo.bulkSoftDelete(ids, deletedBy);
+  const result = await repo.bulkSoftDelete(ids, deletedBy);
+  invalidateFilterCache();
+  return result;
 };
 
 /**
  * Bulk update (isActive, isFeatured...)
  */
-export const bulkUpdateProducts = async (ids: string[], updates: any) => {
+export const bulkUpdateProducts = async (ids: string[], updates: Prisma.productsUpdateManyMutationInput) => {
   if (!ids.length) throw new BadRequestError("Danh sách ID không được rỗng");
-  return repo.bulkUpdate(ids, updates);
+  const result = await repo.bulkUpdate(ids, updates);
+  invalidateFilterCache();
+  return result;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN — VARIANT SOFT DELETE
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const softDeleteVariant = async (variantId: string, deletedBy: string) => {
   return repo.softDeleteVariant(variantId, deletedBy);
@@ -541,9 +572,7 @@ export const restoreVariant = async (variantId: string) => {
   return repo.restoreVariant(variantId);
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // PROMOTION / SALE (public — unchanged)
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const getFlashSaleProducts = async (date: Date = new Date(), options: { limit?: number; categoryId?: string } = {}) => {
   const { products, promotions } = await repo.findProductsOnSaleByDate(date, options);
@@ -566,7 +595,7 @@ export const getFlashSaleProducts = async (date: Date = new Date(), options: { l
 };
 
 export const getCategoriesWithSaleProducts = async (date: Date = new Date(), limit = 5) => {
-  const [products, { productIds: saleProductIds }] = await Promise.all([repo.getProductsForCategoryRanking(date), getProductIdsFromPromotions(date)]);
+  const [products, { productIds: saleProductIds }] = await Promise.all([repo.getProductsForCategoryRanking(date), repo.getProductIdsFromPromotions(date)]);
 
   const map = new Map<string, { totalProducts: number; saleProducts: number; newProducts: number; totalViews: number; totalSold: number }>();
   const NEW_DAYS = 15;
@@ -672,6 +701,25 @@ export const getBestSellingProducts = async (limit = 12) => {
   });
 };
 
+/**
+ * Best-selling products theo từng root category (dùng cho tab loại sản phẩm ở trang chủ).
+ * Trả về [{ category, products: CardEntry[] }] — pricing enrichment xử lý ở pricing use-case.
+ */
+export const getBestSellingProductsByCategories = async (categorySlugs: string[], limitPerCategory = 8) => {
+  const results = await repo.findBestSellingProductsByCategories(categorySlugs, limitPerCategory);
+
+  return results.map(({ category, products }) => ({
+    category,
+    products: products.flatMap((product) => {
+      const variantsForCards = getVariantsForCards(product);
+      return variantsForCards.flatMap((variant) => {
+        const entry = buildCardEntry(product, variant);
+        return entry ? [entry] : [];
+      });
+    }),
+  }));
+};
+
 export const getRecentlyViewedProducts = async (productIds: string[]) => {
   const products = await repo.findProductsByIds(productIds);
   return products.flatMap((product) => {
@@ -716,7 +764,18 @@ export const getSaleSchedule = async (startDate: Date, endDate: Date) => {
     orderBy: [{ priority: "desc" }, { startDate: "asc" }],
   });
 
-  const schedule = new Map<string, any[]>();
+  interface ScheduleEntry {
+    id: string;
+    name: string;
+    description: string | null;
+    startDate: Date | null;
+    endDate: Date | null;
+    priority: number;
+    targetsCount: number;
+    isActive: boolean;
+  }
+
+  const schedule = new Map<string, ScheduleEntry[]>();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -777,9 +836,7 @@ export const getActivePromotions = async () => {
   }));
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // 1. SEARCH SUGGESTIONS TRENDING
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * getSearchSuggestionsTrending
@@ -793,15 +850,13 @@ export const getActivePromotions = async () => {
  * Mỗi item có isTrending = true/false để FE render icon 🔥.
  */
 export const getSearchSuggestionsTrending = async (q: string, options: { limit?: number; category?: string } = {}) => {
-  return findTrendingSearchSuggestions(q, {
+  return repo.findTrendingSearchSuggestions(q, {
     limit: options.limit,
     categorySlug: options.category,
   });
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // 2. SALE SCHEDULE V2
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * getSaleScheduleV2
@@ -821,12 +876,10 @@ export const getSaleScheduleV2 = async (startDate?: Date, endDate?: Date) => {
     throw new BadRequestError("Khoảng thời gian tối đa là 60 ngày");
   }
 
-  return findSaleScheduleDays(from, to);
+  return repo.findSaleScheduleDays(from, to);
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // 3. PRODUCTS ON SALE DATE
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * getProductsOnSaleDate
@@ -844,18 +897,17 @@ export const getProductsOnSaleDate = async (
     activeNow?: boolean;
   } = {},
 ) => {
-  const result = await findProductsOnSaleDate(date, options);
+  const result = await repo.findProductsOnSaleDate(date, options);
 
-  const cards: Array<{ card: any; pricingContext: any }> = [];
+  const cards: CardEntry[] = [];
 
   for (const product of result.products) {
-    const variants: any[] = product.variants ?? [];
+    const variants = product.variants ?? [];
     if (variants.length === 0) continue;
 
-    const variantsForCards =
-      product.variantDisplay === "CARD"
-        ? [variants.find((v: any) => v.isDefault) ?? variants[0]].filter(Boolean) // ← chỉ lấy default dù CARD
-        : [variants.find((v: any) => v.isDefault) ?? variants[0]].filter(Boolean);
+    // Luôn lấy default variant (kể cả khi variantDisplay = CARD) — flash-sale
+    // view chỉ hiển thị 1 card/sản phẩm, không expand theo từng variant.
+    const variantsForCards = [variants.find((v) => v.isDefault) ?? variants[0]].filter(Boolean);
 
     for (const variant of variantsForCards) {
       const card = transformProductCard({ ...product, variants: [variant] });
@@ -869,7 +921,7 @@ export const getProductsOnSaleDate = async (
           price: Number(variant.price),
           brandId: product.brand?.id,
           categoryPath: buildCategoryPath(product.category),
-          variantAttributes: (variant.variantAttributes ?? []).map((va: any) => ({
+          variantAttributes: (variant.variantAttributes ?? []).map((va) => ({
             code: va.attributeOption.attribute.code,
             value: va.attributeOption.value,
           })),
@@ -893,9 +945,7 @@ export const getProductsOnSaleDate = async (
     totalPages: result.totalPages,
   };
 };
-// ─────────────────────────────────────────────────────────────────────────────
 // 4. PRODUCT COMPARISON
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * compareProducts
@@ -938,7 +988,7 @@ export const compareProducts = async (ids: string[]) => {
     throw new BadRequestError("Cần 2-4 sản phẩm để so sánh");
   }
 
-  const products = await findProductsForComparison(ids);
+  const products = await repo.findProductsForComparison(ids);
 
   // Validate tất cả sản phẩm tồn tại
   const foundIds = new Set(products.map((p) => p.id));
@@ -1049,20 +1099,14 @@ export const compareProducts = async (ids: string[]) => {
   };
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // 5. ADMIN STATS
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const getProductStats = async () => {
   const [stats, lowStockProducts, outOfStockProducts] = await Promise.all([
-    getAdminProductStats(),
+    repo.getAdminProductStats(),
     repo.getLowStockProducts(5, 20), // quantity > 0 && <= 5
     repo.getOutOfStockProducts(20), // quantity = 0
   ]);
-
-  // console.log("stats", stats);
-  // console.log("lowStockProducts", lowStockProducts);
-  // console.log("outOfStockProducts", outOfStockProducts);
 
   return {
     ...stats,
@@ -1099,21 +1143,19 @@ export const getProductVariantsBySelection = async (slug: string, selectedOption
   }
 
   // Filter images theo màu — nếu không có attribute color thì trả về tất cả ảnh
-  const filteredImages = relevantColors.size > 0 ? (product.img ?? []).filter((img: any) => relevantColors.has(img.color)) : (product.img ?? []);
+  const filteredImages = relevantColors.size > 0 ? (product.img ?? []).filter((img) => relevantColors.has(img.color)) : (product.img ?? []);
 
   return {
     productId: product.id,
-    brandId: (product as any).brand?.id,
-    categoryPath: buildCategoryPath((product as any).category),
+    brandId: product.brand?.id,
+    categoryPath: buildCategoryPath(product.category),
     selectedOptions,
     variants: normalizedVariants,
     images: filteredImages,
   };
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // EXPORT
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const exportProductsAdmin = async (query: ExportProductsQuery) => {
   const { format = "excel", brandId, categoryId, isActive, inStock, search, limit = 5000 } = query;
@@ -1193,9 +1235,7 @@ export const exportProductsAdmin = async (query: ExportProductsQuery) => {
   };
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // IMPORT TEMPLATE
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const getImportTemplate = async () => {
   const buffer = await buildImportTemplateBuffer();
@@ -1206,9 +1246,7 @@ export const getImportTemplate = async () => {
   };
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // IMPORT
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const importProductsAdmin = async (file: Express.Multer.File): Promise<ImportResult> => {
   if (!file) throw new BadRequestError("Không có file được upload");

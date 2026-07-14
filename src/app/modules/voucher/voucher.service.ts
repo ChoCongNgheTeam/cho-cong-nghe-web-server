@@ -11,16 +11,34 @@ import {
 } from "./voucher.validation";
 import { transformVoucherCard, transformVoucherDetail, transformUserVoucher, calculateDiscount, hasVoucherStarted, isVoucherExpired } from "./voucher.transformers";
 import { VoucherCard, VoucherValidationResult } from "./voucher.types";
-import { DiscountType } from "@prisma/client";
+import { DiscountType, TargetType } from "@prisma/client";
 import { NotFoundError, BadRequestError } from "@/errors";
-import prisma from "prisma/client";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Helpers
 
 const assertVoucherExists = async (id: string, includeDeleted = false) => {
   const voucher = await repo.findById(id, includeDeleted);
   if (!voucher) throw new NotFoundError("Voucher");
   return voucher;
+};
+
+// resolveTargetNames ở repository khai báo targetType: string nên bị widen khỏi enum Prisma.
+// Helper này ép lại đúng enum TargetType trước khi đưa vào transformVoucherDetail,
+// tránh phải dùng `as any` và không cần sửa repository.
+//
+// Lưu ý: return type được khai báo tường minh bằng `Omit<T, "targets"> & {...}` thay vì
+// để TS tự suy luận — nếu để tự suy luận, spread `{ ...voucher, targets: [...] }` với T
+// generic sẽ tạo ra intersection type kỳ lạ giữa targets cũ và targets mới (lỗi "pop()
+// incompatible"), do TS cố giữ lại type gốc của property bị ghi đè trong generic context.
+type NormalizedTarget = { id: string; targetType: TargetType; targetId: string | null; targetName?: string };
+
+const normalizeTargets = <T extends { targets?: { targetType: string; [key: string]: unknown }[] }>(voucher: T): Omit<T, "targets"> & { targets: NormalizedTarget[] } => {
+  const targets: NormalizedTarget[] = (voucher.targets ?? []).map((t) => ({
+    ...t,
+    targetType: t.targetType as TargetType,
+  })) as NormalizedTarget[];
+
+  return { ...voucher, targets };
 };
 
 type CartItemWithTotal = {
@@ -61,7 +79,7 @@ const checkVoucherTargets = (targets: { targetType: string; targetId?: string | 
   return cartItems.some((item) => targets.some((t) => itemMatchesTarget(item, t)));
 };
 
-// ── Public reads ──────────────────────────────────────────────────────────────
+// Public reads
 
 export const getVouchers = async (query: ListVouchersQuery) => {
   const result = await repo.findAll(query);
@@ -107,12 +125,12 @@ const getVoucherScore = (voucher: VoucherCard, cartTotal: number): { group: numb
 export const getVoucherByCode = async (code: string) => {
   const voucher = await repo.findByCode(code);
   if (!voucher) throw new NotFoundError("Voucher");
-  return transformVoucherDetail(voucher);
+  return transformVoucherDetail(normalizeTargets(voucher));
 };
 
 export const getUserVouchers = async (userId: string) => {
   const vouchers = await repo.findUserVouchers(userId);
-  return vouchers.map((v) => transformUserVoucher(v, v.userVoucherData));
+  return vouchers.map((v) => transformUserVoucher(normalizeTargets(v), v.userVoucherData));
 };
 
 export const getDeletedVouchers = async () => {
@@ -158,17 +176,17 @@ export const validateVoucher = async (input: ValidateVoucherInput): Promise<Vouc
   const eligibleTotal = computeEligibleTotal(targets, cartItems, orderTotal);
   const maxDiscount = voucher.maxDiscountValue ? Number(voucher.maxDiscountValue) : null;
   const discount = calculateDiscount(voucher.discountType as DiscountType, Number(voucher.discountValue), orderTotal, eligibleTotal, maxDiscount);
-  return { isValid: true, discount, eligibleTotal, voucher: transformVoucherDetail(voucher) };
+  return { isValid: true, discount, eligibleTotal, voucher: transformVoucherDetail(normalizeTargets(voucher)) };
 };
 
-// ── Admin reads ───────────────────────────────────────────────────────────────
+// Admin reads
 
 export const getVoucherById = async (id: string) => {
   const voucher = await assertVoucherExists(id);
-  return transformVoucherDetail(voucher);
+  return transformVoucherDetail(normalizeTargets(voucher));
 };
 
-// ── Mutates ───────────────────────────────────────────────────────────────────
+// Mutates
 
 /**
  * Tạo voucher.
@@ -177,40 +195,23 @@ export const getVoucherById = async (id: string) => {
  * Repository `create` đã xử lý `userIds` trong Prisma transaction nên
  * không cần gọi thêm `assignToUsers` sau đó — tránh race condition.
  */
-export const createVoucher = async (input: CreateVoucherInput & { userIds?: string[] }) => {
+export const createVoucher = async (input: CreateVoucherInput) => {
   const exists = await repo.checkVoucherCode(input.code);
   if (exists) throw new BadRequestError("Mã voucher đã tồn tại");
 
-  // Validate userIds nếu có
+  // Validate userIds nếu có: dedup + kiểm tra user thực sự tồn tại
   if (input.userIds && input.userIds.length > 0) {
     const uniqueIds = [...new Set(input.userIds)];
-    if (uniqueIds.length !== input.userIds.length) {
-      input = { ...input, userIds: uniqueIds };
+    const userCount = await repo.countExistingUsers(uniqueIds);
+    if (userCount !== uniqueIds.length) {
+      throw new BadRequestError("Một hoặc nhiều user không tồn tại");
     }
-    // Kiểm tra user tồn tại (optional — có thể bỏ nếu muốn nhanh)
-    const userCount = await prisma.users.count({
-      where: { id: { in: input.userIds } },
-    });
-    if (input.userIds && input.userIds.length > 0) {
-      const uniqueIds = [...new Set(input.userIds)];
-
-      const userIds = uniqueIds;
-
-      const userCount = await prisma.users.count({
-        where: { id: { in: userIds } },
-      });
-
-      if (userCount !== userIds.length) {
-        throw new BadRequestError("Một hoặc nhiều user không tồn tại");
-      }
-
-      input = { ...input, userIds };
-    }
+    input = { ...input, userIds: uniqueIds };
   }
 
   // repo.create đã xử lý userIds bên trong — gán atomically
   const voucher = await repo.create(input);
-  return transformVoucherDetail(voucher);
+  return transformVoucherDetail(normalizeTargets(voucher));
 };
 
 export const updateVoucher = async (id: string, input: UpdateVoucherInput) => {
@@ -220,7 +221,7 @@ export const updateVoucher = async (id: string, input: UpdateVoucherInput) => {
     if (exists) throw new BadRequestError("Mã voucher đã tồn tại");
   }
   const voucher = await repo.update(id, input);
-  return transformVoucherDetail(voucher);
+  return transformVoucherDetail(normalizeTargets(voucher));
 };
 
 export const deleteVoucher = async (id: string, deletedBy: string) => {
@@ -240,48 +241,46 @@ export const restoreVoucher = async (id: string) => {
   if (codeConflict) throw new BadRequestError(`Mã "${voucher.code}" đã tồn tại ở voucher khác. Hãy đổi mã trước khi khôi phục.`);
 
   const restored = await repo.restore(id);
-  return transformVoucherDetail(restored);
+  return transformVoucherDetail(normalizeTargets(restored));
 };
 
 export const hardDeleteVoucher = async (id: string) => {
   const voucher = await assertVoucherExists(id, true);
-  if (!voucher.deletedAt) throw new BadRequestError("...");
+  if (!voucher.deletedAt) throw new BadRequestError("Voucher phải được xoá mềm trước khi xoá vĩnh viễn");
 
-  const usageCount = await prisma.voucher_usages.count({ where: { voucherId: id } });
+  const usageCount = await repo.countUsagesByVoucher(id);
   if (usageCount > 0) {
     throw new BadRequestError(`Không thể xóa: voucher đã được sử dụng ${usageCount} lần trong lịch sử đơn hàng`);
   }
 
-  const orderCount = await prisma.orders.count({ where: { voucherId: id } });
+  const orderCount = await repo.countOrdersByVoucher(id);
   if (orderCount > 0) {
     throw new BadRequestError(`Không thể xóa: voucher đang được áp dụng trong ${orderCount} đơn hàng`);
   }
 
   return repo.hardDelete(id);
 };
-// ── Assign ────────────────────────────────────────────────────────────────────
+// Assign
 
 export const assignVoucherToUsers = async (input: AssignVoucherToUsersInput) => {
   await getVoucherById(input.voucherId);
   return repo.assignToUsers(input.voucherId, input.userIds, input.maxUsesPerUser);
 };
 
-// ── Usages ────────────────────────────────────────────────────────────────────
+// Usages
 
 export const getVoucherUsages = async (query: ListVoucherUsagesQuery) => {
   return repo.findAllUsages(query);
 };
 
-// ── Voucher Users (private) ───────────────────────────────────────────────────
+// Voucher Users (private)
 
 export const getVoucherUsers = async (query: ListVoucherUsersQuery) => {
   return repo.findAllVoucherUsers(query);
 };
 
 export const revokeVoucherUser = async (voucherId: string, userId: string) => {
-  const assignment = await prisma.voucher_user.findUnique({
-    where: { voucherId_userId: { voucherId, userId } },
-  });
+  const assignment = await repo.findVoucherUserAssignment(voucherId, userId);
   if (!assignment) throw new NotFoundError("Assignment không tồn tại");
   return repo.revokeVoucherUser(voucherId, userId);
 };

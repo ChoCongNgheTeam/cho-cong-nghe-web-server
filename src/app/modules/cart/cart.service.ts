@@ -1,7 +1,9 @@
 import * as repo from "./cart.repository";
+import { CartItemWithProduct } from "./cart.repository";
 import { getVariantPricing } from "../pricing/pricing.service";
 import { mapPricingToSummary } from "../pricing/pricing.helpers";
-import { AddToCartInput, UpdateCartItemInput, LocalStorageCartItem, SyncCartResult, ChangeVariantInput } from "./cart.types";
+import { SyncCartResult } from "./cart.types";
+import { AddToCartInput, UpdateCartItemInput, LocalStorageCartItem, ChangeVariantInput } from "./cart.validation";
 import { NotFoundError, BadRequestError } from "@/errors";
 
 export const validateCartItemStatus = async (variantId: string, quantity: number) => {
@@ -87,6 +89,7 @@ export const syncLocalStorageToDatabase = async (userId: string, items: LocalSto
       }
       result.synced++;
     } catch (error) {
+      console.error("[cart.service] syncLocalStorageToDatabase: item failed", error, { userId, productVariantId: item.productVariantId });
       result.failed++;
     }
   }
@@ -113,7 +116,7 @@ export const changeCartItemVariant = async (userId: string, cartItemId: string, 
 
   const existingNewVariantItem = await repo.findByUserAndVariant(userId, input.newVariantId);
 
-  let updatedRaw: any;
+  let updatedRaw: CartItemWithProduct;
 
   if (existingNewVariantItem && existingNewVariantItem.id !== cartItemId) {
     const safeQty = Math.min(existingNewVariantItem.quantity + input.quantity, check.availableQuantity);

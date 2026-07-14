@@ -1,20 +1,16 @@
 import { z } from "zod";
 
-// =====================
-// === ENUMS ===
-// =====================
+// ENUMS
 
 export const DiscountTypeEnum = z.enum(["DISCOUNT_PERCENT", "DISCOUNT_FIXED"]);
 export const TargetTypeEnum = z.enum(["ALL", "PRODUCT", "CATEGORY", "BRAND"]);
 
-// =====================
-// === QUERY SCHEMAS ===
-// =====================
+// QUERY SCHEMAS
 
 export const listVouchersSchema = z.object({
   page: z.coerce.number().positive().default(1),
   limit: z.coerce.number().positive().max(100).default(20),
-  search: z.string().optional(),
+  search: z.string().trim().optional(),
   discountType: DiscountTypeEnum.optional(),
   isActive: z.coerce.boolean().optional(),
   status: z.enum(["active", "inactive", "expired", "upcoming"]).optional(),
@@ -39,21 +35,17 @@ export const validateVoucherSchema = z.object({
   cartItems: z.array(cartItemSchema).optional().default([]),
 });
 
-// =====================
-// === PARAMS SCHEMAS ===
-// =====================
+// PARAMS SCHEMAS
 
 export const voucherParamsSchema = z.object({
   id: z.string().uuid({ message: "ID voucher không hợp lệ" }),
 });
 
 export const voucherCodeParamsSchema = z.object({
-  code: z.string().min(1, { message: "Mã voucher không được để trống" }),
+  code: z.string().trim().min(1, { message: "Mã voucher không được để trống" }),
 });
 
-// =====================
-// === CREATE/UPDATE SCHEMAS ===
-// =====================
+// CREATE/UPDATE SCHEMAS
 
 const voucherTargetSchema = z.object({
   targetType: TargetTypeEnum,
@@ -62,8 +54,8 @@ const voucherTargetSchema = z.object({
 
 export const createVoucherSchema = z
   .object({
-    code: z.string().min(3, "Mã voucher phải có ít nhất 3 ký tự").toUpperCase(),
-    description: z.string().optional(),
+    code: z.string().trim().min(3, "Mã voucher phải có ít nhất 3 ký tự").toUpperCase(),
+    description: z.string().trim().optional(),
     discountType: DiscountTypeEnum,
     discountValue: z.coerce.number().positive("Giá trị giảm giá phải lớn hơn 0"),
     minOrderValue: z.coerce.number().nonnegative().default(0),
@@ -99,20 +91,12 @@ export const createVoucherSchema = z
       return true;
     },
     { message: "Ngày bắt đầu phải trước ngày kết thúc", path: ["endDate"] },
-  )
-  .refine(
-    (data) => {
-      // Nếu có userIds mà không có maxUsesPerUser → mặc định 1 (handled in repo)
-      // Không block, chỉ warn logic ở service
-      return true;
-    },
-    { message: "" },
   );
 
 export const updateVoucherSchema = z
   .object({
-    code: z.string().min(3).toUpperCase().optional(),
-    description: z.string().optional(),
+    code: z.string().trim().min(3).toUpperCase().optional(),
+    description: z.string().trim().optional(),
     discountType: DiscountTypeEnum.optional(),
     discountValue: z.coerce.number().positive().optional(),
     minOrderValue: z.coerce.number().nonnegative().optional(),
@@ -170,9 +154,7 @@ export const revokeVoucherUserSchema = z.object({
   userId: z.string().uuid(),
 });
 
-// =====================
-// === TYPE EXPORTS ===
-// =====================
+// TYPE EXPORTS
 
 export type ListVouchersQuery = z.infer<typeof listVouchersSchema>;
 export type ValidateVoucherInput = z.infer<typeof validateVoucherSchema>;

@@ -48,12 +48,16 @@ export const bulkUpsertCategorySpecsSchema = z.object({
   items: z.array(upsertCategorySpecSchema).min(1),
 });
 
-export const removeCategorySpecSchema = z.object({
-  specificationId: z.string().uuid(),
+export const removeCategorySpecParamsSchema = z.object({
+  categoryId: z.string().uuid("categoryId không hợp lệ"),
+  specificationId: z.string().uuid("specificationId không hợp lệ"),
 });
 
 export type UpsertCategorySpecInput = z.infer<typeof upsertCategorySpecSchema>;
 export type BulkUpsertCategorySpecsInput = z.infer<typeof bulkUpsertCategorySpecsSchema>;
+export type SpecParams = z.infer<typeof specParamsSchema>;
+export type CategorySpecParams = z.infer<typeof categorySpecParamsSchema>;
+export type RemoveCategorySpecParams = z.infer<typeof removeCategorySpecParamsSchema>;
 
 export const updateSpecificationSchema = createSpecificationSchema.partial().omit({ key: true });
 
