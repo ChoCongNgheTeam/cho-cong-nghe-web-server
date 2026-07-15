@@ -50,6 +50,9 @@ model users {
   voucherUsages              voucher_usages[]
   voucherUsers               voucher_user[]
   wishlist                   wishlist[]
+  chatSessions        chat_sessions[]
+  userPreferences     user_preferences[]
+  chatMemoryVectors   chat_memory_vectors[]
 
   @@index([deletedAt])
 }
@@ -751,12 +754,16 @@ model ai_contents {
 model chat_sessions {
   id         String   @id @default(uuid()) @db.Uuid
   sessionKey String   @unique
+  userId    String?  @db.Uuid
   messages   Json
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   expiresAt  DateTime
 
+  user      users?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([sessionKey])
+  @@index([userId])
   @@index([expiresAt])
 }
 
@@ -814,6 +821,49 @@ model login_history {
   @@index([userId])
   @@index([ip, createdAt])
   @@index([createdAt])
+}
+
+model user_preferences {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  key       String
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@index([userId])
+}
+
+model chat_memory_vectors {
+  id        String   @id @default(uuid()) @db.Uuid
+  sessionId String   // sessionKey từ chat_sessions
+  userId    String?  @db.Uuid
+  content   String   @db.Text
+  embedding Unsupported("vector(384)")?
+  createdAt DateTime @default(now())
+
+  user      users?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([userId])
+}
+
+model chatbot_semantic_cache {
+  id                String   @id @default(uuid()) @db.Uuid
+  query             String   @db.Text
+  embedding         Unsupported("vector(384)")?
+  toolSignatureHash String   @db.VarChar(255)
+  ttlDays           Int?
+  response          Json
+  hitCount          Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([toolSignatureHash])
+
 }
 
 enum CampaignType {
@@ -960,131 +1010,6 @@ enum BlogType {
   NOI_BAT
 }
 
-<<<<<<< HEAD
-
-// SOFT DELETE: users là entity chính, staff/admin cần trash
-// deletedBy tham chiếu chính nó (self-ref) — dùng String thay vì Uuid relation để tránh circular
-model users {
-  id           String    @id @default(uuid()) @db.Uuid
-  userName     String?   @unique
-  email        String    @unique
-  passwordHash String?
-  fullName     String?
-  phone        String?
-  gender       Gender?
-  dateOfBirth  DateTime?
-  role         UserRole  @default(CUSTOMER)
-  isActive     Boolean   @default(true)
-  notifications notifications[]
-  fcmTokens     fcm_tokens[]
-  avatarPath   String?
-  avatarImage  String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  notifEmail        Boolean @default(true)
-  notifPush         Boolean @default(true)
-  notifWeeklyReport Boolean @default(false)
-  notifOrderStatus  Boolean @default(true)
-  notifUserInactive Boolean @default(true)
-  notifReviewNew    Boolean @default(true)
-
-  isVerified                  Boolean   @default(false)
-  verificationToken           String?   @unique
-  verificationTokenExpiresAt  DateTime?
-    
-
-  // --- Soft Delete ---
-  deletedAt    DateTime?
-  deletedBy    String?   @db.Uuid  // ID của admin/staff thực hiện xóa
-
-  orders        orders[]
-  userAddresses user_addresses[]
-  cartItems     cart_items[]
-  wishlist      wishlist[]
-  reviews       reviews[]
-  voucherUsers  voucher_user[]
-  voucherUsages voucher_usages[]
-  blogs         blogs[]
-  comments      comments[]
-
-  passwordResetTokens password_reset_tokens[]
-  refreshTokens       refresh_tokens[]
-  oauthAccounts       oauth_accounts[]
-  chatSessions        chat_sessions[]
-  userPreferences     user_preferences[]
-  chatMemoryVectors   chat_memory_vectors[]
-
-  staffPermissions staff_permissions?
-  @@index([deletedAt]) // để query isDeleted nhanh hơn
-}
-
-model staff_permissions {
-  userId String @id @db.Uuid
-
-  // Đơn hàng
-  canViewOrders    Boolean @default(false)
-  canCreateOrder   Boolean @default(false)
-  canUpdateOrder   Boolean @default(false)
-
-  // Sản phẩm / kho
-  canViewProducts  Boolean @default(false)
-  canUpdateStock   Boolean @default(false)
-
-  // Marketing
-  canBlogs         Boolean @default(false)
-  canMedia         Boolean @default(false)
-  canCampaigns     Boolean @default(false)
-  canVouchers      Boolean @default(false)
-  canPromotions    Boolean @default(false)
-  canAiContent     Boolean @default(false)
-
-  // CSKH
-  canReviews       Boolean @default(false)
-  canComments      Boolean @default(false)
-  canNotifications Boolean @default(false)
-  canViewUsers     Boolean @default(false)
-
-  // Báo cáo
-  canAnalytics     Boolean @default(false)
-  canPaymentView   Boolean @default(false)
-
-  updatedAt DateTime @updatedAt
-
-  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-// CASCADE: oauth_accounts gắn chặt với user, xóa user thì xóa luôn
-model oauth_accounts {
-  id                String    @id @default(uuid()) @db.Uuid
-  userId            String    @db.Uuid
-  provider          String    // "google" | "facebook" | "apple"
-  providerAccountId String
-  accessToken       String?
-  refreshToken      String?
-  expiresAt         DateTime?
-  createdAt         DateTime  @default(now())
-
-  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-}
-
-// CASCADE: token gắn chặt với user
-model password_reset_tokens {
-  id        String   @id @default(uuid()) @db.Uuid
-  token     String   @unique
-  userId    String   @db.Uuid
-  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-}
-
-=======
->>>>>>> thinh
 enum RefreshTokenTTLType {
   short
   long
@@ -1130,89 +1055,9 @@ enum AiContentType {
   BLOG_POST
 }
 
-<<<<<<< HEAD
-model ai_contents {
-  id          String        @id @default(uuid()) @db.Uuid
-  type        AiContentType
-  referenceId String?       @db.Uuid  // productId nếu type = PRODUCT_DESCRIPTION
-  focusKeyword String
-  inputData   Json          // Raw input để regenerate nếu cần
-  outputContent String      @db.Text
-  seoScore    Int           // 0-100
-  seoDetails  Json          // Chi tiết SEO score
-  createdBy   String        @db.Uuid  // userId của admin/staff
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
- 
-  @@index([type, referenceId])
-  @@index([createdBy])
-  @@index([createdAt])
-}
-
-model chat_sessions {
-  id        String   @id @default(uuid()) @db.Uuid
-  sessionKey String  @unique  // UUID từ FE localStorage
-  userId    String?  @db.Uuid // Lưu userId nếu khách đã login
-  messages  Json    // Array of {role, content}
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  expiresAt DateTime // Tự động xóa sau 24h
- 
-  user      users?   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([sessionKey])
-  @@index([userId])
-  @@index([expiresAt])
-}
-
-model user_preferences {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  key       String
-  value     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, key])
-  @@index([userId])
-}
-
-model chat_memory_vectors {
-  id        String   @id @default(uuid()) @db.Uuid
-  sessionId String   // sessionKey từ chat_sessions
-  userId    String?  @db.Uuid
-  content   String   @db.Text
-  embedding Unsupported("vector(384)")?
-  createdAt DateTime @default(now())
-
-  user      users?   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([sessionId])
-  @@index([userId])
-}
 
 
-// ─────────────────────────────────────────
-// SETTINGS
-// ─────────────────────────────────────────
 
-model system_settings {
-  id        String   @id @default(uuid()) @db.Uuid
-  group     String
-  key       String
-  value     String   @db.Text
-  dataType  SettingDataType @default(STRING)
-  updatedBy String?  @db.Uuid
-  updatedAt DateTime @updatedAt
-
-  @@unique([group, key])
-  @@index([group])
-}
-
-=======
->>>>>>> thinh
 enum SettingDataType {
   STRING
   BOOLEAN
@@ -1239,73 +1084,4 @@ enum AuditAction {
   PERMISSION_CHANGE
   EXPORT
 }
-<<<<<<< HEAD
 
-model audit_logs {
-  id          String        @id @default(uuid()) @db.Uuid
-
-  // WHO
-  userId      String?       @db.Uuid
-  userName    String?
-  userRole    String?
-
-  // WHAT
-  action      AuditAction
-  module      String
-  targetId    String?
-  targetType  String?
-  description String
-  diff        Json?
-
-  // WHERE
-  ip          String?
-  userAgent   String?
-  location    String?
-
-  // META
-  severity    AuditSeverity @default(INFO)
-  isSuccess   Boolean       @default(true)
-  errorMsg    String?
-
-  createdAt   DateTime      @default(now())
-
-  @@index([userId])
-  @@index([module])
-  @@index([severity])
-  @@index([createdAt])
-  @@index([ip, createdAt])
-}
-
-model login_history {
-  id         String   @id @default(uuid()) @db.Uuid
-  userId     String?  @db.Uuid
-  email      String?
-  isSuccess  Boolean
-  ip         String?
-  userAgent  String?
-  location   String?
-  browser   String?
-  failReason String?
-
-  createdAt  DateTime @default(now())
-
-  @@index([userId])
-  @@index([ip, createdAt])
-  @@index([createdAt])
-}
-
-model chatbot_semantic_cache {
-  id                String   @id @default(uuid()) @db.Uuid
-  query             String   @db.Text
-  embedding         Unsupported("vector(384)")?
-  toolSignatureHash String   @db.VarChar(255)
-  ttlDays           Int?
-  response          Json
-  hitCount          Int      @default(0)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  @@index([toolSignatureHash])
-}
-=======
->>>>>>> thinh
