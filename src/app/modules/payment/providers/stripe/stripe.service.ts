@@ -5,7 +5,7 @@
  * - Return handler (FE redirect về sau khi thanh toán)
  */
 
-import { BadRequestError } from "@/errors";
+import { BadRequestError, NotFoundError } from "@/errors";
 import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
 import { Request, Response } from "express";
@@ -14,11 +14,24 @@ import { redirectToFrontend } from "../../payment.service";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-// ─── Create PaymentIntent ─────────────────────────────────────────────────────
+// Create PaymentIntent
 // ⚠️  Không còn gọi prisma.orders.update ở đây nữa.
 //     paymentIntentId được trả về → lưu vào DB trong executeOrderTransaction (atomic).
+//
+// SECURITY: `amount` client gửi lên KHÔNG được tin tưởng trực tiếp — số tiền thực tế
+// luôn lấy từ order.totalAmount trong DB. Một khi PaymentIntent được tạo với amount đúng,
+// Stripe tự đảm bảo client không thể sửa số tiền lúc confirm — nên chỉ cần chặn ở đây là đủ.
 
-export const createStripePaymentIntent = async (orderId: string, amount: number, currency: string = "vnd") => {
+export const createStripePaymentIntent = async (orderId: string, _clientAmount: number, currency: string = "vnd") => {
+  const order = await prisma.orders.findUnique({
+    where: { id: orderId },
+    select: { totalAmount: true, paymentStatus: true },
+  });
+  if (!order) throw new NotFoundError("Đơn hàng");
+  if (order.paymentStatus === "PAID") throw new BadRequestError("Đơn hàng đã được thanh toán");
+
+  const amount = Number(order.totalAmount);
+
   const paymentIntent = await stripe.paymentIntents.create({
     amount: Math.round(amount),
     currency,
@@ -34,7 +47,7 @@ export const createStripePaymentIntent = async (orderId: string, amount: number,
   };
 };
 
-// ─── Webhook handler ──────────────────────────────────────────────────────────
+// Webhook handler
 
 export const handleStripeWebhook = async (req: Request) => {
   const sig = req.headers["stripe-signature"];
@@ -43,8 +56,9 @@ export const handleStripeWebhook = async (req: Request) => {
   let event: Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET!);
-  } catch (err: any) {
-    throw new BadRequestError(`Stripe webhook signature invalid: ${err.message}`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "unknown error";
+    throw new BadRequestError(`Stripe webhook signature invalid: ${message}`);
   }
 
   if (event.type !== "payment_intent.succeeded" && event.type !== "payment_intent.payment_failed") {
@@ -85,13 +99,12 @@ export const handleStripeWebhook = async (req: Request) => {
       where: { id: order.id },
       data: { paymentStatus: "PAID" },
     });
-    // console.log(`[Stripe Webhook] Order ${order.id} → PAID`);
   }
 
   return { received: true, orderId: order.id, transactionStatus: isSuccess ? "COMPLETED" : "FAILED" };
 };
 
-// ─── Return handler ───────────────────────────────────────────────────────────
+// Return handler
 // Stripe redirect FE về đây sau khi confirmPayment (dù thành công hay thất bại).
 // Dùng payment_intent ID để tìm orderCode → redirect /order/{orderCode}/payment.
 // Logic update paymentStatus PAID được xử lý ở webhook (handleStripeWebhook).

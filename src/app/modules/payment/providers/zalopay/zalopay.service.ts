@@ -2,7 +2,7 @@
  * Xử lý toàn bộ logic ZaloPay: tạo payment URL, callback (IPN), return handler.
  */
 
-import { BadRequestError } from "@/errors";
+import { BadRequestError, NotFoundError } from "@/errors";
 import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
 import { Request, Response } from "express";
@@ -12,11 +12,23 @@ import { redirectToFrontend } from "../../payment.service";
 
 const hmacSha256 = (key: string, data: string): string => crypto.createHmac("sha256", key).update(data).digest("hex");
 
-// ─── Create payment URL ───────────────────────────────────────────────────────
+// Create payment URL
 // ⚠️  Không còn gọi prisma.orders.update ở đây nữa.
 //     appTransId được trả về → lưu vào DB trong executeOrderTransaction (atomic).
+//
+// SECURITY: `amount` client gửi lên KHÔNG được tin tưởng trực tiếp — số tiền thực tế
+// luôn lấy từ order.totalAmount trong DB, tránh trường hợp client tự sửa amount để trả ít hơn.
 
-export const createZaloPayPaymentUrl = async (orderId: string, amount: number, description: string) => {
+export const createZaloPayPaymentUrl = async (orderId: string, _clientAmount: number, description: string) => {
+  const order = await prisma.orders.findUnique({
+    where: { id: orderId },
+    select: { totalAmount: true, paymentStatus: true },
+  });
+  if (!order) throw new NotFoundError("Đơn hàng");
+  if (order.paymentStatus === "PAID") throw new BadRequestError("Đơn hàng đã được thanh toán");
+
+  const amount = Number(order.totalAmount);
+
   const appId = Number(process.env.ZALOPAY_APP_ID!);
   const key1 = process.env.ZALOPAY_KEY1!;
 
@@ -61,7 +73,7 @@ export const createZaloPayPaymentUrl = async (orderId: string, amount: number, d
   };
 };
 
-// ─── Callback handler (IPN từ ZaloPay — POST) ────────────────────────────────
+// Callback handler (IPN từ ZaloPay — POST)
 
 export const handleZaloPayCallback = async (rawPayload: unknown) => {
   const key2 = process.env.ZALOPAY_KEY2!;
@@ -93,29 +105,36 @@ export const handleZaloPayCallback = async (rawPayload: unknown) => {
     return { return_code: 1, return_message: "Order not found" };
   }
 
+  // Đối chiếu số tiền nhận được với order.totalAmount trước khi đánh dấu PAID
+  const expectedAmount = Number(order.totalAmount);
+  const amountMismatch = Number(data.amount) !== expectedAmount;
+
+  if (amountMismatch) {
+    console.warn(`[ZaloPay CB] Amount mismatch cho order ${order.id}: nhận ${data.amount}, expect ${expectedAmount}`);
+  }
+
   await prisma.payment_transactions.create({
     data: {
       orderId: order.id,
       paymentMethodId: order.paymentMethodId!,
       amount: data.amount,
       transactionRef: String(data.zp_trans_id),
-      status: "COMPLETED",
+      status: amountMismatch ? "FAILED" : "COMPLETED",
       payload: rawPayload as Prisma.InputJsonValue,
     },
   });
 
-  if (order.paymentStatus !== "PAID") {
+  if (!amountMismatch && order.paymentStatus !== "PAID") {
     await prisma.orders.update({
       where: { id: order.id },
       data: { paymentStatus: "PAID" },
     });
   }
 
-  // console.log(`[ZaloPay CB] Order ${order.id} → PAID`);
-  return { return_code: 1, return_message: "Thành công" };
+  return { return_code: 1, return_message: amountMismatch ? "Amount mismatch, không cập nhật đơn hàng" : "Thành công" };
 };
 
-// ─── Return handler ───────────────────────────────────────────────────────────
+// Return handler
 
 export const zaloPayReturnHandler = (req: Request, res: Response): void => {
   const { apptransid } = req.query as { apptransid: string };

@@ -76,7 +76,6 @@ export const handleSePayWebhook = async (rawPayload: unknown, headers: IncomingH
     where: { transactionRef: payload.referenceCode },
   });
   if (existed) {
-    // console.log("[SePay] Duplicate webhook ignored:", payload.referenceCode);
     return { success: true, message: "Already processed" };
   }
 
@@ -123,9 +122,6 @@ export const handleSePayWebhook = async (rawPayload: unknown, headers: IncomingH
       data: { paymentStatus: "PAID" },
     });
     newPaymentStatus = "PAID";
-    // console.log(`[SePay] Order ${order.id} PAID. TotalPaid=${totalPaid}`);
-  } else {
-    // console.log(`[SePay] Order ${order.id} chưa đủ tiền. Paid=${totalPaid}/${expectedAmount}`);
   }
 
   return {

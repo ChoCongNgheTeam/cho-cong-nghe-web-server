@@ -2,11 +2,12 @@
  * Xử lý toàn bộ logic VNPay: tạo payment URL, IPN (GET), return handler.
  */
 
-import { BadRequestError } from "@/errors";
+import { BadRequestError, NotFoundError } from "@/errors";
 import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
 import { Request, Response } from "express";
 import { VNPay, HashAlgorithm } from "vnpay";
+import type { ReturnQueryFromVNPay } from "vnpay";
 import { redirectToFrontend } from "../../payment.service";
 
 // VNPay SDK instance (singleton)
@@ -23,11 +24,22 @@ export const getClientIp = (req: Request): string => {
   return raw === "::1" ? "127.0.0.1" : raw.replace(/^::ffff:/, "");
 };
 
-// ─── Create payment URL ───────────────────────────────────────────────────────
+// Create payment URL
 // ⚠️  Không còn gọi prisma.orders.update ở đây nữa.
 //     txnRef được trả về → lưu vào DB trong executeOrderTransaction (atomic).
+//
+// SECURITY: `amount` client gửi lên KHÔNG được tin tưởng trực tiếp — số tiền thực tế
+// luôn lấy từ order.totalAmount trong DB (IPN vẫn double-check lại, đây là lớp phòng thủ đầu).
 
-export const createVnpayPaymentUrl = async (orderId: string, amount: number, orderInfo: string, ipAddr: string) => {
+export const createVnpayPaymentUrl = async (orderId: string, _clientAmount: number, orderInfo: string, ipAddr: string) => {
+  const order = await prisma.orders.findUnique({
+    where: { id: orderId },
+    select: { totalAmount: true, paymentStatus: true },
+  });
+  if (!order) throw new NotFoundError("Đơn hàng");
+  if (order.paymentStatus === "PAID") throw new BadRequestError("Đơn hàng đã được thanh toán");
+
+  const amount = Number(order.totalAmount);
   const txnRef = `${Date.now()}${orderId.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 
   const paymentUrl = vnpay.buildPaymentUrl({
@@ -42,10 +54,10 @@ export const createVnpayPaymentUrl = async (orderId: string, amount: number, ord
   return { paymentUrl, txnRef };
 };
 
-// ─── IPN handler (GET) ────────────────────────────────────────────────────────
+// IPN handler (GET)
 
 export const handleVnpayIpn = async (rawQuery: unknown) => {
-  const verify = vnpay.verifyReturnUrl(rawQuery as any);
+  const verify = vnpay.verifyReturnUrl(rawQuery as ReturnQueryFromVNPay);
 
   if (!verify.isVerified) {
     console.warn("[VNPay IPN] Signature invalid");
@@ -95,11 +107,10 @@ export const handleVnpayIpn = async (rawQuery: unknown) => {
   return { RspCode: "00", Message: "Confirm Success" };
 };
 
-// ─── Return handler ───────────────────────────────────────────────────────────
+// Return handler
 
 export const vnpayReturnHandler = (req: Request, res: Response): void => {
-  const verified = vnpay.verifyReturnUrl(req.query as any);
-  // console.log("[VNPay Return] verified:", verified.isVerified, verified.isSuccess);
+  vnpay.verifyReturnUrl(req.query as unknown as ReturnQueryFromVNPay);
   const txnRef = req.query.vnp_TxnRef as string;
   redirectToFrontend(res, txnRef);
 };

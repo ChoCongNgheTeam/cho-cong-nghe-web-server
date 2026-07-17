@@ -2,7 +2,7 @@
  * Xử lý toàn bộ logic MoMo: tạo payment URL (sandbox) và xử lý IPN.
  */
 
-import { BadRequestError } from "@/errors";
+import { BadRequestError, NotFoundError } from "@/errors";
 import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
 import { Request, Response } from "express";
@@ -14,11 +14,23 @@ import { redirectToFrontend } from "../../payment.service";
 // Signature helpers
 const buildMomoSignature = (rawStr: string): string => crypto.createHmac("sha256", process.env.MOMO_SECRET_KEY!).update(rawStr).digest("hex");
 
-// ─── Create payment URL (sandbox) ────────────────────────────────────────────
+// Create payment URL (sandbox)
 // ⚠️  Không còn gọi prisma.orders.update ở đây nữa.
 //     momoOrderId được trả về → lưu vào DB trong executeOrderTransaction (atomic).
+//
+// SECURITY: `amount` client gửi lên KHÔNG được tin tưởng trực tiếp — số tiền thực tế
+// luôn lấy từ order.totalAmount trong DB, tránh trường hợp client tự sửa amount để trả ít hơn.
 
-export const createMomoPaymentUrl = async (orderId: string, amount: number, orderInfo: string) => {
+export const createMomoPaymentUrl = async (orderId: string, _clientAmount: number, orderInfo: string) => {
+  const order = await prisma.orders.findUnique({
+    where: { id: orderId },
+    select: { totalAmount: true, paymentStatus: true },
+  });
+  if (!order) throw new NotFoundError("Đơn hàng");
+  if (order.paymentStatus === "PAID") throw new BadRequestError("Đơn hàng đã được thanh toán");
+
+  const amount = Number(order.totalAmount);
+
   const partnerCode = process.env.MOMO_PARTNER_CODE!;
   const accessKey = process.env.MOMO_ACCESS_KEY!;
   const redirectUrl = process.env.MOMO_REDIRECT_URL!;
@@ -84,7 +96,7 @@ export const createMomoPaymentUrl = async (orderId: string, amount: number, orde
   };
 };
 
-// ─── Return handler (redirect FE, không xử lý logic) ─────────────────────────
+// Return handler (redirect FE, không xử lý logic)
 
 export const momoReturnHandler = (req: Request, res: Response): void => {
   const { orderId, orderInfo } = req.query as {
@@ -104,7 +116,7 @@ export const momoReturnHandler = (req: Request, res: Response): void => {
   }
 };
 
-// ─── IPN handler ──────────────────────────────────────────────────────────────
+// IPN handler
 
 export const handleMomoIpn = async (rawPayload: unknown) => {
   const payload = momoIpnSchema.parse(rawPayload);
@@ -146,9 +158,17 @@ export const handleMomoIpn = async (rawPayload: unknown) => {
     return { success: true, message: "Order not found" };
   }
 
-  // 4. Tạo transaction
+  // 4. Đối chiếu số tiền nhận được với order.totalAmount — chặn trường hợp
+  //    amount bị lệch (dù chữ ký hợp lệ) trước khi đánh dấu đơn hàng đã thanh toán
   const isSuccess = payload.resultCode === 0;
-  const transactionStatus = isSuccess ? "COMPLETED" : "FAILED";
+  const expectedAmount = Number(order.totalAmount);
+  const amountMismatch = isSuccess && Number(payload.amount) !== expectedAmount;
+
+  if (amountMismatch) {
+    console.warn(`[MoMo IPN] Amount mismatch cho order ${order.id}: nhận ${payload.amount}, expect ${expectedAmount}`);
+  }
+
+  const transactionStatus = isSuccess && !amountMismatch ? "COMPLETED" : "FAILED";
 
   await prisma.payment_transactions.create({
     data: {
@@ -161,16 +181,15 @@ export const handleMomoIpn = async (rawPayload: unknown) => {
     },
   });
 
-  // 5. Update order
-  if (isSuccess && order.paymentStatus !== "PAID") {
+  // 5. Update order — chỉ đánh dấu PAID khi thành công VÀ amount khớp
+  if (transactionStatus === "COMPLETED" && order.paymentStatus !== "PAID") {
     await prisma.orders.update({
       where: { id: order.id },
       data: { paymentStatus: "PAID" },
     });
   }
 
-  const newPaymentStatus = isSuccess ? "PAID" : "UNPAID";
-  // console.log(`[MoMo IPN] Order ${order.id} → ${newPaymentStatus}`);
+  const newPaymentStatus = transactionStatus === "COMPLETED" ? "PAID" : "UNPAID";
 
   return { success: true, orderId: order.id, transactionStatus, newPaymentStatus };
 };

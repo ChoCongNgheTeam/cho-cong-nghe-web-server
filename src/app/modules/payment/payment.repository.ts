@@ -7,10 +7,9 @@
 
 import prisma from "@/config/db";
 import { Prisma, PaymentTransactionStatus } from "@prisma/client";
+import { BadRequestError } from "@/errors";
 
-// ---------------------------------------------------------------------------
 // Selects (reusable)
-// ---------------------------------------------------------------------------
 
 const paymentMethodSelect = {
   id: true,
@@ -33,9 +32,7 @@ export const paymentTransactionSelect = {
   createdAt: true,
 };
 
-// ---------------------------------------------------------------------------
 // Payment Methods
-// ---------------------------------------------------------------------------
 
 export const findAllPaymentMethods = () =>
   prisma.payment_methods.findMany({
@@ -69,11 +66,15 @@ export const updatePaymentMethod = (id: string, data: Prisma.payment_methodsUpda
     select: paymentMethodSelect,
   });
 
-export const deletePaymentMethod = (id: string) => prisma.payment_methods.delete({ where: { id } });
+export const deletePaymentMethod = async (id: string) => {
+  const usedCount = await prisma.payment_transactions.count({ where: { paymentMethodId: id } });
+  if (usedCount > 0) {
+    throw new BadRequestError("Phương thức thanh toán đã có giao dịch, không thể xóa — hãy chuyển isActive=false thay vì xóa");
+  }
+  return prisma.payment_methods.delete({ where: { id } });
+};
 
-// ---------------------------------------------------------------------------
 // Payment Transactions
-// ---------------------------------------------------------------------------
 
 export const createPaymentTransaction = (data: {
   orderId: string;

@@ -6,9 +6,7 @@
 
 import { z } from "zod";
 
-// ---------------------------------------------------------------------------
 // Payment Method CRUD
-// ---------------------------------------------------------------------------
 
 export const createPaymentMethodSchema = z.object({
   name: z.string().min(1, "Tên phương thức thanh toán không được để trống"),
@@ -24,9 +22,7 @@ export const updatePaymentMethodSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-// ---------------------------------------------------------------------------
 // SePay
-// ---------------------------------------------------------------------------
 
 export const sePayWebhookSchema = z.object({
   id: z.number(),
@@ -46,9 +42,7 @@ export const sePayWebhookSchema = z.object({
 
 export type SePayWebhookPayload = z.infer<typeof sePayWebhookSchema>;
 
-// ---------------------------------------------------------------------------
 // MoMo
-// ---------------------------------------------------------------------------
 
 export const momoIpnSchema = z
   .object({
@@ -70,38 +64,35 @@ export const momoIpnSchema = z
 
 export type MomoIpnPayload = z.infer<typeof momoIpnSchema>;
 
-// ---------------------------------------------------------------------------
-// VNPay
-// ---------------------------------------------------------------------------
+// Create-payment request bodies
+// Lưu ý: `amount` chỉ giữ lại để tương thích FE cũ gửi lên — server luôn tự tính
+// lại amount từ order.totalAmount trong DB, không dùng giá trị client gửi để tính tiền.
 
-export const vnpayIpnSchema = z
-  .object({
-    vnp_TmnCode: z.string(),
-    vnp_Amount: z.string(), // Số tiền * 100
-    vnp_BankCode: z.string().optional(),
-    vnp_BankTranNo: z.string().optional(),
-    vnp_CardType: z.string().optional(),
-    vnp_PayDate: z.string(),
-    vnp_CurrCode: z.string().optional(),
-    vnp_OrderInfo: z.string(),
-    vnp_TransactionNo: z.string(),
-    vnp_ResponseCode: z.string(), // "00" = success
-    vnp_TransactionStatus: z.string(),
-    vnp_TxnRef: z.string(),
-    vnp_SecureHash: z.string(),
-  })
-  .passthrough();
+const orderIdField = z.string().uuid("orderId không hợp lệ");
 
-export type VnpayIpnPayload = z.infer<typeof vnpayIpnSchema>;
+export const createMomoPaymentSchema = z.object({
+  orderId: orderIdField,
+  amount: z.number().positive().optional(),
+  orderInfo: z.string().min(1, "orderInfo không được để trống"),
+});
+export type CreateMomoPaymentInput = z.infer<typeof createMomoPaymentSchema>;
 
-// ---------------------------------------------------------------------------
-// Legacy / manual test schema (giữ lại nếu cần)
-// ---------------------------------------------------------------------------
+export const createVnpayPaymentSchema = z.object({
+  orderId: orderIdField,
+  amount: z.number().positive().optional(),
+  orderInfo: z.string().min(1, "orderInfo không được để trống"),
+});
+export type CreateVnpayPaymentInput = z.infer<typeof createVnpayPaymentSchema>;
 
-export const webhookPayloadSchema = z
-  .object({
-    orderId: z.string().uuid("orderId không hợp lệ"),
-    transactionRef: z.string().optional(),
-    status: z.enum(["COMPLETED", "FAILED", "REFUNDED"]),
-  })
-  .passthrough();
+export const createZaloPayPaymentSchema = z.object({
+  orderId: orderIdField,
+  amount: z.number().positive().optional(),
+  description: z.string().min(1, "description không được để trống"),
+});
+export type CreateZaloPayPaymentInput = z.infer<typeof createZaloPayPaymentSchema>;
+
+export const createStripePaymentSchema = z.object({
+  orderId: orderIdField,
+  amount: z.number().positive().optional(),
+});
+export type CreateStripePaymentInput = z.infer<typeof createStripePaymentSchema>;
