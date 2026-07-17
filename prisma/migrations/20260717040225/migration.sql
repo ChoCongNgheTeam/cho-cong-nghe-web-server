@@ -1,0 +1,2 @@
+-- -- DropIndex
+-- DROP INDEX "chat_memory_vectors_embedding_idx";
