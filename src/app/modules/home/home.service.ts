@@ -93,6 +93,7 @@ export const getHomeStaticData = async (): Promise<HomeStaticResponse> => {
   ]);
 
   return {
+    bannersDeal: allMedia[MediaPosition.HOME_DEAL] ?? [],
     sliders: allMedia[MediaPosition.HOME_TOP] ?? [],
     bannersTop: allMedia[MediaPosition.BELOW_SLIDER] ?? [],
     bannersSection1: allMedia[MediaPosition.HOME_SECTION_1] ?? [],

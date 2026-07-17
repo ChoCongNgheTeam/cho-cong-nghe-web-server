@@ -128,6 +128,7 @@ export interface PaginatedResult<T> {
 
 /** GET /home/static — ít thay đổi, cache dài */
 export interface HomeStaticResponse {
+  bannersDeal: HomeBanner[];
   sliders: HomeSlider[];
   bannersTop: HomeBanner[];
   bannersSection1: HomeBanner[];
