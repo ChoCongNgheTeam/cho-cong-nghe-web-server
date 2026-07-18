@@ -29,13 +29,9 @@ export const HOME_BLOG_CONFIG = {
 export const VN_TIMEZONE = "Asia/Ho_Chi_Minh";
 
 // ============================================================
-// Cache tags — đồng bộ với FE
-// Đặt ở đây để khi cần revalidate (sau này) chỉ sửa 1 chỗ.
+// Cache tags — re-export từ shared, vì promotion/product/campaign/
+// category/media cũng cần dùng chung tag này để gọi revalidateTags().
+// home module không còn là nơi định nghĩa gốc.
 // ============================================================
 
-export const CACHE_TAGS = {
-  HOME_STATIC: "home-static", // banners + categories + campaigns + blogs
-  HOME_PRODUCTS: "home-products", // featured + best selling
-  SALE_SCHEDULE: "sale-schedule", // sale schedule + today products
-  HOME_CATEGORY_PRODUCTS: "home-category-products", // best selling theo từng category (tabs)
-} as const;
+export { CACHE_TAGS } from "@/shared/cache/cache-tags.constants";
