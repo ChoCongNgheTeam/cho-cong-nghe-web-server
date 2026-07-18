@@ -7,6 +7,13 @@ import { generateUniqueSlug } from "@/utils/generate-unique-slug";
 import { NotFoundError, BadRequestError, ForbiddenError } from "@/errors";
 import buildCategoryTree from "@/utils/build-category-tree";
 import { buildKeywordVariants, normalizeVietnamese } from "@/app/modules/search/search.helpers";
+import { revalidateTags } from "@/shared/cache/revalidate.service";
+import { CACHE_TAGS } from "@/shared/cache/cache-tags.constants";
+
+// Category ảnh hưởng Home ở 2 chỗ: FeaturedCategories (HOME_STATIC) và
+// tab category ở CategoryProducts (HOME_CATEGORY_PRODUCTS) nếu category
+// đó nằm trong HOME_CATEGORY_PRODUCT_TABS.
+const CATEGORY_CACHE_TAGS = [CACHE_TAGS.HOME_STATIC, CACHE_TAGS.HOME_CATEGORY_PRODUCTS];
 
 const assertCategoryExists = async (id: string) => {
   const category = await repo.findById(id);
@@ -154,7 +161,7 @@ export const createCategory = async (input: CreateCategoryInput) => {
   const finalPosition = position ?? (await repo.countSiblings(parentId || null));
   const slug = await generateUniqueSlug(prisma.categories, name);
 
-  return repo
+  const result = await repo
     .create({
       name,
       slug,
@@ -163,6 +170,9 @@ export const createCategory = async (input: CreateCategoryInput) => {
       ...rest,
     })
     .catch(handlePrismaError);
+
+  revalidateTags(CATEGORY_CACHE_TAGS);
+  return result;
 };
 
 export const updateCategory = async (id: string, input: UpdateCategoryInput) => {
@@ -220,6 +230,7 @@ export const updateCategory = async (id: string, input: UpdateCategoryInput) => 
     await helpers.cascadeActivate(id);
   }
 
+  revalidateTags(CATEGORY_CACHE_TAGS);
   return updated;
 };
 
@@ -234,7 +245,9 @@ export const softDeleteCategory = async (id: string, deletedById: string) => {
   const products = await repo.hasProducts(id);
   if (products) throw new BadRequestError("Không thể xóa danh mục đang có sản phẩm. Vui lòng chuyển sản phẩm sang danh mục khác trước.");
 
-  return repo.softDelete(id, deletedById);
+  const result = await repo.softDelete(id, deletedById);
+  revalidateTags(CATEGORY_CACHE_TAGS);
+  return result;
 };
 
 export const restoreCategory = async (id: string) => {
@@ -245,7 +258,9 @@ export const restoreCategory = async (id: string) => {
   const nameConflict = await repo.existsByNameInParent(category.name, category.parentId, id);
   if (nameConflict) throw new BadRequestError(`Không thể khôi phục vì tên "${category.name}" đã được dùng trong cùng cấp`);
 
-  return repo.restore(id);
+  const result = await repo.restore(id);
+  revalidateTags(CATEGORY_CACHE_TAGS);
+  return result;
 };
 
 export const hardDeleteCategory = async (id: string) => {
@@ -256,7 +271,9 @@ export const hardDeleteCategory = async (id: string) => {
 
   if (category.imagePath) await helpers.deleteOldCategoryImage(category.imagePath);
 
-  return repo.hardDelete(id);
+  const result = await repo.hardDelete(id);
+  revalidateTags(CATEGORY_CACHE_TAGS);
+  return result;
 };
 
 export const getDeletedCategories = async (options: { page?: number; limit?: number } = {}) => {
@@ -283,6 +300,7 @@ export const reorderCategory = async (categoryId: string, newPosition: number) =
   updates.push({ id: categoryId, position: newPosition });
 
   await repo.reorderSiblings(updates);
+  revalidateTags(CATEGORY_CACHE_TAGS);
   return { message: "Sắp xếp thành công" };
 };
 

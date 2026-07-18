@@ -21,6 +21,12 @@ import { invalidateFilterCache } from "./product_filter.service";
 import { mapProductsToExportRows, buildProductCsvBuffer, buildProductExcelBuffer, buildImportTemplateBuffer } from "./product.export";
 import { parseExcelBuffer, parseCsvBuffer, bulkImportVariants, ImportResult } from "./product.import";
 import { Prisma } from "@prisma/client";
+import { revalidateTags } from "@/shared/cache/revalidate.service";
+import { CACHE_TAGS } from "@/shared/cache/cache-tags.constants";
+
+// Tag cache Home bị ảnh hưởng khi product thay đổi (giá, isFeatured, isActive,
+// soldCount...) — ảnh hưởng cả featured/best-selling chung và theo category.
+const PRODUCT_CACHE_TAGS = [CACHE_TAGS.HOME_PRODUCTS, CACHE_TAGS.HOME_CATEGORY_PRODUCTS];
 
 // INTERNAL HELPERS
 
@@ -417,6 +423,7 @@ export const createProduct = async (input: Omit<repo.CreateProductRepoInput, "sl
 
   const product = await repo.create({ ...input, slug });
   invalidateFilterCache();
+  revalidateTags(PRODUCT_CACHE_TAGS);
   return transformProductDetail(product);
 };
 
@@ -465,6 +472,7 @@ export const updateProduct = async (id: string, input: UpdateProductInputWithIma
 
   await repo.update(id, updateData);
   invalidateFilterCache();
+  revalidateTags(PRODUCT_CACHE_TAGS);
 
   // Fetch lại raw data để FE admin dùng (giống getProductById)
   const updated = await repo.findById(id);
@@ -490,7 +498,9 @@ export const updateProduct = async (id: string, input: UpdateProductInputWithIma
  */
 export const softDeleteProduct = async (id: string, deletedBy: string) => {
   await assertProductExists(id); // chưa bị xóa
-  return repo.softDelete(id, deletedBy);
+  const result = await repo.softDelete(id, deletedBy);
+  revalidateTags(PRODUCT_CACHE_TAGS);
+  return result;
 };
 
 /**
@@ -510,6 +520,7 @@ export const restoreProduct = async (id: string) => {
 
   const result = await repo.restore(id);
   invalidateFilterCache();
+  revalidateTags(PRODUCT_CACHE_TAGS);
   return result;
 };
 
@@ -523,6 +534,7 @@ export const hardDeleteProduct = async (id: string) => {
   if (!product.deletedAt) throw new BadRequestError("Phải soft-delete trước khi xóa vĩnh viễn");
   const result = await repo.hardDelete(id);
   invalidateFilterCache();
+  revalidateTags(PRODUCT_CACHE_TAGS);
   return result;
 };
 
@@ -549,6 +561,7 @@ export const bulkSoftDeleteProducts = async (ids: string[], deletedBy: string) =
   if (!ids.length) throw new BadRequestError("Danh sách ID không được rỗng");
   const result = await repo.bulkSoftDelete(ids, deletedBy);
   invalidateFilterCache();
+  revalidateTags(PRODUCT_CACHE_TAGS);
   return result;
 };
 
@@ -559,6 +572,7 @@ export const bulkUpdateProducts = async (ids: string[], updates: Prisma.products
   if (!ids.length) throw new BadRequestError("Danh sách ID không được rỗng");
   const result = await repo.bulkUpdate(ids, updates);
   invalidateFilterCache();
+  revalidateTags(PRODUCT_CACHE_TAGS);
   return result;
 };
 

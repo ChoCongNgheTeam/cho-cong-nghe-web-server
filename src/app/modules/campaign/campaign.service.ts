@@ -3,6 +3,12 @@ import { CreateCampaignInput, UpdateCampaignInput, ListCampaignsQuery, CampaignC
 import { campaignRepository } from "./campaign.repository";
 import { generateUniqueCampaignSlug, deleteCampaignCategoryImage } from "./campaign.helpers";
 import { NotFoundError, BadRequestError } from "@/errors";
+import { revalidateTags } from "@/shared/cache/revalidate.service";
+import { CACHE_TAGS } from "@/shared/cache/cache-tags.constants";
+
+// Campaign hiển thị ở Home (SeasonalSale) qua HOME_STATIC — cache dài (3600s),
+// nên bất kỳ thay đổi nào ở campaign/campaign category đều cần invalidate ngay.
+const CAMPAIGN_CACHE_TAGS = [CACHE_TAGS.HOME_STATIC];
 
 export class CampaignService {
   // ── Public reads ────────────────────────────────────────────────────────────
@@ -46,7 +52,9 @@ export class CampaignService {
     if (nameExists) throw new BadRequestError("Tên chiến dịch đã tồn tại");
 
     const slug = await generateUniqueCampaignSlug(data.name, (s) => campaignRepository.checkSlugExists(s));
-    return campaignRepository.createCampaign({ ...data, slug });
+    const result = await campaignRepository.createCampaign({ ...data, slug });
+    revalidateTags(CAMPAIGN_CACHE_TAGS);
+    return result;
   }
 
   async updateCampaign(id: string, data: UpdateCampaignInput) {
@@ -66,17 +74,23 @@ export class CampaignService {
       updateData.slug = await generateUniqueCampaignSlug(data.name, (s) => campaignRepository.checkSlugExists(s, id), existing.slug);
     }
 
-    return campaignRepository.updateCampaign(id, updateData);
+    const result = await campaignRepository.updateCampaign(id, updateData);
+    revalidateTags(CAMPAIGN_CACHE_TAGS);
+    return result;
   }
 
   async deleteCampaign(id: string, deletedBy: string) {
     const campaign = await campaignRepository.getCampaignById(id);
     if (!campaign) throw new NotFoundError("Chiến dịch");
-    return campaignRepository.softDelete(id, deletedBy);
+    const result = await campaignRepository.softDelete(id, deletedBy);
+    revalidateTags(CAMPAIGN_CACHE_TAGS);
+    return result;
   }
 
   async bulkDeleteCampaigns(input: BulkDeleteCampaignsInput, deletedBy: string) {
-    return campaignRepository.bulkSoftDelete(input.ids, deletedBy);
+    const result = await campaignRepository.bulkSoftDelete(input.ids, deletedBy);
+    revalidateTags(CAMPAIGN_CACHE_TAGS);
+    return result;
   }
 
   async restoreCampaign(id: string) {
@@ -89,7 +103,9 @@ export class CampaignService {
       throw new BadRequestError(`Tên "${campaign.name}" đã tồn tại ở chiến dịch khác. Vui lòng đổi tên trước khi khôi phục.`);
     }
 
-    return campaignRepository.restore(id);
+    const result = await campaignRepository.restore(id);
+    revalidateTags(CAMPAIGN_CACHE_TAGS);
+    return result;
   }
 
   async hardDeleteCampaign(id: string) {
@@ -105,7 +121,9 @@ export class CampaignService {
       }
     }
 
-    return campaignRepository.hardDelete(id);
+    const result = await campaignRepository.hardDelete(id);
+    revalidateTags(CAMPAIGN_CACHE_TAGS);
+    return result;
   }
 
   // ── Campaign Categories ─────────────────────────────────────────────────────
@@ -121,7 +139,9 @@ export class CampaignService {
       if (alreadyInCampaign) throw new BadRequestError(`Danh mục ${category.categoryId} đã có trong chiến dịch`);
     }
 
-    return campaignRepository.addCampaignCategories(campaignId, categories);
+    const result = await campaignRepository.addCampaignCategories(campaignId, categories);
+    revalidateTags(CAMPAIGN_CACHE_TAGS);
+    return result;
   }
 
   async updateCampaignCategory(campaignId: string, categoryId: string, data: UpdateCampaignCategoryInput) {
@@ -138,6 +158,7 @@ export class CampaignService {
     }
 
     await campaignRepository.updateCampaignCategory(campaignId, categoryId, updateData);
+    revalidateTags(CAMPAIGN_CACHE_TAGS);
     return campaignRepository.getCampaignCategory(campaignId, categoryId);
   }
 
@@ -146,6 +167,7 @@ export class CampaignService {
     if (!campaignCategory) throw new NotFoundError("Danh mục trong chiến dịch");
     if (campaignCategory.imagePath) await deleteCampaignCategoryImage(campaignCategory.imagePath);
     await campaignRepository.removeCampaignCategory(campaignId, categoryId);
+    revalidateTags(CAMPAIGN_CACHE_TAGS);
   }
 
   async getCampaignCategory(campaignId: string, categoryId: string) {

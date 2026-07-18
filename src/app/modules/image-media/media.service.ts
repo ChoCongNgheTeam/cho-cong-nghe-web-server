@@ -5,6 +5,12 @@ import { MediaType, MediaPosition, MediaByCategoryQuery } from "./media.types";
 import { deleteOldMediaImage } from "./media.helpers";
 import { NotFoundError, BadRequestError } from "@/errors";
 import prisma from "@/config/db";
+import { revalidateTags } from "@/shared/cache/revalidate.service";
+import { CACHE_TAGS } from "@/shared/cache/cache-tags.constants";
+
+// Media (banner/slider) chỉ hiển thị ở Home qua HOME_STATIC (cache 3600s) —
+// thay đổi cần invalidate ngay, không nên để user đợi tới 1 tiếng mới thấy.
+const MEDIA_CACHE_TAGS = [CACHE_TAGS.HOME_STATIC];
 
 export const getMediaByType = async (type: MediaType) => {
   const media = await repo.findByType(type, true);
@@ -51,6 +57,7 @@ export const createMedia = async (input: CreateMediaInput) => {
   const finalOrder = order ?? (await repo.getMaxOrder(type, position)) + 1;
 
   const media = await repo.create({ type, position, order: finalOrder, ...rest });
+  revalidateTags(MEDIA_CACHE_TAGS);
   return transformMedia(media);
 };
 
@@ -62,6 +69,7 @@ export const updateMedia = async (id: string, input: UpdateMediaInput) => {
   }
 
   const media = await repo.update(id, input);
+  revalidateTags(MEDIA_CACHE_TAGS);
   return transformMedia(media);
 };
 
@@ -72,7 +80,9 @@ export const deleteMedia = async (id: string) => {
     await deleteOldMediaImage((media as any).imagePath);
   }
 
-  return repo.remove(id);
+  const result = await repo.remove(id);
+  revalidateTags(MEDIA_CACHE_TAGS);
+  return result;
 };
 
 export const reorderMedia = async (input: ReorderMediaInput) => {
@@ -97,6 +107,7 @@ export const reorderMedia = async (input: ReorderMediaInput) => {
   updates.push(prisma.image_media.update({ where: { id: mediaId }, data: { order: newOrder } }));
 
   await prisma.$transaction(updates);
+  revalidateTags(MEDIA_CACHE_TAGS);
   return { message: "Sắp xếp thành công" };
 };
 
