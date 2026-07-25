@@ -3,6 +3,8 @@ import { Prisma, OrderStatus, PaymentStatus } from "@prisma/client";
 import { CheckoutSummary } from "./checkout.types";
 import { PaymentFields } from "./payment-info.builder";
 import { NotFoundError } from "@/errors";
+import { applyStockMovementTx } from "@/app/modules/inventory/inventory.repository";
+import { getDefaultWarehouseId } from "@/app/modules/warehouse/warehouse.repository";
 
 export const findCartItemsWithProduct = async (userId: string) => {
   return prisma.cart_items.findMany({
@@ -120,6 +122,29 @@ export const executeOrderTransaction = async (userId: string, checkoutSummary: C
       ),
     );
 
+    // 2b. Ghi nhận biến động tồn kho theo kho (stock_movements) — best-effort:
+    // nếu hệ thống chưa cấu hình kho nào thì bỏ qua, không chặn checkout.
+    const defaultWarehouseId = await getDefaultWarehouseId(tx);
+    if (defaultWarehouseId) {
+      await Promise.all(
+        checkoutSummary.items.map((item) =>
+          applyStockMovementTx(
+            tx,
+            {
+              productVariantId: item.productVariantId,
+              warehouseId: defaultWarehouseId,
+              quantityDelta: -item.quantity,
+              type: "SALE",
+              reason: "ORDER_SALE",
+              orderId: newOrder.id,
+              performedBy: userId,
+            },
+            { syncVariantQuantity: false }, // đã trừ ở bước 2 rồi
+          ),
+        ),
+      );
+    }
+
     const productSoldMap = new Map<string, number>();
     for (const item of newOrder.orderItems) {
       const productId = item.productVariant.productId;
@@ -181,6 +206,26 @@ export const cancelOrderAndRestoreInventory = async (orderId: string) => {
         data: { quantity: { increment: item.quantity }, soldCount: { decrement: item.quantity } },
       });
     }
+
+    // Ghi nhận hoàn tồn kho theo kho — best-effort, không chặn việc hủy đơn nếu chưa có kho
+    const defaultWarehouseId = await getDefaultWarehouseId(tx);
+    if (defaultWarehouseId) {
+      for (const item of orderItems) {
+        await applyStockMovementTx(
+          tx,
+          {
+            productVariantId: item.productVariantId,
+            warehouseId: defaultWarehouseId,
+            quantityDelta: item.quantity,
+            type: "RETURN",
+            reason: "ORDER_CANCEL",
+            orderId,
+          },
+          { syncVariantQuantity: false }, // đã cộng lại ở trên rồi
+        );
+      }
+    }
+
     await tx.orders.update({ where: { id: orderId }, data: { orderStatus: "CANCELLED" } });
   });
 };

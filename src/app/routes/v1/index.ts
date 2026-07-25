@@ -55,6 +55,11 @@ import auditRouter from "@/app/modules/audit/audit.route";
 import staffPermissionsRouter from "@/app/modules/staff-permissions/staff-permissions.route";
 import healthRouter from "@/app/modules/health/health.router";
 
+// ===== Kho hàng (Inventory) =====
+import warehouseRouter from "@/app/modules/warehouse/warehouse.route";
+import supplierRouter from "@/app/modules/supplier/supplier.route";
+import inventoryRouter from "@/app/modules/inventory/inventory.route";
+
 import { auditMiddleware } from "@/app/middlewares/audit.middleware";
 import { initSettingsCache } from "@/app/modules/settings/settings.service";
 
@@ -116,6 +121,11 @@ router.use("/analytics", analyticsRouter);
 router.use("/settings", settingsRouter);
 router.use("/audit", auditRouter);
 router.use("/admin/staff-permissions", staffPermissionsRouter);
+
+// ===== Kho hàng (Inventory) =====
+router.use("/admin/warehouses", warehouseRouter);
+router.use("/admin/suppliers", supplierRouter);
+router.use("/admin/inventory", inventoryRouter);
 
 router.use("/health", healthRouter);
 

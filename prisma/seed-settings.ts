@@ -56,6 +56,9 @@ const DEFAULTS: { group: string; key: string; value: string; dataType: DataType 
   { group: "order", key: "cancel_within_minutes", value: "1440", dataType: "NUMBER" },
   { group: "order", key: "return_within_days", value: "7", dataType: "NUMBER" },
 
+  // ── inventory ─────────────────────────────────────────────────────────────────
+  { group: "inventory", key: "low_stock_default_threshold", value: "5", dataType: "NUMBER" },
+
   // ── wallet ─────────────────────────────────────────────────────────────────────
   { group: "wallet", key: "enable_online_recharge", value: "false", dataType: "BOOLEAN" },
   { group: "wallet", key: "enable_offline_recharge", value: "false", dataType: "BOOLEAN" },

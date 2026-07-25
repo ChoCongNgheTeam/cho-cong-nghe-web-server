@@ -76,6 +76,12 @@ model staff_permissions {
   canViewUsers     Boolean  @default(false)
   canAnalytics     Boolean  @default(false)
   canPaymentView   Boolean  @default(false)
+  canViewInventory     Boolean @default(false)
+  canManageWarehouses  Boolean @default(false)
+  canManageSuppliers   Boolean @default(false)
+  canStockIn           Boolean @default(false)
+  canStockOut          Boolean @default(false)
+  canStocktake         Boolean @default(false)
   updatedAt        DateTime @updatedAt
   user             users    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -308,6 +314,9 @@ model products_variants {
   orderItems        order_items[]
   product           products              @relation(fields: [productId], references: [id], onDelete: Cascade)
   variantAttributes variants_attributes[]
+  warehouseStocks   variant_warehouse_stocks[]
+  stockMovements    stock_movements[]
+  stocktakeItems    stocktake_items[]
 
   @@index([deletedAt])
 }
@@ -445,6 +454,7 @@ model orders {
   voucher                vouchers?              @relation(fields: [voucherId], references: [id])
   transactions           payment_transactions[]
   voucherUsages          voucher_usages[]
+  stockMovements         stock_movements[]
 
   @@index([userId])
   @@index([orderStatus])
@@ -864,6 +874,170 @@ model chatbot_semantic_cache {
 
   @@index([toolSignatureHash])
 
+}
+
+// ============ KHO HÀNG (INVENTORY) ============
+// Kiến trúc multi-warehouse: tồn kho thật lưu ở variant_warehouse_stocks theo
+// từng (variant, warehouse). products_variants.quantity được giữ lại như tổng
+// denormalized (sum theo mọi kho) để không phá vỡ logic storefront/order hiện có.
+// Hiện tại vận hành với 1 kho mặc định (isDefault=true), nhưng schema đã sẵn sàng
+// mở rộng nhiều kho sau này.
+
+model warehouses {
+  id          String    @id @default(uuid()) @db.Uuid
+  code        String    @unique
+  name        String
+  address     String?
+  phone       String?
+  managerName String?
+  note        String?
+  isDefault   Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  deletedBy   String?   @db.Uuid
+
+  stocks         variant_warehouse_stocks[]
+  stockMovements stock_movements[]
+  stocktakes     stocktakes[]
+
+  @@index([deletedAt])
+  @@index([isDefault])
+}
+
+model suppliers {
+  id          String    @id @default(uuid()) @db.Uuid
+  code        String    @unique
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  address     String?
+  taxCode     String?
+  note        String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  deletedBy   String?   @db.Uuid
+
+  stockMovements stock_movements[]
+
+  @@index([deletedAt])
+}
+
+// Tồn kho thực tế theo từng kho — nguồn sự thật (source of truth) cho số lượng.
+model variant_warehouse_stocks {
+  id                String   @id @default(uuid()) @db.Uuid
+  productVariantId  String   @db.Uuid
+  warehouseId       String   @db.Uuid
+  quantity          Int      @default(0)
+  lowStockThreshold Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  productVariant products_variants @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+  warehouse      warehouses        @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([productVariantId, warehouseId])
+  @@index([warehouseId])
+  @@index([productVariantId])
+}
+
+// Sổ cái mọi biến động tồn kho — nhập, xuất, bán, hoàn, kiểm kê điều chỉnh.
+// Đây là nguồn dữ liệu cho "Lịch sử nhập/xuất" và sau này cho module AI dự báo.
+model stock_movements {
+  id               String               @id @default(uuid()) @db.Uuid
+  code             String               @unique
+  type             StockMovementType
+  reason           StockMovementReason  @default(OTHER)
+  productVariantId String               @db.Uuid
+  warehouseId      String               @db.Uuid
+  quantity         Int
+  unitCost         Decimal?             @db.Decimal(12, 2)
+  supplierId       String?              @db.Uuid
+  orderId          String?              @db.Uuid
+  stocktakeId      String?              @db.Uuid
+  note             String?
+  performedBy      String?              @db.Uuid
+  createdAt        DateTime             @default(now())
+
+  productVariant products_variants @relation(fields: [productVariantId], references: [id])
+  warehouse      warehouses        @relation(fields: [warehouseId], references: [id])
+  supplier       suppliers?        @relation(fields: [supplierId], references: [id])
+  order          orders?           @relation(fields: [orderId], references: [id])
+  stocktake      stocktakes?       @relation(fields: [stocktakeId], references: [id])
+
+  @@index([productVariantId])
+  @@index([warehouseId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([orderId])
+}
+
+model stocktakes {
+  id          String          @id @default(uuid()) @db.Uuid
+  code        String          @unique
+  warehouseId String          @db.Uuid
+  status      StocktakeStatus @default(DRAFT)
+  note        String?
+  createdBy   String?         @db.Uuid
+  completedAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  warehouse warehouses        @relation(fields: [warehouseId], references: [id])
+  items     stocktake_items[]
+  movements stock_movements[]
+
+  @@index([warehouseId])
+  @@index([status])
+}
+
+model stocktake_items {
+  id               String  @id @default(uuid()) @db.Uuid
+  stocktakeId      String  @db.Uuid
+  productVariantId String  @db.Uuid
+  systemQuantity   Int
+  actualQuantity   Int?
+  difference       Int?
+  note             String?
+
+  stocktake      stocktakes        @relation(fields: [stocktakeId], references: [id], onDelete: Cascade)
+  productVariant products_variants @relation(fields: [productVariantId], references: [id])
+
+  @@unique([stocktakeId, productVariantId])
+  @@index([productVariantId])
+}
+
+enum StockMovementType {
+  STOCK_IN
+  STOCK_OUT
+  SALE
+  RETURN
+  ADJUSTMENT
+}
+
+enum StockMovementReason {
+  PURCHASE
+  DAMAGE
+  LOST
+  EXPIRED
+  RETURN_TO_SUPPLIER
+  CUSTOMER_RETURN
+  STOCKTAKE_ADJUSTMENT
+  ORDER_SALE
+  ORDER_CANCEL
+  INITIAL_STOCK
+  OTHER
+}
+
+enum StocktakeStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 }
 
 enum CampaignType {

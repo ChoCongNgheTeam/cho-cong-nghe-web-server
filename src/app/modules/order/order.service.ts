@@ -7,6 +7,8 @@ import { sendOrderStatusNotification, sendOrderCreatedAdminNotification } from "
 import { Prisma } from "@prisma/client";
 import { buildKeywordVariants } from "../search/search.helpers";
 import crypto from "node:crypto";
+import { applyStockMovementTx } from "../inventory/inventory.repository";
+import { getDefaultWarehouseId } from "../warehouse/warehouse.repository";
 
 // Tách thành helper riêng để dễ test
 const triggerRefundIfEligible = async (orderId: string) => {
@@ -151,6 +153,26 @@ export const cancelOrderUser = async (orderId: string, userId: string) => {
         data: { quantity: { increment: item.quantity }, soldCount: { decrement: item.quantity } },
       });
     }
+
+    const defaultWarehouseId = await getDefaultWarehouseId(tx);
+    if (defaultWarehouseId) {
+      for (const item of order.orderItems) {
+        await applyStockMovementTx(
+          tx,
+          {
+            productVariantId: item.productVariant.id,
+            warehouseId: defaultWarehouseId,
+            quantityDelta: item.quantity,
+            type: "RETURN",
+            reason: "ORDER_CANCEL",
+            orderId,
+            performedBy: userId,
+          },
+          { syncVariantQuantity: false },
+        );
+      }
+    }
+
     await tx.orders.update({
       where: { id: orderId },
       data: {
@@ -240,6 +262,25 @@ export const cancelOrderAdmin = async (orderId: string) => {
         data: { quantity: { increment: item.quantity }, soldCount: { decrement: item.quantity } },
       });
     }
+
+    const defaultWarehouseId = await getDefaultWarehouseId(tx);
+    if (defaultWarehouseId) {
+      for (const item of order.orderItems) {
+        await applyStockMovementTx(
+          tx,
+          {
+            productVariantId: item.productVariant.id,
+            warehouseId: defaultWarehouseId,
+            quantityDelta: item.quantity,
+            type: "RETURN",
+            reason: "ORDER_CANCEL",
+            orderId,
+          },
+          { syncVariantQuantity: false },
+        );
+      }
+    }
+
     await tx.orders.update({
       where: { id: orderId },
       data: {
@@ -362,7 +403,7 @@ export const createOrderAdmin = async (input: CreateOrderAdminInput) => {
 
     const orderCode = `CCN${numberPart}${letterPart}${uuidPart}`;
 
-    return tx.orders.create({
+    const createdOrder = await tx.orders.create({
       data: {
         orderCode: orderCode,
         userId: finalUserId!,
@@ -380,6 +421,27 @@ export const createOrderAdmin = async (input: CreateOrderAdminInput) => {
       },
       include: { orderItems: true },
     });
+
+    // Ghi nhận biến động tồn kho theo kho — best-effort, không chặn tạo đơn nếu chưa có kho
+    const defaultWarehouseId = await getDefaultWarehouseId(tx);
+    if (defaultWarehouseId) {
+      for (const item of orderItemsData) {
+        await applyStockMovementTx(
+          tx,
+          {
+            productVariantId: item.productVariantId,
+            warehouseId: defaultWarehouseId,
+            quantityDelta: -item.quantity,
+            type: "SALE",
+            reason: "ORDER_SALE",
+            orderId: createdOrder.id,
+          },
+          { syncVariantQuantity: false }, // đã trừ ở vòng lặp phía trên rồi
+        );
+      }
+    }
+
+    return createdOrder;
   });
 
   // 🔔 GỬI THÔNG BÁO CHO ADMIN/STAFF KHI TẠO ĐƠN HÀNG

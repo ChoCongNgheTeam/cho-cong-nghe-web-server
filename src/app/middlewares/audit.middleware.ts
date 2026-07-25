@@ -27,6 +27,9 @@ const PATH_ACTION_OVERRIDES: Array<[RegExp, AuditAction]> = [
 // Thứ tự quan trọng — đặt pattern cụ thể hơn lên trước
 const PATH_TO_MODULE: Array<[RegExp, string]> = [
   [/\/blog-with-comments/, "blog"],
+  [/\/warehouses?/, "warehouse"],
+  [/\/suppliers?/, "supplier"],
+  [/\/inventory/, "inventory"],
   [/\/products?/, "product"],
   [/\/orders?/, "order"],
   [/\/reviews?/, "review"],
