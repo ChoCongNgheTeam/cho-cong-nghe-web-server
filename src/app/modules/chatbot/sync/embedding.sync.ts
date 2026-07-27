@@ -14,7 +14,7 @@ export async function generateEmbedding(text: string, type: 'query' | 'passage' 
 
   return await executeWithGeminiRotation(async (key) => {
     const body = {
-      model: "models/text-embedding-004",
+      model: "models/gemini-embedding-2",
       content: {
         parts: [{ text: cleanText }]
       },
@@ -22,7 +22,7 @@ export async function generateEmbedding(text: string, type: 'query' | 'passage' 
       outputDimensionality: 384 // Cực kỳ quan trọng để giữ tương thích với DB cũ
     };
 
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${key}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent?key=${key}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
