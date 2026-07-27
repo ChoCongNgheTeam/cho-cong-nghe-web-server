@@ -405,7 +405,6 @@ export const getCategoryHierarchy = async (categoryId: string): Promise<string[]
 };
 
 // TEMPLATE / ATTRIBUTES / SPECIFICATIONS
-
 export const getCategoryVariantAttributesWithOptions = async (categoryIds: string[]) => {
   const categoryAttributes = await prisma.category_variant_attributes.findMany({
     where: { categoryId: { in: categoryIds } },
@@ -417,7 +416,7 @@ export const getCategoryVariantAttributesWithOptions = async (categoryIds: strin
           name: true,
           createdAt: true,
           // join options ngay tại đây
-          attributes_options: {
+          options: {
             select: { id: true, value: true, label: true },
             orderBy: { value: "asc" },
           },
@@ -434,7 +433,7 @@ export const getCategoryVariantAttributesWithOptions = async (categoryIds: strin
         code: ca.attribute.code,
         name: ca.attribute.name,
         isRequired: true,
-        options: ca.attribute.attributes_options,
+        options: ca.attribute.options,
       });
     }
   }
