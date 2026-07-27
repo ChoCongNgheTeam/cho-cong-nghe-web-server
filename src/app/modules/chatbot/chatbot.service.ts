@@ -327,13 +327,28 @@ export const getChatReply = async (
     if (!requiresRound2) {
       const products =
         productCardMap.size > 0 ? [...productCardMap.values()] : undefined;
-      return {
+      const result = {
         reply: products
           ? `Dưới đây là các sản phẩm phù hợp với yêu cầu của bạn (${products.map(p => p.name).join(", ")}):`
           : "Xin lỗi, mình chưa tìm thấy thông tin phù hợp cho yêu cầu này.",
         toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined,
         products,
       };
+
+      // Lưu vào Cache cho các câu query tìm kiếm sản phẩm cơ bản (Short-circuit)
+      if (!isAction && currentEmbedding) {
+        const isVolatile = toolsUsed.some(t => t === "get_product_detail" || t === "get_active_promotions");
+        const ttlDays = isVolatile ? 1 : null;
+        const finalToolSignatureString = JSON.stringify(allToolCalls.map(t => ({ name: t.name, args: t.args || {} })));
+        const finalToolSignatureHash = crypto.createHash('sha256').update(finalToolSignatureString).digest('hex');
+        
+        prisma.$executeRaw`
+          INSERT INTO chatbot_semantic_cache (id, query, embedding, "toolSignatureHash", "ttlDays", response, "hitCount", "createdAt", "updatedAt")
+          VALUES (gen_random_uuid(), ${standaloneQuery}, ${JSON.stringify(currentEmbedding)}::vector, ${finalToolSignatureHash}, ${ttlDays}, ${JSON.stringify(result)}::jsonb, 0, NOW(), NOW())
+        `.catch(e => console.warn("[Chatbot] Lỗi lưu Cache (Short-circuit):", e));
+      }
+
+      return result;
     } else {
       break;
     }
