@@ -19,7 +19,7 @@ const resolveWarehouseId = async (warehouseId?: string): Promise<string> => {
 // TỒN KHO SẢN PHẨM
 // ============================================================================
 
-const resolveThresholdForRow = (lowStockThreshold: number | null, globalDefault: number) => (lowStockThreshold ?? globalDefault);
+const resolveThresholdForRow = (lowStockThreshold: number | null, globalDefault: number) => lowStockThreshold ?? globalDefault;
 
 export const getInventoryOverview = async (query: ListInventoryQuery) => {
   const globalThreshold = await getGlobalLowStockThreshold();
@@ -55,7 +55,10 @@ export const getInventoryOverview = async (query: ListInventoryQuery) => {
   });
 
   // Lọc theo stockStatus sau khi tính toán (vì phụ thuộc dữ liệu tổng hợp nhiều kho)
-  const filtered = query.stockStatus && query.stockStatus !== "ALL" ? data.filter((v) => (query.stockStatus === "OUT_OF_STOCK" ? v.isOutOfStock : query.stockStatus === "LOW_STOCK" ? v.isLowStock : !v.isOutOfStock && !v.isLowStock)) : data;
+  const filtered =
+    query.stockStatus && query.stockStatus !== "ALL"
+      ? data.filter((v) => (query.stockStatus === "OUT_OF_STOCK" ? v.isOutOfStock : query.stockStatus === "LOW_STOCK" ? v.isLowStock : !v.isOutOfStock && !v.isLowStock))
+      : data;
 
   return { ...result, data: filtered };
 };
@@ -180,6 +183,8 @@ export const getLowStockAlerts = async (query: ListAlertsQuery) => {
 
 export const initializeWarehouseStock = async (warehouseIdInput: string | undefined, performedBy: string) => {
   const warehouseId = await resolveWarehouseId(warehouseIdInput);
-  const initializedCount = await prisma.$transaction((tx) => repo.initializeWarehouseStockTx(tx, warehouseId, performedBy));
+  const initializedCount = await prisma.$transaction((tx) => repo.initializeWarehouseStockTx(tx, warehouseId, performedBy), {
+    timeout: 60000, // có thể chạy tới hàng trăm variant trong 1 lần khởi tạo → nới timeout lên 60s
+  });
   return { warehouseId, initializedCount };
 };
