@@ -11,10 +11,6 @@ export const env = {
 
   RESET_TOKEN_EXPIRES_IN: Number(process.env.RESET_TOKEN_EXPIRES_IN || 3600000),
 
-  // GEMINI_API_KEY: process.env.GEMINI_API_KEY,
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-
   CLIENT_BASE_URL: process.env.CLIENT_BASE_URL || "http://localhost:4200",
   SERVER_BASE_URL: process.env.SERVER_BASE_URL || "http://localhost:5000",
-  HF_TOKEN: process.env.HF_TOKEN || "",
 };

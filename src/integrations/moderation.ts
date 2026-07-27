@@ -1,7 +1,4 @@
-import OpenAI from "openai";
-
-import { executeWithGroqRotation } from "@/utils/groq.util";
-
+import { executeWithGeminiRotation } from "@/utils/gemini.util";
 export interface ModerationResult {
   approved: boolean;
   reason?: string;
@@ -60,23 +57,24 @@ export const moderateContent = async (type: ContentType, content: string): Promi
   try {
     const prompt = buildPrompt(type, content);
 
-    const response = await executeWithGroqRotation(client => client.chat.completions.create({
-      model: "gemini-2.5-flash",
-      messages: [
-        {
-          role: "system",
-          content: "You are a content moderation assistant. Respond ONLY with a valid JSON object. No explanation, no markdown wrapping.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0,
-    }));
-    
-    const text = response.choices[0].message.content?.trim() || "{}";
+    const text = await executeWithGeminiRotation(async (key) => {
+      const body = {
+        system_instruction: { parts: [{ text: "You are a content moderation assistant. Respond ONLY with a valid JSON object. No explanation, no markdown wrapping." }] },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0, responseMimeType: "application/json" },
+      };
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) throw new Error(`${res.status} status code: ${await res.text()}`);
+
+      const data = await res.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "{}";
+    });
     const parsed = JSON.parse(text);
 
     return parsed as ModerationResult;
