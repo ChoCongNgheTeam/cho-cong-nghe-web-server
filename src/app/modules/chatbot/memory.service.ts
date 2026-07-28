@@ -2,8 +2,6 @@ import { PrismaClient } from "@prisma/client";
 import { ChatMessage } from "./chatbot.types";
 import { executeWithGeminiRotation } from "@/utils/gemini.util";
 import { generateEmbedding } from "./sync/embedding.sync";
-import { executeWithGroqRotation } from "@/utils/groq.util";
-
 const prisma = new PrismaClient();
 
 export const memoryService = {

@@ -1,79 +1,42 @@
 
 import { PrismaClient } from "@prisma/client";
-import { env } from "@/config/env";
+import { executeWithGeminiRotation } from "@/utils/gemini.util";
 
 const prisma = new PrismaClient();
 
-import axios from "axios";
-
-const HF_API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/intfloat/multilingual-e5-small";
-
-// Biến môi trường tự định nghĩa để ép kiểu chạy. 
-// Đọc từ file .env, mặc định là 'production' nếu sếp quên cấu hình
-const EMBEDDING_ENV = process.env.EMBEDDING_ENV || 'production';
-
-let localExtractor: any = null;
-
 /**
- * Tạo vector embedding từ văn bản.
+ * Tạo vector embedding từ văn bản (Sử dụng Gemini text-embedding-004)
  */
 export async function generateEmbedding(text: string, type: 'query' | 'passage' = 'passage'): Promise<number[]> {
-  const prefixedText = `${type}: ${text.replace(/\n/g, " ")}`;
-  const token = env.HF_TOKEN || process.env.HF_TOKEN;
+  // text-embedding-004 của Gemini có hỗ trợ `taskType: "RETRIEVAL_QUERY"` hoặc `"RETRIEVAL_DOCUMENT"`
+  const taskType = type === 'query' ? "RETRIEVAL_QUERY" : "RETRIEVAL_DOCUMENT";
+  const cleanText = text.replace(/\n/g, " ");
 
-  // 1. NẾU CẤU HÌNH LÀ PRODUCTION -> GỌI API
-  if (EMBEDDING_ENV === 'production') {
-    if (!token) throw new Error("Chế độ Production bắt buộc phải có HF_TOKEN trong file .env");
-    
-    let retries = 0;
-    const maxRetries = 3;
+  return await executeWithGeminiRotation(async (key) => {
+    const body = {
+      model: "models/gemini-embedding-2",
+      content: {
+        parts: [{ text: cleanText }]
+      },
+      taskType: taskType,
+      outputDimensionality: 384 // Cực kỳ quan trọng để giữ tương thích với DB cũ
+    };
 
-    while (retries < maxRetries) {
-      try {
-        const response = await axios.post(
-          HF_API_URL,
-          { inputs: prefixedText },
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            timeout: 10000
-          }
-        );
-        
-        const data = response.data;
-        if (Array.isArray(data) && Array.isArray(data[0])) return data[0];
-        return data;
-        
-      } catch (error: any) {
-        if (error.response?.status === 503) {
-          const estimatedTime = error.response.data?.estimated_time || 10;
-          console.log(`[HF API] Model is loading. Waiting ${Math.ceil(estimatedTime)}s before retry...`);
-          await new Promise(resolve => setTimeout(resolve, estimatedTime * 1000 + 1000));
-          retries++;
-        } else {
-          console.error("[HF API] Lỗi API:", error.message);
-          throw new Error("Lỗi gọi API Hugging Face (Production)");
-        }
-      }
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent?key=${key}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("[Gemini Embedding Error]:", errText);
+      throw new Error(`Gemini Embedding API Error: ${res.status}`);
     }
-    throw new Error("Hugging Face API Timeout / Quá tải");
-  }
 
-  // 2. NẾU CẤU HÌNH LÀ LOCAL -> CHẠY OFFLINE
-  if (EMBEDDING_ENV === 'local') {
-    if (!localExtractor) {
-      console.log("Đang nạp Local Model (chỉ tốn RAM ở máy Local)...");
-      const { pipeline } = require('@xenova/transformers');
-      localExtractor = await pipeline('feature-extraction', 'Xenova/multilingual-e5-small');
-    }
-    
-    const result = await localExtractor(prefixedText, { pooling: 'mean', normalize: true });
-    return Array.from(result.data);
-  }
-
-  return [];
+    const data = await res.json();
+    return data.embedding?.values || [];
+  });
 }
 
 /**

@@ -13,12 +13,11 @@ import { parse as csvParse } from "csv-parse/sync";
 // AI CONTENT SERVICE
 // ============================================================
 
-import { executeWithGroqRotation } from "@/utils/groq.util";
-
+import { executeWithFireworks } from "@/utils/fireworks.util";
 // ─── callOpenAI ─────────────────────────────────────────────
 const callOpenAI = async (prompt: string, maxTokens: number): Promise<string> => {
-  const response = await executeWithGroqRotation(client => client.chat.completions.create({
-    model: "gemini-2.5-flash",
+  const response = await executeWithFireworks(client => client.chat.completions.create({
+    model: "accounts/fireworks/models/gpt-oss-120b",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.7,
     max_tokens: maxTokens,
