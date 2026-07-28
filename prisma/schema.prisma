@@ -49,6 +49,7 @@ model users {
   userAddresses              user_addresses[]
   voucherUsages              voucher_usages[]
   voucherUsers               voucher_user[]
+  spinEntry                  spin_entries?
   wishlist                   wishlist[]
   chatSessions        chat_sessions[]
   userPreferences     user_preferences[]
@@ -539,6 +540,7 @@ model vouchers {
   targets          voucher_targets[]
   voucherUsages    voucher_usages[]
   voucherUsers     voucher_user[]
+  spinPrizes       spin_prizes[]
 
   @@index([deletedAt])
 }
@@ -876,6 +878,43 @@ model chatbot_semantic_cache {
 
 }
 
+// ============ VÒNG QUAY MAY MẮN (SPIN WHEEL) ============
+// Trao thưởng tận dụng thẳng cơ chế voucher_user (voucher riêng tư) đã có sẵn —
+// trúng thưởng = tạo 1 dòng voucher_user cho user đó, không cần cơ chế mới.
+// spin_entries.userId có @unique để enforce "1 lần duy nhất/tài khoản" ngay ở DB,
+// chống race condition tuyệt đối khi 2 request quay cùng lúc.
+
+model spin_prizes {
+  id           String   @id @default(uuid()) @db.Uuid
+  label        String
+  colorHex     String?
+  voucherId    String?  @db.Uuid // null = trượt / không có quà
+  weight       Int      @default(1)
+  totalBudget  Int? // null = không giới hạn — LUÔN cần ít nhất 1 dòng null làm lưới an toàn
+  awardedCount Int      @default(0)
+  order        Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  voucher vouchers?      @relation(fields: [voucherId], references: [id])
+  entries spin_entries[]
+
+  @@index([isActive])
+}
+
+model spin_entries {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @db.Uuid
+  prizeId   String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  user  users       @relation(fields: [userId], references: [id])
+  prize spin_prizes @relation(fields: [prizeId], references: [id])
+
+  @@index([prizeId])
+}
+
 // ============ KHO HÀNG (INVENTORY) ============
 // Kiến trúc multi-warehouse: tồn kho thật lưu ở variant_warehouse_stocks theo
 // từng (variant, warehouse). products_variants.quantity được giữ lại như tổng
@@ -1200,6 +1239,7 @@ enum MediaPosition {
   BELOW_SLIDER
   HOME_SECTION_1
   HOME_SECTION_2
+  HOME_POPUP
 }
 
 enum NotificationType {

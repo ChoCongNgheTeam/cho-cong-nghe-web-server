@@ -132,6 +132,7 @@ export interface HomeStaticResponse {
   sliders: HomeSlider[];
   bannersTop: HomeBanner[];
   bannersSection1: HomeBanner[];
+  bannersPopup: HomeBanner[];
   featuredCategories: FeaturedCategory[];
   activeCampaigns: HomeCampaign[];
   blogs: PaginatedResult<unknown>;

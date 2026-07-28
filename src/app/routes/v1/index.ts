@@ -60,6 +60,9 @@ import warehouseRouter from "@/app/modules/warehouse/warehouse.route";
 import supplierRouter from "@/app/modules/supplier/supplier.route";
 import inventoryRouter from "@/app/modules/inventory/inventory.route";
 
+// ===== Vòng quay may mắn (Spin Wheel) =====
+import spinRouter from "@/app/modules/spin/spin.route";
+
 import { auditMiddleware } from "@/app/middlewares/audit.middleware";
 import { initSettingsCache } from "@/app/modules/settings/settings.service";
 
@@ -126,6 +129,10 @@ router.use("/admin/staff-permissions", staffPermissionsRouter);
 router.use("/admin/warehouses", warehouseRouter);
 router.use("/admin/suppliers", supplierRouter);
 router.use("/admin/inventory", inventoryRouter);
+
+// ===== Vòng quay may mắn (Spin Wheel) =====
+// Router tự khai báo path đầy đủ (/admin/spin-prizes và /spin) nên mount ở gốc "/"
+router.use("/", spinRouter);
 
 router.use("/health", healthRouter);
 
