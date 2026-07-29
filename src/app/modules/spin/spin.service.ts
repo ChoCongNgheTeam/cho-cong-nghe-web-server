@@ -82,6 +82,9 @@ export const resetAllSpinData = async () => repo.resetAllSpinData();
 // PUBLIC
 // ============================================================================
 
+// Public, không cần đăng nhập — chỉ trả về true/false, không lộ thông tin gì khác
+export const isSpinAvailable = async (): Promise<boolean> => repo.hasAnyEligiblePrize();
+
 export const getSpinStatus = async (userId: string): Promise<SpinStatusResponse> => {
   const [entry, prizes] = await Promise.all([repo.findEntryByUserId(userId), repo.findAllActivePrizesPublic()]);
 

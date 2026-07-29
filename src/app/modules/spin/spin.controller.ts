@@ -40,6 +40,11 @@ export const resetSpinDataHandler = async (_req: Request, res: Response) => {
 
 // ── Public (yêu cầu đăng nhập) ───────────────────────────────────────────────
 
+export const getSpinAvailableHandler = async (_req: Request, res: Response) => {
+  const available = await spinService.isSpinAvailable();
+  res.json({ data: { available }, message: "OK" });
+};
+
 export const getSpinStatusHandler = async (req: Request, res: Response) => {
   const status = await spinService.getSpinStatus(req.user!.id);
   res.json({ data: status, message: "Lấy trạng thái vòng quay thành công" });

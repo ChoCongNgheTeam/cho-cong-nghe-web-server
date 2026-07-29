@@ -3,7 +3,7 @@ import { validate } from "@/app/middlewares/validate.middleware";
 import { authMiddleware } from "@/app/middlewares/auth.middleware";
 import { requireRole } from "@/app/middlewares/role.middleware";
 import { asyncHandler } from "@/utils/async-handler";
-import { getPrizesAdminHandler, getPrizeDetailHandler, createPrizeHandler, updatePrizeHandler, deletePrizeHandler, getSpinStatsHandler, resetSpinDataHandler, getSpinStatusHandler, spinHandler } from "./spin.controller";
+import { getPrizesAdminHandler, getPrizeDetailHandler, createPrizeHandler, updatePrizeHandler, deletePrizeHandler, getSpinStatsHandler, resetSpinDataHandler, getSpinAvailableHandler, getSpinStatusHandler, spinHandler } from "./spin.controller";
 import { prizeParamsSchema, createPrizeSchema, updatePrizeSchema } from "./spin.validation";
 
 const router = Router();
@@ -23,6 +23,10 @@ router.patch("/admin/spin-prizes/:id", ...adminAuth, validate(prizeParamsSchema,
 router.delete("/admin/spin-prizes/:id", ...adminAuth, validate(prizeParamsSchema, "params"), asyncHandler(deletePrizeHandler));
 
 // ── Public — khách đã đăng nhập (mount ở /spin) ──────────────────────────────
+// /available KHÔNG yêu cầu đăng nhập — cho phép cả khách vãng lai quyết định
+// ẩn/hiện nút vòng quay ngay lúc trang chủ vừa load, đúng như thiết kế ban đầu.
+router.get("/spin/available", asyncHandler(getSpinAvailableHandler));
+
 router.get("/spin/status", authMiddleware(), asyncHandler(getSpinStatusHandler));
 router.post("/spin", authMiddleware(), asyncHandler(spinHandler));
 

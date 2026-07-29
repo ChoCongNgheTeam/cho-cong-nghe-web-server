@@ -89,6 +89,16 @@ export const findAllActivePrizesPublic = async () => {
   });
 };
 
+/**
+ * Check "có chương trình vòng quay đang chạy không" — KHÔNG cần đăng nhập,
+ * dùng để FE (kể cả khách chưa login) quyết định ẩn/hiện nút vòng quay ngay
+ * lúc trang chủ vừa load, thay vì luôn hiện nút dù admin chưa cấu hình gì.
+ */
+export const hasAnyEligiblePrize = async (): Promise<boolean> => {
+  const active = await prisma.spin_prizes.findMany({ where: { isActive: true }, select: { totalBudget: true, awardedCount: true } });
+  return active.some((p) => p.totalBudget === null || p.awardedCount < p.totalBudget);
+};
+
 export const createEntryTx = async (tx: Prisma.TransactionClient, userId: string, prizeId: string) => {
   return tx.spin_entries.create({ data: { userId, prizeId } });
 };
