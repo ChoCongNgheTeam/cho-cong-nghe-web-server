@@ -18,8 +18,7 @@ import {
 import { AICompareResult, CompareAIResult } from "./ai-compare.types";
 import { NotFoundError, BadRequestError } from "@/errors";
 
-import { executeWithGroqRotation } from "@/utils/groq.util";
-
+import { executeWithFireworks } from "@/utils/fireworks.util";
 // ─── Step 1: Fetch + validate ─────────────────────────────────────────────────
 
 async function fetchAndValidate(productIds: string[]): Promise<ProductForAI[]> {
@@ -53,8 +52,8 @@ async function callOpenAI(payloads: ReturnType<typeof transformProductSpecs>[]):
   const aiPayloads = payloads.map((p) => p.payload);
   const userPrompt = buildCompareUserPrompt(aiPayloads);
 
-  const response = await executeWithGroqRotation(client => client.chat.completions.create({
-    model: "gemini-2.5-flash",
+  const response = await executeWithFireworks(client => client.chat.completions.create({
+    model: "accounts/fireworks/models/gpt-oss-120b",
     temperature: 0.3,       // thấp để output nhất quán
     response_format: { type: "json_object" }, // force JSON mode — không bao giờ trả markdown
     messages: [
