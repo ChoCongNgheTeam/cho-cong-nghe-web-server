@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import * as service from "./recommendation.service";
-import { SimilarProductsQuery, ForYouQuery, TrackViewEventInput, TrackRecommendationClickInput } from "./recommendation.validation";
+import { SimilarProductsQuery, ForYouQuery, TrackViewEventInput, TrackRecommendationClickInput, RecommendationAnalyticsQuery } from "./recommendation.validation";
 
 export const getSimilarProductsHandler = async (req: Request, res: Response) => {
   const { limit = 8 } = req.query as unknown as SimilarProductsQuery;
@@ -30,4 +30,12 @@ export const trackRecommendationClickHandler = async (req: Request, res: Respons
   const { productId, algorithm } = req.body as TrackRecommendationClickInput;
   await service.trackRecommendationClick(productId, algorithm, req.user?.id);
   res.json({ message: "Đã ghi nhận lượt click gợi ý" });
+};
+
+// ================== ADMIN ==================
+
+export const getAnalyticsHandler = async (req: Request, res: Response) => {
+  const { days = 30 } = req.query as unknown as RecommendationAnalyticsQuery;
+  const data = await service.getAnalytics(days);
+  res.json({ data, message: "Lấy thống kê hiệu suất gợi ý thành công" });
 };

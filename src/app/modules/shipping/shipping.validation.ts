@@ -12,6 +12,16 @@ export const shipmentQuerySchema = z.object({
 
 export type ShipmentQuery = z.infer<typeof shipmentQuerySchema>;
 
+// Danh sách đơn hàng CHƯA có vận đơn — dùng cho picker chọn đơn khi tạo vận đơn hàng loạt.
+export const eligibleOrdersQuerySchema = z.object({
+  page: z.coerce.number().min(1).default(1).optional(),
+  limit: z.coerce.number().min(1).max(100).default(20).optional(),
+  search: z.string().optional(), // theo orderCode, tên/SĐT người nhận
+  orderStatus: z.enum(["PENDING", "PROCESSING", "SHIPPED", "DELIVERED"]).optional(),
+});
+
+export type EligibleOrdersQuery = z.infer<typeof eligibleOrdersQuerySchema>;
+
 // Tạo vận đơn cho 1 đơn hàng đơn lẻ
 export const createShipmentSchema = z.object({
   orderId: z.string().uuid("ID đơn hàng không hợp lệ"),
@@ -31,11 +41,22 @@ export const bulkCreateShipmentSchema = z.object({
 
 export type BulkCreateShipmentInput = z.infer<typeof bulkCreateShipmentSchema>;
 
-export const bulkPrintLabelSchema = z.object({
-  shipmentIds: z.array(z.string().uuid()).min(1, "Cần chọn ít nhất 1 vận đơn"),
+// In tem hàng loạt — đổi thành GET + query (thay vì POST + body) vì apiRequest
+// bên FE chỉ hỗ trợ responseType: "blob" ở GET (giống pattern exportOrders),
+// không hỗ trợ ở POST.
+export const bulkPrintLabelQuerySchema = z.object({
+  shipmentIds: z
+    .string()
+    .min(1, "Cần chọn ít nhất 1 vận đơn")
+    .transform((s) =>
+      s
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean),
+    ),
 });
 
-export type BulkPrintLabelInput = z.infer<typeof bulkPrintLabelSchema>;
+export type BulkPrintLabelQuery = z.infer<typeof bulkPrintLabelQuerySchema>;
 
 export const upsertShippingProviderSchema = z.object({
   code: z.enum(["GHN", "GHTK", "VTP"]),

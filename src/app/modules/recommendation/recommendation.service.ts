@@ -96,3 +96,49 @@ export const trackViewEvent = (data: { userId?: string; sessionId?: string; prod
 
 export const trackRecommendationClick = (productId: string, algorithm: RecommendationAlgorithm, userId?: string) =>
   repo.markRecommendationClicked(productId, algorithm, userId);
+
+// ============================================================
+// Admin analytics
+// ============================================================
+
+interface AlgorithmStat {
+  algorithm: string;
+  shown: number;
+  clicked: number;
+  ctr: number; // %, làm tròn 1 chữ số thập phân
+}
+
+interface DailyStat {
+  date: string;
+  shown: number;
+  clicked: number;
+}
+
+export interface RecommendationAnalytics {
+  totalShown: number;
+  totalClicked: number;
+  ctr: number;
+  byAlgorithm: AlgorithmStat[];
+  daily: DailyStat[];
+}
+
+const toCtr = (shown: number, clicked: number) => (shown > 0 ? Math.round((clicked / shown) * 1000) / 10 : 0);
+
+export const getAnalytics = async (days: number): Promise<RecommendationAnalytics> => {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  const [algorithmRows, dailyRows] = await Promise.all([repo.getAlgorithmStats(since), repo.getDailyStats(since)]);
+
+  const byAlgorithm: AlgorithmStat[] = algorithmRows.map((row) => {
+    const shown = Number(row.shown);
+    const clicked = Number(row.clicked);
+    return { algorithm: row.algorithm, shown, clicked, ctr: toCtr(shown, clicked) };
+  });
+
+  const totalShown = byAlgorithm.reduce((sum, r) => sum + r.shown, 0);
+  const totalClicked = byAlgorithm.reduce((sum, r) => sum + r.clicked, 0);
+
+  const daily: DailyStat[] = dailyRows.map((row) => ({ date: row.date, shown: Number(row.shown), clicked: Number(row.clicked) }));
+
+  return { totalShown, totalClicked, ctr: toCtr(totalShown, totalClicked), byAlgorithm, daily };
+};

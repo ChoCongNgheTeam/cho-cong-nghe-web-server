@@ -34,6 +34,8 @@ const ghnMasterClient = axios.create({
   baseURL: GHN_BASE_URL,
   headers: { Token: GHN_TOKEN, "Content-Type": "application/json" },
   timeout: 15000,
+  // Giống ghn.provider.ts: cho phép status <500 đi qua để đọc được data.message thật của GHN.
+  validateStatus: (status) => status < 500,
 });
 
 const provincesApiClient = axios.create({ baseURL: PROVINCES_API_BASE, timeout: 10000 });

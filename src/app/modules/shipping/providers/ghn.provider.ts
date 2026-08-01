@@ -2,12 +2,7 @@ import axios from "axios";
 import { ShipmentStatus } from "@prisma/client";
 import { BadRequestError } from "@/errors";
 import { resolveGhnAddressCodes } from "./ghn-address-resolver";
-import {
-  ShippingProviderAdapter,
-  CreateShipmentPayload,
-  CreateShipmentResult,
-  ShipmentStatusResult,
-} from "../shipping.types";
+import { ShippingProviderAdapter, CreateShipmentPayload, CreateShipmentResult, ShipmentStatusResult } from "../shipping.types";
 
 // ============================================================
 // GHN (Giao Hàng Nhanh) — https://api.ghn.vn
@@ -26,7 +21,6 @@ import {
 // (xem chi tiết cách quy đổi trong ghn-address-resolver.ts).
 // ============================================================
 
-
 const GHN_BASE_URL = process.env.GHN_BASE_URL || "https://online-gateway.ghn.vn/shiip/public-api";
 const GHN_TOKEN = process.env.GHN_TOKEN || "";
 const GHN_SHOP_ID = process.env.GHN_SHOP_ID || "";
@@ -39,6 +33,12 @@ const ghnClient = axios.create({
     ShopId: GHN_SHOP_ID,
   },
   timeout: 15000,
+  // Quan trọng: GHN trả HTTP 4xx kèm message lỗi thật trong body (VD thiếu field,
+  // sai mã ward...) — mặc định axios sẽ throw ngay khi thấy status 4xx và mình sẽ
+  // KHÔNG đọc được data.message thật, chỉ còn "Request failed with status code 400"
+  // chung chung. Cho phép mọi status <500 đi qua như response bình thường để tự
+  // đọc `data.code`/`data.message` bên dưới; chỉ để lỗi 5xx (server GHN sập) mới throw.
+  validateStatus: (status) => status < 500,
 });
 
 // Map trạng thái GHN -> ShipmentStatus dùng chung của hệ thống.

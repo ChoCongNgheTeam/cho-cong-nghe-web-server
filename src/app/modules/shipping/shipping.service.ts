@@ -3,7 +3,7 @@ import { NotFoundError, BadRequestError, ConflictError } from "@/errors";
 import * as repo from "./shipping.repository";
 import { getProviderAdapter } from "./providers";
 import { generateBulkShipmentLabelsPdf } from "./shipping.pdf";
-import { CreateShipmentInput, BulkCreateShipmentInput, ShipmentQuery, UpsertShippingProviderInput } from "./shipping.validation";
+import { CreateShipmentInput, BulkCreateShipmentInput, ShipmentQuery, EligibleOrdersQuery, UpsertShippingProviderInput } from "./shipping.validation";
 import { CreateShipmentPayload, BulkCreateShipmentResult } from "./shipping.types";
 
 type OrderForShipment = {
@@ -43,6 +43,9 @@ const buildShipmentPayload = (order: OrderForShipment, weightGram: number, note?
 
 export const listShipmentsAdmin = (query: ShipmentQuery) => repo.findAllShipmentsAdmin(query);
 
+/** Danh sách đơn hàng chưa có vận đơn — cho picker chọn đơn khi tạo hàng loạt. */
+export const listEligibleOrders = (query: EligibleOrdersQuery) => repo.findEligibleOrdersPaginated(query);
+
 export const getShipmentDetail = async (id: string) => {
   const shipment = await repo.findShipmentById(id);
   if (!shipment) throw new NotFoundError("Vận đơn");
@@ -57,8 +60,7 @@ export const getShipmentByOrder = async (orderId: string) => {
 
 export const listShippingProviders = () => repo.findAllShippingProviders();
 
-export const upsertShippingProvider = (input: UpsertShippingProviderInput) =>
-  repo.upsertShippingProvider(input.code, { name: input.name, isActive: input.isActive, config: input.config });
+export const upsertShippingProvider = (input: UpsertShippingProviderInput) => repo.upsertShippingProvider(input.code, { name: input.name, isActive: input.isActive, config: input.config });
 
 /** Tạo vận đơn cho 1 đơn hàng đơn lẻ. */
 export const createShipmentForOrder = async (input: CreateShipmentInput) => {

@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import * as service from "./shipping.service";
-import { ShipmentQuery } from "./shipping.validation";
+import { ShipmentQuery, EligibleOrdersQuery } from "./shipping.validation";
 
 // ================== ADMIN ==================
 
@@ -24,6 +24,16 @@ export const getShipmentByOrderHandler = async (req: Request, res: Response) => 
   res.json({ data: shipment, message: "Lấy vận đơn theo đơn hàng thành công" });
 };
 
+export const getEligibleOrdersHandler = async (req: Request, res: Response) => {
+  const query = req.query as unknown as EligibleOrdersQuery;
+  const result = await service.listEligibleOrders(query);
+  res.json({
+    data: result.data,
+    meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
+    message: "Lấy danh sách đơn hàng chưa có vận đơn thành công",
+  });
+};
+
 export const createShipmentHandler = async (req: Request, res: Response) => {
   const shipment = await service.createShipmentForOrder(req.body);
   res.status(201).json({ data: shipment, message: "Tạo vận đơn thành công" });
@@ -44,7 +54,7 @@ export const cancelShipmentHandler = async (req: Request, res: Response) => {
 };
 
 export const printBulkLabelsHandler = async (req: Request, res: Response) => {
-  const { shipmentIds } = req.body;
+  const { shipmentIds } = req.query as unknown as { shipmentIds: string[] };
   const buffer = await service.printBulkLabels(shipmentIds);
 
   res.setHeader("Content-Type", "application/pdf");

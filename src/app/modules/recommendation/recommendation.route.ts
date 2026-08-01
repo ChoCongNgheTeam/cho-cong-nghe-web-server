@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authMiddleware } from "@/app/middlewares/auth.middleware";
+import { requireRole } from "@/app/middlewares/role.middleware";
 import { validate } from "@/app/middlewares/validate.middleware";
 import { asyncHandler } from "@/utils/async-handler";
 import * as c from "./recommendation.controller";
@@ -8,7 +9,9 @@ import {
   forYouQuerySchema,
   trackViewEventSchema,
   trackRecommendationClickSchema,
+  recommendationAnalyticsQuerySchema,
 } from "./recommendation.validation";
+import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
 
 const router = Router();
 
@@ -22,5 +25,11 @@ router.get("/for-you", validate(forYouQuerySchema, "query"), asyncHandler(c.getF
 
 router.post("/view-event", validate(trackViewEventSchema, "body"), asyncHandler(c.trackViewEventHandler));
 router.post("/click", validate(trackRecommendationClickSchema, "body"), asyncHandler(c.trackRecommendationClickHandler));
+
+// ================== ADMIN ==================
+// Route riêng, yêu cầu auth thật + role (khác với authMiddleware(false) ở trên
+// chỉ optional cho các route công khai).
+router.use("/admin", authMiddleware(true), requireRole(...STAFF_ROLES, "ADMIN"));
+router.get("/admin/analytics", validate(recommendationAnalyticsQuerySchema, "query"), asyncHandler(c.getAnalyticsHandler));
 
 export default router;

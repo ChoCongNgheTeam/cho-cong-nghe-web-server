@@ -27,3 +27,10 @@ export const trackRecommendationClickSchema = z.object({
 });
 
 export type TrackRecommendationClickInput = z.infer<typeof trackRecommendationClickSchema>;
+
+// Admin — thống kê hiệu suất gợi ý (CTR theo thuật toán + xu hướng theo ngày)
+export const recommendationAnalyticsQuerySchema = z.object({
+  days: z.coerce.number().min(1).max(365).default(30).optional(),
+});
+
+export type RecommendationAnalyticsQuery = z.infer<typeof recommendationAnalyticsQuerySchema>;

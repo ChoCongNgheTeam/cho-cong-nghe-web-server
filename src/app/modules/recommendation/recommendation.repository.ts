@@ -203,3 +203,43 @@ export const markRecommendationClicked = (productId: string, algorithm: Recommen
     where: { productId, algorithm, ...(userId && { userId }), wasClicked: false },
     data: { wasClicked: true, clickedAt: new Date() },
   });
+
+// ============================================================
+// Admin analytics — CTR (click-through rate) theo thuật toán + xu hướng theo
+// ngày. Dùng raw SQL vì cần COUNT(*) FILTER (đếm shown và clicked cùng lúc
+// trong 1 query) — Prisma groupBy không hỗ trợ điều kiện lọc trong aggregate.
+// ============================================================
+
+export interface AlgorithmStatsRow {
+  algorithm: string;
+  shown: bigint;
+  clicked: bigint;
+}
+
+export interface DailyStatsRow {
+  date: string;
+  shown: bigint;
+  clicked: bigint;
+}
+
+export const getAlgorithmStats = (since: Date) =>
+  prisma.$queryRaw<AlgorithmStatsRow[]>`
+    SELECT algorithm,
+           COUNT(*) as shown,
+           COUNT(*) FILTER (WHERE "wasClicked" = true) as clicked
+    FROM recommendation_events
+    WHERE "shownAt" >= ${since}
+    GROUP BY algorithm
+    ORDER BY shown DESC
+  `;
+
+export const getDailyStats = (since: Date) =>
+  prisma.$queryRaw<DailyStatsRow[]>`
+    SELECT to_char(date_trunc('day', "shownAt"), 'YYYY-MM-DD') as date,
+           COUNT(*) as shown,
+           COUNT(*) FILTER (WHERE "wasClicked" = true) as clicked
+    FROM recommendation_events
+    WHERE "shownAt" >= ${since}
+    GROUP BY 1
+    ORDER BY 1 ASC
+  `;

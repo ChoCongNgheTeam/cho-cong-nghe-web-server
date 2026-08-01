@@ -1,6 +1,6 @@
 import prisma from "@/config/db";
 import { Prisma } from "@prisma/client";
-import { ShipmentQuery } from "./shipping.validation";
+import { ShipmentQuery, EligibleOrdersQuery } from "./shipping.validation";
 
 export const shipmentSelect = {
   id: true,
@@ -135,3 +135,44 @@ export const findOrdersEligibleForShipment = (orderIds: string[]) =>
       },
     },
   });
+
+/**
+ * Danh sách đơn hàng CHƯA có vận đơn (có phân trang) — dùng cho picker chọn
+ * đơn khi tạo vận đơn hàng loạt ở trang Vận đơn. Khác với
+ * findOrdersEligibleForShipment ở trên (nhận sẵn orderIds, dùng nội bộ lúc
+ * TẠO thật) — hàm này phục vụ việc HIỂN THỊ danh sách để admin chọn.
+ */
+export const findEligibleOrdersPaginated = async (query: EligibleOrdersQuery) => {
+  const { page = 1, limit = 20, search, orderStatus } = query;
+  const skip = (page - 1) * limit;
+
+  const where: Prisma.ordersWhereInput = {
+    shipments: { none: {} },
+    orderStatus: orderStatus ? orderStatus : { not: "CANCELLED" },
+    ...(search && {
+      OR: [
+        { orderCode: { contains: search, mode: "insensitive" as const } },
+        { shippingContactName: { contains: search, mode: "insensitive" as const } },
+        { shippingPhone: { contains: search, mode: "insensitive" as const } },
+      ],
+    }),
+  };
+
+  const select = {
+    id: true,
+    orderCode: true,
+    shippingContactName: true,
+    shippingPhone: true,
+    shippingProvince: true,
+    shippingWard: true,
+    totalAmount: true,
+    paymentStatus: true,
+    orderStatus: true,
+    orderDate: true,
+    _count: { select: { orderItems: true } },
+  } satisfies Prisma.ordersSelect;
+
+  const [data, total] = await Promise.all([prisma.orders.findMany({ where, skip, take: limit, select, orderBy: { orderDate: "desc" } }), prisma.orders.count({ where })]);
+
+  return { data, page, limit, total, totalPages: Math.ceil(total / limit) };
+};
