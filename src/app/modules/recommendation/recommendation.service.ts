@@ -1,0 +1,98 @@
+import * as repo from "./recommendation.repository";
+import { RecommendedProductCard, RecommendationAlgorithm } from "./recommendation.types";
+
+const SIMILAR_FALLBACK_MULTIPLIER = 2; // lấy dư ra để có gì đó hiển thị nếu vector similarity trả về ít
+
+/** "Sản phẩm tương tự" trên trang chi tiết — thuần vector similarity trên products_vector có sẵn. */
+export const getSimilarProducts = async (productId: string, limit: number) => {
+  let products = await repo.findSimilarProducts(productId, limit);
+
+  // Vector similarity hụt (SP mới, chưa kịp đồng bộ embedding...) → fallback trending, loại trừ chính nó.
+  if (products.length < limit) {
+    const fallback = await repo.findTrendingProducts([productId, ...products.map((p) => p.id)], limit - products.length);
+    products = [...products, ...fallback];
+  }
+
+  return { algorithm: "VECTOR_SIMILAR" as RecommendationAlgorithm, products };
+};
+
+/** "Khách mua X cũng mua Y" — dùng cho trang chi tiết SP hoặc trang giỏ hàng. */
+export const getBoughtTogetherProducts = async (productId: string, limit: number) => repo.findBoughtTogetherProducts(productId, limit);
+
+type GetForYouParams = {
+  userId?: string;
+  sessionId?: string;
+  limit: number;
+};
+
+/**
+ * "Có thể bạn thích" — trộn nhiều tín hiệu theo thứ tự ưu tiên (waterfall), không trùng lặp SP:
+ *  1. Đăng nhập + có món đang quan tâm (wishlist/cart) chưa mua → vector similar từ món đó
+ *  2. Đăng nhập + có lịch sử mua → SP cùng danh mục đã mua, nhưng chưa mua
+ *  3. Khách chưa đăng nhập nhưng có lượt xem gần đây (theo sessionId) → vector similar từ SP vừa xem
+ *  4. Không có tín hiệu gì → SP bán chạy / nổi bật (trending)
+ */
+export const getForYou = async ({ userId, sessionId, limit }: GetForYouParams): Promise<{ products: RecommendedProductCard[] }> => {
+  const excludeIds = new Set<string>();
+  const result: RecommendedProductCard[] = [];
+
+  const pushUnique = (items: RecommendedProductCard[], algorithm: RecommendationAlgorithm) => {
+    for (const item of items) {
+      if (result.length >= limit) break;
+      if (excludeIds.has(item.id)) continue;
+      result.push({ ...item, algorithm });
+      excludeIds.add(item.id);
+    }
+  };
+
+  if (userId) {
+    const purchasedIds = await repo.findPurchasedProductIds(userId);
+    purchasedIds.forEach((id) => excludeIds.add(id));
+
+    const interestIds = (await repo.findInterestProductIds(userId)).filter((id) => !excludeIds.has(id));
+
+    if (interestIds.length > 0 && result.length < limit) {
+      const seedProductId = interestIds[0];
+      const similar = await repo.findSimilarProducts(seedProductId, limit * SIMILAR_FALLBACK_MULTIPLIER);
+      pushUnique(similar, "VECTOR_SIMILAR");
+    }
+
+    if (result.length < limit) {
+      const categoryIds = await repo.findPurchasedCategoryIds(userId);
+      const categoryProducts = await repo.findProductsByCategoriesExcluding(categoryIds, [...excludeIds], limit - result.length);
+      pushUnique(categoryProducts, "CATEGORY_MATCH");
+    }
+  } else if (sessionId) {
+    const recentProductId = await repo.findRecentlyViewedProductId(undefined, sessionId);
+    if (recentProductId) {
+      excludeIds.add(recentProductId);
+      const similar = await repo.findSimilarProducts(recentProductId, limit * SIMILAR_FALLBACK_MULTIPLIER);
+      pushUnique(similar, "VECTOR_SIMILAR");
+    }
+  }
+
+  if (result.length < limit) {
+    const trending = await repo.findTrendingProducts([...excludeIds], limit - result.length);
+    pushUnique(trending, "TRENDING");
+  }
+
+  // Ghi log "đã hiển thị" để sau này tính CTR (không chặn response nếu lỗi).
+  Promise.all(
+    result.map((p) =>
+      repo.recordRecommendationShown({
+        userId,
+        sessionId,
+        productId: p.id,
+        algorithm: p.algorithm as RecommendationAlgorithm,
+      }),
+    ),
+  ).catch((err) => console.error("[Recommendation] Lỗi ghi log recommendation_events:", err));
+
+  return { products: result };
+};
+
+export const trackViewEvent = (data: { userId?: string; sessionId?: string; productId: string; source?: string }) =>
+  repo.recordViewEvent(data);
+
+export const trackRecommendationClick = (productId: string, algorithm: RecommendationAlgorithm, userId?: string) =>
+  repo.markRecommendationClicked(productId, algorithm, userId);

@@ -63,6 +63,12 @@ import inventoryRouter from "@/app/modules/inventory/inventory.route";
 // ===== Vòng quay may mắn (Spin Wheel) =====
 import spinRouter from "@/app/modules/spin/spin.route";
 
+// ===== Vận chuyển (Shipping) =====
+import shippingRouter from "@/app/modules/shipping/shipping.route";
+
+// ===== Gợi ý sản phẩm (Recommendation) =====
+import recommendationRouter from "@/app/modules/recommendation/recommendation.route";
+
 import { auditMiddleware } from "@/app/middlewares/audit.middleware";
 import { initSettingsCache } from "@/app/modules/settings/settings.service";
 
@@ -133,6 +139,13 @@ router.use("/admin/inventory", inventoryRouter);
 // ===== Vòng quay may mắn (Spin Wheel) =====
 // Router tự khai báo path đầy đủ (/admin/spin-prizes và /spin) nên mount ở gốc "/"
 router.use("/", spinRouter);
+
+// ===== Vận chuyển (Shipping) =====
+// Router tự khai báo "/admin/..." + "/webhook/:providerCode" nên mount ở gốc "/shipping"
+router.use("/shipping", shippingRouter);
+
+// ===== Gợi ý sản phẩm (Recommendation) =====
+router.use("/recommendation", recommendationRouter);
 
 router.use("/health", healthRouter);
 

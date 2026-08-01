@@ -51,40 +51,40 @@ model users {
   voucherUsers               voucher_user[]
   spinEntry                  spin_entries?
   wishlist                   wishlist[]
-  chatSessions        chat_sessions[]
-  userPreferences     user_preferences[]
-  chatMemoryVectors   chat_memory_vectors[]
+  chatSessions               chat_sessions[]
+  userPreferences            user_preferences[]
+  chatMemoryVectors          chat_memory_vectors[]
 
   @@index([deletedAt])
 }
 
 model staff_permissions {
-  userId           String   @id @db.Uuid
-  canViewOrders    Boolean  @default(false)
-  canCreateOrder   Boolean  @default(false)
-  canUpdateOrder   Boolean  @default(false)
-  canViewProducts  Boolean  @default(false)
-  canUpdateStock   Boolean  @default(false)
-  canBlogs         Boolean  @default(false)
-  canMedia         Boolean  @default(false)
-  canCampaigns     Boolean  @default(false)
-  canVouchers      Boolean  @default(false)
-  canPromotions    Boolean  @default(false)
-  canAiContent     Boolean  @default(false)
-  canReviews       Boolean  @default(false)
-  canComments      Boolean  @default(false)
-  canNotifications Boolean  @default(false)
-  canViewUsers     Boolean  @default(false)
-  canAnalytics     Boolean  @default(false)
-  canPaymentView   Boolean  @default(false)
-  canViewInventory     Boolean @default(false)
-  canManageWarehouses  Boolean @default(false)
-  canManageSuppliers   Boolean @default(false)
-  canStockIn           Boolean @default(false)
-  canStockOut          Boolean @default(false)
-  canStocktake         Boolean @default(false)
-  updatedAt        DateTime @updatedAt
-  user             users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId              String   @id @db.Uuid
+  canViewOrders       Boolean  @default(false)
+  canCreateOrder      Boolean  @default(false)
+  canUpdateOrder      Boolean  @default(false)
+  canViewProducts     Boolean  @default(false)
+  canUpdateStock      Boolean  @default(false)
+  canBlogs            Boolean  @default(false)
+  canMedia            Boolean  @default(false)
+  canCampaigns        Boolean  @default(false)
+  canVouchers         Boolean  @default(false)
+  canPromotions       Boolean  @default(false)
+  canAiContent        Boolean  @default(false)
+  canReviews          Boolean  @default(false)
+  canComments         Boolean  @default(false)
+  canNotifications    Boolean  @default(false)
+  canViewUsers        Boolean  @default(false)
+  canAnalytics        Boolean  @default(false)
+  canPaymentView      Boolean  @default(false)
+  canViewInventory    Boolean  @default(false)
+  canManageWarehouses Boolean  @default(false)
+  canManageSuppliers  Boolean  @default(false)
+  canStockIn          Boolean  @default(false)
+  canStockOut         Boolean  @default(false)
+  canStocktake        Boolean  @default(false)
+  updatedAt           DateTime @updatedAt
+  user                users    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model oauth_accounts {
@@ -299,21 +299,21 @@ model category_variant_attributes {
 }
 
 model products_variants {
-  id                String                @id @default(uuid()) @db.Uuid
-  productId         String                @db.Uuid
-  code              String?               @unique
-  price             Decimal               @db.Decimal(12, 2)
-  quantity          Int                   @default(10)
-  soldCount         Int                   @default(0)
-  isDefault         Boolean               @default(false)
-  isActive          Boolean               @default(true)
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
+  id                String                     @id @default(uuid()) @db.Uuid
+  productId         String                     @db.Uuid
+  code              String?                    @unique
+  price             Decimal                    @db.Decimal(12, 2)
+  quantity          Int                        @default(10)
+  soldCount         Int                        @default(0)
+  isDefault         Boolean                    @default(false)
+  isActive          Boolean                    @default(true)
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
   deletedAt         DateTime?
-  deletedBy         String?               @db.Uuid
+  deletedBy         String?                    @db.Uuid
   cartItems         cart_items[]
   orderItems        order_items[]
-  product           products              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product           products                   @relation(fields: [productId], references: [id], onDelete: Cascade)
   variantAttributes variants_attributes[]
   warehouseStocks   variant_warehouse_stocks[]
   stockMovements    stock_movements[]
@@ -456,6 +456,7 @@ model orders {
   transactions           payment_transactions[]
   voucherUsages          voucher_usages[]
   stockMovements         stock_movements[]
+  shipments              shipments[]
 
   @@index([userId])
   @@index([orderStatus])
@@ -555,11 +556,11 @@ model voucher_targets {
 }
 
 model products_vector {
-  productId String                    @id @db.Uuid
+  productId String                      @id @db.Uuid
   content   String
   embedding Unsupported("vector(384)")?
-  updatedAt DateTime                  @updatedAt
-  product   products                  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  updatedAt DateTime                    @updatedAt
+  product   products                    @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 model voucher_user {
@@ -766,13 +767,13 @@ model ai_contents {
 model chat_sessions {
   id         String   @id @default(uuid()) @db.Uuid
   sessionKey String   @unique
-  userId    String?  @db.Uuid
+  userId     String?  @db.Uuid
   messages   Json
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   expiresAt  DateTime
 
-  user      users?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user users? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([sessionKey])
   @@index([userId])
@@ -843,39 +844,38 @@ model user_preferences {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, key])
   @@index([userId])
 }
 
 model chat_memory_vectors {
-  id        String   @id @default(uuid()) @db.Uuid
-  sessionId String   // sessionKey từ chat_sessions
-  userId    String?  @db.Uuid
-  content   String   @db.Text
+  id        String                      @id @default(uuid()) @db.Uuid
+  sessionId String // sessionKey từ chat_sessions
+  userId    String?                     @db.Uuid
+  content   String                      @db.Text
   embedding Unsupported("vector(384)")?
-  createdAt DateTime @default(now())
+  createdAt DateTime                    @default(now())
 
-  user      users?   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  user users? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([sessionId])
   @@index([userId])
 }
 
 model chatbot_semantic_cache {
-  id                String   @id @default(uuid()) @db.Uuid
-  query             String   @db.Text
+  id                String                      @id @default(uuid()) @db.Uuid
+  query             String                      @db.Text
   embedding         Unsupported("vector(384)")?
-  toolSignatureHash String   @db.VarChar(255)
+  toolSignatureHash String                      @db.VarChar(255)
   ttlDays           Int?
   response          Json
-  hitCount          Int      @default(0)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  hitCount          Int                         @default(0)
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
 
   @@index([toolSignatureHash])
-
 }
 
 // ============ VÒNG QUAY MAY MẮN (SPIN WHEEL) ============
@@ -987,20 +987,20 @@ model variant_warehouse_stocks {
 // Sổ cái mọi biến động tồn kho — nhập, xuất, bán, hoàn, kiểm kê điều chỉnh.
 // Đây là nguồn dữ liệu cho "Lịch sử nhập/xuất" và sau này cho module AI dự báo.
 model stock_movements {
-  id               String               @id @default(uuid()) @db.Uuid
-  code             String               @unique
+  id               String              @id @default(uuid()) @db.Uuid
+  code             String              @unique
   type             StockMovementType
-  reason           StockMovementReason  @default(OTHER)
-  productVariantId String               @db.Uuid
-  warehouseId      String               @db.Uuid
+  reason           StockMovementReason @default(OTHER)
+  productVariantId String              @db.Uuid
+  warehouseId      String              @db.Uuid
   quantity         Int
-  unitCost         Decimal?             @db.Decimal(12, 2)
-  supplierId       String?              @db.Uuid
-  orderId          String?              @db.Uuid
-  stocktakeId      String?              @db.Uuid
+  unitCost         Decimal?            @db.Decimal(12, 2)
+  supplierId       String?             @db.Uuid
+  orderId          String?             @db.Uuid
+  stocktakeId      String?             @db.Uuid
   note             String?
-  performedBy      String?              @db.Uuid
-  createdAt        DateTime             @default(now())
+  performedBy      String?             @db.Uuid
+  createdAt        DateTime            @default(now())
 
   productVariant products_variants @relation(fields: [productVariantId], references: [id])
   warehouse      warehouses        @relation(fields: [warehouseId], references: [id])
@@ -1270,9 +1270,6 @@ enum AiContentType {
   BLOG_POST
 }
 
-
-
-
 enum SettingDataType {
   STRING
   BOOLEAN
@@ -1300,3 +1297,82 @@ enum AuditAction {
   EXPORT
 }
 
+// ============ VẬN CHUYỂN (SHIPPING) — module Duy phụ trách ============
+// Sở hữu bởi modules/shipping — không sửa trực tiếp, báo trước nếu cần đổi.
+
+model shipping_providers {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique // GHN | GHTK | VTP
+  name      String
+  isActive  Boolean  @default(true)
+  config    Json // shopId/warehouse mặc định... KHÔNG lưu token raw, xem README module shipping
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shipments shipments[]
+}
+
+model shipments {
+  id                 String         @id @default(uuid()) @db.Uuid
+  orderId            String         @db.Uuid
+  providerId         String         @db.Uuid
+  providerOrderCode  String? // mã vận đơn phía GHN/GHTK/VTP trả về
+  status             ShipmentStatus @default(PENDING)
+  shippingFee        Decimal?       @db.Decimal(12, 2)
+  expectedDeliveryAt DateTime?
+  shippedAt          DateTime?
+  deliveredAt        DateTime?
+  failedReason       String?
+  rawPayload         Json? // log response API để debug
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  order    orders             @relation(fields: [orderId], references: [id])
+  provider shipping_providers @relation(fields: [providerId], references: [id])
+
+  @@index([orderId])
+  @@index([status])
+  @@index([providerOrderCode])
+}
+
+enum ShipmentStatus {
+  PENDING
+  CREATED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  FAILED
+  RETURNED
+  CANCELLED
+}
+
+// ============ AI GỢI Ý SẢN PHẨM CÁ NHÂN HÓA (RECOMMENDATION) — module Duy phụ trách ============
+// Sở hữu bởi modules/recommendation — không sửa trực tiếp, báo trước nếu cần đổi.
+// Không tự sinh embedding — chỉ đọc bảng products_vector có sẵn (do chatbot/embedding.sync đồng bộ).
+
+model product_view_events {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @db.Uuid
+  sessionId String?
+  productId String   @db.Uuid
+  source    String? // HOME | DETAIL | SEARCH
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([productId])
+  @@index([sessionId, createdAt])
+}
+
+model recommendation_events {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String?   @db.Uuid
+  sessionId  String?
+  productId  String    @db.Uuid
+  algorithm  String // VECTOR_SIMILAR | BOUGHT_TOGETHER | TRENDING | FALLBACK
+  wasClicked Boolean   @default(false)
+  shownAt    DateTime  @default(now())
+  clickedAt  DateTime?
+
+  @@index([productId])
+  @@index([algorithm])
+}

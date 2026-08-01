@@ -1,0 +1,33 @@
+import { Request, Response } from "express";
+import * as service from "./recommendation.service";
+import { SimilarProductsQuery, ForYouQuery, TrackViewEventInput, TrackRecommendationClickInput } from "./recommendation.validation";
+
+export const getSimilarProductsHandler = async (req: Request, res: Response) => {
+  const { limit = 8 } = req.query as unknown as SimilarProductsQuery;
+  const result = await service.getSimilarProducts(req.params.productId, limit);
+  res.json({ data: result.products, message: "Lấy sản phẩm tương tự thành công" });
+};
+
+export const getBoughtTogetherProductsHandler = async (req: Request, res: Response) => {
+  const { limit = 8 } = req.query as unknown as SimilarProductsQuery;
+  const products = await service.getBoughtTogetherProducts(req.params.productId, limit);
+  res.json({ data: products, message: "Lấy sản phẩm hay mua cùng thành công" });
+};
+
+export const getForYouHandler = async (req: Request, res: Response) => {
+  const { limit = 12, sessionId } = req.query as unknown as ForYouQuery;
+  const result = await service.getForYou({ userId: req.user?.id, sessionId, limit });
+  res.json({ data: result.products, message: "Lấy gợi ý sản phẩm thành công" });
+};
+
+export const trackViewEventHandler = async (req: Request, res: Response) => {
+  const { productId, sessionId, source } = req.body as TrackViewEventInput;
+  await service.trackViewEvent({ userId: req.user?.id, sessionId, productId, source });
+  res.status(201).json({ message: "Đã ghi nhận lượt xem" });
+};
+
+export const trackRecommendationClickHandler = async (req: Request, res: Response) => {
+  const { productId, algorithm } = req.body as TrackRecommendationClickInput;
+  await service.trackRecommendationClick(productId, algorithm, req.user?.id);
+  res.json({ message: "Đã ghi nhận lượt click gợi ý" });
+};
