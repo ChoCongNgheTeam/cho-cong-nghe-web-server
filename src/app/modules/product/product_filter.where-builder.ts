@@ -16,6 +16,7 @@ interface ProductQueryFilters {
   search?: string;
   category?: string;
   brandId?: string | string[];
+  ids?: string[];
   isFeatured?: boolean;
   minPrice?: number;
   maxPrice?: number;
@@ -253,6 +254,12 @@ export const buildProductWhere = async (
     } else if (brandIds.length > 1) {
       where.brandId = { in: brandIds };
     }
+  }
+
+  // Lọc theo danh sách ID cụ thể (VD: FE gọi để lấy full card data cho kết quả
+  // gợi ý từ module recommendation) — đã được zod transform về string[] sẵn.
+  if (query.ids && query.ids.length > 0) {
+    where.id = { in: query.ids };
   }
 
   if (query.isFeatured !== undefined) {

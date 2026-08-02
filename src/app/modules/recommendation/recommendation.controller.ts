@@ -4,13 +4,13 @@ import { SimilarProductsQuery, ForYouQuery, TrackViewEventInput, TrackRecommenda
 
 export const getSimilarProductsHandler = async (req: Request, res: Response) => {
   const { limit = 8 } = req.query as unknown as SimilarProductsQuery;
-  const result = await service.getSimilarProducts(req.params.productId, limit);
+  const result = await service.getSimilarProducts(req.params.productId, limit, req.user?.id);
   res.json({ data: result.products, message: "Lấy sản phẩm tương tự thành công" });
 };
 
 export const getBoughtTogetherProductsHandler = async (req: Request, res: Response) => {
   const { limit = 8 } = req.query as unknown as SimilarProductsQuery;
-  const products = await service.getBoughtTogetherProducts(req.params.productId, limit);
+  const products = await service.getBoughtTogetherProducts(req.params.productId, limit, req.user?.id);
   res.json({ data: products, message: "Lấy sản phẩm hay mua cùng thành công" });
 };
 

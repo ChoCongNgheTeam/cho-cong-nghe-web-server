@@ -19,6 +19,19 @@ export const listProductsSchema = z
     category: z.string().trim().optional(),
     categoryId: z.string().uuid().optional(),
     brandId: z.union([z.string().uuid(), z.array(z.string().uuid())]).optional(),
+    // Lọc theo danh sách ID cụ thể — dùng khi FE đã có sẵn 1 danh sách productId
+    // (VD: kết quả gợi ý từ module recommendation) và cần lấy đầy đủ dữ liệu card
+    // (giá, khuyến mãi, rating...) mà không phải tự tính lại logic pricing ở nơi khác.
+    // Chấp nhận cả "?ids=a,b,c" (1 chuỗi phân tách dấu phẩy) lẫn "?ids=a&ids=b" (mảng).
+    ids: z
+      .union([z.string(), z.array(z.string())])
+      .optional()
+      .transform((val) => {
+        if (!val) return undefined;
+        const arr = Array.isArray(val) ? val : val.split(",");
+        const cleaned = arr.map((s) => s.trim()).filter(Boolean);
+        return cleaned.length > 0 ? cleaned : undefined;
+      }),
     isFeatured: z.coerce.boolean().optional(),
     dateFrom: z.string().optional(),
     dateTo: z.string().optional(),

@@ -3,8 +3,15 @@ import { RecommendedProductCard, RecommendationAlgorithm } from "./recommendatio
 
 const SIMILAR_FALLBACK_MULTIPLIER = 2; // lấy dư ra để có gì đó hiển thị nếu vector similarity trả về ít
 
+/** Ghi log "đã hiển thị" cho 1 danh sách sản phẩm — dùng chung cho similar/bought-together/for-you. Không chặn response nếu lỗi. */
+const logShown = (products: { id: string }[], algorithm: RecommendationAlgorithm, userId?: string, sessionId?: string) => {
+  Promise.all(products.map((p) => repo.recordRecommendationShown({ userId, sessionId, productId: p.id, algorithm }))).catch((err) =>
+    console.error("[Recommendation] Lỗi ghi log recommendation_events:", err),
+  );
+};
+
 /** "Sản phẩm tương tự" trên trang chi tiết — thuần vector similarity trên products_vector có sẵn. */
-export const getSimilarProducts = async (productId: string, limit: number) => {
+export const getSimilarProducts = async (productId: string, limit: number, userId?: string, sessionId?: string) => {
   let products = await repo.findSimilarProducts(productId, limit);
 
   // Vector similarity hụt (SP mới, chưa kịp đồng bộ embedding...) → fallback trending, loại trừ chính nó.
@@ -13,11 +20,16 @@ export const getSimilarProducts = async (productId: string, limit: number) => {
     products = [...products, ...fallback];
   }
 
+  logShown(products, "VECTOR_SIMILAR", userId, sessionId);
   return { algorithm: "VECTOR_SIMILAR" as RecommendationAlgorithm, products };
 };
 
 /** "Khách mua X cũng mua Y" — dùng cho trang chi tiết SP hoặc trang giỏ hàng. */
-export const getBoughtTogetherProducts = async (productId: string, limit: number) => repo.findBoughtTogetherProducts(productId, limit);
+export const getBoughtTogetherProducts = async (productId: string, limit: number, userId?: string, sessionId?: string) => {
+  const products = await repo.findBoughtTogetherProducts(productId, limit);
+  logShown(products, "BOUGHT_TOGETHER", userId, sessionId);
+  return products;
+};
 
 type GetForYouParams = {
   userId?: string;
@@ -77,6 +89,8 @@ export const getForYou = async ({ userId, sessionId, limit }: GetForYouParams): 
   }
 
   // Ghi log "đã hiển thị" để sau này tính CTR (không chặn response nếu lỗi).
+  // Không dùng logShown() ở đây vì mỗi item có thể khác algorithm nhau (danh
+  // sách trộn nhiều nguồn) — logShown chỉ hợp với 1 algorithm chung cho cả list.
   Promise.all(
     result.map((p) =>
       repo.recordRecommendationShown({
@@ -91,11 +105,9 @@ export const getForYou = async ({ userId, sessionId, limit }: GetForYouParams): 
   return { products: result };
 };
 
-export const trackViewEvent = (data: { userId?: string; sessionId?: string; productId: string; source?: string }) =>
-  repo.recordViewEvent(data);
+export const trackViewEvent = (data: { userId?: string; sessionId?: string; productId: string; source?: string }) => repo.recordViewEvent(data);
 
-export const trackRecommendationClick = (productId: string, algorithm: RecommendationAlgorithm, userId?: string) =>
-  repo.markRecommendationClicked(productId, algorithm, userId);
+export const trackRecommendationClick = (productId: string, algorithm: RecommendationAlgorithm, userId?: string) => repo.markRecommendationClicked(productId, algorithm, userId);
 
 // ============================================================
 // Admin analytics
