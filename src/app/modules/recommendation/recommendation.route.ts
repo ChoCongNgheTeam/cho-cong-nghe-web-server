@@ -10,6 +10,7 @@ import {
   trackViewEventSchema,
   trackRecommendationClickSchema,
   recommendationAnalyticsQuerySchema,
+  recentlyViewedQuerySchema,
 } from "./recommendation.validation";
 import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
 
@@ -22,6 +23,7 @@ router.use(authMiddleware(false));
 router.get("/similar/:productId", validate(similarProductsQuerySchema, "query"), asyncHandler(c.getSimilarProductsHandler));
 router.get("/bought-together/:productId", validate(similarProductsQuerySchema, "query"), asyncHandler(c.getBoughtTogetherProductsHandler));
 router.get("/for-you", validate(forYouQuerySchema, "query"), asyncHandler(c.getForYouHandler));
+router.get("/recently-viewed", validate(recentlyViewedQuerySchema, "query"), asyncHandler(c.getRecentlyViewedHandler));
 
 router.post("/view-event", validate(trackViewEventSchema, "body"), asyncHandler(c.trackViewEventHandler));
 router.post("/click", validate(trackRecommendationClickSchema, "body"), asyncHandler(c.trackRecommendationClickHandler));

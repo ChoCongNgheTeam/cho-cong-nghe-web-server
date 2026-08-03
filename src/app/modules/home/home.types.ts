@@ -133,6 +133,8 @@ export interface HomeStaticResponse {
   bannersTop: HomeBanner[];
   bannersSection1: HomeBanner[];
   bannersPopup: HomeBanner[];
+  // Banner fallback cho ô "Đã xem gần đây" ở sidebar trang chủ (module recommendation) khi chưa có gì để hiện.
+  bannersSidebar: HomeBanner[];
   featuredCategories: FeaturedCategory[];
   activeCampaigns: HomeCampaign[];
   blogs: PaginatedResult<unknown>;

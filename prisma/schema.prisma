@@ -1240,6 +1240,7 @@ enum MediaPosition {
   HOME_SECTION_1
   HOME_SECTION_2
   HOME_POPUP
+  SIDEBAR_BOTTOM
 }
 
 enum NotificationType {

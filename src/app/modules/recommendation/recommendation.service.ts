@@ -105,9 +105,15 @@ export const getForYou = async ({ userId, sessionId, limit }: GetForYouParams): 
   return { products: result };
 };
 
-export const trackViewEvent = (data: { userId?: string; sessionId?: string; productId: string; source?: string }) => repo.recordViewEvent(data);
+export const trackViewEvent = (data: { userId?: string; sessionId?: string; productId: string; source?: string }) =>
+  repo.recordViewEvent(data);
 
-export const trackRecommendationClick = (productId: string, algorithm: RecommendationAlgorithm, userId?: string) => repo.markRecommendationClicked(productId, algorithm, userId);
+/** "Đã xem gần đây" — widget sidebar trang chủ. Không ghi log shown/click — đây là lịch sử, không phải "gợi ý" cần tính CTR. */
+export const getRecentlyViewed = async (params: { userId?: string; sessionId?: string; limit: number; excludeProductId?: string }) =>
+  repo.findRecentlyViewedProductIds(params);
+
+export const trackRecommendationClick = (productId: string, algorithm: RecommendationAlgorithm, userId?: string) =>
+  repo.markRecommendationClicked(productId, algorithm, userId);
 
 // ============================================================
 // Admin analytics

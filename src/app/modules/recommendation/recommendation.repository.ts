@@ -188,6 +188,29 @@ export const findRecentlyViewedProductId = async (userId?: string, sessionId?: s
   return event?.productId ?? null;
 };
 
+/**
+ * Danh sách (nhiều) sản phẩm đã xem gần đây, không trùng lặp — dùng cho widget
+ * "Đã xem gần đây" (khác với findRecentlyViewedProductId ở trên chỉ lấy ĐÚNG 1
+ * sản phẩm làm seed cho vector similarity trong getForYou).
+ */
+export const findRecentlyViewedProductIds = async (params: { userId?: string; sessionId?: string; limit: number; excludeProductId?: string }): Promise<string[]> => {
+  const { userId, sessionId, limit, excludeProductId } = params;
+  if (!userId && !sessionId) return [];
+
+  const events = await prisma.product_view_events.findMany({
+    where: {
+      ...(userId ? { userId } : { sessionId }),
+      ...(excludeProductId && { productId: { not: excludeProductId } }),
+    },
+    distinct: ["productId"],
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    select: { productId: true },
+  });
+
+  return events.map((e) => e.productId);
+};
+
 export const recordViewEvent = (data: { userId?: string; sessionId?: string; productId: string; source?: string }) =>
   prisma.product_view_events.create({ data });
 

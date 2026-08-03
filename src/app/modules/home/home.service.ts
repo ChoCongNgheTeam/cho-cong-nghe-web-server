@@ -98,6 +98,7 @@ export const getHomeStaticData = async (): Promise<HomeStaticResponse> => {
     bannersTop: allMedia[MediaPosition.BELOW_SLIDER] ?? [],
     bannersSection1: allMedia[MediaPosition.HOME_SECTION_1] ?? [],
     bannersPopup: allMedia[MediaPosition.HOME_POPUP] ?? [],
+    bannersSidebar: allMedia[MediaPosition.SIDEBAR_BOTTOM] ?? [],
     featuredCategories,
     activeCampaigns,
     blogs,

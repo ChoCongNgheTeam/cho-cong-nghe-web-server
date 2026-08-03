@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import * as service from "./recommendation.service";
-import { SimilarProductsQuery, ForYouQuery, TrackViewEventInput, TrackRecommendationClickInput, RecommendationAnalyticsQuery } from "./recommendation.validation";
+import { SimilarProductsQuery, ForYouQuery, TrackViewEventInput, TrackRecommendationClickInput, RecommendationAnalyticsQuery, RecentlyViewedQuery } from "./recommendation.validation";
 
 export const getSimilarProductsHandler = async (req: Request, res: Response) => {
   const { limit = 8 } = req.query as unknown as SimilarProductsQuery;
@@ -24,6 +24,12 @@ export const trackViewEventHandler = async (req: Request, res: Response) => {
   const { productId, sessionId, source } = req.body as TrackViewEventInput;
   await service.trackViewEvent({ userId: req.user?.id, sessionId, productId, source });
   res.status(201).json({ message: "Đã ghi nhận lượt xem" });
+};
+
+export const getRecentlyViewedHandler = async (req: Request, res: Response) => {
+  const { limit = 4, sessionId, excludeProductId } = req.query as unknown as RecentlyViewedQuery;
+  const ids = await service.getRecentlyViewed({ userId: req.user?.id, sessionId, limit, excludeProductId });
+  res.json({ data: ids.map((id) => ({ id })), message: "Lấy sản phẩm đã xem gần đây thành công" });
 };
 
 export const trackRecommendationClickHandler = async (req: Request, res: Response) => {

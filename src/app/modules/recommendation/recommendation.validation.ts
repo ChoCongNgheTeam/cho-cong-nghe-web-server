@@ -13,6 +13,15 @@ export const forYouQuerySchema = z.object({
 
 export type ForYouQuery = z.infer<typeof forYouQuerySchema>;
 
+// "Đã xem gần đây" — dùng cho widget ở sidebar trang chủ (dưới danh mục)
+export const recentlyViewedQuerySchema = z.object({
+  limit: z.coerce.number().min(1).max(20).default(4).optional(),
+  sessionId: z.string().optional(),
+  excludeProductId: z.string().uuid().optional(), // loại trừ SP đang xem — dùng khi đặt widget này ở trang chi tiết SP sau này
+});
+
+export type RecentlyViewedQuery = z.infer<typeof recentlyViewedQuerySchema>;
+
 export const trackViewEventSchema = z.object({
   productId: z.string().uuid("ID sản phẩm không hợp lệ"),
   sessionId: z.string().optional(),
