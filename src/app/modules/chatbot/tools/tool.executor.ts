@@ -144,6 +144,7 @@ export const executeSearchProducts = async (
     sortBy,
     specsFilter,
     attrsFilter,
+    keyword,
     semanticQuery,
     needsDetailedComparison,
   } = args;
@@ -193,7 +194,30 @@ export const executeSearchProducts = async (
   const where = await buildProductWhere(dynamicQuery, true);
   let productIds: string[] = [];
 
-  if (semanticQuery && semanticQuery.trim() !== "") {
+  if (keyword && keyword.trim() !== "") {
+    const k = keyword.trim();
+    // 1. Lọc thô lấy ID, limit 300 để chống tràn RAM
+    const candidates = await prisma.products.findMany({ 
+      where, 
+      select: { id: true },
+      take: 300
+    });
+    
+    if (candidates.length > 0) {
+      const candidateIds = candidates.map((c) => Prisma.sql`${c.id}::uuid`);
+      const takeCount = Math.min(limit, 10);
+      
+      const exactRows: { id: string }[] = await prisma.$queryRaw`
+        SELECT id FROM products 
+        WHERE "deletedAt" IS NULL 
+          AND id IN (${Prisma.join(candidateIds)})
+          AND (name ILIKE ${'%' + k + '%'} OR similarity(name, ${k}) > 0.3)
+        ORDER BY similarity(name, ${k}) DESC
+        LIMIT ${takeCount}
+      `;
+      productIds = exactRows.map(r => r.id);
+    }
+  } else if (semanticQuery && semanticQuery.trim() !== "") {
     // 1. Lọc thô lấy ID, limit 300 để chống tràn RAM
     const candidates = await prisma.products.findMany({ 
       where, 
@@ -356,6 +380,9 @@ export const executeSearchProducts = async (
     mappedProducts.sort((a, b) => b.priceMin - a.priceMin);
   } else if (sortBy === "BEST_SELLING") {
     mappedProducts.sort((a, b) => b.totalSoldCount - a.totalSoldCount);
+  } else if (keyword && keyword.trim() !== "") {
+    // Ưu tiên xếp theo Giá từ cao xuống thấp trong 5 kết quả khớp nhất
+    mappedProducts.sort((a, b) => b.priceMax - a.priceMax);
   }
 
   return mappedProducts.slice(0, Math.min(limit, 10));

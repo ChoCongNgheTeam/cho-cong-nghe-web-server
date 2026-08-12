@@ -18,16 +18,21 @@ export const CHATBOT_TOOLS = [
       - "cao cấp/đắt nhất" -> KHÔNG dùng maxPrice, bắt buộc dùng sortBy = "PRICE_DESC"
       - "hot nhất/bán chạy nhất/nhiều người mua" -> BẮT BUỘC dùng sortBy = "BEST_SELLING"
       - KHÁCH HỎI TÌM "SẢN PHẨM SALE/GIẢM GIÁ" -> BẮT BUỘC GỌI TOOL NÀY. Nếu khách không nói rõ loại máy, hãy để trống các tham số để lấy top.
-      - QUAN TRỌNG: NẾU KHÁCH HỎI ĐÍCH DANH 1 DÒNG MÁY CỤ THỂ (VD: "có Z Fold 7 không?", "giá iPhone 15") -> Gọi tool này để tìm máy. Nếu tìm thấy, BẮT BUỘC lấy 'slug' đó gọi tiếp tool 'get_product_detail' để lấy danh sách các phiên bản (variants) báo giá chi tiết cho khách.
-      - NẾU SEARCH LẦN 1 KHÔNG RA KẾT QUẢ: Thử lại với keyword ngắn hơn (chỉ giữ thương hiệu, bỏ hết phần còn lại) và vẫn giữ categorySlug.`,
+      - QUAN TRỌNG: NẾU KHÁCH HỎI ĐÍCH DANH 1 DÒNG MÁY CỤ THỂ (VD: "có Z Fold 7 không?", "giá iPhone 15") -> BẮT BUỘC truyền tên máy đó vào tham số 'keyword' và KHÔNG DÙNG 'semanticQuery'.
+      - NẾU KHÁCH HỎI NHU CẦU CHUNG CHUNG (VD: "điện thoại pin trâu", "laptop văn phòng") -> BẮT BUỘC dùng 'semanticQuery' và KHÔNG DÙNG 'keyword'.
+      - NẾU SEARCH LẦN 1 KHÔNG RA KẾT QUẢ: Thử lại với keyword/semanticQuery ngắn hơn và giữ categorySlug.`,
     parameters: {
       type: "object",
       properties: {
+        keyword: {
+          type: "string",
+          description: `Dùng khi khách hỏi ĐÍCH DANH 1 dòng máy/tên máy cụ thể (VD: "iPhone 15 Pro Max", "Galaxy S24"). Sẽ dùng thuật toán tìm kiếm chính xác. Không dùng chung với semanticQuery.`
+        },
         semanticQuery: {
           type: "string",
           description: `Nhu cầu hoặc ý định tìm kiếm của khách hàng, được viết bằng ngôn ngữ tự nhiên. 
 VD: "điện thoại chụp hình đẹp ban đêm", "laptop chơi game mượt mà không nóng", "dành cho người lớn tuổi", "pin trâu".
-NẾU khách hỏi đích danh tên máy (VD: "iPhone 15 Pro Max"), hãy truyền tên máy vào đây.
+TUYỆT ĐỐI KHÔNG truyền tên máy cụ thể vào đây (nếu khách hỏi tên cụ thể, hãy dùng 'keyword').
 QUAN TRỌNG VỚI CÁC TỪ CHỦ QUAN:
 - Nếu khách yêu cầu "chụp hình đẹp", "chơi game mượt", "cao cấp": HÃY KẾT HỢP với minPrice: 15000000 để AI lọc ra máy xịn (Flagship).
 - Nếu khách yêu cầu "giá rẻ", "chữa cháy": KẾT HỢP với maxPrice: 5000000.

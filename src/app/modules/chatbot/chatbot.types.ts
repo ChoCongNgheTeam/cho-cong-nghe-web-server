@@ -42,8 +42,8 @@ export interface ChatResponse {
 // ---- Tool input types ----
 
 export interface SearchProductsArgs {
-  semanticQuery?: string;
   keyword?: string;
+  semanticQuery?: string;
   categorySlug?: string;
   brandSlug?: string;
   minPrice?: number;
