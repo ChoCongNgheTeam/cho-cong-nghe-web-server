@@ -1,6 +1,6 @@
 import { env } from "@/config/env";
 
-const geminiKeys = (process.env.GEMINI_API_KEY || process.env.GROQ_API_KEYS || process.env.OPENAI_API_KEY || "")
+const geminiKeys = (process.env.GEMINI_API_KEY || "")
   .split(",")
   .map((k) => k.trim())
   .filter(Boolean);

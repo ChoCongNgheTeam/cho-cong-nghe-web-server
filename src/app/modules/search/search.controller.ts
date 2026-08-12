@@ -5,6 +5,7 @@ import { transformProductCard } from "../product/product.transformers";
 import { getVariantPricing } from "../pricing/pricing.service";
 import { mapPricingToSummary } from "../pricing/pricing.helpers";
 import { ProductCardRow } from "./search.repository";
+import { trendForecastService } from "../trend-forecast/trend-forecast.service";
 
 // Enrich 1 sản phẩm với giá — tách riêng để Promise.allSettled bên dưới có thể
 // bắt lỗi từng sản phẩm mà không làm sập toàn bộ response tìm kiếm.
@@ -60,6 +61,11 @@ export const searchHandler = async (req: Request, res: Response) => {
   }
 
   const result = await searchProducts(query);
+
+  if (query.q) {
+    const userId = (req as any).user?.id;
+    trendForecastService.logSearchQuery(query.q, userId, result.total).catch(console.error);
+  }
 
   // Promise.allSettled thay vì Promise.all: 1 sản phẩm lỗi tính giá (vd thiếu attribute,
   // promotion lỗi) sẽ không kéo sập toàn bộ kết quả tìm kiếm — chỉ sản phẩm đó bị bỏ qua,

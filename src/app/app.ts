@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import routes from "./routes/v1";
+import trendForecastRouter from "@/app/modules/trend-forecast/trend-forecast.route";
 import cookieParser from "cookie-parser";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "@/config/swagger";
@@ -90,6 +91,7 @@ app.get("/", (req, res) => {
   });
 });
 app.use("/api/v1", routes);
+app.use("/api/trend-forecast", trendForecastRouter);
 
 app.use(errorMiddleware);
 

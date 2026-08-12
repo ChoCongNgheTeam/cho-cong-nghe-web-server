@@ -13,12 +13,11 @@ import { parse as csvParse } from "csv-parse/sync";
 // AI CONTENT SERVICE
 // ============================================================
 
-import { executeWithGroqRotation } from "@/utils/groq.util";
-
+import { executeWithFireworks } from "@/utils/fireworks.util";
 // ─── callOpenAI ─────────────────────────────────────────────
 const callOpenAI = async (prompt: string, maxTokens: number): Promise<string> => {
-  const response = await executeWithGroqRotation(client => client.chat.completions.create({
-    model: "gemini-2.5-flash",
+  const response = await executeWithFireworks(client => client.chat.completions.create({
+    model: "accounts/fireworks/models/gpt-oss-120b",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.7,
     max_tokens: maxTokens,
@@ -296,9 +295,10 @@ const safeParseSpecJson = (raw: string): Record<string, string | null> => {
 // Thêm 200 tokens buffer cho prompt overhead
 const TOKENS_PER_SPEC = 35;
 const PROMPT_OVERHEAD = 300;
-const MAX_TOKENS_CAP = 4000; // gpt-4o-mini max output safe limit
+const MAX_TOKENS_CAP = 8000;
 
-const calcMaxTokens = (specCount: number): number => Math.min(PROMPT_OVERHEAD + specCount * TOKENS_PER_SPEC, MAX_TOKENS_CAP);
+// Cho phép số token đủ lớn để model reasoning không bị đứt đoạn
+const calcMaxTokens = (specCount: number): number => MAX_TOKENS_CAP;
 
 // ─── Chunk size: ~20 specs/batch là điểm ngọt nhất ──────────
 // - Đủ nhỏ để không bị cắt token
@@ -334,6 +334,7 @@ export const suggestSpecifications = async (
       console.log(`[ai-content] chunk ${idx + 1}/${chunks.length}: ${chunk.length} specs, maxTokens=${maxTokens}`);
 
       const raw = await callOpenAI(prompt, maxTokens);
+      console.log(`[ai-content] RAW RESPONSE FOR CHUNK ${idx + 1}:`, raw);
       return safeParseSpecJson(raw);
     }),
   );

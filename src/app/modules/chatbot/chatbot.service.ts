@@ -33,6 +33,20 @@ const prisma = new PrismaClient();
 
 const MAX_TOOL_ROUNDS = 3;
 
+function canonicalizeArgs(args: any): any {
+  if (Array.isArray(args)) return args.map(canonicalizeArgs);
+  if (args !== null && typeof args === "object") {
+    return Object.keys(args).sort().reduce((acc: any, key) => {
+      const val = args[key];
+      if (val !== null && val !== undefined && val !== "") {
+        acc[key] = canonicalizeArgs(val);
+      }
+      return acc;
+    }, {});
+  }
+  return args;
+}
+
 // ─── Dispatcher: routes tool name → executor ────────────────
 const dispatchTool = async (
   name: string,
@@ -101,6 +115,33 @@ export const getChatReply = async (
   if (standaloneQuery) {
     try {
       currentEmbedding = await generateEmbedding(standaloneQuery, 'query');
+      
+      // ─── PRE-LLM CACHE (VÒNG 0) ───
+      // Trả lời siêu tốc ngay lập tức nếu vector score >= 0.98
+      try {
+        const cachedV0: any[] = await prisma.$queryRaw`
+          SELECT response, (1 - (embedding <=> ${JSON.stringify(currentEmbedding)}::vector)) as score
+          FROM chatbot_semantic_cache
+          WHERE (1 - (embedding <=> ${JSON.stringify(currentEmbedding)}::vector)) >= 0.98
+            AND ("ttlDays" IS NULL OR "updatedAt" >= NOW() - ("ttlDays" * INTERVAL '1 day'))
+          ORDER BY embedding <=> ${JSON.stringify(currentEmbedding)}::vector
+          LIMIT 1
+        `;
+        if (cachedV0.length > 0) {
+          console.log(`[Chatbot] Pre-LLM Cache HIT! Score: ${cachedV0[0].score.toFixed(3)} cho "${standaloneQuery}"`);
+          
+          prisma.$executeRaw`
+            UPDATE chatbot_semantic_cache 
+            SET "hitCount" = "hitCount" + 1, "updatedAt" = NOW() 
+            WHERE response::text = ${JSON.stringify(cachedV0[0].response)}::text
+          `.catch(() => {});
+          
+          return cachedV0[0].response as ChatResponse;
+        }
+      } catch (err) {
+        console.warn("[Chatbot] Lỗi tra cứu Pre-LLM Cache:", err);
+      }
+
     } catch (e) {
       console.warn("[Chatbot] Lỗi generateEmbedding cho cache:", e);
     }
@@ -211,8 +252,8 @@ export const getChatReply = async (
     // ─── HYBRID CACHE LOOKUP ──────────────────────────────────
       const isAction = false;
     
-    // Hash danh sách Tool Calls
-    const toolSignatureString = JSON.stringify(toolCalls.map(t => ({ name: t.name, args: t.args || {} })));
+    // Hash danh sách Tool Calls ĐÃ ĐƯỢC CHUẨN HÓA
+    const toolSignatureString = JSON.stringify(toolCalls.map(t => ({ name: t.name, args: canonicalizeArgs(t.args || {}) })));
     const toolSignatureHash = crypto.createHash('sha256').update(toolSignatureString).digest('hex');
     
     let cacheHitResponse: ChatResponse | null = null;
@@ -327,13 +368,28 @@ export const getChatReply = async (
     if (!requiresRound2) {
       const products =
         productCardMap.size > 0 ? [...productCardMap.values()] : undefined;
-      return {
+      const result = {
         reply: products
           ? `Dưới đây là các sản phẩm phù hợp với yêu cầu của bạn (${products.map(p => p.name).join(", ")}):`
           : "Xin lỗi, mình chưa tìm thấy thông tin phù hợp cho yêu cầu này.",
         toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined,
         products,
       };
+
+      // Lưu vào Cache cho các câu query tìm kiếm sản phẩm cơ bản (Short-circuit)
+      if (!isAction && currentEmbedding) {
+        const isVolatile = toolsUsed.some(t => t === "get_product_detail" || t === "get_active_promotions");
+        const ttlDays = isVolatile ? 1 : null;
+        const finalToolSignatureString = JSON.stringify(allToolCalls.map(t => ({ name: t.name, args: canonicalizeArgs(t.args || {}) })));
+        const finalToolSignatureHash = crypto.createHash('sha256').update(finalToolSignatureString).digest('hex');
+        
+        prisma.$executeRaw`
+          INSERT INTO chatbot_semantic_cache (id, query, embedding, "toolSignatureHash", "ttlDays", response, "hitCount", "createdAt", "updatedAt")
+          VALUES (gen_random_uuid(), ${standaloneQuery}, ${JSON.stringify(currentEmbedding)}::vector, ${finalToolSignatureHash}, ${ttlDays}, ${JSON.stringify(result)}::jsonb, 0, NOW(), NOW())
+        `.catch(e => console.warn("[Chatbot] Lỗi lưu Cache (Short-circuit):", e));
+      }
+
+      return result;
     } else {
       break;
     }
@@ -409,7 +465,7 @@ Khi khách hàng hỏi về chính sách, bạn phải tuân thủ:
       const isVolatile = toolsUsed.some(t => t === "get_product_detail" || t === "get_active_promotions");
       const ttlDays = isVolatile ? 1 : null;
 
-      const finalToolSignatureString = JSON.stringify(allToolCalls.map(t => ({ name: t.name, args: t.args || {} })));
+      const finalToolSignatureString = JSON.stringify(allToolCalls.map(t => ({ name: t.name, args: canonicalizeArgs(t.args || {}) })));
       const finalToolSignatureHash = crypto.createHash('sha256').update(finalToolSignatureString).digest('hex');
       
       prisma.$executeRaw`
