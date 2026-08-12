@@ -211,7 +211,7 @@ export const executeSearchProducts = async (
         SELECT id FROM products 
         WHERE "deletedAt" IS NULL 
           AND id IN (${Prisma.join(candidateIds)})
-          AND (name ILIKE ${'%' + k + '%'} OR similarity(name, ${k}) > 0.3)
+          AND name ILIKE ${'%' + k + '%'}
         ORDER BY similarity(name, ${k}) DESC
         LIMIT ${takeCount}
       `;
