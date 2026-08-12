@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres} # Lấy từ .env
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-web_db}
+      POSTGRES_DB: ${POSTGRES_DB:-chocongnghe}
     ports:
       - "5432:5432" # Chỉ expose nếu dev local; production nên remove
     volumes:

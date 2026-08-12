@@ -47,6 +47,7 @@ import uploadRoutes from "@/app/modules/upload/upload.route";
 import { chatbotRoute } from "@/app/modules/chatbot/chatbot.route";
 import { aiContentRoute } from "@/app/modules/ai-content/ai-content.route";
 import aiCompareRouter from "@/app/modules/ai-compare/ai-compare.router";
+import trendForecastRouter from "@/app/modules/trend-forecast/trend-forecast.route";
 
 // ===== Admin =====
 import analyticsRouter from "@/app/modules/analytics/analytics.route";
@@ -124,6 +125,7 @@ router.use("/upload", uploadRoutes);
 router.use("/chatbot", chatbotRoute);
 router.use("/ai-content", aiContentRoute);
 router.use("/ai-compare", aiCompareRouter);
+router.use("/trend-forecast", trendForecastRouter);
 
 // ===== Admin =====
 router.use("/analytics", analyticsRouter);
