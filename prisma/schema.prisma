@@ -1085,3 +1085,26 @@ enum AuditAction {
   EXPORT
 }
 
+model search_query_logs {
+  id          String   @id @default(uuid()) @db.Uuid
+  query       String
+  userId      String?  @db.Uuid
+  resultCount Int
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([query])
+}
+
+model demand_forecasts {
+  id             String   @id @default(uuid()) @db.Uuid
+  keyword        String?
+  productId      String?  @db.Uuid
+  period         String
+  forecastScore  Float
+  suggestedAction String
+  reasoning      String
+  generatedAt    DateTime @default(now())
+
+  @@index([generatedAt])
+}
