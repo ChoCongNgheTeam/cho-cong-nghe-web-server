@@ -1,0 +1,98 @@
+paths:
+  /trend-forecast:
+    get:
+      summary: Lấy danh sách dự báo xu hướng mới nhất
+      tags: [Trend Forecast]
+      security:
+        - bearerAuth: []
+      servers:
+        - url: "/api"
+      responses:
+        "200":
+          description: Lấy dự báo xu hướng thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Lấy dự báo xu hướng thành công
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        keyword:
+                          type: string
+                          example: "iphone 16 pro max"
+                        forecastScore:
+                          type: number
+                          example: 95
+                        suggestedAction:
+                          type: string
+                          example: "Nhập hàng ngay lập tức"
+                        reasoning:
+                          type: string
+                          example: "Lượt tìm kiếm đạt mức cực cao..."
+                        period:
+                          type: string
+                          example: "LAST_7_DAYS"
+                        generatedAt:
+                          type: string
+                          format: date-time
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden (Requires canAnalytics permission)
+
+  /trend-forecast/generate:
+    post:
+      summary: Yêu cầu AI tổng hợp dữ liệu và tạo dự báo mới
+      tags: [Trend Forecast]
+      security:
+        - bearerAuth: []
+      servers:
+        - url: "/api"
+      requestBody:
+        description: Thông tin khoảng thời gian muốn AI phân tích
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                days:
+                  type: number
+                  description: "Số ngày phân tích (Mặc định: 7)"
+                  example: 7
+      responses:
+        "200":
+          description: Tạo dự báo xu hướng thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Tạo dự báo xu hướng thành công
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        keyword:
+                          type: string
+                        forecastScore:
+                          type: number
+                        suggestedAction:
+                          type: string
+                        reasoning:
+                          type: string
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden (Requires canAnalytics permission)
+        "500":
+          description: Lỗi Server / Lỗi gọi model AI

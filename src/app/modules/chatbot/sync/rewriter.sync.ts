@@ -2,7 +2,7 @@ import { ChatMessage } from "../chatbot.types";
 import { env } from "@/config/env";
 import axios from "axios";
 
-const FIREWORKS_MODEL = "accounts/fireworks/models/gpt-oss-120b";
+const FIREWORKS_MODEL = "accounts/fireworks/routers/glm-5p2-fast";
 const FIREWORKS_API_URL = "https://api.fireworks.ai/inference/v1/chat/completions";
 
 /**
