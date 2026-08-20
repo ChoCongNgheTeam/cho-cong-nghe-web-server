@@ -14,11 +14,25 @@ import { Resend } from "resend";
  * nên auth.service.ts và các nơi khác KHÔNG cần sửa gì thêm.
  */
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-init: trước đây `new Resend(...)` chạy ngay lúc module được import
+// (top-level), nên nếu thiếu RESEND_API_KEY, việc import module này — và do
+// đó TOÀN BỘ APP (auth.service.ts import email.service.ts ở top-level) —
+// crash ngay lúc khởi động, kể cả khi request không hề gửi email. Giờ chỉ
+// khởi tạo client khi thực sự cần gửi mail, và báo lỗi rõ ràng lúc đó.
+let resend: Resend | null = null;
+function getResendClient(): Resend {
+  if (!resend) {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY chưa được cấu hình — không thể gửi email.");
+    }
+    resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resend;
+}
 
 // Helper dùng chung cho mọi email, có log lỗi rõ ràng để dễ debug trên Render
 const sendMail = async (opts: { to: string; subject: string; html: string }) => {
-  const { data, error } = await resend.emails.send({
+  const { data, error } = await getResendClient().emails.send({
     from: process.env.SMTP_FROM || "Cho Cong Nghe <onboarding@resend.dev>",
     to: opts.to,
     subject: opts.subject,

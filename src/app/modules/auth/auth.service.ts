@@ -28,9 +28,8 @@ import {
   isKnownDevice,
 } from "./auth.repository";
 import { sendResetPasswordEmail, sendVerificationEmail, sendNewDeviceLoginAlert } from "@/integrations/email.service";
-import { forgotPasswordRateLimit } from "@/utils/rateLimiter";
 import { Request } from "express";
-import prisma from "prisma/client";
+import prisma from "@/config/db";
 import { sendWelcomeVoucherNotification } from "@/app/modules/notification/notification.service";
 import { buildSessionMeta } from "./session.util";
 import { auditLoginHistory } from "@/app/modules/audit/audit.logger";
@@ -263,12 +262,14 @@ export const logout = async (refreshToken: string) => {
 
 // ─── Forgot Password ──────────────────────────────────────────────────────────
 
-export const forgotPassword = async (email: string, req: Request) => {
-  forgotPasswordRateLimit(req);
+// _req giữ lại tham số cho tương thích ngược với call site (auth.controller.ts);
+// rate-limit đã chuyển hẳn sang forgotPasswordLimiter (express-rate-limit) ở
+// tầng route — xem auth.route.ts + utils/rateLimiter.ts.
+export const forgotPassword = async (email: string, _req: Request) => {
   const user = await findByEmail(email);
   if (!user) return { message: "Nếu email tồn tại, link reset đã được gửi" };
 
-  const resetToken = jwt.sign({ userId: user.id }, jwtConfig.resetToken.secret, {
+  const resetToken = jwt.sign({ userId: user.id, type: "reset" }, jwtConfig.resetToken.secret, {
     expiresIn: jwtConfig.resetToken.expiresIn,
   });
   await createPasswordResetToken(user.id, resetToken, new Date(Date.now() + 60 * 60 * 1000));
@@ -283,10 +284,14 @@ export const forgotPassword = async (email: string, req: Request) => {
 
 export const resetPassword = async (input: ResetPasswordInput) => {
   const { token, password } = input;
-  let decoded: { userId: string };
+  let decoded: { userId: string; type?: string };
   try {
-    decoded = jwt.verify(token, jwtConfig.resetToken.secret) as { userId: string };
+    decoded = jwt.verify(token, jwtConfig.resetToken.secret) as { userId: string; type?: string };
   } catch {
+    throw new BadRequestError("Token không hợp lệ hoặc đã hết hạn");
+  }
+
+  if (decoded.type !== "reset") {
     throw new BadRequestError("Token không hợp lệ hoặc đã hết hạn");
   }
 

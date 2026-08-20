@@ -1,8 +1,7 @@
 
-import { PrismaClient } from "@prisma/client";
+import prisma from "@/config/db";
 import { executeWithGeminiRotation } from "@/utils/gemini.util";
 
-const prisma = new PrismaClient();
 
 /**
  * Tạo vector embedding từ văn bản (Sử dụng Gemini text-embedding-004)

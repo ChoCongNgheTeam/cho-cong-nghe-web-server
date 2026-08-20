@@ -3,16 +3,22 @@ import { authMiddleware } from "@/app/middlewares/auth.middleware";
 import { requireRole } from "@/app/middlewares/role.middleware";
 import { validate } from "@/app/middlewares/validate.middleware";
 import { asyncHandler } from "@/utils/async-handler";
+import { verifyShippingWebhookSecret } from "./shipping.webhook-auth";
 import * as c from "./shipping.controller";
 import { shipmentQuerySchema, eligibleOrdersQuerySchema, createShipmentSchema, bulkCreateShipmentSchema, bulkPrintLabelQuerySchema, upsertShippingProviderSchema } from "./shipping.validation";
 import { STAFF_ROLES } from "@/app/modules/staff-permissions/staff-permissions.types";
 
 const router = Router();
 
-// ================== WEBHOOK (public — provider gọi vào, không có auth) ==================
-// Lưu ý bảo mật: nên xác thực chữ ký/IP whitelist theo từng provider trước khi lên production.
-// TODO: thêm xác thực request (VD: GHN gửi kèm Token header riêng cho webhook, có thể verify ở đây).
-router.post("/webhook/:providerCode", asyncHandler(c.providerWebhookHandler));
+// ================== WEBHOOK (public — provider gọi vào, không có auth Bearer) ==================
+// Các provider vận chuyển (GHN/GHTK/VTP) không có chuẩn HMAC signature thống nhất
+// cho webhook. Cách phổ biến và được các provider hỗ trợ là nhúng 1 shared-secret
+// tự chọn ngay trong URL webhook cấu hình trên dashboard của từng provider, VD:
+//   https://api.example.com/api/v1/shipping/webhook/GHN?secret=<SHIPPING_WEBHOOK_SECRET_GHN>
+// verifyShippingWebhookSecret() so khớp secret này (timing-safe) trước khi xử lý.
+// Bắt buộc phải set secret trong .env VÀ trong URL webhook trên dashboard của
+// từng provider trước khi lên production — xem ghi chú trong middleware.
+router.post("/webhook/:providerCode", verifyShippingWebhookSecret, asyncHandler(c.providerWebhookHandler));
 
 // ================== ADMIN ==================
 router.use("/admin", authMiddleware(true), requireRole(...STAFF_ROLES, "ADMIN"));

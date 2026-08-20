@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { authMiddleware, requirePermission } from "@/app/middlewares/auth.middleware";
+import { validate } from "@/app/middlewares/validate.middleware";
+import { generateForecastSchema } from "./trend-forecast.validation";
 import { getForecastsHandler, generateForecastHandler } from "./trend-forecast.controller";
 
 const router = Router();
@@ -8,6 +10,12 @@ const router = Router();
 router.get("/", authMiddleware(), requirePermission("canAnalytics"), getForecastsHandler);
 
 // Tạo dự báo mới (trigger bằng tay)
-router.post("/generate", authMiddleware(), requirePermission("canAnalytics"), generateForecastHandler);
+router.post(
+  "/generate",
+  authMiddleware(),
+  requirePermission("canAnalytics"),
+  validate(generateForecastSchema, "body"),
+  generateForecastHandler
+);
 
 export default router;

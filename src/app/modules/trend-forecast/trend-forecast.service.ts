@@ -1,7 +1,22 @@
 import prisma from "../../../config/db";
+import { Prisma } from "@prisma/client";
 import { executeWithFireworks } from "../../../utils/fireworks.util";
 
 class TrendForecastService {
+  /**
+   * Validate/clamp the "days" window used in raw SQL date-range filters.
+   * Defence in depth: even though callers should already validate via the
+   * route-level zod schema, we never trust a number this deep into raw SQL
+   * without re-checking it's a safe finite positive integer within bounds.
+   */
+  private static sanitizeDays(days: number): number {
+    const n = Number(days);
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) {
+      return 7;
+    }
+    return Math.min(n, 365);
+  }
+
   /**
    * Log search query to database (raw SQL to bypass Prisma client limitations during testing)
    */
@@ -12,10 +27,10 @@ class TrendForecastService {
       const q = query.trim().toLowerCase();
       
       // Use raw SQL because search_query_logs might not be generated in Prisma client yet
-      await prisma.$executeRawUnsafe(`
+      await prisma.$executeRaw`
         INSERT INTO "search_query_logs" ("query", "userId", "resultCount", "createdAt")
-        VALUES ($1, $2, $3, NOW())
-      `, q, userId || null, resultCount);
+        VALUES (${q}, ${userId || null}, ${resultCount}, NOW())
+      `;
       
     } catch (error) {
       console.error("[TrendForecastService] Error logging search query:", error);
@@ -26,18 +41,20 @@ class TrendForecastService {
    * Get search trends for the last N days
    */
   async getSearchTrends(days: number = 7) {
-    // Raw SQL to get top 20 keywords with highest searches
-    const result = await prisma.$queryRawUnsafe<any[]>(`
+    const safeDays = TrendForecastService.sanitizeDays(days);
+    // Parameterized raw SQL (days is validated to be a safe positive integer,
+    // and passed as a bound parameter rather than string-interpolated).
+    const result = await prisma.$queryRaw<any[]>`
       SELECT 
         "query", 
         COUNT(*) as "searchCount", 
         MIN("resultCount") as "minResultCount"
       FROM "search_query_logs"
-      WHERE "createdAt" >= NOW() - INTERVAL '${days} days'
+      WHERE "createdAt" >= NOW() - (${safeDays} || ' days')::interval
       GROUP BY "query"
       ORDER BY "searchCount" DESC
       LIMIT 20
-    `);
+    `;
     
     // Format BigInt from Prisma raw query to Number
     return result.map(row => ({
@@ -51,12 +68,14 @@ class TrendForecastService {
    * Get enriched search trends (including product matches and sales)
    */
   async getEnrichedSearchTrends(days: number = 7) {
-    const searchTrends = await this.getSearchTrends(days);
+    const safeDays = TrendForecastService.sanitizeDays(days);
+    const searchTrends = await this.getSearchTrends(safeDays);
     
     const enrichedData = [];
     for (const item of searchTrends) {
       // Find products matching keyword and their sales in the period
-      const matchedProducts = await prisma.$queryRawUnsafe<any[]>(`
+      // (safeDays is a validated positive integer, bound as a parameter below)
+      const matchedProducts = await prisma.$queryRaw<any[]>`
         SELECT 
           p."id" as "productId",
           p."name" as "productName",
@@ -66,12 +85,12 @@ class TrendForecastService {
         LEFT JOIN "order_items" oi ON oi."productVariantId" = pv."id"
         LEFT JOIN "orders" o ON oi."orderId" = o."id" 
              AND o."orderStatus" != 'CANCELLED' 
-             AND o."orderDate" >= NOW() - INTERVAL '${days} days'
-        WHERE p."name" ILIKE $1
+             AND o."orderDate" >= NOW() - (${safeDays} || ' days')::interval
+        WHERE p."name" ILIKE ${`%${item.query}%`}
         GROUP BY p."id", p."name"
         ORDER BY "totalSoldInPeriod" DESC
         LIMIT 3
-      `, `%${item.query}%`);
+      `;
 
       enrichedData.push({
         keyword: item.query,
@@ -91,6 +110,8 @@ class TrendForecastService {
    * Generate forecast using AI (Single Pass)
    */
   async generateForecast(days: number = 7) {
+    const safeDays = TrendForecastService.sanitizeDays(days);
+    days = safeDays;
     const enrichedSearchTrends = await this.getEnrichedSearchTrends(days);
 
     if (enrichedSearchTrends.length === 0) {
@@ -150,16 +171,18 @@ Dựa trên dữ liệu trên, hãy phân tích và trả về mảng JSON dự 
 
       const forecasts = JSON.parse(jsonString);
 
-      // Xóa dự báo cũ của đợt trước
-      await prisma.$executeRawUnsafe(`DELETE FROM "demand_forecasts"`);
+      // Xóa dự báo cũ và lưu dự báo mới trong 1 transaction để tránh mất dữ liệu
+      // nếu có lỗi giữa chừng (VD: 1 phần tử forecast bị AI trả sai định dạng).
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.$executeRaw`DELETE FROM "demand_forecasts"`;
 
-      // Lưu dự báo mới vào DB
-      for (const forecast of forecasts) {
-        await prisma.$executeRawUnsafe(`
-          INSERT INTO "demand_forecasts" ("keyword", "period", "forecastScore", "suggestedAction", "reasoning", "generatedAt")
-          VALUES ($1, $2, $3, $4, $5, NOW())
-        `, forecast.keyword || "", `LAST_${days}_DAYS`, forecast.forecastScore || 0, forecast.suggestedAction || "", forecast.reasoning || "");
-      }
+        for (const forecast of forecasts) {
+          await tx.$executeRaw`
+            INSERT INTO "demand_forecasts" ("keyword", "period", "forecastScore", "suggestedAction", "reasoning", "generatedAt")
+            VALUES (${forecast.keyword || ""}, ${`LAST_${days}_DAYS`}, ${forecast.forecastScore || 0}, ${forecast.suggestedAction || ""}, ${forecast.reasoning || ""}, NOW())
+          `;
+        }
+      });
 
       return forecasts;
     } catch (error) {
@@ -172,10 +195,10 @@ Dựa trên dữ liệu trên, hãy phân tích và trả về mảng JSON dự 
    * Get latest forecasts
    */
   async getLatestForecasts() {
-    const result = await prisma.$queryRawUnsafe<any[]>(`
+    const result = await prisma.$queryRaw<any[]>`
       SELECT * FROM "demand_forecasts"
       ORDER BY "forecastScore" DESC
-    `);
+    `;
     return result;
   }
 }

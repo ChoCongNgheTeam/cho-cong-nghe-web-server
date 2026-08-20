@@ -27,9 +27,8 @@ import { executeWithGeminiRotation } from "@/utils/gemini.util";
 import { generateEmbedding } from "./sync/embedding.sync";
 import { rewriteQueryWithContext } from "./sync/rewriter.sync";
 import crypto from "crypto";
-import { PrismaClient } from "@prisma/client";
+import prisma from "@/config/db";
 
-const prisma = new PrismaClient();
 
 const MAX_TOOL_ROUNDS = 3;
 

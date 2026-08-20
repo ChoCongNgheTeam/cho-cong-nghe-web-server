@@ -1,4 +1,5 @@
 import express from "express";
+import crypto from "crypto";
 import cors from "cors";
 import routes from "./routes/v1";
 
@@ -56,9 +57,18 @@ app.use(
 // }
 
 app.post("/cron/cleanup-refresh-tokens", async (req, res) => {
-  const auth = req.headers.authorization;
+  const auth = req.headers.authorization || "";
+  const expected = `Bearer ${process.env.CRON_SECRET || ""}`;
 
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  // So sánh timing-safe để tránh timing attack dò từng ký tự CRON_SECRET.
+  const authBuf = Buffer.from(auth);
+  const expectedBuf = Buffer.from(expected);
+  const isValid =
+    !!process.env.CRON_SECRET &&
+    authBuf.length === expectedBuf.length &&
+    crypto.timingSafeEqual(authBuf, expectedBuf);
+
+  if (!isValid) {
     return res.status(403).json({ message: "Forbidden" });
   }
 
@@ -77,11 +87,6 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
-app.get("/test-cleanup", async (req, res) => {
-  await cleanupRefreshTokens();
-  res.send("Cleanup done");
-});
 
 app.get("/", (req, res) => {
   res.json({

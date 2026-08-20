@@ -8,7 +8,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { OAuthResolvedUser } from "./oauth.types";
 import { sendWelcomeVoucherNotification } from "@/app/modules/notification/notification.service";
-import prisma from "prisma/client";
+import prisma from "@/config/db";
 import { buildSessionMeta } from "../session.util";
 
 // ─── Types ────────────────────────────────────────────────────────────────────

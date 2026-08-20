@@ -2,7 +2,7 @@ import prisma from "@/config/db";
 import { Prisma, OrderStatus, PaymentStatus } from "@prisma/client";
 import { CheckoutSummary } from "./checkout.types";
 import { PaymentFields } from "./payment-info.builder";
-import { NotFoundError } from "@/errors";
+import { NotFoundError, BadRequestError } from "@/errors";
 import { applyStockMovementTx } from "@/app/modules/inventory/inventory.repository";
 import { getDefaultWarehouseId } from "@/app/modules/warehouse/warehouse.repository";
 
@@ -113,14 +113,23 @@ export const executeOrderTransaction = async (userId: string, checkoutSummary: C
     });
 
     // 2. Trừ tồn kho Variant và cập nhật lượt bán Product
-    await Promise.all(
-      checkoutSummary.items.map((item) =>
-        tx.products_variants.update({
-          where: { id: item.productVariantId },
-          data: { quantity: { decrement: item.quantity }, soldCount: { increment: item.quantity } },
-        }),
-      ),
-    );
+    //
+    // AN TOÀN VỚI RACE CONDITION: dùng updateMany với điều kiện WHERE
+    // quantity >= số lượng mua, để Postgres tự đảm bảo atomic tại tầng
+    // UPDATE...WHERE (được evaluate lại đúng lúc ghi, trong transaction).
+    // Trước đây dùng update() + decrement vô điều kiện — không có ràng buộc
+    // nào chặn quantity xuống âm, nên 2 người mua đồng thời sản phẩm sắp hết
+    // hàng có thể khiến tồn kho âm (oversell). Nếu updateMany trả về count=0
+    // nghĩa là không đủ hàng tại thời điểm này → rollback toàn bộ transaction.
+    for (const item of checkoutSummary.items) {
+      const updated = await tx.products_variants.updateMany({
+        where: { id: item.productVariantId, quantity: { gte: item.quantity } },
+        data: { quantity: { decrement: item.quantity }, soldCount: { increment: item.quantity } },
+      });
+      if (updated.count === 0) {
+        throw new BadRequestError(`Sản phẩm "${item.productName || item.productVariantId}" không đủ hàng tồn kho (còn lại không đủ ${item.quantity})`);
+      }
+    }
 
     // 2b. Ghi nhận biến động tồn kho theo kho (stock_movements) — best-effort:
     // nếu hệ thống chưa cấu hình kho nào thì bỏ qua, không chặn checkout.

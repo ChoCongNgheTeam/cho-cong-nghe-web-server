@@ -1,4 +1,4 @@
-import prisma from "prisma/client";
+import prisma from "@/config/db";
 
 /** Lấy tất cả categories (flat) kèm attributes đang liên kết */
 export const findAllCategoriesWithAttributes = async () => {

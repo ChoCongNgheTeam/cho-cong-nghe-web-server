@@ -10,11 +10,24 @@ const IMAGE_SIZE_LIMIT = 5 * 1024 * 1024; // 5MB
 const allowedImageMimes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 const allowedImageExts = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
 
-/** Filter chỉ cho phép ảnh, dùng cho hầu hết các entity */
-function createImageFilter(entityName: string) {
+/**
+ * Filter chỉ cho phép ảnh, dùng cho hầu hết các entity.
+ *
+ * Trước đây chỉ check `file.mimetype.startsWith("image/")` — mimetype do
+ * CLIENT tự khai báo trong multipart request nên giả mạo được hoàn toàn
+ * (VD: gửi file "shell.php" kèm Content-Type "image/jpeg" là qua filter).
+ * Giờ check cả extension VÀ mimetype (AND), giống pattern của productUpload
+ * bên dưới. Extension thực tế lưu trên đĩa vẫn do server tự suy ra từ mime
+ * (xem multerStorage.ts) chứ không lấy từ originalname, để phòng thủ theo
+ * chiều sâu ngay cả khi filter này có sai sót.
+ */
+export function createImageFilter(entityName: string) {
   return (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
-    if (!file.mimetype.startsWith("image/")) {
-      return cb(new Error(`${entityName} chỉ cho phép upload ảnh`));
+    const ext = path.extname(file.originalname).toLowerCase();
+    const mime = file.mimetype.toLowerCase();
+
+    if (!allowedImageExts.includes(ext) || !allowedImageMimes.includes(mime)) {
+      return cb(new Error(`${entityName} chỉ cho phép upload ảnh jpg, jpeg, png, gif, webp`));
     }
     cb(null, true);
   };

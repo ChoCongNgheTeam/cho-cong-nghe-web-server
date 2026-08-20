@@ -1,8 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import prisma from "@/config/db";
 import { ChatMessage } from "./chatbot.types";
 import { executeWithGeminiRotation } from "@/utils/gemini.util";
 import { generateEmbedding } from "./sync/embedding.sync";
-const prisma = new PrismaClient();
 
 export const memoryService = {
   // 1. Lưu Session & Quản lý Sliding Window (Tầng 1)

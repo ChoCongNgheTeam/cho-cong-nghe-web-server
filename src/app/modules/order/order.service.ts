@@ -366,13 +366,22 @@ export const createOrderAdmin = async (input: CreateOrderAdminInput) => {
     for (const item of items) {
       const variant = await tx.products_variants.findUnique({ where: { id: item.productVariantId } });
       if (!variant) throw new BadRequestError(`Biến thể SP ${item.productVariantId} không tồn tại`);
-      if (variant.quantity < item.quantity) throw new BadRequestError(`Không đủ tồn kho cho biến thể ${variant.code}`);
 
       subtotalAmount += Number(item.unitPrice) * item.quantity;
-      await tx.products_variants.update({
-        where: { id: item.productVariantId },
+
+      // AN TOÀN VỚI RACE CONDITION: check "variant.quantity < item.quantity" ở
+      // trên rồi mới update riêng là check-then-act (TOCTOU) — giữa 2 bước đó,
+      // 1 transaction khác (VD: checkout của khách hàng) có thể đã trừ tồn kho
+      // trước, khiến update() vẫn chạy decrement vô điều kiện và đẩy quantity
+      // xuống âm. Dùng updateMany với where quantity >= item.quantity để
+      // Postgres tự đảm bảo atomic ngay tại câu UPDATE.
+      const updated = await tx.products_variants.updateMany({
+        where: { id: item.productVariantId, quantity: { gte: item.quantity } },
         data: { quantity: { decrement: item.quantity }, soldCount: { increment: item.quantity } },
       });
+      if (updated.count === 0) {
+        throw new BadRequestError(`Không đủ tồn kho cho biến thể ${variant.code}`);
+      }
       orderItemsData.push({ productVariantId: item.productVariantId, quantity: item.quantity, unitPrice: item.unitPrice });
     }
 

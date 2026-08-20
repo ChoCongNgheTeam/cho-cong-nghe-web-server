@@ -1,7 +1,7 @@
-import { PrismaClient, Prisma, CampaignType } from "@prisma/client";
+import { Prisma, CampaignType } from "@prisma/client";
+import prisma from "@/config/db";
 import { CreateCampaignInput, UpdateCampaignInput, ListCampaignsQuery, CampaignCategoryInput, UpdateCampaignCategoryInput } from "./campaign.validation";
 
-const prisma = new PrismaClient();
 
 // ── Query builders ─────────────────────────────────────────────────────────────
 

@@ -12,7 +12,20 @@ import { Request, Response } from "express";
 import Stripe from "stripe";
 import { redirectToFrontend } from "../../payment.service";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+// Lazy-init: `new Stripe(undefined)` throw ngay lúc module load nếu thiếu
+// STRIPE_SECRET_KEY. app.ts import stripeWebhookHandler trực tiếp ở top-level
+// → nếu eager-init, THIẾU BIẾN NÀY LÀ SẬP TOÀN BỘ SERVER lúc khởi động, kể cả
+// khi không có request Stripe nào. Chỉ khởi tạo client khi thực sự cần dùng.
+let stripe: Stripe | null = null;
+function getStripeClient(): Stripe {
+  if (!stripe) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error("STRIPE_SECRET_KEY chưa được cấu hình — không thể dùng Stripe.");
+    }
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  }
+  return stripe;
+}
 
 // Create PaymentIntent
 // ⚠️  Không còn gọi prisma.orders.update ở đây nữa.
@@ -32,7 +45,7 @@ export const createStripePaymentIntent = async (orderId: string, _clientAmount: 
 
   const amount = Number(order.totalAmount);
 
-  const paymentIntent = await stripe.paymentIntents.create({
+  const paymentIntent = await getStripeClient().paymentIntents.create({
     amount: Math.round(amount),
     currency,
     metadata: { orderId },
@@ -55,7 +68,7 @@ export const handleStripeWebhook = async (req: Request) => {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET!);
+    event = getStripeClient().webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET!);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "unknown error";
     throw new BadRequestError(`Stripe webhook signature invalid: ${message}`);
